@@ -1,0 +1,95 @@
+---
+title: "Load Balancer Introduction"
+---
+
+One server is a single point of failure and a single point of overload. It works fine until the night it doesn't - too much traffic, or the box simply dies, and your whole site goes with it. A **load balancer** is the fix: it sits in front of several servers and spreads incoming requests across all of them.
+
+## The problem, drawn
+
+```text
+   Without a load balancer            With a load balancer
+   ───────────────────────            ─────────────────────
+                                              ┌──► Server A
+   All users ──► one server          Users ──►│ LB ├──► Server B
+                  (overloaded,                 └──► Server C
+                   or it dies → outage)        (spread + survives a failure)
+```
+
+A load balancer gives you two things at once: **scale** (many servers share the work) and **availability** (if one server dies, the rest keep serving).
+
+## What a load balancer actually does
+
+It's a traffic cop standing at the entrance to your application:
+
+1. Accepts every incoming request at **one stable address**.
+2. Decides which healthy backend server should handle it.
+3. Forwards the request and returns the response.
+4. Continuously **health-checks** the servers and stops sending traffic to any that fail.
+
+That single stable address is a big deal: clients connect to the load balancer, never to individual servers. Servers can be added, removed, replaced, or can crash - and clients never notice, because they only ever talked to the load balancer.
+
+## Health checks: the quiet hero
+
+The feature that turns "spreading traffic" into "high availability" is the **health check**. The load balancer regularly pings each server (e.g. `GET /health`). If a server stops responding, it's marked **unhealthy** and pulled out of rotation automatically - no traffic goes to a dead box.
+
+```text
+   LB health-checks every few seconds:
+     Server A → 200 OK   keep sending traffic
+     Server B → 200 OK   
+     Server C → timeout  remove from rotation
+                         (add back automatically when it recovers)
+```
+
+This is what lets you survive a server failure with zero downtime - and what makes rolling deployments and auto scaling safe.
+
+## The types of AWS load balancer
+
+AWS calls the service **Elastic Load Balancing (ELB)** and offers a few flavours. Pick by what kind of traffic you're balancing:
+
+| Type | Operates at | Best for |
+|------|-------------|----------|
+| **Application Load Balancer (ALB)** | Layer 7 (HTTP/HTTPS) | Web apps, APIs, content/path-based routing |
+| **Network Load Balancer (NLB)** | Layer 4 (TCP/UDP) | Extreme performance, low latency, non-HTTP |
+| **Gateway Load Balancer (GWLB)** | Layer 3/4 | Routing through virtual appliances (firewalls, etc.) |
+
+(There's also the older **Classic Load Balancer**, now legacy - don't reach for it in new designs.)
+
+The next page explains what "Layer 7" and "Layer 4" mean, but the short version:
+
+- **ALB** understands HTTP. It can read the URL path and route `/api` to one set of servers and `/images` to another. This is the one you'll use for web apps and the one we build hands-on.
+- **NLB** is a raw, blazing-fast TCP/UDP forwarder. It doesn't understand HTTP - it just moves packets, extremely fast.
+
+<Callout type="info">
+For 90% of web workloads, the answer is **ALB.** Reach for NLB only when you need millions of requests per second at the lowest possible latency, static IPs, or you're balancing non-HTTP protocols. When in doubt, ALB.
+</Callout>
+
+## Where the load balancer sits
+
+A load balancer lives across **multiple Availability Zones**, which is how it delivers real resilience:
+
+```text
+   Region
+   ┌──────────────────────────────────────────────┐
+   │           Load Balancer (spans AZs)            │
+   │             /                    \             │
+   │      AZ-a  ▼                  AZ-b ▼           │
+   │     Server A1, A2            Server B1, B2     │
+   └──────────────────────────────────────────────┘
+   An entire AZ can fail and the LB shifts traffic to the other.
+```
+
+This is the concrete version of the "always spread across at least two AZs" rule from the fundamentals section. The load balancer is the piece that makes multi-AZ actually pay off.
+
+## What you get, in one list
+
+- **No single point of failure** - lose a server (or a whole AZ) and stay up.
+- **Horizontal scale** - add servers to handle more traffic; the LB spreads it.
+- **One stable endpoint** - clients hit the LB's DNS name; backends come and go freely.
+- **Automatic recovery** - unhealthy servers are removed and re-added without you.
+- **TLS termination** - the ALB can handle HTTPS certificates, so backends can speak plain HTTP internally.
+
+<Callout type="warn">
+A load balancer spreads traffic, but it doesn't *create* capacity. If all your servers are overloaded, the LB just spreads the overload evenly. To actually add and remove servers in response to demand, you pair it with **Auto Scaling** - which is exactly where this section is headed.
+</Callout>
+
+Next: a quick, beginner-friendly tour of the networking layers - so "Layer 4 vs Layer 7" stops being jargon.

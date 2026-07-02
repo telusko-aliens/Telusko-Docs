@@ -1,0 +1,85 @@
+---
+title: "AWS Networking Layers for Beginners"
+---
+
+"Layer 4 load balancer," "Layer 7 routing," "it's a Layer 3 thing" - AWS docs throw these numbers around constantly. They come from the **OSI model**, a way of slicing networking into layers, each building on the one below. You don't need to memorize all seven. You need to understand a handful - and especially the difference between Layer 4 and Layer 7, because that one decision shapes which load balancer you pick.
+
+## The model, top to bottom
+
+Networking is layered like a postal system: the layer that writes the letter doesn't care how the truck drives. Each layer trusts the one beneath it.
+
+```text
+   Layer 7  Application   HTTP, HTTPS, DNS    ← what your app speaks
+   Layer 6  Presentation  TLS, encoding
+   Layer 5  Session       connections/state
+   Layer 4  Transport     TCP, UDP, ports     ← "is the pipe reliable?"
+   Layer 3  Network       IP addresses        ← "where is it going?"
+   Layer 2  Data Link     MAC, switches
+   Layer 1  Physical      cables, signals
+```
+
+For AWS, three layers do almost all the talking: **3, 4, and 7.**
+
+## The three layers that matter in AWS
+
+### Layer 3 - Network (IP addresses)
+
+This is the layer of **IP addresses and routing** - "which machine, and how do packets get there?" In AWS, this is the world of **VPCs, subnets, route tables, and the private/public IPs** you met earlier. When you design a network, you're working at Layer 3.
+
+### Layer 4 - Transport (TCP/UDP and ports)
+
+This layer is about **ports and the transport protocol** - TCP (reliable, ordered) or UDP (fast, fire-and-forget) - plus port numbers like 80, 443, 22, 3306. A Layer 4 device sees "TCP traffic on port 443 heading to this IP" but **not** what's inside. It doesn't know if it's a web page, an API call, or a file.
+
+### Layer 7 - Application (HTTP and friends)
+
+The top layer is where **HTTP, HTTPS, and your application's actual content** live. A Layer 7 device can read the **URL path, headers, cookies, and host name**. It knows the request is `GET /api/users` with a `Host: shop.example.com` header - not just "some bytes on port 443."
+
+## Why this matters: Layer 4 vs Layer 7 load balancers
+
+This is the whole payoff. AWS load balancers operate at different layers, and that determines what they can *do*:
+
+| | Network Load Balancer (Layer 4) | Application Load Balancer (Layer 7) |
+|---|--------------------------------|-------------------------------------|
+| **Sees** | IP + port + protocol | Full HTTP: paths, headers, host, cookies |
+| **Can route by** | Just "forward this TCP/UDP" | URL path, hostname, headers, method |
+| **Speed** | Extremely fast, ultra-low latency | Slightly more work (it inspects content) |
+| **Use for** | Raw TCP/UDP, millions of req/s | Web apps, APIs, smart routing |
+
+```text
+   Layer 4 (NLB):  "TCP on port 443 → pick any backend"
+                   (blind to content - just moves packets fast)
+
+   Layer 7 (ALB):  "GET /api/*   → API servers
+                    GET /images/* → image servers
+                    Host: admin.* → admin servers"
+                   (reads the request and routes intelligently)
+```
+
+Because the ALB understands HTTP, it can do **content-based routing** - sending `/api` to one group of servers and `/static` to another, all behind one address. The NLB can't; it just forwards packets blazingly fast.
+
+<Callout type="info">
+A simple way to remember it: **Layer 4 routes the envelope; Layer 7 reads the letter.** If your routing decisions depend on what's *in* the request (the URL, the host, a header), you need Layer 7 - an ALB. If you just need to forward raw connections as fast as possible, Layer 4 - an NLB - is enough.
+</Callout>
+
+## Where security groups and NACLs fit
+
+The networking tools you've already met map onto these layers too:
+
+- **Security groups** filter by protocol and port (Layer 4) and IP (Layer 3) - "allow TCP 443 from anywhere."
+- **NACLs** are also Layer 3/4 - IP and port rules at the subnet level.
+- **ALB rules** work at Layer 7 - "route this *path* to that target group."
+
+So you secure the lower layers with security groups, and route intelligently at the top layer with an ALB.
+
+## You don't need the rest (yet)
+
+Layers 1, 2, 5, and 6 exist and matter to network engineers, but as someone building on AWS you'll rarely touch them directly:
+
+- **Layer 1/2** (cables, switches, MAC) - AWS owns the physical network; you never see it.
+- **Layer 5/6** (sessions, TLS encoding) - mostly handled for you; TLS, for instance, is something the ALB terminates on your behalf.
+
+<Callout type="warn">
+Don't get lost memorizing all seven layers for an exam-style recall. The practical knowledge is: **Layer 3 = IPs/VPC, Layer 4 = ports/TCP/UDP, Layer 7 = HTTP content.** That trio explains security groups, both load balancer types, and most AWS networking conversations you'll have.
+</Callout>
+
+With the layers clear, the next page gets hands-on with the Layer 7 workhorse: the Application Load Balancer and target groups.

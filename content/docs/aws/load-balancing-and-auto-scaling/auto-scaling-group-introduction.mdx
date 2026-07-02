@@ -1,0 +1,99 @@
+---
+title: "Auto Scaling Group Introduction"
+---
+
+A load balancer spreads traffic across the servers you have. It can't conjure new ones when demand spikes, and it won't switch idle ones off to save money when demand drops. **Auto Scaling** does both - it adds and removes EC2 instances automatically so capacity tracks demand. Set it up once and your fleet breathes on its own.
+
+## The two jobs Auto Scaling does
+
+```text
+   Traffic rises  ──► Auto Scaling adds instances   (scale OUT)
+   Traffic falls  ──► Auto Scaling removes instances (scale IN)
+   An instance dies ──► Auto Scaling replaces it     (self-healing)
+```
+
+The second job is the underrated one. Even with steady traffic, an Auto Scaling Group (ASG) keeps your fleet at the size you asked for - if an instance crashes or fails its health check, the ASG terminates it and launches a fresh one. Your capacity self-heals.
+
+## The pieces of an Auto Scaling Group
+
+An ASG is configured by a few key settings:
+
+| Setting | What it controls |
+|---------|------------------|
+| **Launch template** | The blueprint for new instances - AMI, type, key, security group, user data |
+| **Min size** | The fewest instances to ever run |
+| **Max size** | The ceiling - never launch more than this |
+| **Desired capacity** | How many to run *right now* (scaling adjusts this) |
+| **Health checks** | How the ASG decides an instance is bad and replaces it |
+| **Scaling policies** | The rules that change desired capacity |
+
+```text
+   min=2 ───────────── desired=3 ───────────── max=6
+   (never fewer)      (running now)           (never more)
+        ▲                                        ▲
+   floor for HA                          ceiling for cost/safety
+```
+
+### The launch template
+
+A **launch template** is the recipe for every new instance the ASG creates: which AMI, instance type, key pair, security group, and - importantly - the **user-data script** that bootstraps it. This is why user data and reproducible servers mattered: each scaled-out instance must come up fully configured with **no human involved.**
+
+<Callout type="info">
+Min, max, and desired do three different jobs. **Min** guarantees availability (never drop below 2 so one AZ failure doesn't take you to zero). **Max** caps your spend and contains runaway scaling. **Desired** is the live number that scaling policies push up and down between those bounds.
+</Callout>
+
+## How it decides to scale: scaling policies
+
+The ASG changes **desired capacity** based on policies you set. The common kinds:
+
+| Policy type | How it works |
+|-------------|--------------|
+| **Target tracking** | "Keep average CPU at 50%." AWS adds/removes instances to hold the target. Simplest, recommended. |
+| **Step scaling** | "If CPU > 70% add 2; if > 90% add 4." Tiered reactions to a metric. |
+| **Scheduled** | "Scale to 10 every weekday at 9 a.m." For predictable patterns. |
+
+Target tracking is the one to start with - you name a metric and a target value (e.g. 50% CPU) and AWS does the math.
+
+```text
+   CPU climbs to 80%  ──► above the 50% target ──► add instances
+   CPU drops to 20%   ──► below the target     ──► remove instances
+   (a cooldown prevents thrashing up and down too fast)
+```
+
+## ASG + ALB: the standard pattern
+
+Auto Scaling and the load balancer are designed to work together, and this combination is the backbone of almost every resilient AWS web app:
+
+```text
+              Users
+                │
+            ┌───▼────┐
+            │  ALB   │  one stable address, health checks
+            └───┬────┘
+                │  forwards to target group
+        ┌───────▼─────────┐
+        │ Auto Scaling Grp │  adds/removes instances by demand
+        │  ┌──┐ ┌──┐ ┌──┐ │
+        │  │EC2│ │EC2│ │EC2││ ← spread across AZs, auto-replaced
+        │  └──┘ └──┘ └──┘ │
+        └─────────────────┘
+```
+
+When the ASG launches a new instance, it **automatically registers it with the target group**, so the ALB starts sending it traffic once it's healthy. When the ASG terminates one, it's **deregistered** first (with connection draining), so no requests are dropped. You get elastic capacity *and* a stable front door, with nothing manual in between.
+
+<Callout type="warn">
+Spread the ASG across **multiple Availability Zones** and keep **min size ≥ 2.** An ASG pinned to one AZ with min=1 gives you auto-replacement but not high availability - lose that AZ and you're down until another zone spins up. Multi-AZ + min 2 means an entire data centre can fail and you stay online.
+</Callout>
+
+## Why this changes how you think about servers
+
+Auto Scaling is the moment "servers as cattle, not pets" becomes real:
+
+- You stop caring about *individual* instances - any one can die and be replaced.
+- Capacity is defined by **rules and bounds**, not by you clicking "launch" at 2 a.m.
+- You pay for what demand requires, scaling in when it's quiet.
+- Deployments and failures both become routine: the ASG just keeps the fleet at the right size and health.
+
+This only works because each instance is reproducible (launch template + user data) and disposable (no precious state on the box - that lives in EBS, S3, or a database).
+
+Next: an end-to-end hands-on - building an ASG and watching it scale under load.

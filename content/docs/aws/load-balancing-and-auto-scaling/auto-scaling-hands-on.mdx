@@ -1,0 +1,135 @@
+---
+title: "Auto Scaling Hands-On Demo"
+---
+
+Reading about Auto Scaling is one thing; watching the instance count climb on its own while you hammer the CPU is what makes it click. This page builds a complete, working setup - launch template, Auto Scaling Group, scaling policy, all behind a load balancer - and then stresses it to see the group grow and shrink.
+
+## The plan
+
+```text
+   1. Launch template   ─ defines what each instance looks like
+   2. Target group + ALB ─ the stable front door (from the last section)
+   3. Auto Scaling Group ─ min 2 / desired 2 / max 4, across 2 AZs
+   4. Scaling policy     ─ target tracking: keep CPU ~50%
+   5. Load test          ─ spike CPU, watch it scale OUT, then IN
+```
+
+## Step 1 - Create a launch template
+
+EC2 → **Launch Templates** → Create. This is the blueprint the ASG stamps out.
+
+<Steps>
+<Step>
+### Set the basics
+
+Choose a free-tier AMI (Amazon Linux), `t2.micro`, your key pair, and a security group allowing HTTP (80) and SSH (22 from your IP).
+</Step>
+<Step>
+### Add a user-data script
+
+So every launched instance self-configures and serves an identifiable page:
+
+```bash title="user-data.sh"
+#!/bin/bash
+yum update -y
+yum install -y nginx stress-ng
+systemctl enable nginx
+systemctl start nginx
+echo "<h1>Served by $(hostname -f)</h1>" > /usr/share/nginx/html/index.html
+```
+
+(We install `stress-ng` now so we can spike CPU later.)
+</Step>
+</Steps>
+
+## Step 2 - Have a target group + ALB ready
+
+Reuse the [ALB and target group](/docs/aws/load-balancing-and-auto-scaling/application-load-balancer-and-target-groups) from the previous page - an internet-facing ALB across two AZs, with an HTTP:80 listener forwarding to an (initially empty) target group. The ASG will populate that target group for you.
+
+## Step 3 - Create the Auto Scaling Group
+
+EC2 → **Auto Scaling Groups** → Create.
+
+<Steps>
+<Step>
+### Pick the launch template
+
+Select the template from Step 1.
+</Step>
+<Step>
+### Choose the network and AZs
+
+Select your VPC and **two or more subnets in different AZs.** This is what makes the group resilient.
+</Step>
+<Step>
+### Attach it to the load balancer
+
+Choose **attach to an existing load balancer → your target group.** Now scaled instances auto-register with the ALB. Turn on **ELB health checks** so the ASG replaces instances the load balancer considers unhealthy, not just ones that fail the basic EC2 check.
+</Step>
+<Step>
+### Set capacity
+
+**Min = 2, Desired = 2, Max = 4.** Two instances start immediately, spread across your AZs.
+</Step>
+</Steps>
+
+After a minute, check the target group - two healthy instances, both receiving traffic through the ALB.
+
+## Step 4 - Add a scaling policy
+
+In the ASG, add a **Target tracking** policy:
+
+```text
+   Metric:  Average CPU Utilization
+   Target:  50%
+   → if CPU goes above 50%, add instances (up to max=4)
+   → if CPU falls below,   remove instances (down to min=2)
+```
+
+This is the rule that will react when we apply load.
+
+## Step 5 - Trigger a scale-out
+
+Now force the CPU up. SSH into one of the instances and run the stress tool:
+
+```bash
+# peg all CPU cores for 10 minutes
+stress-ng --cpu 0 --timeout 600s
+```
+
+Then watch (give CloudWatch a few minutes - scaling isn't instant):
+
+```text
+   t+0   CPU on the instance shoots to ~100%
+   t+~3m Average CPU crosses the 50% target
+   t+~5m ASG raises desired capacity → launches a new instance
+   t+~7m new instance boots, runs user data, passes health check,
+         registers with the target group → ALB starts using it
+```
+
+In the EC2 console you'll see the **instance count climb** from 2 toward 4. Refresh the ALB's DNS name and you'll see the new hostname join the rotation. **That's auto scaling reacting to real load.**
+
+## Step 6 - Watch it scale back in
+
+Stop the stress (or let the timeout expire). CPU falls, the average drops below 50%, and after a **cooldown** the ASG terminates the extra instances back down to the minimum of 2 - deregistering them from the target group first so no requests are dropped.
+
+```text
+   load gone ──► CPU low ──► (cooldown) ──► terminate extras ──► back to min=2
+```
+
+<Callout type="warn">
+**Tear this down when you're done.** An ASG keeps `min` instances running 24/7 - leave it at min=2 and that's two `t2.micro`s billing continuously, plus the ALB's hourly charge. To stop the meter: set desired/min to 0 (or delete the ASG), then delete the ALB and target group. The ALB in particular bills by the hour whether or not anyone visits.
+</Callout>
+
+## What you just proved
+
+- **Capacity follows demand** automatically - no human at the console during a spike.
+- **New instances self-configure** via the launch template's user data and join the ALB on their own.
+- **Scale-in is graceful** - extras are drained and removed without dropping requests.
+- **The fleet self-heals** - kill an instance manually and the ASG replaces it to hold the desired count.
+
+<Callout type="info">
+The exact thresholds and timings matter less than the loop: **metric → policy → change desired capacity → launch/terminate → register/deregister with the ALB.** Once you've seen that loop run, every production scaling setup is a variation on it - different metrics (request count, queue depth), different bounds, same machinery.
+</Callout>
+
+That completes resilient compute. Next we shift from servers to storage - Amazon S3.

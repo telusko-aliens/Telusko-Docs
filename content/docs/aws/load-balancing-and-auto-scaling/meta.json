@@ -1,0 +1,10 @@
+{
+    "title": "Load Balancing & Auto Scaling",
+    "pages": [
+        "load-balancer-introduction.mdx",
+        "aws-networking-layers.mdx",
+        "application-load-balancer-and-target-groups.mdx",
+        "auto-scaling-group-introduction.mdx",
+        "auto-scaling-hands-on.mdx"
+    ]
+}

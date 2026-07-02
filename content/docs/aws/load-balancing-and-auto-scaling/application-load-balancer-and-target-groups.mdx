@@ -1,0 +1,120 @@
+---
+title: "Application Load Balancer & Target Groups"
+---
+
+The Application Load Balancer has three moving parts, and once you see how they click together, every "hands-on ALB" tutorial makes sense. A **listener** catches incoming traffic, a set of **rules** decides where it goes, and a **target group** is the pool of servers that actually answer. Miss how these connect and the ALB feels like magic; see it and it's just plumbing.
+
+## The three pieces
+
+```text
+   Client ──► ALB
+              │
+         ┌────▼─────┐  Listener: "I listen on port 443 (HTTPS)"
+         │ Listener │
+         └────┬─────┘
+              │  Rules: "if path = /api/* → API group, else → web group"
+         ┌────▼───────────────┐
+         │   Target Group(s)   │  the pool of registered targets
+         │   ┌────┐ ┌────┐     │
+         │   │EC2 │ │EC2 │ ...  │  ← health-checked individually
+         │   └────┘ └────┘     │
+         └────────────────────┘
+```
+
+| Piece | What it is |
+|-------|------------|
+| **Listener** | A port + protocol the ALB watches (e.g. HTTP:80, HTTPS:443) |
+| **Rule** | A condition → action ("if path is `/api/*`, forward to the API target group") |
+| **Target group** | A set of backends (EC2 instances, IPs, or Lambda) that receive traffic, each health-checked |
+
+## Target groups, in focus
+
+A **target group** is where the actual servers register. It's not a server itself - it's a named pool. The ALB forwards a request *to a target group*, and the target group hands it to one of its healthy members.
+
+Key things about target groups:
+
+- Targets can be **EC2 instances**, raw **IP addresses**, or **Lambda functions**.
+- Each target group has **its own health check** (path, interval, healthy/unhealthy thresholds).
+- A target is only sent traffic while it's **healthy**. Fail the check → pulled out automatically.
+- The same instance can be in **multiple** target groups (e.g. one per port).
+
+```text
+   Target group "web-servers"
+     health check: GET /health every 30s, healthy after 2 OKs
+     ├── i-aaa  (AZ-a)   healthy   → gets traffic
+     ├── i-bbb  (AZ-b)   healthy   → gets traffic
+     └── i-ccc  (AZ-a)   unhealthy → no traffic until it recovers
+```
+
+<Callout type="warn">
+The health check path must be something your app actually answers with a 2xx. A classic failure: the check hits `/` but your app returns a 302 redirect there, so every target is marked unhealthy and the ALB returns **503** - even though the servers are fine. Point the health check at a dedicated `/health` endpoint that returns `200 OK`.
+</Callout>
+
+## Content-based routing - the ALB's superpower
+
+Because the ALB reads HTTP (Layer 7), one load balancer can serve several apps by routing on **path** or **host**:
+
+```text
+   Listener HTTPS:443
+     rule 1: path = /api/*       → target group "api-servers"
+     rule 2: host = blog.site.com → target group "blog-servers"
+     default:                     → target group "web-servers"
+```
+
+This is why a single ALB can front a whole microservice setup - one entry point, many backends, routed by the request itself.
+
+## Hands-on: ALB in front of two instances
+
+The canonical demo - two web servers, one load balancer, watch traffic spread:
+
+<Steps>
+<Step>
+### Launch two instances serving identifiable pages
+
+Two `t2.micro`s with a user-data script installing Nginx and writing a page that shows the hostname (so you can tell them apart). Put them in **two different AZs**, with a security group allowing HTTP (80).
+</Step>
+
+<Step>
+### Create a target group
+
+EC2 → Target Groups → Create. Type **Instances**, protocol HTTP:80, set a health check path (`/`). **Register both instances** into it.
+</Step>
+
+<Step>
+### Create the Application Load Balancer
+
+EC2 → Load Balancers → Create → **Application Load Balancer.** Make it **internet-facing**, select **at least two AZs/subnets**, and attach a security group allowing HTTP from anywhere.
+</Step>
+
+<Step>
+### Add a listener pointing at the target group
+
+Listener on **HTTP:80** → default action **forward to** your target group.
+</Step>
+
+<Step>
+### Hit the ALB's DNS name and refresh
+
+Copy the ALB's DNS name (something like `my-alb-123.ap-south-1.elb.amazonaws.com`) and open it. Refresh a few times - you'll see the page alternate between the two hostnames. **That's the load balancer spreading requests.**
+</Step>
+</Steps>
+
+<Callout type="info">
+Notice you connect to the ALB's **DNS name**, never to either instance's IP. That indirection is the point: you can now terminate an instance, launch a new one, register it, and clients keep hitting the same ALB address the whole time. This is exactly what Auto Scaling automates next.
+</Callout>
+
+## Cross-zone load balancing
+
+By default, an ALB does **cross-zone load balancing**: it spreads requests evenly across *all* healthy targets regardless of which AZ they're in. So if AZ-a has 3 instances and AZ-b has 1, all four get roughly equal traffic - not 50/50 split by zone. (For NLB this is off by default and optional.) You rarely change this for an ALB; just know it's why traffic distributes evenly even with uneven AZ counts.
+
+## HTTPS, briefly
+
+Production ALBs usually listen on **HTTPS:443** with a TLS certificate from **AWS Certificate Manager (ACM)** - which is free for use with AWS load balancers. The ALB **terminates TLS** (decrypts) and can forward plain HTTP to the backends inside your VPC, so your instances don't each need a certificate. A common setup also adds an HTTP:80 listener that just **redirects to HTTPS**.
+
+## The recap
+
+- **Listener** catches traffic on a port; **rules** decide where it goes; **target groups** hold the servers.
+- Target groups **health-check** each member and only route to healthy ones.
+- The ALB routes on **path/host** (Layer 7) and gives you **one stable DNS name** in front of a changing fleet.
+
+Now the fleet itself needs to grow and shrink with demand - that's **Auto Scaling**, next.
