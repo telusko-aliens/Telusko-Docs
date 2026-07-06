@@ -1,0 +1,122 @@
+---
+title: "Static Website Hosting on S3"
+---
+
+If your site is just HTML, CSS, JavaScript, and images - no server-side code - running an EC2 instance for it is wasteful. S3 can serve those files directly to browsers, with no server to manage, no patching, and a bill that's often pennies a month. This is how you host a portfolio, a landing page, a docs site, or a React/Vue build.
+
+## Static vs. dynamic - know which you have
+
+```text
+   Static site                      Dynamic site
+   ───────────                      ────────────
+   HTML/CSS/JS files, as-is         code runs per request (PHP, Java, Node)
+   same for every visitor*          personalized, database-backed
+   → S3 can serve it                → needs a server (EC2 / Beanstalk / ECS)
+
+   * a React SPA is still "static" to host: the files are fixed;
+     the dynamic behaviour runs in the visitor's browser, not on a server.
+```
+
+If there's **no code executing on the server** to build the page, it's static - and S3 hosting is the right, cheap tool. (A single-page app that calls APIs from the browser still counts: you host the static build on S3 and the APIs live elsewhere.)
+
+## Setting it up
+
+<Steps>
+<Step>
+### Create a bucket
+
+Pick a globally-unique name. If you'll use a custom domain, naming the bucket after the domain (e.g. `www.mysite.com`) keeps things tidy.
+</Step>
+
+<Step>
+### Upload your site files
+
+Upload `index.html` and the rest. The object key `index.html` must sit at the bucket root for the home page to resolve.
+</Step>
+
+<Step>
+### Enable static website hosting
+
+Bucket → **Properties → Static website hosting → Enable.** Set the **index document** (`index.html`) and an **error document** (`error.html`, or `index.html` for SPAs that do client-side routing).
+</Step>
+
+<Step>
+### Allow public read access
+
+A website must be readable by the world. Turn **off** the relevant Block Public Access setting for this bucket, then add a bucket policy granting public `s3:GetObject`:
+
+```json title="bucket-policy.json"
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": "*",
+    "Action": "s3:GetObject",
+    "Resource": "arn:aws:s3:::www.mysite.com/*"
+  }]
+}
+```
+</Step>
+
+<Step>
+### Visit the website endpoint
+
+S3 gives you a URL like `http://www.mysite.com.s3-website.ap-south-1.amazonaws.com`. Open it - your site loads.
+</Step>
+</Steps>
+
+<Callout type="warn">
+This is the one time you *deliberately* make a bucket public - and you should scope it precisely. The policy grants only `s3:GetObject` (read), only on objects (`/*`), in this one bucket. Never grant `s3:*` or apply this to a bucket holding anything private. Public read on a *website* bucket is fine; public read on your data bucket is a breach.
+</Callout>
+
+## The two URLs, and why it matters
+
+You'll see two different endpoint styles, and they behave differently:
+
+| Endpoint | Example | Supports |
+|----------|---------|----------|
+| **REST endpoint** | `bucket.s3.region.amazonaws.com` | Object access; **not** index/error docs |
+| **Website endpoint** | `bucket.s3-website.region.amazonaws.com` | Index doc, error doc, redirects |
+
+For website behaviour (serving `index.html` at `/`, custom error pages), you must use the **website endpoint** - the one with `s3-website` in it. Using the REST endpoint is a common "why doesn't my home page load?" mistake.
+
+## The gap: no HTTPS, no custom domain (yet)
+
+The raw S3 website endpoint has two real limitations:
+
+- It's **HTTP only** - no padlock, and modern browsers flag it as "not secure."
+- It's an **ugly URL** - nobody wants `bucket.s3-website.region.amazonaws.com`.
+
+Both are solved by putting **CloudFront** in front of the bucket:
+
+```text
+   User ──► CloudFront ──► S3 bucket (private origin)
+            │
+            ├─ HTTPS with a free ACM certificate
+            ├─ your custom domain (via Route 53)
+            └─ global edge caching = fast everywhere
+```
+
+<Callout type="info">
+The production-grade pattern for a static site is **S3 + CloudFront + Route 53 + ACM**: the bucket stays *private* (locked down), CloudFront reads from it via a secure origin access setting, serves it over HTTPS on your own domain, and caches it worldwide. The plain "enable website hosting + public bucket" approach is perfect for learning and quick demos; reach for the CloudFront setup the moment you want HTTPS and a real domain.
+</Callout>
+
+## Deploying updates
+
+Updating the site is just re-uploading files:
+
+```bash
+# sync a local build folder to the bucket
+aws s3 sync ./build s3://www.mysite.com --delete
+```
+
+`--delete` removes files from the bucket that no longer exist locally, keeping it in sync with your build. If CloudFront is in front, you'll also **invalidate the cache** so visitors get the new version immediately rather than the cached old one.
+
+## Why this is the right tool for static sites
+
+- **No servers** - nothing to launch, patch, scale, or pay for idle.
+- **Cheap** - you pay for storage (tiny) and requests (tiny); often cents per month.
+- **Durable & available** - the same 11-nines S3 backing everything else.
+- **Scales automatically** - a traffic spike is S3's problem, not yours; it just serves more requests.
+
+For a static site, this beats EC2 on every axis: cost, effort, and resilience. The next page shows an even more hands-off route for front-end apps - AWS Amplify.

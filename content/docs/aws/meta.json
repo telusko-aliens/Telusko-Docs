@@ -9,7 +9,7 @@
         "identity-and-access-management",
         "compute-with-ec2",
         "load-balancing-and-auto-scaling",
-        "disabled-storage-and-static-hosting",
+        "storage-and-static-hosting",
         "disabled-databases-with-rds",
         "disabled-networking-vpc-and-route53",
         "disabled-monitoring-cli-and-iac"

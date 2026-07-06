@@ -1,0 +1,94 @@
+---
+title: "Amazon S3 - Object Storage"
+---
+
+S3 is probably the most-used service in all of AWS, and for good reason: it's an effectively bottomless bucket you throw files into, that almost never loses them, and that you can reach from anywhere. Photos, backups, videos, logs, static websites, machine-learning datasets - if it's a file, it lives well in S3.
+
+## What S3 is - and isn't
+
+**S3 - Simple Storage Service - is object storage.** You store **objects** (files plus their metadata) in **buckets** (containers). That's a different model from the disk on your laptop, and the difference matters.
+
+| | Block storage (EBS) | File storage | Object storage (S3) |
+|---|--------------------|--------------|---------------------|
+| **Looks like** | A raw disk you format | A shared folder tree | A flat key → file store |
+| **Access** | Attached to one instance | Mounted over a network | Over HTTP(S), from anywhere |
+| **Best for** | An OS / database disk | Shared team files | Files, media, backups, web assets |
+| **Structure** | Blocks | Folders & files | Buckets & objects (keys) |
+
+The key shift: S3 isn't a drive you mount. It's a service you talk to over the web - `GET` an object, `PUT` an object - and every object has a URL.
+
+## Buckets and objects
+
+```text
+   Bucket: my-app-media   (globally unique name, lives in a region)
+   ├── images/logo.png        ← object (key = "images/logo.png")
+   ├── images/banner.jpg      ← object
+   └── backups/2026-06-21.zip ← object
+```
+
+- A **bucket** is the top-level container. Its name must be **globally unique across all of AWS** (someone else having `photos` means you can't), and it lives in a **specific region**.
+- An **object** is a file plus metadata, identified by its **key** (the full path-like name). Objects can be up to **5 TB** each.
+- Those slashes in keys *look* like folders, but S3 is actually **flat** - "folders" are just a naming convention the console renders as a tree. There are no real directories underneath.
+
+<Callout type="info">
+Because bucket names are globally unique and become part of URLs, pick names that are descriptive and unlikely to collide - `telusko-course-media-2026`, not `images`. You'll also avoid the "bucket already exists" error that trips up every beginner on their first try.
+</Callout>
+
+## The two numbers that make S3 special
+
+AWS designs S3 for **11 nines of durability** - `99.999999999%`. Store 10 million objects and you'd statistically expect to lose one object every ten thousand years. It achieves this by automatically replicating every object across multiple devices in multiple Availability Zones inside the region.
+
+- **Durability** (will my data survive?) → 99.999999999%. Extraordinary.
+- **Availability** (can I reach it right now?) → typically 99.99% for the standard tier.
+
+You don't manage any of that replication - it's built in. Your one file is quietly stored several times across separate data centres.
+
+## Storage classes: pay for how often you read
+
+Not all data is accessed equally. A profile photo is read constantly; a 2019 tax backup almost never. S3 **storage classes** let you trade retrieval speed/cost against storage cost:
+
+| Class | For data that's... | Trade-off |
+|-------|--------------------|-----------|
+| **S3 Standard** | Accessed often | Highest storage cost, instant access |
+| **S3 Standard-IA** | Accessed rarely, needed fast | Cheaper storage, retrieval fee |
+| **S3 One Zone-IA** | Rare access, re-creatable | Cheaper still, but only one AZ |
+| **S3 Glacier Instant / Flexible** | Archives | Very cheap, slower/fee'd retrieval |
+| **S3 Glacier Deep Archive** | "Maybe never" compliance data | Cheapest, retrieval in hours |
+| **S3 Intelligent-Tiering** | Unpredictable access | Auto-moves objects between tiers for you |
+
+<Callout type="info">
+Don't agonize over classes up front. Use **Standard** for active data, and let a **Lifecycle rule** (covered shortly) automatically demote old objects to cheaper tiers - "move to Glacier after 90 days, delete after a year." That's where the real savings come from, without you watching each file.
+</Callout>
+
+## Security: private by default (and keep it that way)
+
+A new bucket is **private** - only you (the owner account) can access it. Access opens up through:
+
+- **IAM policies** - what your users/roles can do.
+- **Bucket policies** - JSON attached to the bucket itself (e.g. "make these objects public-readable").
+- **Block Public Access** - an account/bucket-level master switch that *prevents* public exposure, on by default.
+
+<Callout type="warn">
+"Public S3 bucket" is one of the most common data-leak headlines in tech - companies accidentally exposing customer data because someone flipped a bucket to public. **Leave Block Public Access on** unless you have a deliberate reason (like static website hosting). When you do need public access, scope it to exactly the objects that should be public, and nothing else.
+</Callout>
+
+## How you interact with S3
+
+Same service, several front doors:
+
+- **Console** - drag and drop, browse buckets. Great for learning and one-offs.
+- **AWS CLI** - `aws s3 cp file.txt s3://my-bucket/` for scripting and bulk transfers.
+- **SDKs** - your application code (Java, Python, etc.) reading/writing objects.
+- **HTTPS** - every object has a URL; with the right permissions, a simple `GET` retrieves it.
+
+## Why S3 shows up everywhere
+
+Once you have cheap, durable, web-accessible storage, it becomes the backbone of countless patterns:
+
+- **Static website hosting** (next pages) - serve HTML/CSS/JS straight from a bucket.
+- **Backups & snapshots** - EBS snapshots live in S3 under the hood.
+- **Data lakes & analytics** - dump raw data, query it in place.
+- **Media storage** - user uploads, images, video.
+- **Software & artifact distribution** - installers, build outputs, ML models.
+
+S3 is the default answer to "where do I put this file?" on AWS. The next pages go deeper - versioning and object lock for protecting data, a feature tour, and then using a bucket to host an actual website.

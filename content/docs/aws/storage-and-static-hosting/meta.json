@@ -1,0 +1,10 @@
+{
+    "title": "Storage & Static Hosting",
+    "pages": [
+        "s3-introduction.mdx",
+        "s3-versioning-and-object-lock.mdx",
+        "s3-features-summary.mdx",
+        "static-website-hosting-on-s3.mdx",
+        "deploy-a-static-site-with-amplify.mdx"
+    ]
+}

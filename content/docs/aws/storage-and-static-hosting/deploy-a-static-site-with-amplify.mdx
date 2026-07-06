@@ -1,0 +1,118 @@
+---
+title: "Deploy a Static Site with Amplify"
+---
+
+The S3 + CloudFront + Route 53 + ACM setup is powerful, but it's a lot of clicking for a simple front-end. **AWS Amplify Hosting** rolls all of that into one flow: connect your Git repo, and Amplify builds your app, serves it over HTTPS on a global CDN, and redeploys automatically every time you push. It's the "git push and it's live" experience, AWS-style.
+
+## What Amplify Hosting gives you in one box
+
+```text
+   Git push ──► Amplify
+                 ├─ pulls your code
+                 ├─ runs your build (npm run build, etc.)
+                 ├─ deploys to a global CDN (CloudFront under the hood)
+                 ├─ serves over HTTPS (certificate handled for you)
+                 └─ gives you a live URL
+   Next push ──► it all happens again, automatically
+```
+
+Everything you'd assemble by hand - build, storage, CDN, TLS certificate, deploy pipeline - Amplify wires together and manages.
+
+<Callout type="info">
+Under the hood Amplify *is* using S3, CloudFront, and ACM. The value isn't new infrastructure - it's that you stop assembling those pieces yourself. Amplify trades some control for a huge reduction in setup. Think of it as the PaaS option for front-ends, where S3-static-hosting is the IaaS-flavoured, do-it-yourself option.
+</Callout>
+
+## What it's good at
+
+Amplify Hosting is built for front-end and JavaScript-framework apps:
+
+| Great fit | Examples |
+|-----------|----------|
+| Single-page apps | React, Vue, Angular |
+| Static site generators | Next.js (static/SSR), Gatsby, Hugo, Astro |
+| Plain static sites | HTML/CSS/JS with a build step |
+
+It handles SPA routing (so refreshing `/about` doesn't 404), build environments per branch, and more.
+
+## Deploying - the Git-connected flow
+
+<Steps>
+<Step>
+### Push your app to a Git provider
+
+GitHub, GitLab, Bitbucket, or AWS CodeCommit. Amplify connects to the repo.
+</Step>
+
+<Step>
+### Create an Amplify app and connect the repo
+
+Amplify console → **New app → Host web app.** Authorize your Git provider and pick the repository and branch (e.g. `main`).
+</Step>
+
+<Step>
+### Confirm the build settings
+
+Amplify auto-detects most frameworks and proposes a build spec - the install, build, and output-directory commands. Adjust if needed:
+
+```yaml title="amplify.yml"
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - npm run build
+  artifacts:
+    baseDirectory: build      # or dist / out, per your framework
+    files:
+      - '**/*'
+```
+</Step>
+
+<Step>
+### Deploy
+
+Amplify runs the build and deploys. In a couple of minutes you get a live HTTPS URL like `https://main.d1abc234.amplifyapp.com`.
+</Step>
+
+<Step>
+### Push to redeploy
+
+From now on, every `git push` to the connected branch triggers an automatic rebuild and deploy. No manual upload, no cache invalidation to remember.
+</Step>
+</Steps>
+
+## The features you get for free
+
+Things you'd otherwise wire up yourself:
+
+- **Continuous deployment** - push to deploy, every time.
+- **HTTPS by default** - certificate provisioned and renewed automatically.
+- **Global CDN** - fast worldwide via CloudFront edges.
+- **Branch deployments** - connect a `dev` branch and get a separate preview URL; great for testing before merging.
+- **Custom domains** - connect your own domain with managed TLS in a few clicks.
+- **Atomic deploys & rollbacks** - a bad build doesn't half-replace the site; you can roll back to a previous deploy.
+
+<Callout type="warn">
+Amplify Hosting is **for front-ends and static/SSR sites, not arbitrary back-end servers.** If you need a long-running Java/Spring backend, a database, or container workloads, that's Elastic Beanstalk or ECS (later sections) - not Amplify Hosting. (The broader Amplify *platform* also offers backend features like auth and APIs, but the Hosting piece we're using here is about shipping the front-end.)
+</Callout>
+
+## S3 hosting vs. Amplify - which to pick
+
+Both serve static sites well. Choose by how much you want managed for you:
+
+| | S3 (+ CloudFront) | Amplify Hosting |
+|---|-------------------|-----------------|
+| **Setup** | You assemble the pieces | One connected flow |
+| **CI/CD** | You build it (or CodePipeline) | Built in - push to deploy |
+| **HTTPS / domain** | You configure ACM + Route 53 | Handled for you |
+| **Control** | Maximum | Less, but far less work |
+| **Best for** | Learning the internals; bespoke setups | Shipping a front-end fast |
+
+<Callout type="info">
+A good rule: use **S3 + CloudFront** when you want to *understand* and control every layer (and this course deliberately does that on the previous page), and use **Amplify** when you just want a front-end live with CI/CD and HTTPS in five minutes. Knowing both means you can pick the right trade-off per project instead of forcing one tool everywhere.
+</Callout>
+
+That wraps storage and static hosting. Next we let AWS run a database for us - Amazon RDS.

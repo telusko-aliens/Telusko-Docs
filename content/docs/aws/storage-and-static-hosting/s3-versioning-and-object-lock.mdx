@@ -1,0 +1,107 @@
+---
+title: "S3 Versioning & Object Lock"
+---
+
+Storing data durably is only half the battle. The other half is protecting it from *you* - the accidental overwrite, the bad deploy, the `aws s3 rm` run against the wrong bucket, the ransomware that encrypts everything. **Versioning** and **Object Lock** are S3's answers: one lets you undo mistakes, the other makes deletion outright impossible.
+
+## Versioning: an undo button for objects
+
+By default, uploading an object with a key that already exists **overwrites** the old one - gone, no recovery. Turn on **versioning** and S3 instead keeps *every* version of an object, each with a unique version ID.
+
+```text
+   Versioning OFF                    Versioning ON
+   ──────────────                    ─────────────
+   upload report.pdf  → v1           upload report.pdf  → v1
+   upload report.pdf  → replaces v1  upload report.pdf  → v2 (v1 kept)
+                                     upload report.pdf  → v3 (v1, v2 kept)
+   (old data lost)                   (every version retrievable)
+```
+
+Now an overwrite is recoverable: the new version becomes "current," but old versions sit behind it, ready to be restored.
+
+### Delete becomes reversible too
+
+With versioning on, deleting an object doesn't actually remove it - S3 adds a **delete marker** that hides it. Remove the marker and the object reappears.
+
+```text
+   delete report.pdf  ──► S3 adds a "delete marker" (object hidden)
+   list bucket        ──► report.pdf looks gone
+   remove the marker  ──► report.pdf is back, all versions intact
+```
+
+To *truly* delete, you delete a specific **version ID** (a "permanent delete"). This two-step nature is exactly what saves you from the catastrophic accidental delete.
+
+<Callout type="info">
+Versioning is the single best protection against the most common S3 disaster: a script or human overwriting/deleting the wrong objects. It can't be turned *off* once used - only **suspended** - and existing versions are kept regardless. Turn it on for any bucket holding data you'd be upset to lose.
+</Callout>
+
+### The cost and how to manage it
+
+Every version is a stored object you pay for. Keep ten versions of a 1 GB file and you're billed for ~10 GB. The fix is a **lifecycle rule** that prunes old versions:
+
+```text
+   Lifecycle rule example:
+     - keep current version
+     - move noncurrent versions to cheaper storage after 30 days
+     - permanently delete noncurrent versions after 90 days
+```
+
+So you get the safety net without versions accumulating forever.
+
+## Object Lock: make deletion impossible
+
+Versioning protects against *accidents*. **Object Lock** protects against *anyone* - including admins, attackers, and your future self - by enforcing **WORM**: Write Once, Read Many. A locked object **cannot be deleted or overwritten** until its retention period expires.
+
+This is how you meet compliance rules (finance, healthcare, legal) and defend against ransomware that tries to destroy your backups.
+
+```text
+   Normal object:   admin can delete it anytime
+   Locked object:   nobody can delete/modify it until the lock expires
+                    - not the admin, not root, not a leaked key
+```
+
+### Two retention modes
+
+| Mode | Who can shorten/remove it | Use for |
+|------|---------------------------|---------|
+| **Governance** | Users with a special permission can override | Internal policy, "protect but allow rare overrides" |
+| **Compliance** | **No one** - not even the root account - until it expires | Hard regulatory requirements, ransomware defense |
+
+<Callout type="warn">
+**Compliance mode is irreversible by design.** Once an object is locked in compliance mode for, say, 7 years, *nobody* can delete it for 7 years - and you'll be billed for that storage the entire time. That's the point (it's what makes it trustworthy), but test with short retention periods first. A mistaken 100-year compliance lock on a large dataset is an expensive, unfixable mistake.
+</Callout>
+
+Object Lock **requires versioning** to be enabled, and it's easiest to turn on **at bucket creation** (enabling it later is more restricted).
+
+## Related protections worth knowing
+
+The lecture title says "& More" - a few neighbours in the same protection family:
+
+- **MFA Delete** - requires an MFA code to permanently delete a version or change versioning state. An extra hurdle on critical buckets.
+- **Replication (CRR/SRR)** - automatically copy objects to another bucket, in the same region (SRR) or a different one (CRR), for disaster recovery and lower-latency access elsewhere.
+- **Encryption** - S3 encrypts objects at rest by default (SSE-S3); you can use your own KMS keys (SSE-KMS) for tighter control and audit.
+
+## Choosing what to turn on
+
+A practical default ladder for a bucket that matters:
+
+<Cards>
+  <Card title="Always">
+    Block Public Access on, encryption on (it's default), a sensible bucket policy.
+  </Card>
+  <Card title="For important data">
+    Enable versioning + a lifecycle rule to prune old versions.
+  </Card>
+  <Card title="For critical/compliance data">
+    Add Object Lock (governance, or compliance if mandated) and consider MFA Delete.
+  </Card>
+  <Card title="For disaster recovery">
+    Add cross-region replication to a second bucket.
+  </Card>
+</Cards>
+
+<Callout type="info">
+Most learning buckets need none of this - but knowing it exists changes how you think about data. The mindset to take away: in S3, **deletion and overwrites should be recoverable by default**, and for the data that truly can't be lost, they should be *impossible*. Versioning gives you the first; Object Lock gives you the second.
+</Callout>
+
+Next: a fast tour of the rest of S3's feature set, so you know what's in the toolbox.

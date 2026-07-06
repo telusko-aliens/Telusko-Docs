@@ -1,0 +1,118 @@
+---
+title: "S3 Features Summary"
+---
+
+S3 quietly grew from "a place for files" into a platform with a feature for nearly every storage problem. You won't use all of them, but knowing they exist means that when you hit a problem - "this is getting expensive," "I need to serve this fast worldwide," "I need a notification when a file lands" - you'll know S3 already has the answer. Here's the toolbox, organized by the problem each feature solves.
+
+## Cost control
+
+| Feature | What it does |
+|---------|--------------|
+| **Storage classes** | Standard, IA, Glacier tiers - pay less for rarely-read data |
+| **Lifecycle rules** | Auto-move objects to cheaper tiers or delete them on a schedule |
+| **Intelligent-Tiering** | S3 moves objects between tiers automatically based on access |
+
+The big lever is **lifecycle rules**. You almost never want to manually re-tier objects; you set a policy once ("after 90 days → Glacier, after 1 year → delete") and S3 enforces it forever.
+
+```text
+   Day 0      Day 90        Day 365
+   Standard ──► Glacier ────► deleted
+   (active)   (archive)     (gone, per policy)
+```
+
+## Data protection
+
+| Feature | What it does |
+|---------|--------------|
+| **Versioning** | Keep every version; undo overwrites and deletes |
+| **Object Lock** | WORM - make objects undeletable for a retention period |
+| **MFA Delete** | Require an MFA code for permanent deletes |
+| **Replication (CRR/SRR)** | Auto-copy objects to another bucket/region for DR |
+
+(Versioning and Object Lock got their own page - they're the headline protections.)
+
+## Security & access
+
+| Feature | What it does |
+|---------|--------------|
+| **Block Public Access** | Master switch preventing accidental public exposure (on by default) |
+| **Bucket policies** | JSON rules on the bucket - grant/deny access at scale |
+| **IAM policies** | Control what your users/roles can do with S3 |
+| **Encryption at rest** | SSE-S3 by default; SSE-KMS for your own keys + audit |
+| **Pre-signed URLs** | Time-limited URLs granting temporary access to a private object |
+
+**Pre-signed URLs** deserve a callout because they solve a real, common problem.
+
+<Callout type="info">
+A **pre-signed URL** lets you share a *private* object temporarily without making it public. Your backend generates a URL that works for, say, 15 minutes, then expires. This is how apps let a user download their own invoice or upload a profile picture directly to S3 - secure, time-boxed access to one object, no public bucket required.
+</Callout>
+
+## Performance & delivery
+
+| Feature | What it does |
+|---------|--------------|
+| **CloudFront (CDN)** | Cache objects at edge locations worldwide for fast, cheap delivery |
+| **Transfer Acceleration** | Faster uploads over long distances via AWS's edge network |
+| **Multipart upload** | Split big files into parts, upload in parallel, resume on failure |
+| **Byte-range fetches** | Download just part of an object |
+
+For serving content to a global audience, you rarely point users straight at S3 - you put **CloudFront** in front of it:
+
+```text
+   User in Tokyo ──► CloudFront edge (Tokyo) ──cache hit──► instant
+                          │ cache miss
+                          ▼
+                      S3 bucket (Mumbai)  ──► fetched once, cached at edge
+```
+
+This makes delivery fast worldwide *and* cheaper (fewer requests hit S3, and CloudFront egress is discounted).
+
+## Automation & integration
+
+| Feature | What it does |
+|---------|--------------|
+| **Event notifications** | Trigger Lambda/SQS/SNS when an object is created/deleted |
+| **S3 Select** | Run SQL-style queries to pull only the rows you need from an object |
+| **Static website hosting** | Serve a website directly from a bucket (next page) |
+| **Access logs / CloudTrail** | Record who accessed what |
+
+**Event notifications** turn S3 from passive storage into an active trigger:
+
+```text
+   User uploads image.jpg ──► S3 event ──► Lambda runs
+                                           └─ generate a thumbnail,
+                                              update the database, etc.
+```
+
+This event-driven pattern (upload → automatic processing) is everywhere in modern AWS apps.
+
+## The "which do I actually need?" filter
+
+You'll drown if you try to learn all of these at once. Use this filter instead - adopt a feature when its problem shows up:
+
+<Cards>
+  <Card title="Storage bill too high?">
+    Lifecycle rules + cheaper storage classes.
+  </Card>
+  <Card title="Worried about data loss?">
+    Versioning, then Object Lock for the critical stuff.
+  </Card>
+  <Card title="Slow for distant users?">
+    CloudFront in front of the bucket.
+  </Card>
+  <Card title="Need to react to uploads?">
+    Event notifications → Lambda.
+  </Card>
+  <Card title="Share a private file safely?">
+    Pre-signed URL.
+  </Card>
+  <Card title="Hosting a static site?">
+    Static website hosting (next page).
+  </Card>
+</Cards>
+
+<Callout type="warn">
+Resist turning on features "because they look useful." Each one adds cost, complexity, or both - versions accumulate, replication doubles storage, KMS adds per-request charges. Start with a plain, private, encrypted bucket and **add features when a concrete need appears.** The toolbox is there; you don't have to use every tool on every bucket.
+</Callout>
+
+With S3's capabilities mapped, the next page uses the most beginner-friendly one: turning a bucket into a live website.
