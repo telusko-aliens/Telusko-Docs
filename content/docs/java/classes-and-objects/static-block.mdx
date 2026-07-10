@@ -8,10 +8,10 @@ In Java, a **static block** (also called a static initialization block) is a spe
 
 Static blocks are used to:
 
-- Initialize static variables  
-- Perform class-level setup  
-- Load configurations  
-- Execute code only once for the entire program  
+- Initialize static variables
+- Perform class-level setup
+- Load configurations
+- Execute code only once for the entire program
 
 Understanding static blocks is essential for mastering class loading, static initialization, and JVM behavior.
 
@@ -27,10 +27,10 @@ static {
 
 ### Key Characteristics
 
-* Executes **only once** when the class is loaded
-* Runs **before main()**
-* Used for static initialization
-* Executes **in the order they appear** if multiple static blocks exist
+- Executes **only once** when the class is loaded
+- Runs **before main()**
+- Used for static initialization
+- Executes **in the order they appear** if multiple static blocks exist
 
 ### Example
 
@@ -97,8 +97,6 @@ static {
 
 ### 3.4 Calling static helper methods during class load
 
-
-
 ## 4. Multiple Static Blocks
 
 Java allows multiple static blocks.
@@ -156,12 +154,10 @@ public class Main {
 Output:
 
 ```
-Static Block of A
+(no output)
 ```
 
 Because class A was loaded.
-
-
 
 ## 7. Static Block and Class.forName()
 
@@ -173,8 +169,6 @@ Class.forName("Test");
 
 This causes the static block inside `Test` to execute immediately.
 
-
-
 ## 8. Using Static Blocks to Load Native Libraries
 
 ```java
@@ -184,8 +178,6 @@ static {
 ```
 
 This ensures the library is loaded only once.
-
-
 
 ## 9. Common Mistakes
 
@@ -208,8 +200,6 @@ If simple assignment works, no need for a static block.
 ### Mistake 3: Expecting static block to run multiple times
 
 It runs **only once** per class loading.
-
-
 
 ## 10. Complete Example Demonstrating Static Block Behavior
 
@@ -246,16 +236,14 @@ Loading configuration...
 Connecting to jdbc:mysql://localhost/test
 ```
 
-
-
 ## 11. Summary
 
-* Static blocks execute **once** when the class loads.
-* They run **before main()** and before any object creation.
-* Used for initializing static variables and configurations.
-* Multiple static blocks execute in order.
-* Cannot access instance members.
-* Useful for complex initialization and setup tasks.
+- Static blocks execute **once** when the class loads.
+- They run **before main()** and before any object creation.
+- Used for initializing static variables and configurations.
+- Multiple static blocks execute in order.
+- Cannot access instance members.
+- Useful for complex initialization and setup tasks.
 
 This completes **Static Block in Java**.
 
