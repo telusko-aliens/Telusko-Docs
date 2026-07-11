@@ -1,0 +1,148 @@
+---
+title: "Amazon RDS - Managed MySQL"
+---
+
+You *could* install MySQL on an EC2 instance yourself. Then you'd also own the backups, the patching, the failover when the instance dies at 3 a.m., the replication setup, and the version upgrades. **RDS - Relational Database Service - does all of that for you.** You ask for a database; AWS runs the boring, critical operational work. You're left with just the part that matters: your data and your queries.
+
+## What "managed" actually buys you
+
+```text
+   Self-managed DB on EC2          Amazon RDS
+   ──────────────────────          ──────────
+   you install MySQL          →     provisioned for you
+   you configure backups      →     automated daily backups + snapshots
+   you patch the engine       →     managed patching windows
+   you set up replication     →     read replicas with a click
+   you handle failover        →     Multi-AZ standby, automatic failover
+   you monitor the host       →     CloudWatch metrics built in
+```
+
+You still design schemas, write SQL, and tune queries - RDS doesn't take those away. It takes away the *operational* burden that has nothing to do with your application.
+
+## The engines RDS supports
+
+RDS isn't a database itself; it's a managed wrapper around real engines:
+
+| Engine | Notes |
+|--------|-------|
+| **MySQL** | The one we use here; hugely popular, open source |
+| **PostgreSQL** | Feature-rich open source; a common default for new apps |
+| **MariaDB** | MySQL-compatible fork |
+| **Oracle / SQL Server** | Commercial engines, bring-your-own-license options |
+| **Amazon Aurora** | AWS's own MySQL/PostgreSQL-compatible engine, higher performance |
+
+Your app connects with the *same* drivers and SQL it would use for a self-hosted database - RDS just runs the engine for you.
+
+## Provisioning a MySQL instance
+
+<Steps>
+<Step>
+### Open RDS and create a database
+
+RDS console → **Create database.** Choose **Standard create** (it exposes the options worth understanding) and engine **MySQL**.
+</Step>
+
+<Step>
+### Pick a template and size
+
+For learning, choose the **Free tier** template - it pins you to a `db.t3.micro` (or `db.t2.micro`) with limits that stay free for 12 months.
+</Step>
+
+<Step>
+### Set identifiers and the master credentials
+
+Give the DB instance a name, a **master username** (e.g. `admin`), and a strong **master password.** You'll need these to connect - store them safely.
+</Step>
+
+<Step>
+### Configure connectivity
+
+Place it in your VPC. The crucial choice: **Public access.**
+- **No** (recommended) - the DB is reachable only from inside the VPC (e.g. your EC2 app). Safer.
+- **Yes** - reachable from the internet. Convenient for connecting from your laptop, but a real exposure.
+
+Attach a **security group** that allows MySQL (**port 3306**) only from the source that needs it.
+</Step>
+
+<Step>
+### Create and wait
+
+RDS provisions the instance (a few minutes). When it's **Available**, copy the **endpoint** - a hostname like `mydb.abc123.ap-south-1.rds.amazonaws.com`. That endpoint, not an IP, is how you connect.
+</Step>
+</Steps>
+
+<Callout type="warn">
+**Never open port 3306 to `0.0.0.0/0`.** A publicly reachable database with a guessable password is found and attacked within hours. The right pattern: keep **Public access = No**, put your app server in the same VPC, and let the security group allow 3306 **only from the app server's security group.** If you must connect from your laptop for a demo, scope the rule to *your* IP and remove it afterwards.
+</Callout>
+
+## Connecting to it
+
+Use the **endpoint** as the host. From an EC2 instance in the same VPC (the normal case):
+
+```bash
+mysql -h mydb.abc123.ap-south-1.rds.amazonaws.com -u admin -p
+# enter the master password when prompted
+```
+
+```sql
+CREATE DATABASE appdb;
+USE appdb;
+CREATE TABLE users (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(100));
+INSERT INTO users (name) VALUES ('Telusko');
+SELECT * FROM users;
+```
+
+From an application, it's a standard JDBC/connection string - the endpoint is just the host:
+
+```text
+jdbc:mysql://mydb.abc123.ap-south-1.rds.amazonaws.com:3306/appdb
+```
+
+<Callout type="info">
+Notice you connect to a **DNS endpoint**, never a fixed IP. That's deliberate: if RDS fails over to a standby or you restore from a snapshot, the endpoint stays the same and points at the new instance. Hard-code the endpoint, not an IP - same lesson as load balancers and Elastic IPs.
+</Callout>
+
+## The features that make RDS worth it
+
+These come essentially for free once the instance exists:
+
+### Automated backups & snapshots
+
+RDS takes **automated daily backups** and lets you take **manual snapshots** anytime. With backups on, you get **point-in-time recovery** - restore the database to any moment within the retention window (e.g. "2:47 p.m. yesterday, just before the bad migration").
+
+### Multi-AZ for high availability
+
+Enable **Multi-AZ** and RDS keeps a **synchronous standby** in a second Availability Zone. If the primary fails, RDS **automatically fails over** to the standby - and because clients use the endpoint, they reconnect to the new primary without config changes.
+
+```text
+   Primary (AZ-a) ──sync replication──► Standby (AZ-b)
+        │ fails
+        ▼
+   RDS promotes the standby, repoints the endpoint, you stay up
+```
+
+### Read replicas for scale
+
+For read-heavy apps, add **read replicas** - asynchronous copies you send `SELECT` traffic to, taking load off the primary. (Different from Multi-AZ: replicas are for *scaling reads*, Multi-AZ is for *availability*.)
+
+| Feature | Purpose | Replication |
+|---------|---------|-------------|
+| **Multi-AZ** | High availability / failover | Synchronous, standby not readable |
+| **Read replica** | Scale read traffic | Asynchronous, replica is readable |
+
+## Cost awareness
+
+RDS bills for the instance (running hours), storage, backups beyond the free allowance, and data transfer.
+
+<Callout type="warn">
+An RDS instance bills **even when your app is idle** - it's a running server. For learning, stay on the **free-tier** `db.t3.micro`, single-AZ (Multi-AZ doubles the instance cost), and **delete the instance when you're done practising.** When you delete, RDS offers a final snapshot - take it if you might want the data back, skip it to avoid the snapshot storage charge. A forgotten RDS instance is one of the most common surprise line items.
+</Callout>
+
+## When to use RDS vs. alternatives
+
+- **RDS** - you want a standard relational database (MySQL/PostgreSQL) without operational overhead. The default choice for most apps.
+- **Aurora** - same, but you need higher performance/scale and are okay being AWS-specific.
+- **Self-managed on EC2** - you need a database/version/config RDS doesn't support, or total control. Rare, and you take on all the ops.
+- **DynamoDB** - a *non*-relational (NoSQL) option for key-value/document workloads at massive scale. Different model entirely.
+
+The takeaway: for a relational database, reach for **RDS** first. You get backups, failover, patching, and monitoring handled, and you keep the SQL and schema design that are actually your job. We'll use exactly this when the project sections connect a Spring Boot app to a database.

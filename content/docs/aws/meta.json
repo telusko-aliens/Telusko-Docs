@@ -10,7 +10,7 @@
         "compute-with-ec2",
         "load-balancing-and-auto-scaling",
         "storage-and-static-hosting",
-        "disabled-databases-with-rds",
+        "databases-with-rds",
         "disabled-networking-vpc-and-route53",
         "disabled-monitoring-cli-and-iac"
     ]

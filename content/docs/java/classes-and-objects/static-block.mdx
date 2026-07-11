@@ -157,7 +157,7 @@ Output:
 (no output)
 ```
 
-Because class A was loaded.
+Because class `A` is never referenced or loaded in this program, its static block does not execute. Static blocks run only when the class is actually loaded (for example, when an object is created, a static member is accessed, or `Class.forName("A")` is used).
 
 ## 7. Static Block and Class.forName()
 
