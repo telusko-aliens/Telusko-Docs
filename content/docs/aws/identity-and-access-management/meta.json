@@ -1,0 +1,8 @@
+{
+    "title": "Identity & Access Management",
+    "pages": [
+        "iam-introduction-root-vs-iam-user.mdx",
+        "iam-groups-policies-and-roles.mdx",
+        "iam-in-the-real-world.mdx"
+    ]
+}
