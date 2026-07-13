@@ -16,6 +16,7 @@ import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { LLMCopyButton, ViewOptions } from '@/components/ai/page-actions';
 import { Feedback } from '@/components/feedback';
 import { onRateAction,owner, repo } from '@/lib/github';
+import { DownloadPDFButton } from '@/components/ui/DownloadPDFButton';
 
 export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   const params = await props.params;
@@ -52,6 +53,9 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
           // blob/main/content/docs/index.mdx
           githubUrl={`https://github.com/${owner}/${repo}/blob/main/content/docs/${page.path}`}
         />
+        {page.url === '/docs/system-design/getting-started' && (
+    <DownloadPDFButton pdfUrl="https://dyz1pdcuffwr5.cloudfront.net/System-designs/System%20Design%20Notes%20PDF/System_Design_Notes.pdf" />
+  )}
       </div>
       <DocsBody>
         <MDX
