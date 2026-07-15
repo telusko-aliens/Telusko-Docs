@@ -1,0 +1,212 @@
+---
+title: Database Joins
+---
+
+<Steps>
+<Video id="Vnm-ycSfJx4" />
+
+---
+
+In relational databases, data is often distributed across multiple tables to reduce duplication and maintain consistency. However, real-world applications frequently require data from multiple tables to be combined and presented together.
+
+A join is a SQL operation that combines data from two or more related tables based on a
+common column, usually a primary key and foreign key relationship.
+
+## What is a Join?
+
+A **join** allows SQL queries to fetch related data stored in separate tables.
+
+A **join** is a database operation that combines rows from two or more tables using a related column between them.
+
+**Why Are Joins Needed?**
+
+In a well-designed relational database:
+- User information is stored in a Users table.
+- Blog information is stored in a Blogs table.
+- Comments are stored in a Comments table.
+
+Instead of storing all information in a single table, data is separated into logical entities.
+Joins help reconnect these entities whenever related information needs to be retrieved.
+
+In system design, understanding joins is critical because they directly impact **query performance**, **data modeling**, and **scalability** of the system.
+
+---
+
+## Types of Table Relationships
+
+Relational databases primarily support four types of relationships:
+
+![Types_of_Relationships](https://dyz1pdcuffwr5.cloudfront.net/System-designs/types_of_relationships.png)
+
+
+<Step>
+
+### One-to-Many Relationship
+
+A single record in one table is associated with **multiple records** in another table.
+
+**Example:** A User can have multiple Blogs.
+
+**Users Table:**
+
+| id | fname   |
+|----|---------|
+| 1  | Alice   |
+| 2  | Bob     |
+
+**Blogs Table:**
+
+| id | title            | user_id |
+|----|------------------|---------|
+| 1  | Blog on SQL      | 1       |
+| 2  | Blog on NoSQL    | 1       |
+| 3  | Blog on Caching  | 2       |
+
+- Alice (id=1) has **two** blogs associated with her.
+- Bob (id=2) has **one** blog associated with him.
+- `user_id` in the Blogs table acts as a **foreign key** referencing the Users table.
+
+</Step>
+
+---
+
+<Step>
+### Many-to-One Relationship
+
+Multiple records in one table are associated with a **single record** in another table. This is the inverse perspective of One-to-Many.
+
+**Example:** Multiple Blogs belong to the same User.
+
+| Blog            | Belongs To |
+|-----------------|------------|
+| Blog on SQL     | Alice      |
+| Blog on NoSQL   | Alice      |
+| Blog on Caching | Bob        |
+
+- From the **Blogs' perspective**, many blogs point to the same user - this is Many-to-One.
+- From the **Users' perspective**, one user has many blogs - this is One-to-Many.
+
+> One-to-Many and Many-to-One are the same relationship viewed from different directions.
+
+</Step>
+
+---
+
+<Step>
+### Many-to-Many Relationship
+
+Many records from one table are associated with many records from another table, **and vice-versa**.
+
+**Example:** Students and Courses, A student can enroll in many courses, and a course can have multiple students.
+
+**Students Table:**
+
+| id | fname   |
+|----|---------|
+| 1  | Alice   |
+| 2  | Bob     |
+| 3  | Charlie |
+
+**Courses Table:**
+
+| id | name       |
+|----|------------|
+| 1  | Math       |
+| 2  | Science    |
+| 3  | History    |
+
+**Junction Table - students_courses:**
+
+| id | student_id | course_id |
+|----|------------|-----------|
+| 1  | 1          | 1         |
+| 2  | 1          | 2         |
+| 3  | 2          | 1         |
+| 4  | 3          | 2         |
+| 5  | 3          | 3         |
+
+**Why is a Junction Table Required?**
+
+- A **junction table** (also called a bridge/mapping table) is required to maintain the Many-to-Many relationship.
+- The junction table contains foreign keys referencing both related tables.
+- From the above table:
+  - Alice is enrolled in Math and Science.
+  - Bob is enrolled in Math.
+  - Charlie is enrolled in Science and History.
+  - Math has Alice and Bob enrolled.
+  - Science has Alice and Charlie enrolled.
+
+> Without a junction table, there is no way to represent Many-to-Many relationships in a relational database.
+
+</Step>
+---
+
+<Step>
+### One-to-One Relationship
+
+A single record in one table is associated with **exactly one record** in another table.
+
+**Example:** A content search table stores metadata, while the actual data resides in separate type-specific tables.
+
+**Contents Table (Searchable Metadata):**
+
+| id | name          | content_id | type  |
+|----|---------------|------------|-------|
+| 1  | Intro Video   | 101        | video |
+| 2  | Jazz Track    | 201        | audio |
+| 3  | Tech Article  | 301        | blog  |
+
+**Videos Table:**
+
+| id  | data               |
+|-----|--------------------|
+| 101 | (video binary data) |
+
+**Audios Table:**
+
+| id  | data               |
+|-----|--------------------|
+| 201 | (audio binary data) |
+
+**Blogs Table:**
+
+| id  | data               |
+|-----|--------------------|
+| 301 | (blog content data) |
+
+**Key Points:**
+
+- `content_id` in the Contents table acts as a **foreign key** pointing to the respective data table (Videos, Audios, or Blogs).
+- Each content record maps to **exactly one** record in its corresponding data table.
+- This pattern is useful when you want a **unified searchable interface** while keeping actual data separated by type.
+
+</Step>
+
+---
+
+![Joins_Relationship_Summary](https://dyz1pdcuffwr5.cloudfront.net/System-designs/relationship_summary.png)
+
+![DB_Design_Best_Practices](https://dyz1pdcuffwr5.cloudfront.net/System-designs/db_design_best_practices.png)
+
+---
+
+## Summary
+* A join combines data from multiple related tables.
+
+* Relational databases support One-to-Many, Many-to-One, Many-to-Many, and One-to-One relationships.
+
+* Foreign Keys connect related tables and make joins possible.
+
+* Many-to-Many relationships require a junction table.
+
+* Proper indexing is essential for fast join performance.
+  
+* Excessive joins can become expensive in large-scale systems, where denormalization may be used.
+
+* Understanding joins is fundamental for database design, backend development, and system design interviews.
+
+
+</Steps>
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>
