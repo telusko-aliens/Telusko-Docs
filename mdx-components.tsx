@@ -18,7 +18,13 @@ import { ImageZoom } from 'fumadocs-ui/components/image-zoom';
 export function getMDXComponents(components?: MDXComponents): MDXComponents {
   return {
     ...defaultMdxComponents,
-    img:(props) => <ImageZoom {...(props as any)}/>,
+    img: (props) =>
+      props.width ? (
+        <ImageZoom {...(props as any)} />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img {...(props as any)} alt={props.alt ?? ''} />
+      ),
      Accordion,
     Accordions,
     File,

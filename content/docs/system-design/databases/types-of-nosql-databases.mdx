@@ -1,0 +1,262 @@
+---
+title: Types of NoSQL Databases
+---
+
+<Steps>
+<Video id="Vnm-ycSfJx4" />
+
+---
+
+
+NoSQL databases provide alternative ways of storing and retrieving data, allowing systems to achieve better scalability, flexibility, and
+performance. 
+
+NoSQL databases are categorized into four main types based on how they store and retrieve data:
+1. Key-Value Databases
+2. Columnar Databases
+3. Graph Databases
+4. Document Databases
+
+Each type solves a different set of problems and is widely used in modern system design
+
+---
+
+<Step>
+## Key-Value Pair Database
+
+A Key-Value database stores data in the form of a unique key and its corresponding value.
+
+- **Key** - Must be unique (acts as an identifier)
+- **Value** - Can contain any type of data
+
+### Supported Value Types
+
+| Value Type | Example                        |
+|------------|--------------------------------|
+| String     | `"hello world"`               |
+| Number     | `42`, `3.14`                  |
+| JSON       | `{"name": "Alice"}`           |
+| Array      | `[1, 2, 3]`                   |
+| Object     | Nested objects                 |
+| BLOB       | Binary large objects (images)  |
+| Byte[]     | Raw byte arrays                |
+
+### Key Characteristics
+
+- No fixed structure required
+- No relationships to maintain
+- Values can be nested objects, arrays, or combinations of multiple data types
+
+### Example: Blog Post Stored as Key-Value
+
+```json
+{
+  "posts": [
+    {
+      "post_id": 1,
+      "content": "anyText",
+      "comments": [
+        {
+          "comment_id": 1,
+          "comment": "nice"
+        }
+      ]
+    }
+  ]
+}
+```
+
+All related data (post + comments) lives together in a single value and no joins needed.
+
+![Key-Value_database_UseCases](https://dyz1pdcuffwr5.cloudfront.net/System-designs/key_value_db_cases.png)
+
+### Popular Key-Value Databases
+
+- Redis
+- Amazon DynamoDB
+- Memcached
+
+</Step>
+
+---
+
+<Step>
+## Columnar Database
+
+Traditional SQL databases read data **row-wise (left to right)**. Columnar databases read data **column-wise (top to bottom)**, enabling efficient aggregation and analytics.
+
+### How Does It Work?
+
+**Students Table:**
+
+| id | name    | marks |
+|----|---------|-------|
+| 1  | Alice   | 85    |
+| 2  | Bob     | 72    |
+| 3  | Charlie | 90    |
+
+**Task:** Calculate the average marks of the class.
+
+| Approach        | How It Reads                                  | Efficiency       |
+|-----------------|-----------------------------------------------|------------------|
+| SQL (Row-wise)  | Reads id, name, marks for every row           | Reads unnecessary columns (id, name) |
+| Columnar DB     | Reads only the marks column: [85, 72, 90]     | Reads only what's needed |
+
+### Key Characteristics
+
+| Operation | Performance | Reason                                              |
+|-----------|-------------|-----------------------------------------------------|
+| Reading   | Faster      | Only relevant columns are scanned                   |
+| Writing   | Slower      | Data must be written column by column (id → name → marks → ...) |
+
+### Use Cases
+
+- Data analytics and aggregations
+- Business intelligence and reporting
+- Large-scale data warehousing
+
+![Columnar_databases_UseCases](https://dyz1pdcuffwr5.cloudfront.net/System-designs/columnar_db_cases.png)
+
+### Popular Columnar Databases
+
+| Database         | Company |
+|------------------|---------|
+| BigQuery         | Google  |
+| RedShift         | Amazon  |
+| Snowflake        | Snowflake Inc. |
+
+> Columnar DBs are optimized for **read-heavy analytical workloads**, not for frequent writes, because data must be written separately into different column structures like id column, name column, and marks column.
+
+</Step>
+
+---
+
+<Step>
+## Graph Database
+
+Data is represented as **nodes** (entities) connected by **edges** (relationships). Both nodes and edges can have **properties**.
+
+| Component | Represents                                 | Can Have Properties? | Examples                              |
+|-----------|--------------------------------------------|----------------------|---------------------------------------|
+| Node      | Represents an entity (data)                | Yes                  | Student, Course, User                 |
+| Edge      | Represents a relationship between nodes.   | Yes                  | Student --> Enrolled In --> Course    |
+
+### Example - Student-Course-College System
+
+```
+[Student] --Enrolled--> [Course]
+[Student] --Studies-->   [College]
+[College] --Provides--> [Course]
+```
+
+**Node Properties:**
+
+| Node    | Properties                         |
+|---------|------------------------------------|
+| Student | id, name, age, department          |
+| Course  | id, name, duration, credits        |
+| College | id, name, location                 |
+
+**Edge Properties:**
+
+| Edge     | Connects            | Properties                     |
+|----------|---------------------|--------------------------------|
+| Enrolled | Student → Course    | year, marks, year_of_passing   |
+| Studies  | Student → College   | batch, enrollment_year         |
+| Provides | College → Course    | semester, faculty              |
+
+### Key Characteristics
+
+- Two entities can have **multiple different relationships**
+- Entities can be connected to **many other entities**
+- Ideal for finding **patterns and connections** between data
+- Can be slower due to maintaining multiple nodes and edges with properties
+
+![Graph_databases_UseCases](https://dyz1pdcuffwr5.cloudfront.net/System-designs/graph_db_cases.png)
+
+### Popular Graph Databases
+
+- Gremlin
+- SparQL
+- Cypher (Neo4j)
+
+</Step>
+
+---
+
+<Step>
+## Document Database
+
+Data is stored as **documents** ( JSON/BSON format). Each document can have a different structure, and thus no fixed schema is required.
+
+### Key Characteristics
+
+- **Flexible and schema-less** - each document can have different fields
+- Data can be stored with **any length and structure**
+- No need to follow a predefined schema
+- Retrieval of data is **fast** due to self-contained documents
+
+### Example - User Profiles with Varying Data
+
+```json
+// User 1: Minimal data
+{
+  "user_id": "u1",
+  "name": "Alice",
+  "email": "alice@mail.com"
+}
+
+// User 2: Detailed data
+{
+  "user_id": "u2",
+  "name": "Bob",
+  "email": "bob@mail.com",
+  "phone": "+1234567890",
+  "address": { "city": "NYC", "zip": "10001" },
+  "social": { "twitter": "@bob", "github": "bob-dev" }
+}
+```
+
+Both documents coexist in the same collection despite different structures.
+
+![Document_databases_UseCases](https://dyz1pdcuffwr5.cloudfront.net/System-designs/document_db_cases.png)
+
+### Popular Document Databases
+
+- MongoDB
+- CouchDB
+
+</Step>
+
+---
+
+## NoSQL Database Comparison
+
+| Type          | Data Model       | Read Speed | Write Speed | Best For                        |
+|---------------|------------------|------------|-------------|---------------------------------|
+| Key-Value     | Key → Value      | Very Fast  | Fast        | Caching, sessions, simple lookups |
+| Columnar      | Column-oriented  | Fast (analytics) | Slow  | Aggregations, data warehousing  |
+| Graph         | Nodes + Edges    | Moderate   | Moderate    | Relationships, pattern detection |
+| Document      | JSON Documents   | Fast       | Fast        | Flexible schemas, logging       |
+
+---
+
+
+![Different_Dabatase_Usage](https://dyz1pdcuffwr5.cloudfront.net/System-designs/different_db_usage.png)
+
+
+---
+
+## Summary
+
+* NoSQL databases are designed to address scalability, flexibility, and performance challenges that traditional relational databases may face at large scale.
+* Key-value databases provide extremely fast access and are ideal for caching and session management.
+* Columnar databases are optimized for analytical workloads and large-scale reporting systems.
+* Graph databases excel at managing and analyzing relationships between interconnected entities.
+* Document databases offer schema flexibility and are widely used for content platforms, user profiles, and modern web applications.
+* Selecting the right NoSQL database depends on the application's access patterns, scalability requirements, and data model.
+
+</Steps>
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

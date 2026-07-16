@@ -1,6 +1,9 @@
 {   "title":"Databases",
     "pages":[
         "relational-databases.mdx",
-        "db-constraints.mdx"    
+        "db-constraints.mdx",
+        "db-joins.mdx",
+        "nosql-databases.mdx",
+        "types-of-nosql-databases.mdx" 
     ]
 }

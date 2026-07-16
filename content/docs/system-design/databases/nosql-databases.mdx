@@ -1,0 +1,205 @@
+---
+title: NoSQL Databases
+---
+
+<Steps>
+<Video id="Vnm-ycSfJx4" />
+
+---
+
+
+As applications grow to millions of users and handle massive amounts of data, traditional relational databases can become difficult to scale efficiently. Modern systems such as
+social media platforms, e-commerce websites, streaming services, and real-time applications often require databases that can scale horizontally, handle flexible data structures, and provide high performance.
+
+NoSQL databases are designed to overcome many of the scalability and flexibility
+challenges faced by traditional relational databases.
+
+
+## The Problem with Relational Databases at Scale
+
+Consider a **Blog Application** with the following relational schema:
+
+| Table    | Columns                        |
+|----------|--------------------------------|
+| Posts    | id, content                    |
+| Content  | id, type (image/text/video)    |
+| Images   | id, data                       |
+| Texts    | id, data                       |
+| Videos   | id, data                       |
+| Comments | id, comment, post_id, user_id  |
+| Users    | id, name                       |
+
+This results in **6+ tables** with multiple relationships. As the blog grows in size, maintaining these relationships and scaling becomes increasingly difficult.
+
+---
+
+## Scaling Databases
+
+### 1. Vertical Scaling
+
+Vertical scaling means increasing the capacity of a single server.
+
+Examples: More RAM, Faster CPU, Larger storage, Better hardware
+
+**Advantages**
+- Simple to implement
+- No major application changes
+  
+**Limitations**
+- Expensive
+- Physical hardware limits exist
+- Eventually reaches a maximum capacity
+
+### 2. Horizontal Scaling
+
+Horizontal scaling means distributing data across multiple servers.
+
+Examples: Instead of one server: Server 1, Server 2, Server 3, Server 4. The workload is distributed among all servers.
+
+**Advantages**
+- Nearly unlimited scalability
+- Better fault tolerance
+- Improved availability
+
+**Challenges in SQL Databases**
+
+When data is distributed across multiple servers:
+- Joins become complex
+- Foreign key relationships become difficult to maintain
+- Cross-server queries become slower
+
+---
+
+## What is NoSQL?
+
+**NoSQL** stands for **Not Only SQL**.
+Unlike relational databases, NoSQL databases do not store data strictly in rows and columns. Data is typically stored as **documents**, **key-value pairs**, **wide-column stores**, or **graphs**, making them inherently easier to distribute.
+
+![NoSQL_Data_Types](https://dyz1pdcuffwr5.cloudfront.net/System-designs/nosql_data_types.png)
+
+
+### Blog Application in NoSQL (Document Model)
+
+Instead of 6 separate tables, a single document can represent a blog post:
+
+```json
+{
+  "post_id": "p101",
+  "author": {
+    "user_id": "u1",
+    "name": "Alice"
+  },
+  "content": {
+    "type": "image",
+    "data": "image_url_here"
+  },
+  "comments": [
+    { "comment_id": "c1", "text": "Great post!", "user_id": "u2" },
+    { "comment_id": "c2", "text": "Very helpful.", "user_id": "u3" }
+  ]
+}
+```
+
+- No joins required and all related data lives within **one document**.
+- Easy to replicate or partition across servers.
+
+---
+
+## Advantages of NoSQL Databases
+
+### 1. Easy Horizontal and Vertical Scaling
+
+NoSQL databases are designed for distributed environments.
+- Data can be split across multiple servers.
+- New servers can be added easily.
+- High availability can be achieved.
+- Large datasets can be managed efficiently
+
+**Common Techniques** 
+- **Sharding:** Data is divided into smaller partitions and distributed across multiple servers.
+- **Replication:** Copies of data are stored on multiple servers to improve reliability.
+
+### 2. Schema-less (Flexible Structure)
+
+In relational databases, table structure is **fixed** as you cannot have different columns for different rows.
+
+**Problem Example:**
+
+| user   | content_type | data         | description |
+|--------|--------------|--------------|-------------|
+| user1  | image        | img_url      | -           |
+| user2  | text         | text_data    | -           |
+| user3  | java_code    | code_snippet | some desc   |
+
+In SQL, every row must conform to the same schema. Adding or removing columns for individual entries is not possible without altering the entire table.
+
+**NoSQL Solution - Each document can have a different structure:**
+
+```json
+// Document 1
+{ "user": "user1", "type": "image", "data": "img_url" }
+
+// Document 2
+{ "user": "user2", "type": "text", "data": "text_content" }
+
+// Document 3
+{ "user": "user3", "type": "java_code", "data": "code_snippet", "description": "Sorting algorithm" }
+```
+
+Each document can have a **different number and type of fields** within the same collection.
+
+### 3. Self-Contained Entities
+
+Every entity in NoSQL stands on its own, and there is no need to maintain complex relationships.
+
+**Example - Courses Collection:**
+
+```json
+// Document 1: Basic info
+{ "course_id": "c1", "course": "System Design" }
+
+// Document 2: With details
+{ "course_id": "c2", "course": "DSA", "duration": "8 weeks", "level": "Intermediate" }
+
+// Document 3: With lessons
+{ "course_id": "c3", "course": "Backend", "lessons": ["Node.js", "Databases", "APIs"] }
+
+// Document 4: With lessons and comments
+{ "course_id": "c4", "course": "DevOps", "lessons": ["Docker", "K8s"], "comments": ["Excellent!", "Very detailed"] }
+```
+
+All four documents coexist in the same collection despite having different structures.
+
+---
+
+## Real-World NoSQL Usage
+
+| Company          | NoSQL Database       | Use Case                                    |
+|------------------|----------------------|---------------------------------------------|
+| Netflix          | Apache Cassandra     | Tracking user activities at scale           |
+| Amazon           | DynamoDB             | Scaling e-commerce application globally     |
+| Facebook (Meta)  | HBase                | User messaging and large-scale storage      |
+| Uber             | MongoDB              | Handling flexible and real-time data        |
+| Twitter (X)      | Redis                | Caching and timeline rendering              |
+
+---
+
+![SQL_vs_NoSQL_Comparison](https://dyz1pdcuffwr5.cloudfront.net/System-designs/sql_vs_nosql_comparison.png)
+
+---
+
+## Summary
+
+- NoSQL databases were created to solve scalability and flexibility challenges faced by traditional relational databases.
+- They store data in formats such as documents, key-value pairs, wide columns, and graphs.
+- NoSQL databases are designed for horizontal scaling and distributed architectures.
+- They provide flexible schemas, making them ideal for rapidly changing applications.
+- NoSQL databases reduce the need for joins by storing related information together.
+- SQL remains the preferred choice when strong consistency and complex relationships are required.
+- Modern large-scale applications often use both SQL and NoSQL databases together, selecting the best tool for each specific requirement.
+
+
+</Steps>
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>
