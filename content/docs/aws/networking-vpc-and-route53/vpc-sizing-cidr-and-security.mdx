@@ -1,0 +1,124 @@
+---
+title: "VPC Sizing - CIDR Blocks & Security"
+---
+
+The first decision you make when building a VPC is its **CIDR block** - the range of IP addresses it owns. Get it right and you'll never think about it again. Get it wrong - too small, or overlapping with another network - and you'll be rebuilding the VPC later, because **you can't easily shrink or un-overlap it once things are running.** This page makes CIDR make sense.
+
+## CIDR notation in 60 seconds
+
+A CIDR block looks like `10.0.0.0/16`. Two parts:
+
+```text
+   10.0.0.0 / 16
+   └─ base ─┘ └┘
+              the prefix: how many bits are FIXED (the network part)
+```
+
+- The number after the slash is how many **bits are locked** as the network portion.
+- The **remaining** bits are free for hosts. More free bits = more addresses.
+- Total addresses = 2^(32 − prefix).
+
+| CIDR | Fixed bits | Addresses | Feel |
+|------|-----------|-----------|------|
+| `/16` | 16 | 65,536 | A large VPC |
+| `/24` | 24 | 256 | A typical subnet |
+| `/28` | 28 | 16 | A tiny subnet |
+
+The smaller the number after the slash, the **bigger** the network. `/16` is huge; `/28` is tiny. (Counterintuitive at first - a smaller prefix means fewer fixed bits, so more host addresses.)
+
+## The private ranges to use
+
+VPCs use **private IP ranges** (RFC 1918) - addresses reserved for internal networks, never routable on the public internet:
+
+```text
+   10.0.0.0    - 10.255.255.255   (10.0.0.0/8)
+   172.16.0.0  - 172.31.255.255   (172.16.0.0/12)
+   192.168.0.0 - 192.168.255.255  (192.168.0.0/16)
+```
+
+`10.0.0.0/16` is the conventional starting point for a VPC - plenty of room, easy to read.
+
+## Sizing the VPC and carving subnets
+
+A common, clean layout: a `/16` VPC sliced into `/24` subnets (256 addresses each), spread across AZs and split public/private.
+
+```text
+   VPC            10.0.0.0/16   (65,536 addresses)
+   ├── public-a   10.0.1.0/24   (AZ-a, internet-facing)
+   ├── public-b   10.0.2.0/24   (AZ-b, internet-facing)
+   ├── private-a  10.0.11.0/24  (AZ-a, internal)
+   └── private-b  10.0.12.0/24  (AZ-b, internal)
+```
+
+This gives two AZs (for high availability) and a public/private tier in each.
+
+<Callout type="info">
+**Leave gaps in your subnet numbering** (1, 2, then jump to 11, 12). It costs nothing now and leaves room to add subnets later without an awkward scheme. A little planning here saves a messy retrofit when the architecture grows.
+</Callout>
+
+### The "missing" addresses
+
+AWS reserves **5 IP addresses in every subnet** (the first four and the last). So a `/24` subnet gives you **251 usable** addresses, not 256. Worth knowing before you size a subnet right up to the edge of what you need.
+
+## The cardinal sizing rules
+
+<Callout type="warn">
+**Don't overlap CIDR ranges.** If two VPCs you'll ever connect (via peering or a VPN) have overlapping ranges - both using `10.0.0.0/16` - they **cannot be connected**, because addresses would be ambiguous. Pick distinct ranges per VPC/environment from day one (e.g. prod `10.0.0.0/16`, dev `10.1.0.0/16`). Fixing an overlap later means re-addressing a live network - painful.
+</Callout>
+
+Two more rules of thumb:
+
+- **Size up, within reason.** A `/16` VPC costs nothing extra over a `/24` - the addresses are free. Going too small and running out of room is the expensive mistake.
+- **Plan subnets before you launch.** Subnets are AZ-bound and their sizes are fixed at creation; design the whole layout up front rather than bolting subnets on ad hoc.
+
+## Security: defense in depth
+
+CIDR/subnet design is the *first* security layer (segmentation). On top of it, AWS gives you two firewalls that work at different levels - and using both is "defense in depth."
+
+| | Security Group | Network ACL (NACL) |
+|---|----------------|---------------------|
+| **Level** | Instance (ENI) | Subnet |
+| **Rules** | Allow only | Allow **and** deny |
+| **State** | Stateful (return traffic auto-allowed) | Stateless (allow both directions) |
+| **Evaluated** | All rules together | In numbered order, first match wins |
+| **Typical use** | Your everyday firewall | Coarse subnet-wide guardrails |
+
+```text
+   Internet
+      │
+   ┌──▼─────────────── NACL (subnet-level, allow/deny) ───────────┐
+   │   ┌──── Security Group (instance-level, allow only) ────┐    │
+   │   │                  EC2 instance                       │    │
+   │   └─────────────────────────────────────────────────────┘    │
+   └──────────────────────────────────────────────────────────────┘
+```
+
+The layered approach: **NACLs** set broad subnet rules (e.g. "this private subnet never talks to the internet"), and **security groups** do the fine-grained per-instance control (e.g. "only the app server's SG may reach the DB on 3306").
+
+<Callout type="info">
+For most setups, you do nearly all your real work with **security groups** and leave NACLs at their default "allow all." NACLs earn their keep when you need a hard, subnet-wide *deny* that no security group rule can accidentally override - like blocking a known-bad IP range, or guaranteeing a subnet is fully internal.
+</Callout>
+
+## A sizing checklist
+
+Before you click "create VPC":
+
+<Cards>
+  <Card title="Pick a private range">
+    `10.0.0.0/16` is a safe, roomy default.
+  </Card>
+  <Card title="Don't overlap">
+    Distinct CIDR per VPC/environment you might ever connect.
+  </Card>
+  <Card title="Size generously">
+    Addresses are free; running out is the costly mistake.
+  </Card>
+  <Card title="Plan subnets across AZs">
+    Public + private tier in at least two AZs, with numbering gaps.
+  </Card>
+  <Card title="Layer the firewalls">
+    Security groups for fine control, NACLs for subnet-wide rules.
+  </Card>
+</Cards>
+
+With the addressing and security thinking in place, the next page actually builds a custom VPC from the ground up.

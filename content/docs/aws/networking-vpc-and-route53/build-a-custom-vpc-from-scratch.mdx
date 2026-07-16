@@ -1,0 +1,122 @@
+---
+title: "Build a Custom VPC from Scratch"
+---
+
+Reading about subnets and route tables is abstract until you wire them together yourself and watch a server in a *public* subnet reach the internet while a server in a *private* subnet can't. This page builds a complete, two-tier VPC by hand - VPC, subnets, gateway, routes, and a NAT - so every component clicks into a working whole.
+
+## The target architecture
+
+```text
+   VPC  10.0.0.0/16
+   ┌────────────────────────────────────────────────────────────┐
+   │  Public subnet 10.0.1.0/24 (AZ-a)                            │
+   │   ├── web server (public IP)                                 │
+   │   └── NAT Gateway ───────────────┐                           │
+   │           ▲                       │ outbound for private      │
+   │  Internet Gateway                 ▼                           │
+   │           ▲          Private subnet 10.0.11.0/24 (AZ-a)       │
+   │           │           └── app/db server (no public IP)        │
+   └───────────┼──────────────────────────────────────────────────┘
+               ▼
+           Internet
+```
+
+Two tiers: a public subnet that faces the internet, and a private subnet that can reach *out* (via NAT) but is never reachable *in*.
+
+## Build it step by step
+
+<Steps>
+<Step>
+### Create the VPC
+
+VPC console → **Create VPC.** Choose **VPC only**, name it, and set the CIDR to `10.0.0.0/16`. (The "VPC and more" wizard can build everything below in one shot - but doing it manually once is how you learn what it creates.)
+</Step>
+
+<Step>
+### Create two subnets
+
+- **Public subnet:** `10.0.1.0/24` in AZ `ap-south-1a`.
+- **Private subnet:** `10.0.11.0/24` in the same AZ (or another for HA).
+
+Nothing is "public" yet - that depends on routing, which comes below.
+</Step>
+
+<Step>
+### Create and attach an Internet Gateway
+
+VPC → **Internet Gateways → Create**, then **Attach** it to your VPC. This is the door to the internet; without it, no subnet can be public.
+</Step>
+
+<Step>
+### Create the route tables
+
+**Public route table:**
+- Associate it with the **public subnet**.
+- Add a route: `0.0.0.0/0 → Internet Gateway`. *This single route is what makes the subnet public.*
+
+**Private route table:**
+- Associate it with the **private subnet**.
+- Leave it with only the automatic `local` route for now (no internet path).
+</Step>
+
+<Step>
+### Enable auto-assign public IP on the public subnet
+
+Edit the public subnet's settings → enable **auto-assign public IPv4.** Now instances launched there get a public IP automatically.
+</Step>
+
+<Step>
+### Add a NAT Gateway for the private subnet
+
+VPC → **NAT Gateways → Create**, placed **in the public subnet**, with an Elastic IP. Then edit the **private** route table and add: `0.0.0.0/0 → NAT Gateway`. The private subnet can now reach out (updates, APIs) but stays unreachable from the internet.
+</Step>
+</Steps>
+
+## Test that it actually works
+
+The proof is in launching instances and observing the asymmetry:
+
+```text
+   Public instance:
+     ✅ gets a public IP
+     ✅ you can SSH in from your laptop (SG allows 22 from your IP)
+     ✅ it can reach the internet (curl https://example.com)
+
+   Private instance:
+     ❌ no public IP - you CANNOT SSH to it directly from outside
+     ✅ it can still reach the internet OUTBOUND via the NAT (yum update works)
+     ✅ reachable from the public instance over private IP (SSH "jump")
+```
+
+To reach the private instance, you SSH into the public one first, then SSH onward using the private IP - the **bastion / jump host** pattern. That's the secure way to administer private servers.
+
+<Callout type="info">
+The moment that makes VPC "click": you `curl` a website successfully from the **private** instance (outbound through NAT works), but you cannot `ssh` *to* it from your laptop (no inbound path). Outbound-yes / inbound-no is exactly the isolation a private subnet is supposed to provide - and you built it.
+</Callout>
+
+## Common things that go wrong
+
+When connectivity misbehaves, it's almost always one of these - check in order:
+
+| Symptom | Usual cause |
+|---------|-------------|
+| Public instance has no internet | Route table missing `0.0.0.0/0 → IGW`, or IGW not attached |
+| Public instance has no public IP | Auto-assign public IP not enabled on the subnet |
+| Can't SSH to public instance | Security group doesn't allow port 22 from your IP |
+| Private instance can't `yum update` | Private route table missing `0.0.0.0/0 → NAT`, or NAT in wrong subnet |
+| Private instance reachable from internet | It shouldn't be - check it has no public IP and no IGW route |
+
+<Callout type="warn">
+**NAT Gateways cost money** - an hourly charge plus per-GB data processing - and they run 24/7 once created. They're one of the most common "why is my bill not zero?" culprits on a learning account. When you finish this exercise, **delete the NAT Gateway** (and release its Elastic IP). For pure learning where the private subnet doesn't truly need outbound internet, you can skip the NAT entirely.
+</Callout>
+
+## What you built, and why it's the real-world shape
+
+```text
+   Public tier   → load balancers, bastion hosts, public web servers
+   Private tier  → app servers, RDS databases, internal services
+```
+
+This two-tier (or three-tier, adding a separate data subnet) layout is the standard production VPC: anything that must face the internet lives public, everything sensitive lives private, and the NAT gives private resources controlled outbound access. You now understand every piece of it because you assembled it.
+
+Next: connecting two separate VPCs together with **VPC peering**.

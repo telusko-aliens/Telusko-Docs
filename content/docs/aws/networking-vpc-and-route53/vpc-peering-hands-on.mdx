@@ -1,0 +1,121 @@
+---
+title: "VPC Peering Hands-On"
+---
+
+VPCs are isolated by design - a server in VPC-A can't talk to a server in VPC-B, even in the same account, even in the same region. Usually that's exactly what you want. But sometimes two networks genuinely need to talk: a shared-services VPC and an app VPC, or two teams' environments. **VPC peering** is the private, direct link between them.
+
+## What peering is
+
+A **VPC peering connection** privately links two VPCs so resources in each can communicate using **private IP addresses**, as if they were on the same network. The traffic stays on AWS's backbone - it never touches the public internet.
+
+```text
+   VPC-A  10.0.0.0/16            VPC-B  10.1.0.0/16
+   ┌──────────────────┐         ┌──────────────────┐
+   │  server  10.0.1.5│◄═══════►│ server  10.1.1.9  │
+   └──────────────────┘ peering └──────────────────┘
+         private IPs, AWS backbone, no internet
+```
+
+Peering works **across accounts** and **across regions**, not just within one account - handy for connecting environments owned by different teams.
+
+## The one rule that makes or breaks it
+
+<Callout type="warn">
+**The two VPCs' CIDR ranges must not overlap.** If both use `10.0.0.0/16`, peering is impossible - an address like `10.0.1.5` would be ambiguous (which VPC?). This is *the* reason the sizing page insisted on distinct ranges per VPC. If you're planning to peer, settle the CIDRs (e.g. `10.0.0.0/16` and `10.1.0.0/16`) before you build either VPC.
+</Callout>
+
+## Setting up peering
+
+Peering isn't "on" just because you created the connection - there are three distinct steps, and skipping any of them leaves traffic broken.
+
+<Steps>
+<Step>
+### Create the peering connection
+
+VPC → **Peering Connections → Create.** Pick the **requester** VPC (VPC-A) and the **accepter** VPC (VPC-B). It starts in *pending-acceptance*.
+</Step>
+
+<Step>
+### Accept the request
+
+On the accepter side (VPC-B - possibly another account/region), **accept** the pending connection. Now the link exists - but no traffic flows yet.
+</Step>
+
+<Step>
+### Update route tables on BOTH sides
+
+This is the step everyone forgets. Each VPC needs a route pointing the *other* VPC's CIDR at the peering connection:
+
+```text
+   VPC-A route table:  10.1.0.0/16 → pcx-xxxx (the peering connection)
+   VPC-B route table:  10.0.0.0/16 → pcx-xxxx
+```
+
+Without routes on *both* sides, packets leave but never find their way back.
+</Step>
+
+<Step>
+### Open security groups
+
+The destination instance's **security group** must allow the incoming traffic from the other VPC's IP range (e.g. allow ICMP/SSH/your-port from `10.0.0.0/16`). Peering provides the path; the firewall still has to permit the traffic.
+</Step>
+</Steps>
+
+## Test it
+
+From a server in VPC-A, reach a server in VPC-B by its **private IP**:
+
+```bash
+# from VPC-A's instance, ping VPC-B's instance private IP
+ping 10.1.1.9
+# or
+ssh ec2-user@10.1.1.9
+```
+
+If it works, you've connected two isolated networks privately. If it times out, walk the checklist: routes on both sides? security group allowing the source range? CIDRs non-overlapping?
+
+<Callout type="info">
+A clean way to remember the four requirements: **connection accepted, routes both ways, security groups open, CIDRs distinct.** Three of those four are the usual culprits when peering "doesn't work" - almost always a missing route on one side or a security group that wasn't opened.
+</Callout>
+
+## The limitation that surprises people: no transitive peering
+
+Peering is strictly **point-to-point.** If A peers with B, and B peers with C, that does **not** mean A can reach C. There's no routing *through* B.
+
+```text
+   A ↔ B   (peered)
+   B ↔ C   (peered)
+   A ✗ C   ── NOT connected; peering is non-transitive
+```
+
+To connect A and C you'd add a *direct* A↔C peering. This is fine for a few VPCs, but it explodes as you add more - connecting N VPCs fully needs N×(N-1)/2 connections.
+
+## When peering stops scaling: Transit Gateway
+
+Once you have many VPCs to interconnect, a mesh of peerings becomes unmanageable. The answer is **AWS Transit Gateway** - a hub that every VPC connects to once, and it routes between them all:
+
+```text
+   Peering mesh (messy)          Transit Gateway (hub-and-spoke)
+   A ─ B                              A
+   │ ╳ │                             ╱│╲
+   C ─ D                       B ── TGW ── D
+   (many links)                      │
+                                     C
+```
+
+| | VPC Peering | Transit Gateway |
+|---|-------------|-----------------|
+| **Topology** | Point-to-point | Hub-and-spoke |
+| **Transitive?** | No | Yes |
+| **Scales to** | A handful of VPCs | Hundreds |
+| **Cost** | Cheaper (data transfer only) | Hourly + data charges |
+
+<Callout type="info">
+For two or three VPCs, **peering** is the simplest, cheapest answer - and it's what the hands-on builds. Reach for **Transit Gateway** when you're connecting many VPCs (and maybe on-prem networks too) and the peering mesh becomes a maintenance burden. Don't over-engineer with a Transit Gateway when one peering connection does the job.
+</Callout>
+
+## Cleanup
+
+A peering connection itself has no hourly charge (you pay for cross-AZ/cross-region data transfer), but tidy up anyway - delete the peering connection and remove the routes you added when you're done practising, so old paths don't linger in your route tables.
+
+That's VPC-to-VPC connectivity. Next we move up to how humans (and the internet) *find* your resources by name - DNS with Route 53.

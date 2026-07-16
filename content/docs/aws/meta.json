@@ -11,7 +11,7 @@
         "load-balancing-and-auto-scaling",
         "storage-and-static-hosting",
         "databases-with-rds",
-        "disabled-networking-vpc-and-route53",
+        "networking-vpc-and-route53",
         "disabled-monitoring-cli-and-iac"
     ]
 }

@@ -1,0 +1,11 @@
+{
+    "title": "Networking: VPC & Route 53",
+    "pages": [
+        "vpc-networking-basics-and-components.mdx",
+        "vpc-sizing-cidr-and-security.mdx",
+        "build-a-custom-vpc-from-scratch.mdx",
+        "vpc-peering-hands-on.mdx",
+        "route-53-dns-hosted-zones-and-records.mdx",
+        "route-53-with-load-balancer.mdx"
+    ]
+}

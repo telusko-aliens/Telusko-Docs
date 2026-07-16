@@ -1,0 +1,109 @@
+---
+title: "VPC Basics & Components"
+---
+
+Every EC2 instance, every RDS database, every load balancer you've launched so far lived inside a **VPC** - you just used the default one without thinking about it. A **VPC - Virtual Private Cloud - is your own private, isolated network inside AWS.** It's the digital equivalent of the building your servers sit in: you decide the address scheme, the rooms, the doors to the outside, and who can walk between rooms.
+
+## The mental model: your own data centre
+
+```text
+   AWS Region
+   ┌──────────────────────────────────────────────────────┐
+   │  VPC  10.0.0.0/16   (your private network)             │
+   │                                                        │
+   │   Public subnet 10.0.1.0/24      Private subnet 10.0.2.0/24
+   │   ┌──────────────────┐           ┌──────────────────┐ │
+   │   │  web server      │           │   database        │ │
+   │   │  (internet-facing)│  ──────►  │   (no internet)   │ │
+   │   └──────────────────┘           └──────────────────┘ │
+   │            │                                           │
+   │      Internet Gateway ── to/from the internet          │
+   └──────────────────────────────────────────────────────┘
+```
+
+A VPC is **isolated** by default - nothing gets in or out unless you build a path. That isolation is the whole security premise: your database can be made literally unreachable from the internet while your web server stays public.
+
+## The core components
+
+A working VPC is assembled from a handful of parts. Learn these six and VPC stops being intimidating:
+
+| Component | What it is | Analogy |
+|-----------|------------|---------|
+| **VPC** | The private network, defined by an IP range (CIDR) | The building |
+| **Subnet** | A slice of the VPC's range, tied to one AZ | A floor / room |
+| **Route table** | Rules for where traffic goes | The hallway signs |
+| **Internet Gateway (IGW)** | The door to the public internet | The front door |
+| **NAT Gateway** | Lets private subnets reach *out* without being reachable | A one-way exit |
+| **Security group / NACL** | Firewalls (instance / subnet level) | Locks on doors |
+
+### Subnets: public vs. private
+
+A **subnet** is a sub-range of the VPC's IPs, and it lives in **exactly one Availability Zone.** What makes a subnet "public" or "private" isn't a checkbox - it's whether its route table has a path to the internet:
+
+```text
+   Public subnet  → route table sends 0.0.0.0/0 to the Internet Gateway
+   Private subnet → no route to the IGW (no direct internet path)
+```
+
+That's the entire distinction. A "public subnet" is just a subnet whose traffic *can* reach the internet gateway.
+
+<Callout type="info">
+The standard, secure pattern is **public subnet for things that must face the internet** (load balancers, bastion hosts, public web servers) and **private subnet for everything that shouldn't** (databases, internal app servers). Put your RDS database in a private subnet and it's unreachable from the internet by design - no firewall rule can be misconfigured to expose it, because there's no route there at all.
+</Callout>
+
+### Route tables: the traffic signs
+
+A **route table** is a list of rules saying "traffic for *this* destination goes to *that* target." Every subnet is associated with one. The key route is the default one:
+
+```text
+   Destination      Target
+   10.0.0.0/16      local            ← traffic within the VPC stays internal
+   0.0.0.0/0        igw-xxxx         ← everything else → Internet Gateway (public subnet)
+```
+
+The `local` route is automatic - it's how subnets talk to each other. Adding the `0.0.0.0/0 → IGW` route is what turns a subnet public.
+
+### Internet Gateway: the front door
+
+The **Internet Gateway (IGW)** is what connects your VPC to the public internet. One per VPC, attached to it, and referenced in route tables. No IGW = no internet, in or out.
+
+### NAT Gateway: the one-way exit
+
+Private subnets often still need to reach *out* - to download OS updates or call an external API - without being reachable *from* the internet. A **NAT Gateway** (placed in a public subnet) makes that possible:
+
+```text
+   Private server ──► NAT Gateway (public subnet) ──► Internet
+   Internet ──X──► (cannot initiate a connection back to the private server)
+```
+
+Outbound works; inbound from the internet doesn't. (Note: NAT Gateways cost money per hour and per GB - a common surprise on bills.)
+
+## How it all connects - a request's journey
+
+A user hitting a web app that talks to a private database:
+
+```text
+   1. User ──► Internet Gateway ──► public subnet ──► web server
+   2. Web server ──► (private IP) ──► database in private subnet
+   3. Database response ──► back to web server ──► IGW ──► user
+   4. Database needs an update? ──► NAT Gateway ──► internet (outbound only)
+```
+
+The web server is reachable; the database never is. That layered exposure is what good VPC design gives you.
+
+## The default VPC
+
+Every account comes with a **default VPC** in each region - pre-built with public subnets, an internet gateway, and routes, so a freshly launched instance "just works" with a public IP. It's convenient for learning (it's what you've been using), but for real workloads you build a **custom VPC** so *you* control the layout, segmentation, and what's exposed. That's exactly what the next pages do.
+
+<Callout type="warn">
+The default VPC makes every subnet public - fine for experiments, not for production. Anything sensitive launched into a default VPC's subnet is one security-group mistake away from exposure. Designing your own VPC with proper public/private separation is a core skill, and it's why this section builds one from scratch.
+</Callout>
+
+## The recap
+
+- A **VPC** is your isolated private network, defined by a CIDR range.
+- **Subnets** slice it per-AZ; **public** ones route to an **Internet Gateway**, **private** ones don't.
+- **Route tables** decide where traffic flows; **NAT Gateways** give private subnets outbound-only internet.
+- **Security groups** and **NACLs** are the firewalls layered on top.
+
+Next: how to *size* a VPC - choosing CIDR blocks - and the security thinking that goes with it.

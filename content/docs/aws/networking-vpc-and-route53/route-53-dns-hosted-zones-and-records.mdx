@@ -1,0 +1,124 @@
+---
+title: "Route 53 - DNS, Hosted Zones & Records"
+---
+
+Nobody types `54.221.10.8` into a browser - they type `telusko.com`. The system that translates the friendly name into the address is **DNS**, and **Route 53** is AWS's DNS service. (The name is a nod to port 53, the port DNS runs on.) It's where you register or manage domains, and where you tell the internet "this name points at that resource."
+
+## DNS in one diagram
+
+```text
+   You type:  shop.example.com
+       │
+       ▼
+   DNS lookup: "what's the IP for shop.example.com?"
+       │
+       ▼
+   Answer:  13.232.0.50
+       │
+       ▼
+   Browser connects to 13.232.0.50
+```
+
+DNS is the internet's phone book: names in, addresses out. Route 53 is your entry in that phone book, and it's a **global** service - not tied to a region.
+
+## Hosted zones: your domain's container
+
+A **hosted zone** is a container for all the DNS records of one domain. Create a hosted zone for `example.com` and inside it you manage every record - `www`, `api`, `mail`, the root, and so on.
+
+```text
+   Hosted zone: example.com
+   ├── example.com        →  A record  → 13.232.0.50
+   ├── www.example.com    →  CNAME     → example.com
+   ├── api.example.com    →  A (alias) → load balancer
+   └── mail.example.com   →  MX record → mail server
+```
+
+Two kinds:
+
+- **Public hosted zone** - resolves names on the public internet (what a real website uses).
+- **Private hosted zone** - resolves names only *inside* your VPC(s), for internal service names.
+
+## The record types that matter
+
+DNS has many record types; you'll use a handful constantly:
+
+| Record | Maps a name to | Example |
+|--------|----------------|---------|
+| **A** | An IPv4 address | `example.com → 13.232.0.50` |
+| **AAAA** | An IPv6 address | `example.com → 2406:da00::1` |
+| **CNAME** | Another name (alias) | `www.example.com → example.com` |
+| **MX** | A mail server | routes email for the domain |
+| **TXT** | Arbitrary text | domain verification, SPF/DKIM |
+| **NS** | The authoritative name servers | delegation |
+
+### The A record
+
+The **A record** is the workhorse: it points a name straight at an IPv4 address. `example.com → 13.232.0.50` is an A record. When you "point my domain at my server," you're usually creating or editing an A record.
+
+### CNAME vs. A
+
+A **CNAME** points a name at *another name* rather than an IP:
+
+```text
+   A:     example.com     → 13.232.0.50   (name → IP)
+   CNAME: www.example.com → example.com   (name → another name)
+```
+
+<Callout type="warn">
+A **CNAME cannot be used on the root/apex domain** (`example.com` itself) - only on subdomains (`www.example.com`). This is a hard DNS rule that trips everyone up: you can't CNAME the bare domain. Route 53's answer is the **Alias record** (below), which *can* sit on the apex and point at AWS resources.
+</Callout>
+
+## Alias records: Route 53's superpower
+
+An **Alias record** is a Route 53-specific record that points a name directly at an **AWS resource** - a load balancer, CloudFront distribution, S3 website, or another Route 53 record - instead of at a raw IP.
+
+Why it's better than a plain A or CNAME for AWS resources:
+
+- It **works on the apex domain** (unlike CNAME) - so `example.com` (no `www`) can point at a load balancer.
+- It **auto-updates** if the underlying resource's IP changes (load balancer IPs change; the alias follows).
+- It's **free** to query (AWS doesn't charge for alias lookups to AWS resources).
+
+```text
+   example.com  ─Alias─►  my-alb-123.ap-south-1.elb.amazonaws.com
+   (apex domain pointing straight at the load balancer - no IP to maintain)
+```
+
+This is exactly how you point a domain at a load balancer, which is the next page.
+
+## TTL: how long answers are cached
+
+Every record has a **TTL (Time To Live)** - how long resolvers cache the answer before asking again.
+
+```text
+   TTL = 300   → cached for 5 minutes (changes propagate fast, more queries)
+   TTL = 86400 → cached for 24 hours  (fewer queries, slow to change)
+```
+
+<Callout type="info">
+Lower the TTL **before** you plan a change (e.g. set it to 60 seconds a day ahead), make the change, then raise it back. That way the old answer expires from caches quickly and your update propagates fast. Forgetting this is why "I changed my DNS but the old site still loads" - caches are still holding the previous answer until its TTL expires. (Alias records to AWS resources sidestep much of this.)
+</Callout>
+
+## Registering vs. managing a domain
+
+Route 53 does two related jobs - don't confuse them:
+
+- **Register a domain** - buy `yourname.com` through Route 53 (it's also a registrar). It then auto-creates a hosted zone for you.
+- **Manage DNS for a domain** - you can keep a domain bought elsewhere (GoDaddy, Namecheap) and just use Route 53 for DNS. To do that, create a hosted zone, then update the domain's **name servers** at your registrar to the NS values Route 53 gives you.
+
+```text
+   Domain bought at GoDaddy + DNS on Route 53:
+     1. Create hosted zone in Route 53 for example.com
+     2. Route 53 gives you 4 NS server names
+     3. At GoDaddy, set the domain's name servers to those 4
+     4. Now Route 53 answers all DNS for example.com
+```
+
+## The recap
+
+- **Route 53** is AWS's global DNS (and a domain registrar).
+- A **hosted zone** holds all records for one domain.
+- **A records** map names to IPs; **CNAMEs** map names to other names (not on the apex).
+- **Alias records** point names at AWS resources, work on the apex, auto-update, and are free to query - the right choice for load balancers, CloudFront, and S3.
+- **TTL** controls caching; lower it before planned changes.
+
+Next, we use all of this to point a real domain at a load balancer.

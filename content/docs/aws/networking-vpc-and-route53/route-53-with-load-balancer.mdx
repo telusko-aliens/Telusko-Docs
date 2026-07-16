@@ -1,0 +1,123 @@
+---
+title: "Route 53 with a Load Balancer"
+---
+
+This page joins two threads - the load balancer from earlier and the DNS you just learned - into the setup that fronts almost every real AWS web app: **a friendly domain name pointing at a load balancer, which spreads traffic across an auto-scaling fleet.** It's the last mile that turns `my-alb-123.ap-south-1.elb.amazonaws.com` into `www.yoursite.com`.
+
+## Why not point the domain at a server?
+
+You *could* point an A record straight at an EC2 instance's IP. You shouldn't:
+
+```text
+   Domain ──► single server IP
+     ✗ server dies → site down until you edit DNS (and wait for TTL)
+     ✗ stop/start changes the public IP → DNS now wrong
+     ✗ can't scale to multiple servers
+
+   Domain ──► load balancer ──► fleet of servers
+     ✅ a server can die; the LB routes around it
+     ✅ the LB's address is stable; instances come and go freely
+     ✅ scales to as many servers as you need
+```
+
+The load balancer gives you one stable, resilient front door; Route 53 gives that door a human name.
+
+## The catch: load balancers don't have fixed IPs
+
+An Application Load Balancer's IP addresses **change over time** - AWS manages them, and there can be several. So you can't just write an A record with a hardcoded IP. This is precisely the problem the **Alias record** solves.
+
+<Callout type="info">
+A plain A record needs a fixed IP, which a load balancer doesn't have. A **CNAME** could point a *subdomain* at the LB's DNS name - but a CNAME can't sit on the apex (`yoursite.com`). The **Alias record** handles both cases: it points at the load balancer *as a resource*, works on the apex, and auto-updates as the LB's IPs change. For domain-to-load-balancer, **alias is the answer.**
+</Callout>
+
+## Wiring it up
+
+<Steps>
+<Step>
+### Have a load balancer ready
+
+An internet-facing ALB across two AZs, forwarding to a target group of healthy instances (from the load-balancing section). Note its DNS name.
+</Step>
+
+<Step>
+### Have a hosted zone for your domain
+
+A Route 53 public hosted zone for `yoursite.com`, with the domain's name servers pointed at Route 53 (whether registered in Route 53 or elsewhere).
+</Step>
+
+<Step>
+### Create an Alias A record at the apex
+
+In the hosted zone, create a record:
+- **Name:** leave blank for the apex (`yoursite.com`), or `www` for the subdomain.
+- **Type:** A.
+- **Alias:** toggle **on**.
+- **Route traffic to:** *Alias to Application/Network Load Balancer*, your region, then pick your ALB.
+
+```text
+   yoursite.com  ─Alias A─►  my-alb-123.ap-south-1.elb.amazonaws.com
+```
+</Step>
+
+<Step>
+### Add the www variant too
+
+Most people want both `yoursite.com` and `www.yoursite.com` to work. Add a second alias record for `www` pointing at the same ALB (or a record that redirects one to the other).
+</Step>
+
+<Step>
+### Test
+
+After DNS propagates, `http://yoursite.com` resolves to the ALB, which forwards to a healthy instance. Confirm with:
+
+```bash
+dig yoursite.com          # see the resolved addresses
+curl -I http://yoursite.com
+```
+</Step>
+</Steps>
+
+## Add HTTPS while you're here
+
+A real domain should be served over HTTPS. The pieces fit together cleanly:
+
+```text
+   Route 53 (yoursite.com)
+        │ alias
+        ▼
+   ALB  ── HTTPS:443 listener with an ACM certificate for yoursite.com
+        ── HTTP:80 listener that redirects to HTTPS
+        │ forwards (plain HTTP) to
+        ▼
+   Target group → instances
+```
+
+1. Request a **free certificate** for `yoursite.com` (and `www`) in **AWS Certificate Manager (ACM)** - validate it via a DNS record Route 53 can add for you automatically.
+2. Add an **HTTPS:443 listener** on the ALB using that certificate.
+3. Add an **HTTP:80 listener** that **redirects to HTTPS**, so visitors always end up secure.
+
+The ALB terminates TLS, so your instances behind it can speak plain HTTP internally - no per-instance certificates.
+
+<Callout type="info">
+This is the canonical production stack and it's worth memorizing as a unit: **Route 53 (alias) → ALB (HTTPS via ACM) → Auto Scaling Group → instances**, often with **RDS in a private subnet** behind them. Almost every "deploy a web app properly on AWS" answer is some version of this diagram.
+</Callout>
+
+## Routing policies (a glimpse beyond the basics)
+
+Pointing a name at one load balancer is "simple routing." Route 53 can do much more when you need it:
+
+| Policy | Sends traffic based on |
+|--------|------------------------|
+| **Simple** | One record, one target (what we did) |
+| **Weighted** | Percentages - 90% to v1, 10% to v2 (canary releases) |
+| **Latency** | The region that's fastest for the user |
+| **Failover** | A healthy primary, falling back to a standby |
+| **Geolocation** | The user's country/continent |
+
+These power blue-green deployments, multi-region apps, and disaster recovery. You don't need them for a single-region site - but knowing they exist means you'll recognize the tool when the need ("serve EU users from Frankfurt, fail over to Mumbai") appears.
+
+## Cleanup
+
+Route 53 hosted zones carry a small **monthly charge per zone**, plus per-query charges (alias queries to AWS resources are free). For learning, delete hosted zones you're not using. And as always, tear down the ALB and instances behind it when the exercise is over - those are the parts that bill by the hour.
+
+That completes the networking section - and the core AWS service tour. From here the course shifts to operating and automating everything you've built: monitoring, the CLI, and infrastructure as code.
