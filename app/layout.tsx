@@ -34,7 +34,7 @@ export default function Layout({ children }: LayoutProps<'/'>) {
     // 'rgba(140, 170, 255, 0.3)',
     'transparent',
   ]} > <a 
-    href="https://www.learn.telusko.com/courses/agentic-ai-engineering-with-python" 
+    href="https://go.telusko.com/agentic-ai-python" 
     target="_blank" 
     rel="noopener noreferrer" 
     className="flex items-center gap-2 justify-center no-underline hover:no-underline text-sm sm:text-base md:text-lg"
