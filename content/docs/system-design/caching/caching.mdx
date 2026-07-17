@@ -1,0 +1,221 @@
+---
+title: Caching
+---
+
+<Steps>
+<Video id="Vnm-ycSfJx4" />
+
+---
+
+
+Caching is a performance optimization technique used to store frequently accessed data in a high-speed temporary storage layer known as a **cache**. Instead of repeatedly querying a database for the same information, applications retrieve the data directly from memory, resulting in significantly faster response times and reduced database load.
+
+
+## Why is Caching Needed?
+
+As applications grow, the number of database requests increases rapidly. Repeatedly fetching the same data from the database introduces unnecessary latency and places additional load on the database server.
+
+### Example Scenario
+
+Consider a learning platform where:
+
+* A user is enrolled in **6 courses**
+* Each course contains **4 sections**
+
+To load the dashboard, the application may need to fetch details for all courses and sections.
+
+**Total Database Requests:**
+
+```
+6 Courses × 4 Sections = 24 Requests
+```
+
+Without caching:
+
+* Every page refresh triggers the same database queries.
+* Database response time increases.
+* Server resources are consumed unnecessarily.
+* User experience becomes slower.
+
+
+### Solution through Caching
+
+Caching addresses this problem by storing frequently accessed data after its first retrieval from the database.
+
+1. User requests course information.
+2. Application checks the cache.
+3. If data is not found, it is fetched from the database.
+4. The fetched data is stored in the cache.
+5. Subsequent requests retrieve the data directly from the cache.
+
+**Benefits**
+
+* Faster response times
+* Reduced database traffic
+* Lower server load
+* Improved scalability
+* Better user experience
+
+
+---
+
+![Types_of_Caching](https://dyz1pdcuffwr5.cloudfront.net/System-designs/cache_types.png)
+
+---
+
+
+## Cache Terminology
+
+### 1. Cache Hit
+
+A **Cache Hit** occurs when the requested data is already present in the cache.
+
+1. Application checks the cache.
+2. Data is found.
+3. Data is returned immediately.
+4. No database query is required.
+
+**Example**
+
+```
+Request → Cache → Data Found → Response
+```
+
+### 2. Cache Miss
+
+A **Cache Miss** occurs when the requested data is not available in the cache.
+
+1. Application checks the cache.
+2. Data is not found.
+3. Database is queried.
+4. Retrieved data is returned to the user.
+5. Data may be stored in the cache for future requests.
+
+**Example**
+
+```
+Request → Cache → Data Not Found
+                    ↓
+                Database
+                    ↓
+                 Response
+                    ↓
+             Store in Cache
+```
+
+### 3. TTL (Time To Live)
+
+**TTL (Time To Live)** defines how long a cached item remains valid.
+
+Once the TTL expires:
+
+* The cached entry becomes invalid.
+* The item is automatically removed from the cache.
+* A fresh copy must be retrieved from the database.
+
+**Example**
+
+```
+Course Data
+TTL = 30 Minutes
+
+After 30 minutes:
+Cache Entry Expires
+→ Removed Automatically
+→ Fresh Data Retrieved on Next Request
+```
+
+---
+
+## How Data is Stored in Cache?
+
+Most caching systems store information using a **Key-Value Pair** structure.
+
+### Key
+
+A unique identifier used to locate cached data.
+
+**Examples:**
+
+```text
+user:101
+course:501
+product:2001
+```
+
+### Value
+
+Contains the actual data associated with the key.
+
+**Example:**
+
+```json
+{
+  "courseId": 501,
+  "courseName": "System Design",
+  "sections": 4
+}
+```
+
+### Metadata
+
+Additional information stored with the value, such as:
+
+* TTL
+* Creation time
+* Last access time
+* Expiration timestamp
+
+
+---
+
+
+## Automatic Eviction of Expired Data
+
+When a cache entry reaches its expiration time:
+
+1. The item becomes invalid.
+2. The cache system removes it automatically.
+3. Memory is freed for new entries.
+4. Fresh data is loaded from the database when needed.
+
+This process is known as **cache eviction**.
+
+
+---
+
+
+## Why Not Cache All Data?
+
+| Reason                       | Explanation                                                             |
+| ---------------------------- | ----------------------------------------------------------------------- |
+| **Limited Memory**           | Cache memory is much smaller and more expensive than database storage.  |
+| **Frequently Accessed Data** | Only commonly requested data provides significant performance benefits. |
+| **Data Consistency**         | Cached data should be refreshed regularly to prevent stale information. |
+
+
+---
+
+
+![Caching_Usage](https://dyz1pdcuffwr5.cloudfront.net/System-designs/cache_usage.png)
+
+---
+
+
+## Summary
+
+* **Caching** stores frequently accessed data in memory to improve performance.
+* It reduces database load and decreases response latency.
+* A **Cache Hit** occurs when data is found in the cache.
+* A **Cache Miss** occurs when data must be retrieved from the database.
+* **TTL (Time To Live)** controls how long cached data remains valid.
+* Cache systems typically store data using **key-value pairs**.
+* Expired entries are automatically removed through cache eviction.
+* Not all data should be cached due to memory limitations and consistency concerns.
+* Caching enhances application scalability and user experience but complements the database rather than replacing it.
+
+
+</Steps>
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

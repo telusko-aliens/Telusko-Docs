@@ -1,0 +1,141 @@
+---
+title: Caching Strategies
+---
+
+<Steps>
+<Video id="Vnm-ycSfJx4" />
+
+---
+
+
+Caching strategies determine how data is stored, retrieved, and synchronized between the cache and the database. Choosing the correct strategy helps balance **performance**, **consistency**, **scalability**, and **reliability** within a system.
+
+<Step>
+## Read-Through Cache
+
+A strategy designed to handle **read operations from the cache only**. Write operations always go directly to the database.
+
+### How It Works?
+
+| Operation | Flow |
+|------------|------|
+| Read (Cache Hit) | Request → Cache → Response |
+| Read (Cache Miss) | Request → Cache (Miss) → Database → Store in Cache → Response from Cache |
+| Write | Request → Database directly (Cache is not updated) |
+
+**Key Points**
+
+- Data is never written to the cache explicitly; it is populated only when a cache miss occurs.
+- The first read for any data always results in a cache miss.
+- Subsequent reads are served directly from the cache.
+- Best suited for read-heavy workloads where write data does not need to be cached.
+
+**Example**
+
+Product listings displayed to users are cached for fast retrieval. Order placement requests go directly to the database because they are write operations that are not frequently read by users.
+
+</Step>
+
+---
+
+<Step>
+## Write-Through Cache
+
+A strategy where data is written to the cache first and then synchronously written to the database.
+
+### How It Works?
+
+| Operation | Flow |
+|------------|------|
+| Write | Request → Cache (Updated) → Database (Updated) |
+| Read | Request → Cache → Response |
+
+**Key Points**
+
+- Cache always contains the latest and most consistent data.
+- Write latency is slightly higher because both cache and database are updated on every write.
+- Ensures strong consistency between cache and database.
+- Read operations are extremely fast since data is already available in the cache.
+
+**Example**
+
+Stock market values that must always reflect the latest price. Every update is written to the cache first and then persisted to the database.
+
+</Step>
+
+---
+
+<Step>
+## Write-Around Cache
+
+A strategy where write operations go directly to the database, bypassing the cache entirely. Reads are served from the cache.
+
+### How It Works?
+
+| Operation | Flow |
+|------------|------|
+| Write | Request → Database directly (Cache is not updated) |
+| Read (Cache Hit) | Request → Cache → Response |
+| Read (Cache Miss) | Request → Cache (Miss) → Database → Store in Cache → Response from Cache |
+
+**Key Points**
+
+- Cache is not polluted with data that may never be read.
+- Useful when newly written data is unlikely to be accessed immediately.
+- Improves cache efficiency by storing only frequently accessed data.
+- Risk of stale data if cached entries are not invalidated after database updates.
+
+**Example**
+
+Logging systems where large volumes of data are written continuously, but only a small portion is read later.
+
+</Step>
+
+---
+
+<Step>
+## Write-Back Cache (Write-Behind)
+
+A strategy where data is written only to the cache during the request. The database is updated later through an asynchronous process.
+
+### How It Works?
+
+| Operation | Flow |
+|------------|------|
+| Write | Request → Cache (Updated Immediately) → Database (Updated Asynchronously) |
+| Read (Cache Hit) | Request → Cache → Response |
+| Read (Cache Miss) | Request → Cache (Miss) → Database → Store in Cache → Response from Cache |
+
+**Key Points**
+
+- Prioritizes performance over immediate consistency.
+- Provides very low write latency.
+- Ideal for systems experiencing high write traffic.
+- Risk of data loss if the cache fails before the asynchronous database update completes.
+
+**Example**
+
+In a food delivery application, order-tracking status updates change frequently. Updates are written immediately to the cache for fast access, while the database is updated asynchronously in the background.
+
+</Step>
+
+---
+
+![Cache_Strategy_Comparison](https://dyz1pdcuffwr5.cloudfront.net/System-designs/cache_comparison.png)
+
+---
+
+
+## Summary
+
+- Caching strategies define how data is read from and written to the cache and database, balancing performance, consistency, and scalability.
+- **Read-Through Cache** is optimized for read-heavy workloads, loading data into the cache only when a cache miss occurs.
+- **Write-Through Cache** provides strong consistency by updating both the cache and database synchronously, ensuring the cache always contains the latest data.
+- **Write-Around Cache** writes data directly to the database, preventing unnecessary cache usage for data that is unlikely to be read immediately after being written.
+- **Write-Back Cache (Write-Behind)** offers the highest write performance by updating the cache immediately and persisting data to the database asynchronously, trading immediate consistency for speed.
+
+
+</Steps>
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

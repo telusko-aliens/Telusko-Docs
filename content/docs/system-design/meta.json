@@ -5,6 +5,7 @@
         "introduction.mdx",
         "fundamentals",
         "api-communication",
-        "databases"
+        "databases",
+        "caching"
     ]
 } 

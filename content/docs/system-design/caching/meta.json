@@ -1,0 +1,7 @@
+{   "title":"Caching",
+    "pages":[
+        "caching.mdx",
+        "caching-strategies.mdx",
+        "cache-eviction-policies.mdx"
+    ]
+}

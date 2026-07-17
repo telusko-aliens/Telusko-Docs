@@ -1,0 +1,293 @@
+---
+title: Cache Eviction Policies
+---
+
+<Steps>
+<Video id="Vnm-ycSfJx4" />
+
+---
+
+
+Cache memory is limited and cannot store data indefinitely. When the cache reaches its maximum capacity, some existing entries must be removed to make room for new data.
+
+The process of deciding **which cache entries should be removed** is governed by **Cache Eviction Policies**.
+
+An effective eviction policy helps:
+
+* Maximize cache hit rates
+* Improve application performance
+* Optimize memory utilization
+* Retain the most valuable data in the cache
+
+
+---
+
+
+![Need_of_Eviction_Policies](https://dyz1pdcuffwr5.cloudfront.net/System-designs/cache_eviction_need.png)
+
+
+---
+
+<Step>
+## LRU (Least Recently Used)
+
+**Least Recently Used (LRU)** removes the data that has not been accessed for the longest period of time.
+
+> The assumption behind LRU is: If data has not been used recently, it is less likely to be needed again in the near future.
+
+### How Does It Work?
+
+Consider the following access sequence:
+
+```text
+A → B → C → D
+```
+
+Later, the user accesses:
+
+```text
+B → C
+```
+
+Current order of recent usage:
+
+```text
+D (Least Recent) → A → B → C (Most Recent)
+```
+
+If the cache becomes full, **D** is removed first because it has not been accessed for the longest time.
+
+**Example**
+
+After a new mobile phone version is launched:
+
+* Users frequently search for the latest model.
+* Older models receive fewer recent accesses.
+
+As a result, product data for older models is evicted first.
+
+### Common Use Cases
+
+* Web applications
+* Browser caching
+* Database query caching
+* Content delivery systems
+
+</Step>
+
+---
+
+<Step>
+## MRU (Most Recently Used)
+
+**Most Recently Used (MRU)** removes the data that was accessed most recently.
+
+> The assumption behind MRU is: If data was just used, there is a lower probability it will be needed again immediately.
+
+### How Does It Work?
+
+Access sequence:
+
+```text
+A → B → C → D
+```
+
+Most recently accessed item:
+
+```text
+D
+```
+
+If eviction is required:
+
+```text
+D is removed first.
+```
+
+**Example**
+
+A user applies a discount coupon during checkout.
+
+Once applied:
+
+* The coupon is unlikely to be used again immediately.
+* The cached coupon data can be evicted first.
+
+### Common Use Cases
+
+* Batch-processing systems
+* Sequential data access workloads
+* Certain analytical applications
+
+</Step>
+
+---
+
+<Step>
+## LFU (Least Frequently Used)
+
+**Least Frequently Used (LFU)** removes the data that has been accessed the fewest number of times.
+
+> The assumption behind LFU is: Data with a low access count is less valuable and should be removed first.
+
+### How Does It Work?
+
+Suppose the cache contains:
+
+| Item    | Access Count |
+| ------- | ------------ |
+| Gadgets | 500          |
+| Clothes | 300          |
+| Books   | 120          |
+| Plants  | 25           |
+
+If space is required:
+
+```text
+Plants
+```
+
+is evicted first because it has the lowest access frequency.
+
+**Example**
+
+In an e-commerce platform:
+
+* Gadgets are searched thousands of times daily.
+* Plants receive very few searches.
+
+When the cache becomes full, the Plants category is removed first.
+
+### Common Use Cases
+
+* Product recommendation systems
+* Search engines
+* Streaming platforms
+* Frequently accessed content services
+
+</Step>
+
+---
+
+<Step>
+## FIFO (First In First Out)
+
+**First In First Out (FIFO)** removes the data that entered the cache first, regardless of how frequently or recently it was accessed.
+
+> The oldest cached entries are removed first. FIFO follows a **Queue** structure.
+
+### How Does It Work?
+
+Insertion order:
+
+```text
+A → B → C → D
+```
+
+If the cache becomes full:
+
+```text
+A is removed first.
+```
+
+**Example**
+
+Cache entries are inserted as:
+
+```text
+User1 → User2 → User3 → User4
+```
+
+When a new entry arrives:
+
+```text
+User1 is evicted first.
+```
+
+even if User1 is still frequently accessed.
+
+### Common Use Cases
+
+* Basic caching systems
+* Queue-based processing
+* Systems where simplicity is more important than optimization
+
+</Step>
+
+---
+
+<Step>
+## LIFO (Last In First Out)
+
+**Last In First Out (LIFO)** removes the most recently inserted entry first.
+
+> The newest entry is considered the first candidate for eviction. LIFO follows a **Stack** structure.
+
+### How Does It Work?
+
+Insertion order:
+
+```text
+A → B → C → D
+```
+
+Most recently inserted:
+
+```text
+D
+```
+
+If eviction is needed:
+
+```text
+D is removed first.
+```
+
+**Example**
+
+Suppose cache entries are:
+
+```text
+Course1 → Course2 → Course3 → Course4
+```
+
+If the cache reaches capacity:
+
+```text
+Course4
+```
+
+is removed first because it was inserted most recently.
+
+### Common Use Cases
+
+* Stack-based systems
+* Specialized processing workloads
+* Temporary data structures
+
+</Step>
+
+---
+
+
+![Cache_Eviction_Comparison](https://dyz1pdcuffwr5.cloudfront.net/System-designs/cache_eviction_comparison.png)
+
+
+---
+
+
+## Summary
+
+* **Cache Eviction Policies** determine which data should be removed when cache memory becomes full.
+* **LRU (Least Recently Used)** removes the least recently accessed data and is one of the most widely used cache eviction strategies.
+* **MRU (Most Recently Used)** removes the most recently accessed data and is useful in specialized access patterns.
+* **LFU (Least Frequently Used)** removes data with the lowest access frequency and is ideal for workloads with consistently popular items.
+* **FIFO (First In First Out)** evicts entries based on insertion order, removing the oldest data first.
+* **LIFO (Last In First Out)** removes the newest entries first and is commonly associated with stack-like processing.
+* The best eviction policy depends on application access patterns, performance requirements, memory constraints, and the nature of the cached data.
+
+
+</Steps>
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>
