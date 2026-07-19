@@ -1,0 +1,277 @@
+---
+title: Load Balancer Introduction
+---
+
+<Steps>
+<Video id="Vnm-ycSfJx4" />
+
+---
+
+
+A Load Balancer is a component that distributes incoming client requests across multiple servers to ensure that no single server becomes overloaded. It acts as an intermediary between clients and a pool of backend servers, routing each request to the most appropriate server based on a load-balancing algorithm.
+
+By evenly distributing traffic, a load balancer improves **performance**, **scalability**, **availability**, and **fault tolerance** in distributed systems.
+
+
+## Why is a Load Balancer Needed?
+
+As the number of users increases, sending all requests to a single server can lead to:
+
+- High response times
+- Server overload
+- Reduced application performance
+- Increased chances of downtime
+
+A load balancer solves these problems by distributing traffic across multiple servers, allowing the system to handle more concurrent users efficiently.
+
+
+---
+
+
+## Core Functions of a Load Balancer
+
+| Function | Description |
+|----------|-------------|
+| **Choosing the Server** | Determines which backend server should handle an incoming request using a load-balancing algorithm. |
+| **Health Checks** | Continuously monitors backend servers to ensure they are healthy and available before routing traffic to them. |
+
+
+---
+
+
+## Load Balancing Algorithms
+
+<Step>
+### Round Robin
+
+**Round Robin** distributes incoming requests sequentially among all available servers in a circular order.
+
+**How It Works**
+
+```text
+Request 1 → Server 1
+Request 2 → Server 2
+Request 3 → Server 3
+Request 4 → Server 1
+Request 5 → Server 2
+...
+```
+
+Each server receives approximately the same number of requests.
+
+**Key Points:**
+- Each server handles an approximately equal number of requests.
+- Only a single counter is needed to track which server receives the next request.
+- No server state management required.
+  
+**Disadvantage:** Does not account for differences in server configurations (RAM, CPU, storage). A low-capacity server receives the same load as a high-capacity server, leading to unfair distribution.
+
+</Step>
+
+---
+
+
+<Step>
+### Weighted Round Robin
+
+**Weighted Round Robin** improves upon Round Robin by assigning a weight to each server based on its hardware capacity.
+
+Servers with higher weights receive proportionally more requests.
+
+**How It Works**
+
+Example:
+
+| Server | Weight |
+|---------|-------:|
+| Server 1 | 5 |
+| Server 2 | 3 |
+| Server 3 | 2 |
+
+Request distribution:
+
+```text
+Server 1 → 50%
+Server 2 → 30%
+Server 3 → 20%
+```
+
+**Key Points:** 
+- Higher configuration → Higher weight → More requests routed to that server.
+- Addresses the limitation of standard Round Robin by considering server capacity.
+ 
+</Step>
+
+---
+
+<Step>
+## Geo-Based Algorithm
+
+The **Geo-Based Algorithm** routes client requests to the server that is geographically closest to the user.
+
+The objective is to reduce network latency by minimizing the physical distance between the client and the server.
+
+
+**How It Works**
+
+```text
+User (India)
+      ↓
+Nearest Server (Mumbai)
+
+User (Europe)
+      ↓
+Nearest Server (Frankfurt)
+
+User (USA)
+      ↓
+Nearest Server (Virginia)
+```
+
+**Key Points:**
+- Load balancer maintains information about request origin and server locations.
+- Reduces latency by minimizing physical distance between client and server.
+- Database replication and partitioning must be maintained across geographic regions.
+- Data should be replicated to nearby servers as failover in case of server crashes.
+
+**Disadvantage:** VPNs and proxies can mislead the traffic by masking the user's actual location.
+
+</Step>
+
+---
+
+<Step>
+## Least Connection Algorithm
+
+The **Least Connection Algorithm** routes incoming requests to the server with the fewest active client connections.
+
+**How It Works**
+
+Example:
+
+| Server | Active Connections |
+|---------|-------------------:|
+| Server 1 | 120 |
+| Server 2 | 45 |
+| Server 3 | 70 |
+
+The next request is routed to **Server 2** because it has the fewest active connections.
+
+**Key Points:**
+- Only the number of active connections is considered.
+- Connection counts need to be continuously updated.
+
+**Disadvantage:** Does not check server metrics like response time or server configuration. A server may have few connections but still be under heavy processing load.
+
+</Step>
+
+---
+
+<Step>
+## Least Time Algorithm
+
+The **Least Time Algorithm** routes requests to the server with the lowest average response time.
+
+Unlike Least Connection, it considers actual server performance.
+
+**How It Works**
+
+The load balancer continuously measures:
+
+- Average response time
+- Number of requests
+- Current workload
+
+Requests are sent to the fastest responding server.
+
+**Key Points:**
+- Accounts for server configuration - higher-capacity servers naturally have lower response times.
+- Load balancer continuously calculates the average response time for each server.
+- Additional information maintained: number of requests per server and average response time.
+- Ideal for latency-sensitive applications (e.g., stock trading platforms).
+
+</Step>
+
+---
+
+
+<Step>
+## IP Hash Algorithm
+
+The **IP Hash Algorithm** uses the client's IP address to calculate a hash value that determines which backend server will handle the request.
+
+This ensures that the same client is consistently routed to the same server.
+
+**How It Works**
+
+```text
+Client IP
+      ↓
+Hash Function
+      ↓
+Assigned Server
+```
+
+Example:
+
+| IP Range | Server |
+|-----------|--------|
+| 1–10 | Server 1 |
+| 11–20 | Server 2 |
+| 21–30 | Server 3 |
+
+
+**Key Points:**
+- IP ranges are mapped to specific servers (e.g., IPs hashing to 1–10 → Server 1, 11–20 → Server 2).
+- Ensures the same client always reaches the same server (session persistence).
+- The server must be healthy to maintain proper sessions; if it crashes, data must be replicated to another server.
+  
+**Disadvantage:**
+- Scaling is challenging - adding a new server requires rehashing and reassignment of all values.
+- Not ideal for microservice architectures where session continuity is critical.
+
+</Step>
+
+---
+
+
+## Algorithm Comparison
+
+![Algorithm_Comparison](https://dyz1pdcuffwr5.cloudfront.net/System-designs/algo_comparison.png)
+
+
+---
+
+
+## Hybrid Load Balancing
+
+Modern distributed systems rarely rely on a single load-balancing algorithm. Instead, they combine multiple algorithms to achieve better performance and reliability.
+
+For example:
+
+- **IP Hash + Round Robin** provides session persistence while distributing requests evenly.
+- **Geo-Based + Least Time** routes users to the nearest region and then selects the fastest server within that region.
+- **Weighted Round Robin + Least Connection** balances traffic based on both server capacity and current workload.
+
+This hybrid approach enables systems to optimize for multiple factors simultaneously.
+
+
+---
+
+
+## Summary
+
+- A **Load Balancer** distributes incoming requests across multiple servers, improving system scalability, availability, fault tolerance, and performance.
+- Its two primary responsibilities are **server selection** using routing algorithms and **health monitoring** to ensure requests are sent only to healthy servers.
+- **Round Robin** distributes requests sequentially and is best suited for identical servers.
+- **Weighted Round Robin** considers server capacity, allowing more powerful servers to handle a larger share of traffic.
+- **Geo-Based Routing** directs users to the nearest server, reducing latency for globally distributed applications.
+- **Least Connection** routes traffic to the server with the fewest active connections, making it suitable for long-lived client sessions.
+- **Least Time** selects the server with the lowest average response time, making it ideal for latency-sensitive applications.
+- **IP Hash** ensures session persistence by consistently routing the same client to the same server.
+- Modern distributed systems commonly adopt a **hybrid load-balancing approach**, combining multiple algorithms to achieve optimal performance, reliability, and user experience.
+
+
+</Steps>
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

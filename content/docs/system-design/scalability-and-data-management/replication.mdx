@@ -1,0 +1,251 @@
+---
+title: Replication
+---
+
+<Steps>
+<Video id="Vnm-ycSfJx4" />
+
+---
+
+
+**Replication** is the process of copying and maintaining data across multiple databases or nodes. Instead of storing data in a single location, identical copies are maintained on multiple servers.
+
+Replication improves:
+
+- High availability
+- Fault tolerance
+- Read performance
+- Disaster recovery
+- Data durability
+
+By maintaining multiple copies of data, applications can continue operating even if one or more database servers become unavailable.
+
+![Benefits_of_Replication](https://dyz1pdcuffwr5.cloudfront.net/System-designs/replication_benefits.png)
+
+
+---
+
+
+## Types of Replication
+
+There are three major replication strategies:
+
+1. Single Leader Replication
+2. Multi-Leader Replication
+3. Leaderless Replication
+
+
+---
+
+<Step>
+## Single Leader Replication
+
+In **Single Leader Replication**, one database acts as the **Leader (Primary)**, while the remaining databases act as **Followers (Replicas)**.
+
+Only the leader accepts write requests.
+
+Followers receive replicated data from the leader.
+
+**Architecture**
+
+```text
+             User
+               │
+               ▼
+            Application
+               │
+               ▼
+         Leader Database
+          /     |      \
+         ▼      ▼       ▼
+   Follower1 Follower2 Follower3
+```
+
+Flow:
+
+```text
+User → Server → Leader → Followers
+```
+
+### Asynchronous Replication
+
+In Asynchronous Replication, the leader immediately responds to the client after updating its own data.
+
+Followers are updated later in the background.
+
+**How It Works**
+
+- The leader completes the write and responds to the user.
+- Followers update in the background.
+- If followers fail, they sync again once recovered.
+
+**Advantage:** Faster response, no resource blocking.
+
+**Disadvantage:** Consistency is not guaranteed; data can be temporarily inconsistent or corrupted if followers lag behind.
+
+
+### Synchronous Replication
+
+In Synchronous Replication, the leader waits until all follower nodes acknowledge the write before responding to the client.
+
+**How It Works**
+
+- The leader sends a write request to all followers.
+- The leader waits until all followers return an OK response.
+- Only then does it confirm success to the user.
+
+| Aspect | Advantage | Disadvantage |
+|--------|-----------|--------------|
+| **Data Consistency** | Followers are always up-to-date. | Longer response time. |
+| **Failover** | Any follower can become the leader (all followers have the latest data). | Blocks resources while waiting for confirmations. |
+
+In practice: Asynchronous replication is preferred for most use cases due to faster responses and no resource blocking.
+
+### Adding a New Follower Node
+1. Create a snapshot of the data from the leader (or an existing follower).
+2. Load the snapshot into the new node.
+3. Establish a connection between the leader and the new node for ongoing replication.
+
+### Leader Failure - Electing a New Leader
+When the leader fails, a new leader must be elected:
+1. Identify the most up-to-date follower - check timestamps to determine which follower has the latest data.
+2.  Inform all other nodes about the newly elected leader.
+
+Tools like FSImage (full metadata snapshot) and EditLogs (incremental change logs) are used for data replication and recovery.
+
+</Step>
+
+---
+
+
+<Step>
+## Multi-Leader Replication
+
+Multiple data centers each have their own leader and follower nodes. Leaders communicate with each other across data centers in addition to their own followers.
+
+**Key Points:**
+- Each leader communicates with its followers and with leaders of other data centers.
+- Improves performance and fault tolerance, if one leader fails, others continue to serve.
+- Enables parallel writes from multiple leaders.
+
+
+### Architecture
+
+```text
+ Data Center A                 Data Center B
+
+     Leader A  ◄────────────►  Leader B
+      /   \                     /   \
+     ▼     ▼                   ▼     ▼
+Follower Follower          Follower Follower
+```
+
+### Conflict Problem
+When two leaders write to the same data simultaneously, conflicts arise.
+
+**Example**
+
+```text
+Leader A
+
+File Name = A
+
+──────────────
+
+Leader B
+
+File Name = B
+```
+
+Both users receive successful responses.
+
+During synchronization:
+
+```text
+A ≠ B
+```
+
+Conflict detected.
+
+### Conflict Resolution Strategies
+
+| Strategy | Description |
+|----------|-------------|
+| **Last Write Wins** | The value with the most recent timestamp becomes the final value. |
+| **Leader Priority** | Leaders are assigned priorities, and the higher-priority leader's update is retained. |
+| **User Resolution** | The application presents the conflict to the user, allowing them to choose the correct version. |
+
+</Step>
+
+---
+
+
+<Step>
+## Leaderless Replication
+
+Leaderless Replication removes the concept of a primary database.
+
+Every node can receive both read and write requests.
+
+A write succeeds only when enough nodes acknowledge the update.
+
+
+### Architecture
+
+```text
+          User
+            │
+            ▼
+      Distributed Cluster
+
+      Node A
+      Node B
+      Node C
+      Node D
+      Node E
+```
+
+No single node acts as the leader.
+
+### Quorum
+
+A **Quorum** defines the minimum number of nodes that must successfully participate before an operation is considered successful.
+
+For a cluster containing **n** nodes:
+
+```text
+Quorum > n / 2
+```
+
+| Operation | Quorum Requirement |
+|------------|-------------------|
+| **Read** | More than n/2 nodes must respond |
+| **Write** | More than n/2 nodes must confirm |
+
+Where:
+
+```text
+n = Total Number of Nodes
+```
+
+This ensures that at least one node in both read and write operations has the latest data, maintaining consistency across the system.
+
+</Step>
+
+---
+
+
+## Summary
+
+- **Replication** is the process of maintaining multiple copies of data across different nodes or databases to improve availability, fault tolerance, read performance, and disaster recovery.
+- **Single Leader Replication** uses one primary node to handle all write operations, while follower nodes replicate the data using either **Asynchronous** or **Synchronous Replication**.
+- **Asynchronous Replication** prioritizes performance by acknowledging writes immediately, whereas **Synchronous Replication** prioritizes strong consistency by waiting for follower confirmations.
+- **Multi-Leader Replication** enables multiple leaders to accept write requests across different locations, improving availability and scalability while introducing the possibility of write conflicts.
+- **Conflict Resolution** in multi-leader systems can be achieved using **Last Write Wins**, **Leader Priority**, or **User Resolution** strategies.
+- **Leaderless Replication** eliminates the primary node and uses **Quorum-Based Reads and Writes** to maintain consistency across distributed nodes.
+- The choice of replication strategy depends on the application's requirements for **consistency**, **availability**, **latency**, **fault tolerance**, and **scalability**.
+
+
+</Steps>
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

@@ -6,6 +6,8 @@
         "fundamentals",
         "api-communication",
         "databases",
-        "caching"
+        "caching",
+        "scalability-and-data-management",
+        "system-reliability-and-operations"
     ]
 } 

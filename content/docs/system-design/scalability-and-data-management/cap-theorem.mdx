@@ -1,0 +1,259 @@
+---
+title: CAP Theorem
+---
+
+<Steps>
+<Video id="Vnm-ycSfJx4" />
+
+---
+
+
+The **CAP Theorem** is a fundamental principle in distributed systems that states:
+
+> **A distributed system cannot simultaneously guarantee all three properties: Consistency (C), Availability (A), and Partition Tolerance (P). It can guarantee only two of these three properties at any given time.**
+
+When designing a distributed system, architects must decide which two properties are most important based on the application's requirements.
+
+
+## The Three Properties of CAP Theorem
+
+| Property | Full Form | Meaning |
+|----------|-----------|---------|
+| **C** | **Consistency** | Every user always receives the latest and most up-to-date data from the system. |
+| **A** | **Availability** | Every request receives a response, even if some nodes are experiencing failures. |
+| **P** | **Partition Tolerance** | The system continues to operate even when communication failures or network partitions occur between nodes. |
+
+
+---
+
+
+## Understanding the Three Properties
+
+### 1. Consistency (C)
+
+Consistency ensures that every client always sees the most recent version of the data.
+
+Once a write operation is completed, every subsequent read returns the updated value.
+
+**Example**
+
+Suppose a user's account balance is updated from:
+
+```text
+₹10,000
+↓
+₹12,000
+```
+
+Every user reading the balance should immediately see:
+
+```text
+₹12,000
+```
+
+No user should receive the old value.
+
+
+### 2. Availability (A)
+
+Availability ensures that every request receives a response, regardless of the current state of the system.
+
+The response may contain:
+
+- Latest data
+- Older (stale) data
+- An empty result
+
+However, the system must always respond.
+
+**Example**
+
+```text
+Client Request
+↓
+Server Responds
+
+✓ Always
+```
+
+Even if one server fails, another server should continue serving requests.
+
+
+### 3. Partition Tolerance (P)
+
+Partition Tolerance means the system continues functioning even when communication between distributed nodes is interrupted.
+
+Network failures should not completely stop the system.
+
+**Example**
+
+```text
+Node A
+
+──── Network Failure ────
+
+Node B
+```
+
+Despite the communication failure, both nodes continue operating independently.
+
+
+---
+
+
+## Why Can't We Have All Three?
+
+In a distributed system, data is stored across multiple nodes.
+
+Whenever data changes:
+
+1. One node updates its data.
+2. The updated data must be synchronized with other nodes.
+3. Synchronization requires time.
+
+During this synchronization period, the system must make a decision.
+
+- If we show the data (even if outdated) → Availability is maintained, but Consistency is compromised.
+- If we block the request until sync completes → Consistency is maintained, but Availability is compromised.
+
+This unavoidable trade-off forms the basis of the **CAP Theorem**.
+
+
+---
+
+
+## CAP Theorem Combinations
+
+Since all three properties cannot be achieved simultaneously, distributed systems choose one of the following combinations.
+
+<Step>
+### CA (Consistency + Availability)
+
+A **CA System** guarantees:
+
+- Consistent data
+- Continuous availability
+
+However, it does **not** tolerate network partitions.
+
+**Characteristics**
+
+- Every read returns the latest data.
+- Every request receives a response.
+- Assumes no communication failures between nodes.
+
+**Example**
+
+```text
+Single Database
+↓
+Always Available
+↓
+Always Consistent
+```
+
+**Use Cases:** Small-scale applications with a single database.
+
+</Step>
+
+<Step>
+### CP (Consistency + Partition Tolerance)
+
+A **CP System** guarantees:
+
+- Consistent data
+- Continued operation during network partitions
+
+Availability is sacrificed.
+
+**Characteristics**
+
+- Nodes remain synchronized.
+- During network failures, requests may wait or fail.
+- No stale data is returned.
+
+**Example**
+
+```text
+User Request
+↓
+Wait Until Data Sync Completes
+↓
+Latest Data Returned
+```
+
+**Use Cases:**
+- Banking systems
+- Financial applications
+- Payment gateways
+- Inventory management
+
+</Step>
+
+<Step>
+### AP (Availability + Partition Tolerance)
+
+An **AP System** guarantees:
+
+- High availability
+- Tolerance to network partitions
+
+Consistency is sacrificed temporarily.
+
+**Characteristics**
+
+- System always responds.
+- Data synchronization happens later.
+- Temporary stale data is acceptable.
+
+**Example**
+
+```text
+User Request
+↓
+Immediate Response
+↓
+Latest Data Synchronizes Later
+```
+
+**Use Cases**
+
+- Social media platforms
+- Content management systems
+- News websites
+- Streaming platforms
+
+</Step>
+
+---
+
+
+![CAP_Theorem](https://dyz1pdcuffwr5.cloudfront.net/System-designs/cap_theorem.png)
+
+
+---
+
+
+## Advantages of Understanding CAP Theorem
+
+- Helps design reliable distributed systems.
+- Clarifies the trade-offs between consistency and availability.
+- Guides database and architecture decisions.
+- Improves fault tolerance planning.
+- Enables systems to meet business requirements effectively.
+
+
+---
+
+
+## Summary
+
+- CAP Theorem states that a distributed system can guarantee only two out of three properties at a time: Consistency (C), Availability (A), and Partition Tolerance (P).
+- During network partitions or communication failures, systems must choose between maintaining Consistency (always returning the latest data) or Availability (always responding to requests).
+- CP systems prioritize data accuracy and consistency over availability, making them suitable for critical applications such as banking and financial systems, while AP systems prioritize availability and fault tolerance, even if some data becomes temporarily stale.
+- The CAP Theorem highlights the fundamental trade-offs in distributed system design, requiring architects to select the most appropriate balance based on business and application requirements.
+
+
+</Steps>
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

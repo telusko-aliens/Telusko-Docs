@@ -1,0 +1,9 @@
+{   "title":"Scalability and Data Management",
+    "pages":[
+        "loadbalancer.mdx",
+        "loadbalancer-healthchecks.mdx",
+        "replication.mdx",
+        "partitioning.mdx",
+        "cap-theorem.mdx"
+    ]
+}

@@ -1,0 +1,173 @@
+---
+title: Faults and Errors
+---
+
+<Steps>
+<Video id="Vnm-ycSfJx4" />
+
+---
+
+
+A **fault** or **error** occurs when a system fails to perform as expected or deviates from its intended behavior. Faults can affect a system's **reliability**, **availability**, **performance**, and **data integrity**.
+
+Understanding different types of faults helps architects design resilient systems that can detect, tolerate, and recover from failures effectively.
+
+
+## Why is Understanding Faults Important?
+
+Modern distributed systems consist of multiple servers, networks, databases, and applications. Failures can occur at any layer, making it essential to identify potential fault sources and implement appropriate mitigation strategies.
+
+By understanding fault categories, organizations can:
+
+- Improve system reliability.
+- Reduce downtime.
+- Increase fault tolerance.
+- Minimize data loss.
+- Design effective recovery mechanisms.
+
+
+---
+
+
+## Categories of Faults
+
+<Step>
+### Hardware Failures
+
+**Hardware Failures** are failures related to the physical infrastructure of a system. These failures are often **random**, **unpredictable**, and difficult to prevent completely.
+
+Since hardware components naturally wear out over time, distributed systems rely on redundancy and replication to maintain availability.
+
+**Common Causes**
+
+- Disk full
+- Disk crash
+- Server failure
+- Network cable damage
+- Power supply failure
+- Hardware overheating
+- Database hardware compromise
+
+**Characteristics**
+
+- Random and difficult to predict.
+- May cause complete service outages.
+- Can lead to data loss if redundancy is absent.
+- Usually require hardware replacement or failover.
+
+**Mitigation Strategies**
+
+- Data replication
+- Server redundancy
+- RAID storage
+- Backup power supplies (UPS)
+- Regular hardware monitoring
+- Automatic failover mechanisms
+
+</Step>
+
+<Step>
+### Software Failures
+
+**Software Failures** occur due to issues in application code, system configuration, deployment, or software logic.
+
+Unlike hardware failures, software failures are generally **preventable** and **fixable** through proper engineering practices.
+
+**Common Causes**
+
+- Poor or unoptimized code
+- Unhandled exceptions
+- Missing edge-case handling
+- Configuration errors
+- Deployment failures
+- Merge conflicts
+- Performance bottlenecks
+
+**Characteristics**
+
+- Usually deterministic and reproducible.
+- Can often be identified during testing.
+- May affect application functionality or performance.
+- Easier to fix compared to hardware failures.
+
+**Mitigation Strategies**
+
+- Code reviews
+- Unit and integration testing
+- Proper exception handling
+- Continuous Integration / Continuous Deployment (CI/CD)
+- Automated testing
+- Performance optimization
+- Configuration validation
+
+</Step>
+
+<Step>
+### Human Errors
+
+**Human Errors** are failures caused by incorrect actions or decisions made by users, developers, administrators, or operators.
+
+They are considered one of the most unpredictable sources of system failures.
+
+**Common Examples**
+
+- Incorrect configuration changes
+- Accidental data deletion
+- Wrong deployment procedures
+- Misconfigured servers
+- Incorrect database updates
+- Permission mismanagement
+
+**Characteristics**
+
+- Difficult to predict.
+- Cannot be eliminated.
+- May affect multiple system components.
+- Often caused by manual processes.
+
+**Mitigation Strategies**
+
+- Automation of repetitive tasks
+- Role-based access control (RBAC)
+- Standard operating procedures
+- Change approval processes
+- User-friendly interfaces
+- Continuous training and documentation
+
+</Step>
+
+---
+
+
+![Types_of_errors](https://dyz1pdcuffwr5.cloudfront.net/System-designs/types_of_errors.png)
+
+
+---
+
+
+## Best Practices for Fault Tolerance
+
+- Design systems with redundancy and replication.
+- Continuously monitor infrastructure and applications.
+- Automate deployments and operational tasks.
+- Implement comprehensive testing before production releases.
+- Use robust backup and disaster recovery strategies.
+- Restrict access using role-based permissions.
+- Document operational procedures and provide regular training.
+
+
+---
+
+
+## Summary
+
+- A **fault** or **error** occurs when a system deviates from its expected behavior, potentially affecting **reliability**, **availability**, and **performance**.
+- **Hardware Failures** involve physical infrastructure issues such as server crashes, disk failures, power outages, or network problems and are commonly mitigated using redundancy, replication, monitoring, and failover mechanisms.
+- **Software Failures** result from defects in code, application logic, configuration, or deployment and can be significantly reduced through code reviews, testing, exception handling, and CI/CD practices.
+- **Human Errors** are caused by incorrect actions or decisions and are best minimized through automation, access controls, standardized processes, clear documentation, and continuous training.
+- Building resilient distributed systems requires anticipating all three categories of faults and implementing appropriate prevention, detection, and recovery mechanisms.
+
+
+</Steps>
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

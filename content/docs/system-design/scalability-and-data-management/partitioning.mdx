@@ -1,0 +1,280 @@
+---
+title: Partitioning
+---
+
+<Steps>
+<Video id="Vnm-ycSfJx4" />
+
+---
+
+
+Partitioning is the process of dividing a large dataset into smaller, manageable chunks called **partitions**, which are distributed across multiple nodes.
+
+Each partition stores only a subset of the data, and when all partitions are combined, they represent the complete dataset.
+
+Partitioning enables distributed systems to efficiently store and process massive amounts of data while improving scalability and performance.
+
+
+## Why is Partitioning Needed?
+
+As datasets continue to grow, storing all data on a single database server becomes inefficient.
+
+Without partitioning:
+
+- Replicating the entire dataset across multiple nodes is expensive.
+- Database queries become slower.
+- Search performance degrades.
+- Storage and processing become bottlenecks.
+- Scaling the system becomes difficult.
+
+Partitioning addresses these issues by distributing data across multiple nodes, allowing queries and processing to occur in parallel.
+
+### Benefits of Partitioning
+
+- Improves scalability.
+- Enables parallel query execution.
+- Reduces query response time.
+- Distributes storage across multiple nodes.
+- Improves overall system performance.
+
+### Key Rule of Partitioning
+
+Data should always be distributed **as evenly as possible** across all partitions.
+
+Even distribution ensures:
+
+- Balanced workload
+- Better resource utilization
+- Higher throughput
+- Improved fault tolerance
+
+Uneven distribution can lead to **hotspots**, reducing system performance.
+
+
+---
+
+
+## Hotspot
+
+A **Hotspot** occurs when one partition receives significantly more requests than the others.
+
+Instead of distributing traffic evenly, one partition becomes overloaded while the remaining partitions remain underutilized.
+
+### Problems Caused by Hotspots
+
+- Excessive CPU utilization.
+- Increased memory consumption.
+- Higher response times.
+- Uneven resource utilization.
+- Increased risk of node failure.
+
+**Example**
+
+Suppose there are three partitions:
+
+```text
+Partition 1 → 20 Requests
+Partition 2 → 30 Requests
+Partition 3 → 500 Requests
+```
+
+Partition 3 becomes a hotspot because it handles the majority of the workload.
+
+
+---
+
+
+## Partitioning Strategies
+
+<Step>
+### Partition by Key (Range-Based Partitioning)
+
+In **Range-Based Partitioning**, data is divided based on a range of key values.
+
+Each partition stores a specific range of keys.
+
+**Example**
+
+```text
+Keys A–M → Partition 1
+
+Keys N–Z → Partition 2
+```
+
+**Problem:** If traffic is unevenly distributed across key ranges, one partition becomes a hotspot.
+Example: Partition 1 stores India's data, Partition 2 stores US data. If the application is more popular in the US, Partition 2 becomes a hotspot while Partition 1 remains underutilized.
+
+</Step>
+
+<Step>
+### Partition by Hash of Key (Hash-Based Partitioning)
+
+In **Hash-Based Partitioning**, a hash function converts the partition key into a numeric value.
+
+The hash value determines which partition stores the data.
+
+**Example:**
+
+```text
+Hash(Customer1)
+↓
+Partition 2
+
+Hash(Customer2)
+↓
+Partition 5
+```
+
+**Handling Hotspots**
+
+Even hash-based systems can occasionally experience hotspots.
+
+Common techniques include:
+
+- Attach timestamps to requests.
+- Continuously monitor partition traffic.
+- Redistribute data when a partition becomes overloaded.
+
+</Step>
+
+<Step>
+### Partition by Local Secondary Index
+
+Each partition maintains its own **secondary index** for non-primary key attributes.
+
+The index exists only within that partition.
+
+**Example**
+
+**Partition 1**
+
+| Color | Car IDs |
+|---------|---------|
+| Blue | 209, 305 |
+| Red | 350, 359 |
+
+**Partition 2**
+
+| Color | Car IDs |
+|---------|---------|
+| Blue | 509, 609 |
+| Red | 610, 690 |
+
+**Query Example**
+
+Searching for:
+
+```text
+Red Cars
+```
+
+The application must query:
+
+- Partition 1
+- Partition 2
+
+Each partition searches its own local index independently.
+
+Similarly:
+
+```text
+Silver Cars
+```
+
+Each partition checks its local index.
+
+If no records exist, the partition immediately reports no matches without scanning the actual data.
+
+**Used By**
+
+- Apache Cassandra
+- Elasticsearch
+
+**Disadvantage:** Every partition must be queried (scatter-gather), even if a partition has no relevant data , since each partition maintains its own local index independently.
+
+</Step>
+
+
+<Step>
+### Partition by Global Secondary Index
+
+Instead of maintaining separate indexes for each partition, a **Global Secondary Index (GSI)** maintains one centralized index for all partitions.
+
+The global index stores information about which partition contains a particular value.
+
+**Example**
+
+```text
+Global Index
+
+Blue Cars
+↓
+Partition 1
+Partition 2
+
+--------------------
+
+Silver Cars
+↓
+Partition 3
+```
+
+**Query Example**
+
+Searching for:
+
+```text
+Blue Cars
+```
+
+The global index immediately identifies:
+
+```text
+Partition 1
+
+Partition 2
+```
+
+Only those partitions are queried.
+
+Other partitions are skipped entirely.
+
+**Advantages**
+
+- Faster read performance.
+- Queries only relevant partitions.
+- Eliminates unnecessary partition scans.
+- Better search efficiency.
+
+**Disadvantages**
+
+- Every write must update the global index.
+- Higher write latency.
+- More complex implementation.
+- Additional storage required for maintaining the index.
+
+</Step>
+
+---
+
+
+![Partition_Strategy_Comparison](https://dyz1pdcuffwr5.cloudfront.net/System-designs/partition_comparison.png)
+
+
+---
+
+
+## Summary
+
+- **Partitioning** is the process of dividing a large dataset into smaller partitions and distributing them across multiple nodes to improve scalability, performance, and parallel processing.
+- The primary objective of partitioning is to distribute both **data** and **traffic** evenly, preventing **hotspots**, where one partition becomes overloaded while others remain underutilized.
+- **Range-Based Partitioning** organizes data using key ranges and is efficient for range queries but can suffer from uneven traffic distribution.
+- **Hash-Based Partitioning** uses hash functions to achieve a more uniform distribution of data, significantly reducing the likelihood of hotspots.
+- **Local Secondary Indexes** maintain indexes within each partition, simplifying writes but requiring scatter-gather queries across multiple partitions during reads.
+- **Global Secondary Indexes** maintain a centralized index that directs queries only to relevant partitions, improving read performance while introducing additional write overhead.
+- Selecting the appropriate partitioning strategy requires balancing **read performance**, **write performance**, **scalability**, **query patterns**, and **maintenance complexity** based on the application's requirements.
+
+
+</Steps>
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>
