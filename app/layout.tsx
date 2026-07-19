@@ -34,12 +34,12 @@ export default function Layout({ children }: LayoutProps<'/'>) {
     // 'rgba(140, 170, 255, 0.3)',
     'transparent',
   ]} > <a 
-    href="https://go.telusko.com/agentic-ai-lnkin" 
+    href="https://go.telusko.com/agentic-ai-python" 
     target="_blank" 
     rel="noopener noreferrer" 
     className="flex items-center gap-2 justify-center no-underline hover:no-underline text-sm sm:text-base md:text-lg"
   >
-  Mastering Agentic AI with Java: Live Course 
+    Agentic AI Engineering with Python: Live Course 
     <ExternalLink className="w-4 h-4" />
   </a></Banner>
         <RootProvider>{children}</RootProvider>
