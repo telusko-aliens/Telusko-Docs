@@ -1,0 +1,135 @@
+---
+title: "Monitoring & Alerts - CloudWatch & SNS"
+---
+
+You can't fix what you can't see, and you can't react to what nobody tells you about. **CloudWatch** is the eyes - it collects metrics and logs from every AWS service. **SNS** is the mouth - it delivers the alert to your inbox or phone. Together they turn "the server fell over at 2 a.m. and we found out at 9" into "my phone buzzed the moment CPU spiked."
+
+## The two services, two jobs
+
+```text
+   CloudWatch  ── watches: metrics, logs, alarms
+        │  alarm fires (e.g. CPU > 80%)
+        ▼
+   SNS         ── notifies: email, SMS, Lambda, queues
+        │
+        ▼
+   You (or an automated response)
+```
+
+CloudWatch observes and decides *when* something is wrong. SNS spreads the word to whoever (or whatever) needs to act.
+
+## CloudWatch: the observability service
+
+CloudWatch collects four kinds of things:
+
+| Feature | What it does |
+|---------|--------------|
+| **Metrics** | Numeric time-series data - CPU, network, request count, etc. |
+| **Logs** | Text logs from apps and services, searchable and retained |
+| **Alarms** | Watch a metric and trigger an action when it crosses a threshold |
+| **Dashboards** | Custom visual panels combining metrics into one view |
+
+### Metrics
+
+A **metric** is a measurement over time - `CPUUtilization` of an instance, `RequestCount` on a load balancer, `FreeStorageSpace` on an RDS database. AWS services publish many metrics automatically, for free, at a basic resolution.
+
+```text
+   CPUUtilization (i-abc123)
+   100% ┤            ╭─╮
+    50% ┤      ╭─────╯ ╰──────
+     0% ┤──────╯
+        └────────────────────── time
+```
+
+<Callout type="info">
+A subtlety that surprises people: **standard EC2 metrics don't include memory or disk usage.** AWS sees CPU, network, and disk *I/O* from outside the instance, but RAM and disk-space-used live *inside* the OS. To monitor those, install the **CloudWatch agent** on the instance - it pushes memory and disk metrics up as custom metrics.
+</Callout>
+
+### Alarms
+
+An **alarm** watches one metric and changes state when it breaches a threshold for a set time:
+
+```text
+   "If average CPUUtilization > 80% for 5 minutes → ALARM"
+        │
+        ├─ send an SNS notification (tell a human)
+        ├─ trigger Auto Scaling (add an instance)
+        └─ stop/reboot the instance (automated remediation)
+```
+
+Alarms have three states: **OK**, **ALARM**, and **INSUFFICIENT_DATA**. The action you attach is what makes an alarm useful - notify, scale, or remediate.
+
+### Logs
+
+**CloudWatch Logs** centralizes text logs. Your app (or the CloudWatch agent) ships log lines to a **log group**, where you can search them, set retention, and create **metric filters** - e.g. "count how many times `ERROR` appears, and alarm if it spikes."
+
+## SNS: the notification fan-out
+
+**SNS - Simple Notification Service - is publish/subscribe messaging.** A message published to a **topic** is delivered to every **subscriber** of that topic at once.
+
+```text
+   CloudWatch alarm ──publish──► SNS Topic "ops-alerts"
+                                      │ fan-out to all subscribers
+                          ┌───────────┼───────────┐
+                          ▼           ▼           ▼
+                       Email        SMS        Lambda
+                    (you)       (on-call)   (auto-fix)
+```
+
+Subscribers can be **email**, **SMS**, **HTTP(S) endpoints**, **Lambda functions**, **SQS queues**, and more. One alarm can therefore email the team, text the on-call engineer, and trigger an automated response - all from a single published message.
+
+<Callout type="info">
+The decoupling is the point. CloudWatch doesn't need to know *who* gets notified or *how* - it just publishes to a topic. You manage the recipients by editing the topic's subscriptions. Add a new team member to the alerts? Subscribe their email to the topic; nothing about the alarm changes.
+</Callout>
+
+## The classic setup: a CPU alarm that emails you
+
+The canonical first monitoring task - get notified when an instance is in trouble:
+
+<Steps>
+<Step>
+### Create an SNS topic
+
+SNS → **Create topic** (Standard), name it `ec2-alerts`.
+</Step>
+<Step>
+### Subscribe your email
+
+Add an **email subscription** to the topic, then **confirm** it via the link AWS sends. (Unconfirmed subscriptions get nothing.)
+</Step>
+<Step>
+### Create a CloudWatch alarm
+
+CloudWatch → **Alarms → Create.** Pick the instance's `CPUUtilization` metric, set the condition (`> 80%` for 5 minutes), and set the action to **notify the `ec2-alerts` SNS topic.**
+</Step>
+<Step>
+### Test it
+
+Stress the instance's CPU. When it crosses 80%, the alarm flips to ALARM, publishes to SNS, and your inbox gets the alert.
+</Step>
+</Steps>
+
+## The one you should set up first: the billing alarm
+
+Before any CPU alarm, the most valuable alarm on a learning account watches your **spend**:
+
+```text
+   CloudWatch billing alarm: "EstimatedCharges > $10" ──► SNS ──► email
+```
+
+<Callout type="warn">
+This is the safety net mentioned back in account setup - now you know how it's built. A billing alarm catches a forgotten NAT Gateway, a stray RDS instance, or an Auto Scaling group you never tore down, *while the bill is small.* Set the threshold low enough to make you nervous ($5-$10 for learning). It's the single cheapest insurance policy on AWS.
+</Callout>
+
+## Where monitoring connects to everything else
+
+CloudWatch isn't a standalone topic - it's the nervous system tying the course together:
+
+- **Auto Scaling** scales on CloudWatch metrics (CPU, request count).
+- **RDS, S3, ELB** all publish metrics you can alarm on.
+- **Logs** from your EC2/Beanstalk/ECS apps land in CloudWatch Logs.
+- **Alarms → SNS** notify you, and **alarms → automated actions** remediate.
+
+The mental model to carry forward: **measure with CloudWatch, decide with alarms, notify or act through SNS.** Almost every "how do I know if X is healthy / how do I get told when it isn't" question on AWS routes through these two services.
+
+Next: driving AWS from the terminal instead of the console - the AWS CLI.

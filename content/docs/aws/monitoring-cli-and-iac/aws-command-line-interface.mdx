@@ -1,0 +1,143 @@
+---
+title: "AWS Command Line Interface (CLI)"
+---
+
+The console is great for learning and one-off clicks. But the tenth time you launch the same instance, or when you need to copy 500 files to S3, or script a nightly task, clicking gets old fast. The **AWS CLI** lets you do anything the console can - from your terminal, scriptable, repeatable, and fast.
+
+## What the CLI is
+
+The **AWS CLI** is a command-line tool that talks to the same AWS APIs the console uses. Every command follows one predictable shape:
+
+```bash
+aws <service> <command> [options]
+```
+
+```bash
+aws s3 ls                              # list your buckets
+aws ec2 describe-instances             # list your EC2 instances
+aws s3 cp file.txt s3://my-bucket/     # upload a file
+aws ec2 start-instances --instance-ids i-abc123
+```
+
+Once you see the `aws <service> <action>` pattern, the whole CLI is discoverable - and `aws <service> help` lists what's available.
+
+## Installing and configuring
+
+<Steps>
+<Step>
+### Install the CLI
+
+Install AWS CLI v2 (the current version) for your OS - Windows installer, macOS package, or Linux bundle. Verify:
+
+```bash
+aws --version    # should print aws-cli/2.x ...
+```
+</Step>
+
+<Step>
+### Create access keys for an IAM user
+
+In IAM, for **your IAM user** (not root), create an **access key** - you get an **Access Key ID** and a **Secret Access Key.** The secret is shown **once** - copy it now.
+</Step>
+
+<Step>
+### Configure the CLI
+
+```bash
+aws configure
+# AWS Access Key ID     : AKIA...
+# AWS Secret Access Key : ********
+# Default region name   : ap-south-1
+# Default output format : json
+```
+
+This stores credentials in `~/.aws/credentials` and settings in `~/.aws/config`.
+</Step>
+
+<Step>
+### Test it
+
+```bash
+aws sts get-caller-identity   # confirms WHO the CLI is acting as
+```
+
+This returns your account ID and user ARN - a quick "am I authenticated, and as whom?" check.
+</Step>
+</Steps>
+
+<Callout type="warn">
+Those access keys are **long-lived credentials with your permissions.** Treat them like passwords: never commit them to git, never paste them in chat or screenshots, never put them in client-side code. If one leaks, **deactivate it in IAM immediately.** And use the keys of a *least-privilege IAM user*, never root - root should have no access keys at all.
+</Callout>
+
+## The better way on EC2: don't use keys at all
+
+When you run the CLI **on an EC2 instance**, you should *not* run `aws configure` and paste keys onto the box. Instead, attach an **IAM role** to the instance:
+
+```text
+   ❌ keys in ~/.aws/credentials on the server  → leak risk, manual rotation
+   ✅ IAM role attached to the instance         → temporary auto-rotating creds
+```
+
+With a role attached, the CLI automatically picks up temporary credentials - no keys stored, nothing to leak, nothing to rotate. This is the same role concept from the IAM section, and it's the correct pattern for any code running on AWS.
+
+## Profiles for multiple accounts
+
+Work with more than one account or role? Named **profiles** keep them separate:
+
+```bash
+aws configure --profile work
+aws s3 ls --profile work          # use the "work" profile for this command
+export AWS_PROFILE=work           # or set it for the whole session
+```
+
+No more reconfiguring when you switch contexts - just pass `--profile` or set the env var.
+
+## Why the CLI matters: scripting
+
+The real power isn't typing single commands - it's combining them. Because CLI output is plain text/JSON, it composes with shell tools and scripts:
+
+```bash
+# stop every running instance tagged Environment=dev
+aws ec2 describe-instances \
+  --filters "Name=tag:Environment,Values=dev" "Name=instance-state-name,Values=running" \
+  --query "Reservations[].Instances[].InstanceId" --output text \
+| xargs aws ec2 stop-instances --instance-ids
+```
+
+That's a nightly cost-saving job in two commands - impossible to do as efficiently by clicking.
+
+### The `--query` flag
+
+The `--query` option uses **JMESPath** to extract just what you want from the JSON response, so you don't pipe through `grep`/`jq` for everything:
+
+```bash
+aws ec2 describe-instances \
+  --query "Reservations[].Instances[].[InstanceId,State.Name]" \
+  --output table
+```
+
+```text
+   ┌──────────────┬─────────┐
+   │ i-abc123     │ running │
+   │ i-def456     │ stopped │
+   └──────────────┴─────────┘
+```
+
+<Callout type="info">
+`--output table` for reading with your eyes, `--output text` for piping into scripts, `--output json` for machine processing. Pair `--output` with `--query` and the CLI becomes a precise tool instead of a wall of JSON.
+</Callout>
+
+## Console vs. CLI vs. SDK vs. IaC
+
+The CLI is one of four ways to control AWS - know when each fits:
+
+| Tool | Best for |
+|------|----------|
+| **Console** | Learning, exploring, one-off visual tasks |
+| **CLI** | Scripting, automation, quick repeatable commands |
+| **SDKs** | AWS calls from inside your application code |
+| **IaC (CloudFormation)** | Reproducible, version-controlled infrastructure |
+
+The CLI sits perfectly between clicking and full infrastructure-as-code: more repeatable than the console, lighter than CloudFormation. It's also the tool you'll use constantly in the project sections - configuring deployments, pushing Docker images to ECR, and managing ECS tasks.
+
+Next, we go one step further than scripting commands: describing entire infrastructures *as code* with CloudFormation.

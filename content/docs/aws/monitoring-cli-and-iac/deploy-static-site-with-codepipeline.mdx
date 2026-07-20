@@ -1,0 +1,132 @@
+---
+title: "CI/CD: CodePipeline, CodeBuild & S3"
+---
+
+Deploying by hand - build locally, drag files to S3, hope you didn't miss a step - works until it doesn't. **CI/CD** replaces that ritual with automation: you `git push`, and a pipeline builds, tests, and deploys without you touching anything. This page builds exactly that for a static site using AWS's native tools - **CodePipeline**, **CodeBuild**, and **S3**.
+
+## What CI/CD means
+
+```text
+   CI  - Continuous Integration:  every push is automatically built & tested
+   CD  - Continuous Deployment:   passing builds are automatically deployed
+
+   git push ──► [ build ] ──► [ test ] ──► [ deploy ] ──► live
+              (all automatic, every single time)
+```
+
+The payoff: deployments become boring and frequent instead of risky and rare. A typo fix ships in minutes, and the *same* steps run every time, so "works on my machine" stops being a deployment strategy.
+
+## The AWS "Code" family
+
+AWS has a suite of CI/CD building blocks. For this pipeline we use three:
+
+| Service | Role | Analogy |
+|---------|------|---------|
+| **CodePipeline** | Orchestrates the stages, end to end | The conductor |
+| **CodeBuild** | Runs the build/test commands | The build server |
+| **CodeCommit** *(or GitHub)* | Source repository | Where the code lives |
+| **CodeDeploy** | Deploys to EC2/ECS/Lambda | The deployer (not needed for S3) |
+
+For a **static site**, the deploy target is just an S3 bucket, so CodePipeline can deploy to S3 directly - no CodeDeploy required.
+
+## The pipeline we're building
+
+```text
+   ┌──────────┐   ┌────────────┐   ┌──────────────────┐
+   │  Source  │──►│   Build    │──►│     Deploy        │
+   │ (GitHub/ │   │ (CodeBuild │   │ (copy build       │
+   │ CodeCommit)  │  runs npm) │   │  output to S3)    │
+   └──────────┘   └────────────┘   └──────────────────┘
+        │              │                    │
+   push triggers   compiles the         site is live
+   the pipeline    site to /build        from the bucket
+```
+
+Three stages: **Source** watches the repo, **Build** compiles, **Deploy** publishes to the S3 website bucket.
+
+## Building it
+
+<Steps>
+<Step>
+### Prepare the S3 website bucket
+
+A bucket with [static website hosting enabled](/docs/aws/storage-and-static-hosting/static-website-hosting-on-s3) - this is the deploy target.
+</Step>
+
+<Step>
+### Put your site in a repo with a buildspec
+
+Your source repo (GitHub or CodeCommit) needs a `buildspec.yml` telling CodeBuild what to do:
+
+```yaml title="buildspec.yml"
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - npm ci
+  build:
+    commands:
+      - npm run build
+artifacts:
+  base-directory: build      # the folder to publish
+  files:
+    - '**/*'
+```
+
+(For a plain HTML site with no build step, the buildspec can simply pass the files straight through as artifacts.)
+</Step>
+
+<Step>
+### Create the pipeline
+
+CodePipeline → **Create pipeline.**
+- **Source stage:** connect your repo and branch. Pushing to it triggers the pipeline.
+- **Build stage:** create/select a **CodeBuild** project that uses your `buildspec.yml`.
+- **Deploy stage:** choose **Amazon S3** as the provider, pick your website bucket, and enable **extract file before deploy** so the built files land directly in the bucket.
+</Step>
+
+<Step>
+### Push and watch it run
+
+Commit and push. CodePipeline detects the change, CodeBuild runs the build, and the output is copied to S3. Within minutes your site is live - and every future push repeats it automatically.
+</Step>
+</Steps>
+
+<Callout type="info">
+The first time you watch a `git push` turn into a live deployment with zero manual steps, the value of CI/CD clicks. There's no "I forgot to upload the new CSS" anymore - the pipeline does the exact same thing every time, which is precisely why deployments stop being scary.
+</Callout>
+
+## What each piece is actually doing
+
+- **CodePipeline** is the **orchestrator** - it defines the stages, passes artifacts between them, and reacts to source changes. It doesn't build or deploy itself; it *coordinates* the services that do.
+- **CodeBuild** is a **managed build environment** - a fresh container spins up, runs your `buildspec.yml` commands, produces artifacts, and shuts down. You pay only for build minutes; there's no build server to maintain.
+- **S3** is the **deploy target and artifact store** - CodePipeline also uses an S3 bucket behind the scenes to pass artifacts between stages.
+
+## Add a manual approval (optional but real-world)
+
+For anything beyond a personal project, you often don't want *every* push to auto-deploy to production. CodePipeline supports a **manual approval** stage:
+
+```text
+   Source ──► Build ──► [ Manual Approval ] ──► Deploy
+                          (a human clicks "approve")
+```
+
+This is the middle ground between fully manual and fully automatic - automate the build and the boring steps, but keep a human gate before production. Approvals can notify via SNS so the right person knows it's their turn.
+
+<Callout type="warn">
+A pipeline runs on **every** triggering push. If your build does something costly, or your deploy hits production, make sure the trigger branch is the one you intend (deploy from `main`, not every feature branch) - and add an approval gate before any production deploy. An unguarded pipeline pointed at the wrong branch will happily deploy half-finished work.
+</Callout>
+
+## The bigger picture
+
+This static-site pipeline is the simplest possible CD, but the shape generalizes to everything:
+
+- Static site → deploy to **S3** (this page).
+- Containerized app → build a Docker image, push to **ECR**, deploy to **ECS** (the container project ahead).
+- Server app → build, then **CodeDeploy** to EC2 or **Elastic Beanstalk** (the Beanstalk project next).
+
+Same pipeline idea, different deploy target. Once you've built one, the rest are variations.
+
+That completes the operate-and-automate section. The remaining two sections are full projects that put everything together - deploying real applications with **Elastic Beanstalk**, then with **containers on ECS**.
