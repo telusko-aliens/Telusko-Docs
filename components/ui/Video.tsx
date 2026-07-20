@@ -5,13 +5,16 @@ import React, { useState } from "react";
 interface VideoProps {
   id: string; 
   title?: string;
+  start?: number;
 }
 
-export default function Video({ id, title = "Video" }: VideoProps) {
+export default function Video({ id, title = "Video", start }: VideoProps) {
   const [isPlaying, setIsPlaying] = useState(false);
 
   const thumbnail = `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
-  const embedUrl = `https://www.youtube.com/embed/${id}?autoplay=1`;
+  const embedUrl = `https://www.youtube.com/embed/${id}?autoplay=1${
+    start ? `&start=${start}` : ""
+  }`;
 
   return (
     <div className="w-full mx-auto"> {/* 80% width, centered */}
