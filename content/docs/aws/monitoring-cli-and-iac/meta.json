@@ -1,0 +1,9 @@
+{
+    "title": "Monitoring, CLI & IaC",
+    "pages": [
+        "cloudwatch-and-sns-monitoring.mdx",
+        "aws-command-line-interface.mdx",
+        "cloudformation-infrastructure-as-code.mdx",
+        "deploy-static-site-with-codepipeline.mdx"
+    ]
+}

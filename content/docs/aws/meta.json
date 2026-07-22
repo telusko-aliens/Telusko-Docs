@@ -12,6 +12,6 @@
         "storage-and-static-hosting",
         "databases-with-rds",
         "networking-vpc-and-route53",
-        "disabled-monitoring-cli-and-iac"
+        "monitoring-cli-and-iac"
     ]
 }

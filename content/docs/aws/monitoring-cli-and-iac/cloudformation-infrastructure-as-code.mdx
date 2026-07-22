@@ -1,0 +1,135 @@
+---
+title: "CloudFormation - Infrastructure as Code"
+---
+
+Clicking through the console to build a VPC, subnets, an ALB, an Auto Scaling group, and an RDS database takes an afternoon - and the next time you need the same stack, you do it all again, slightly differently, and now your staging and production environments quietly disagree. **CloudFormation** ends that: you describe your infrastructure in a text file, and AWS builds it. Need it again? Run the file again. It's **Infrastructure as Code (IaC)**.
+
+## The core idea
+
+```text
+   Clicking (imperative)            CloudFormation (declarative)
+   ─────────────────────            ────────────────────────────
+   "create VPC, then subnet,        "here's what should EXIST:
+    then IGW, then route,            a VPC, 2 subnets, an ALB..."
+    then..."                        AWS figures out HOW to build it
+   manual, error-prone, one-off     repeatable, versioned, reviewable
+```
+
+You write **what you want to exist**, not the step-by-step clicks. CloudFormation reads that description (a **template**), works out the order and dependencies, and creates everything as one managed unit (a **stack**).
+
+## Templates and stacks
+
+| Term | What it is |
+|------|------------|
+| **Template** | A YAML/JSON file describing the resources you want |
+| **Stack** | The actual deployed set of resources created from a template |
+| **Change set** | A preview of what an update *would* change before you apply it |
+
+```text
+   template.yaml ──► CloudFormation ──► Stack
+   (the recipe)        (the chef)       (the meal: real AWS resources)
+```
+
+Delete the stack and CloudFormation **deletes everything it created** - clean teardown, no orphaned resources quietly billing you. That alone makes it worth using for learning experiments.
+
+## A minimal template
+
+YAML is the common choice (less noisy than JSON). Here's a tiny template that creates an S3 bucket and an EC2 instance:
+
+```yaml title="template.yaml"
+AWSTemplateFormatVersion: '2010-09-09'
+Description: A simple stack
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t2.micro          # overridable input
+
+Resources:
+  MyBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: my-iac-demo-bucket-2026
+
+  MyServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType   # use the parameter
+      ImageId: ami-0abcd1234efgh5678     # an AMI in your region
+
+Outputs:
+  ServerId:
+    Value: !Ref MyServer                # report back the created instance ID
+```
+
+The anatomy of nearly every template:
+
+| Section | Purpose |
+|---------|---------|
+| **Parameters** | Inputs you supply at deploy time (instance type, env name) |
+| **Resources** | The AWS things to create (the only *required* section) |
+| **Mappings / Conditions** | Lookup tables and if-this-then-that logic |
+| **Outputs** | Values to return (an endpoint, an ID) for humans or other stacks |
+
+## Deploying a stack
+
+Via the console (upload the template) or the CLI:
+
+```bash
+aws cloudformation deploy \
+  --template-file template.yaml \
+  --stack-name my-demo \
+  --parameter-overrides InstanceType=t2.micro
+```
+
+Update the file, re-run, and CloudFormation computes the **difference** and changes only what's needed - adding, modifying, or removing resources to match the new template.
+
+<Callout type="info">
+Before applying an update to anything important, generate a **change set** - a dry run that shows exactly what CloudFormation will add, modify, or *delete*. Some property changes force a **replacement** (delete + recreate), which on a database would mean data loss. The change set surfaces that *before* it happens, not after.
+</Callout>
+
+## Why IaC changes everything
+
+The benefits compound the more you use it:
+
+<Cards>
+  <Card title="Repeatable">
+    The same template builds an identical stack every time - no config drift between environments.
+  </Card>
+  <Card title="Version controlled">
+    Infrastructure lives in git: history, code review, rollback, blame - same as application code.
+  </Card>
+  <Card title="Self-documenting">
+    The template *is* the documentation of what exists and how it's wired.
+  </Card>
+  <Card title="Clean teardown">
+    Delete the stack, everything goes - no forgotten resources on the bill.
+  </Card>
+  <Card title="Automatable">
+    Plug it into CI/CD so infrastructure changes deploy like code changes.
+  </Card>
+</Cards>
+
+<Callout type="warn">
+The flip side of "delete the stack removes everything": be careful what you put in one stack. Deleting a stack will try to delete its RDS database too. Use **deletion policies** (`Retain`, `Snapshot`) on stateful resources so a stack teardown doesn't take your data with it. IaC is powerful precisely because it's literal - which means a careless delete is also literal.
+</Callout>
+
+## CloudFormation vs. the alternatives
+
+CloudFormation is AWS's native IaC tool, but it's not the only one:
+
+| Tool | Notes |
+|------|-------|
+| **CloudFormation** | Native, no extra software, AWS-only, YAML/JSON |
+| **AWS CDK** | Write infrastructure in real code (TypeScript, Python, Java) that *generates* CloudFormation |
+| **Terraform** | Third-party, multi-cloud, its own HCL language, hugely popular |
+
+<Callout type="info">
+For an AWS-only shop, **CloudFormation** (or **CDK** if you'd rather write Python/TypeScript than YAML) is the natural choice - nothing to install, deeply integrated. **Terraform** wins when you manage multiple clouds or prefer one tool everywhere. They're all expressing the same idea: infrastructure described as code, applied repeatably. Learn the *concept* here and any of them is approachable.
+</Callout>
+
+## The mindset shift
+
+The lasting takeaway isn't the YAML syntax - it's the shift from **treating infrastructure as something you build by hand** to **treating it as code you write, review, version, and run.** Servers become reproducible (user data, launch templates), and now the *whole environment* - networks, databases, load balancers - does too. That's the foundation real teams build on.
+
+The final page of this section ties automation together with a deployment pipeline: CodePipeline, CodeBuild, and S3.
