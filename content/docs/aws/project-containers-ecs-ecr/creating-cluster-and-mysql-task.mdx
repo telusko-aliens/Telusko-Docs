@@ -1,0 +1,110 @@
+---
+title: "ECS Cluster & Running MySQL as a Task"
+---
+
+Now we meet ECS properly. We'll create a **cluster** (where containers run), write a **task definition** (the blueprint), and launch our first running **task** - a MySQL database container. Doing the database first gives the app something to connect to, and it makes the three core ECS concepts concrete before we add the app on top.
+
+## The three concepts, made concrete
+
+```text
+   Task definition (the recipe)        Task (the running dish)
+   ────────────────────────────        ───────────────────────
+   image: mysql:8                       a live MySQL container
+   cpu: 0.5 vCPU, mem: 1 GB     ──run──►  using 0.5 vCPU / 1 GB
+   port: 3306                            answering on 3306
+   env: MYSQL_ROOT_PASSWORD=...          inside the cluster
+
+   Cluster = the place all your tasks run
+```
+
+| Concept | One-line definition |
+|---------|---------------------|
+| **Cluster** | A logical grouping where tasks/services run |
+| **Task definition** | JSON blueprint: image, CPU/memory, ports, env vars, logging |
+| **Task** | A running instance of a task definition |
+| **Service** | (next pages) keeps N tasks running and healthy over time |
+
+## Step 1 - Create a cluster
+
+ECS → **Create cluster.** Choose **AWS Fargate** (serverless - no EC2 hosts to manage) and name it `telusko-cluster`. Pick the VPC/subnets (the default VPC is fine for learning).
+
+```text
+   Cluster: telusko-cluster   (Fargate - AWS provides the compute)
+   └── (empty for now - we'll run tasks into it)
+```
+
+<Callout type="info">
+Choosing **Fargate** here means you never provision or patch a server for these containers. You define what a task needs (CPU, memory) and AWS finds capacity to run it. That removes the entire "manage the EC2 hosts" layer - ideal for learning and for most workloads. The EC2 launch type exists for when you need host-level control, but you don't need it here.
+</Callout>
+
+## Step 2 - Define the MySQL task
+
+Create a **task definition** for MySQL. The essentials:
+
+```text
+   Task definition: mysql-task   (Fargate)
+   ├── container: mysql
+   │     image: mysql:8                  ← pulled from Docker Hub
+   │     port mappings: 3306
+   │     environment:
+   │       MYSQL_ROOT_PASSWORD = ********
+   │       MYSQL_DATABASE      = appdb   ← creates the schema on startup
+   ├── task size: 0.5 vCPU, 1 GB memory
+   └── log configuration: send logs to CloudWatch
+```
+
+A few choices worth understanding:
+
+- **Image `mysql:8`** - the official MySQL image. ECS can pull public images straight from Docker Hub; your *own* app image will come from ECR.
+- **Environment variables** - MySQL's image reads `MYSQL_ROOT_PASSWORD` and `MYSQL_DATABASE` on first boot to set itself up. This is the same "config via environment" pattern from the Beanstalk project.
+- **Logging to CloudWatch** - so you can read the container's output when something goes wrong (you will need this).
+
+## Step 3 - Run the task
+
+From the task definition, **Run task** into `telusko-cluster` (Fargate). Choose the VPC/subnets and a **security group** that allows port **3306** from the app's task (we'll connect them shortly).
+
+When the task reaches **RUNNING**, you have a MySQL database living as a container in ECS.
+
+```text
+   telusko-cluster
+   └── task: mysql-task   STATUS: RUNNING
+        container "mysql" on 3306, schema "appdb" ready
+```
+
+## The hard part with databases in containers: storage
+
+Here's the thing nobody should skip:
+
+<Callout type="warn">
+**A plain container's filesystem is ephemeral - stop the task and its data is gone.** If this MySQL task is replaced or restarted, the database resets unless you attach **persistent storage** (an EFS volume for Fargate). For learning and demos, a throwaway MySQL task is fine. For anything you care about, **don't run your production database as a bare ECS task** - use **RDS** (the managed, durable, backed-up option from earlier). Containers are brilliant for stateless apps and less so for the one thing in your system that must never lose data.
+</Callout>
+
+This is a genuine architecture lesson, not a footnote: containers shine for **stateless** workloads. State (your database) wants either managed services (RDS) or carefully-attached persistent volumes. We run MySQL as a task here to *learn ECS*, while knowing the production answer is usually RDS.
+
+## How tasks find each other
+
+The app task will need to reach this MySQL task. Within ECS there are a couple of approaches:
+
+| Approach | How the app addresses MySQL |
+|----------|------------------------------|
+| **Same task, multiple containers** | `localhost:3306` (containers share the task's network) |
+| **Service discovery / Service Connect** | A stable DNS name like `mysql.telusko.local` |
+| **Separate tasks via IP** | The MySQL task's private IP (changes if it restarts - fragile) |
+
+<Callout type="info">
+For a simple two-container demo, putting the app and MySQL in the **same task definition** lets the app reach the DB at `localhost:3306` - simplest possible wiring. For anything more realistic, **ECS Service Connect / service discovery** gives each service a stable DNS name so tasks find each other by name even as their IPs change - the container-world equivalent of using an RDS endpoint instead of an IP.
+</Callout>
+
+## Verify it works
+
+Read the task's **CloudWatch logs** - a healthy MySQL container prints `ready for connections`. If the task keeps stopping and restarting, the logs will show why (a common one: the task ran out of the memory you allocated, or the password env var was missing).
+
+## What's next
+
+You now have:
+
+- A Fargate **cluster** running.
+- A MySQL **task** alive inside it, with `appdb` created.
+- An understanding of *why* a real database would live in RDS, not a task.
+
+The next page containerizes the actual Java app and pushes its image to ECR - then we run it as a task that talks to this database.

@@ -1,0 +1,134 @@
+---
+title: "Building & Pushing the Docker Image"
+---
+
+This is where your app becomes a container. You'll write a **Dockerfile** that packages the Java app into an image, build it, tag it for your ECR repository, and push it. Once the image is in ECR, ECS can pull and run it - the same image, byte for byte, that you tested on your laptop.
+
+## The four moves
+
+```text
+   1. Dockerfile   → describe how to package the app
+   2. docker build → produce an image locally
+   3. docker tag   → label it with the ECR repo address
+   4. docker push  → upload it to ECR
+```
+
+Every "containerize and ship" workflow, anywhere, is these four steps.
+
+## Step 1 - Write the Dockerfile
+
+A Dockerfile is the recipe for the image. For a Spring Boot app, a **multi-stage build** keeps the final image small - build with the full JDK, run with just a JRE:
+
+```dockerfile title="Dockerfile"
+# ---- build stage: compile and package ----
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /app
+COPY pom.xml .
+RUN mvn dependency:go-offline       # cache deps for faster rebuilds
+COPY src ./src
+RUN mvn clean package -DskipTests
+
+# ---- run stage: small image with just the JAR ----
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+Why multi-stage matters:
+
+```text
+   Single stage (JDK + Maven + source + JAR)  → ~700 MB image
+   Multi-stage (just JRE + JAR)               → ~200 MB image
+   smaller = faster pushes, faster pulls, smaller attack surface
+```
+
+<Callout type="info">
+Copy `pom.xml` and download dependencies **before** copying your source. Docker caches each layer; if your code changes but `pom.xml` doesn't, Docker reuses the cached dependency layer and your rebuilds are dramatically faster. Ordering Dockerfile steps from least-to-most frequently changed is the single biggest build-speed trick.
+</Callout>
+
+## Step 2 - Build the image
+
+```bash
+docker build -t telusko-app .
+```
+
+Then run it **locally** to confirm it works before involving AWS:
+
+```bash
+docker run -p 8080:8080 telusko-app
+# open http://localhost:8080
+```
+
+<Callout type="warn">
+**Always test the image locally first.** If `docker run` works on your machine, the *exact same image* will run on ECS - that's the whole promise of containers. If it doesn't work locally, pushing it to ECR and debugging through the AWS console is slow and painful. The container makes "works on my machine" *actually mean* "works everywhere," but only if you verify the machine part first.
+</Callout>
+
+## Step 3 - Tag for ECR
+
+Docker needs to know *where* to push. Tag the image with your full ECR repository address (from the CLI-config page):
+
+```bash
+docker tag telusko-app:latest \
+  <account-id>.dkr.ecr.ap-south-1.amazonaws.com/telusko-app:v1
+```
+
+```text
+   local name          →  ECR address
+   telusko-app:latest  →  123456789.dkr.ecr.ap-south-1.amazonaws.com/telusko-app:v1
+```
+
+Use a real version tag (`v1`), not just `latest`, so you have a precise rollback target.
+
+## Step 4 - Push to ECR
+
+Make sure Docker is still logged in to ECR (the token lasts ~12 hours - re-run the login if needed), then:
+
+```bash
+docker push <account-id>.dkr.ecr.ap-south-1.amazonaws.com/telusko-app:v1
+```
+
+You'll see the layers upload. Confirm it landed:
+
+```bash
+aws ecr list-images --repository-name telusko-app
+```
+
+The image is now in your private registry, ready for ECS to pull.
+
+## The full sequence on one screen
+
+```bash
+# (one-time) log Docker in to ECR
+aws ecr get-login-password --region ap-south-1 \
+  | docker login --username AWS --password-stdin <account-id>.dkr.ecr.ap-south-1.amazonaws.com
+
+# build → tag → push
+docker build -t telusko-app .
+docker tag telusko-app:latest <account-id>.dkr.ecr.ap-south-1.amazonaws.com/telusko-app:v1
+docker push <account-id>.dkr.ecr.ap-south-1.amazonaws.com/telusko-app:v1
+```
+
+## Common push problems
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `no basic auth credentials` | Docker not logged in (or token expired) | Re-run the ECR login command |
+| `repository does not exist` | Repo missing or wrong region in the tag | Create the repo / fix the tag's region |
+| `denied` | IAM identity lacks ECR push permission | Attach an ECR policy to the user/role |
+| Push is huge/slow | Bloated image | Use multi-stage builds; add a `.dockerignore` |
+
+<Callout type="info">
+Add a **`.dockerignore`** (like `.gitignore`) to keep `target/`, `.git/`, and local junk out of the build context. It speeds up `docker build` and avoids accidentally baking secrets or huge files into the image. A lean build context is faster and safer.
+</Callout>
+
+## What you've achieved
+
+```text
+   Java app  ──► Docker image  ──► ECR repository (telusko-app:v1)
+   (your code)   (portable,        (private, in AWS, ready for ECS)
+                  self-contained)
+```
+
+The app is now a portable, versioned artifact in AWS's registry. The final page defines an ECS task from this image and runs the Java app - connected to the MySQL from earlier - completing the containerized deployment.

@@ -1,0 +1,11 @@
+{
+    "title": "Project: Elastic Beanstalk",
+    "pages": [
+        "whats-next-project-roadmap.mdx",
+        "simple-webapp-project.mdx",
+        "deploying-on-elastic-beanstalk.mdx",
+        "springboot-project-with-db.mdx",
+        "creating-a-database-in-rds.mdx",
+        "deploying-the-app-on-beanstalk.mdx"
+    ]
+}

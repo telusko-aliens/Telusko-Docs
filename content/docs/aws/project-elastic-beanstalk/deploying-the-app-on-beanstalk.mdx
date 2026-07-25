@@ -1,0 +1,112 @@
+---
+title: "Deploying the App on Beanstalk"
+---
+
+Every piece is now in place: a Spring Boot app that reads its database config from the environment, and an RDS MySQL instance reachable from inside the VPC. This final step joins them - deploy the app to Beanstalk and hand it the environment properties that point at RDS. When the health turns green and your data persists across a restart, the full-stack deployment is complete.
+
+## The whole picture
+
+```text
+   Internet
+      │
+      ▼
+   Beanstalk environment
+   ┌───────────────────────────────────────────────┐
+   │  Load balancer ──► EC2 (Spring Boot app)        │
+   │                      │ reads env properties:     │
+   │                      │  DB_HOST, DB_NAME, ...     │
+   │                      ▼                            │
+   │                  (port 3306, allowed by SG)       │
+   └──────────────────────┼────────────────────────────┘
+                          ▼
+                   RDS MySQL (private)
+```
+
+## Deploy and configure
+
+<Steps>
+<Step>
+### Deploy the Spring Boot JAR
+
+If you already have a Beanstalk environment from the simple-app step, upload the new JAR as a new application version. Otherwise create a new **Java platform** environment and upload `target/app.jar`.
+</Step>
+
+<Step>
+### Set the database environment properties
+
+This is the key step. In the environment's **Configuration → Software → Environment properties**, add the values from the RDS page:
+
+```text
+   DB_HOST     = mydb.abc123.ap-south-1.rds.amazonaws.com
+   DB_NAME     = appdb
+   DB_USER     = admin
+   DB_PASSWORD = ********
+```
+
+Spring Boot reads these via the `${DB_HOST:...}` placeholders in `application.properties` - no rebuild needed.
+</Step>
+
+<Step>
+### Confirm the security group path
+
+The app's instances run in the Beanstalk environment's security group; the RDS security group must allow **3306 from that security group** (set on the previous page). Without this, the app deploys but can't reach the DB.
+</Step>
+
+<Step>
+### Apply and watch the environment
+
+Saving the properties triggers an environment update. Watch the health: it should settle on **green/OK** once the app starts and connects to the database.
+</Step>
+
+<Step>
+### Test the live app
+
+Hit the environment URL. `POST` an item, `GET` the list - then **restart** the instance (or redeploy) and `GET` again. The data survives, because it lives in RDS, not on the instance. That persistence across restarts is the proof the whole stack works.
+</Step>
+</Steps>
+
+## When it goes red - the deploy debugging ladder
+
+A red environment after wiring in the database is almost always one of a short list. Check in this order:
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| App won't start at all | Port not read from env / startup crash | Check app logs; bind to the expected port |
+| Starts, then unhealthy | Can't reach RDS (timeout) | RDS security group must allow 3306 from the app's SG |
+| `Access denied` in logs | Wrong `DB_USER`/`DB_PASSWORD` | Re-check the env properties |
+| `Unknown database` | `DB_NAME` doesn't exist | Create the schema, or fix `DB_NAME` |
+| Works then 5xx under load | Too few instances / DB connections | Scale, or tune the connection pool |
+
+<Callout type="warn">
+**The logs have the answer - read them before changing things.** Beanstalk → **Logs → Request Logs (Last 100 lines)** shows your application's startup and error output. A database connection failure prints a clear stack trace there. Re-uploading or flipping settings at random wastes time; the log tells you whether it's a port, a security group, or a credential, and you fix exactly that.
+</Callout>
+
+## What you actually accomplished
+
+Step back and look at what's running:
+
+```text
+   ✅ A Spring Boot app, live on a public URL
+   ✅ Behind a load balancer, on auto-scaling EC2 instances
+   ✅ Connected to a managed RDS MySQL database
+   ✅ Config and secrets supplied by the environment, not hardcoded
+   ✅ Health-monitored, with one-click rollback to a previous version
+```
+
+You assembled a production-shaped, full-stack deployment - and Beanstalk built and wired the EC2 / load balancer / auto-scaling / monitoring layer for you, while you understood every piece of it.
+
+## Tear it down
+
+<Callout type="warn">
+This stack bills continuously: EC2 instance(s), the load balancer (hourly), and the RDS instance (hourly + storage). When you're done:
+
+1. **Terminate the Beanstalk environment** - this removes the EC2 instances, load balancer, auto-scaling group, and security groups it created.
+2. **Delete the RDS instance** - Beanstalk doesn't own it, so it won't go with the environment. Take a final snapshot only if you want the data.
+3. **Check for leftovers** - Elastic IPs, the S3 bucket Beanstalk made for versions, and any CloudWatch alarms.
+
+Leaving an RDS instance running is the most common forgotten charge after one of these projects. Your billing alarm is the backstop, but tearing down is the habit.
+</Callout>
+
+## Where this leads
+
+Beanstalk gave you "upload code, get an app." The next project trades a little of that simplicity for **portability and container-native control**: packaging the same kind of app as a **Docker image**, storing it in **ECR**, and running it on **ECS**. Same goal - a running app connected to a database - different, more modern machinery.

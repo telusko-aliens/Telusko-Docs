@@ -1,0 +1,104 @@
+---
+title: "Simple WebApp Project"
+---
+
+Before deploying anything, you need something to deploy. We'll start deliberately small - a minimal web app whose only job is to prove the deployment works. Keeping the app trivial means that when something goes wrong on AWS, you *know* it's the deployment, not your code. Get the simple thing live first; complexity comes later.
+
+## The philosophy: deploy the smallest thing first
+
+```text
+   ❌ Build a complex app, then try to deploy it
+      → when it fails, is it the app or the deployment? You can't tell.
+
+   ✅ Deploy a "hello world" first
+      → it works → the pipeline is sound → now add real features
+```
+
+This is the single most useful habit in deployment work: **establish a working deployment with a trivial app, then grow the app.** Every later problem is then a small diff from a known-good state.
+
+## What "a web app" means to Beanstalk
+
+Elastic Beanstalk runs apps in a chosen **platform** (runtime). It supports many:
+
+| Platform | You deploy |
+|----------|------------|
+| **Java SE / Tomcat** | A JAR or WAR |
+| **Node.js** | Your JS app + `package.json` |
+| **Python** | Your app + `requirements.txt` |
+| **PHP, Go, .NET, Ruby** | The respective project |
+| **Docker** | A container (bridges into the ECS project) |
+
+Since this course centres on Java, our "real" app later is **Spring Boot** (a runnable JAR). For the very first deploy, anything trivial in your chosen platform works - the point is just to see Beanstalk accept it and serve it.
+
+## A minimal app
+
+The simplest possible deployable web app - pick the flavour that matches your platform. A bare Node example:
+
+```javascript title="app.js"
+const http = require("http");
+const port = process.env.PORT || 8080;
+
+http.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("Hello from Elastic Beanstalk!\n");
+}).listen(port);
+
+console.log(`listening on ${port}`);
+```
+
+Or, for the Java path we'll build on, a Spring Boot app with one endpoint:
+
+```java title="HelloController.java"
+@RestController
+public class HelloController {
+    @GetMapping("/")
+    public String home() {
+        return "Hello from Elastic Beanstalk!";
+    }
+}
+```
+
+<Callout type="warn">
+**Read the port from the environment, don't hardcode it.** Beanstalk tells your app which port to listen on via the `PORT` environment variable (commonly 8080 / 5000 depending on platform). An app that hardcodes a different port will deploy "successfully" but fail its health check, and you'll see a green upload turn into a red environment. Bind to `process.env.PORT` (Node) or set `server.port` from the environment (Spring). This is the #1 first-deploy gotcha.
+</Callout>
+
+## Package it the way Beanstalk expects
+
+Beanstalk takes a **source bundle** - usually a zip of your app (or a built JAR for Java):
+
+```text
+   Node:   zip your project (app.js, package.json, ...) → upload the zip
+   Python: zip your project (app.py, requirements.txt) → upload the zip
+   Java:   build the runnable JAR (mvn package)         → upload the JAR
+```
+
+```bash
+# Java / Spring Boot - produce the deployable artifact
+mvn clean package
+# → target/myapp-0.0.1-SNAPSHOT.jar  (this is what you upload)
+```
+
+<Callout type="info">
+Test the artifact **locally** before uploading. Run the JAR (`java -jar target/myapp.jar`) or the app and hit `http://localhost:8080`. If it doesn't work on your machine, it won't work on Beanstalk - and debugging locally is far faster than debugging through the AWS console. "Works locally, then deploy" beats "deploy and hope" every time.
+</Callout>
+
+## A health endpoint helps
+
+Beanstalk (via the load balancer it creates) health-checks your app. By default it checks `/`. If your app's `/` returns a 200, you're fine. For anything real, add a dedicated lightweight health route:
+
+```java
+@GetMapping("/health")
+public String health() { return "OK"; }
+```
+
+Then you can point Beanstalk's health check at `/health` - a cheap endpoint that doesn't touch the database or do heavy work, so health checks stay fast and honest.
+
+## What we have, and what's next
+
+At this point you have:
+
+- A minimal web app that runs locally.
+- It reads its port from the environment.
+- It's packaged as a zip or JAR ready to upload.
+
+That's everything Beanstalk needs. The next page introduces Elastic Beanstalk itself and deploys this app - turning a local artifact into a live URL with AWS provisioning all the infrastructure underneath.

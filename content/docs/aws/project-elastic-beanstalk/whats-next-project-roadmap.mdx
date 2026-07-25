@@ -1,0 +1,96 @@
+---
+title: "What's Next - Project Roadmap"
+---
+
+You've now toured the core of AWS - compute, storage, networking, databases, identity, monitoring, automation. That's the vocabulary. The last two sections are where you *speak the language*: two end-to-end projects that take a real application from your laptop to a live URL on AWS, using the pieces you've learned.
+
+## Two paths to deploying an app
+
+There are many ways to run an application on AWS. These projects walk the two most important ones for a developer:
+
+```text
+   Project 1: Elastic Beanstalk (PaaS)
+   ───────────────────────────────────
+   "Here's my app. You handle the servers."
+   → fastest path from code to running app
+
+   Project 2: Containers on ECS + ECR
+   ───────────────────────────────────
+   "Here's my app in a Docker container. Run copies of it."
+   → the modern, portable, container-native path
+```
+
+Both end at the same place - a running app - but they represent different philosophies, and knowing both means you can pick the right one per project.
+
+## Why two projects instead of one
+
+Each teaches a different deployment model you'll meet in the real world:
+
+| | Elastic Beanstalk | ECS + ECR |
+|---|-------------------|-----------|
+| **You hand AWS** | Your code (a JAR/zip) | A Docker image |
+| **AWS manages** | Servers, scaling, load balancing, health | The container orchestration |
+| **Mental model** | "Just run my app" (PaaS) | "Run my containers" |
+| **Best when** | You want speed and simplicity | You want portability and container control |
+| **Effort** | Lowest | Moderate |
+
+<Callout type="info">
+Beanstalk is the gentler on-ramp - it hides the most. ECS asks you to think in containers but gives you more control and portability (the same image runs anywhere Docker does). Doing both, in this order, means each new concept builds on the last instead of arriving all at once.
+</Callout>
+
+## What the Beanstalk project covers
+
+This first project (the pages that follow) goes from simple to real:
+
+<Steps>
+<Step>
+### A simple web app
+
+Start with a minimal web application so the focus stays on *deployment*, not on writing complex code.
+</Step>
+<Step>
+### Deploy it on Elastic Beanstalk
+
+Meet Beanstalk: upload the app and watch AWS provision everything to run it - no manual EC2, no manual load balancer.
+</Step>
+<Step>
+### A Spring Boot app that needs a database
+
+Step up to a realistic app - a Spring Boot service that reads and writes data, so we need persistence.
+</Step>
+<Step>
+### Create the database in RDS
+
+Provision a managed MySQL database (using the RDS skills from earlier) for the app to talk to.
+</Step>
+<Step>
+### Deploy the full app on Beanstalk
+
+Tie it together - the Spring Boot app on Beanstalk, connected to the RDS database, live on a URL.
+</Step>
+</Steps>
+
+## How these connect to what you learned
+
+Nothing here is brand new - it's the earlier services, assembled:
+
+```text
+   Beanstalk quietly creates and manages:
+     EC2 instances      ← the compute section
+     a load balancer    ← the load balancing section
+     an Auto Scaling grp ← the scaling section
+     security groups    ← the networking section
+     CloudWatch alarms  ← the monitoring section
+   ...and you connect it to:
+     RDS                ← the database section
+```
+
+That's the real lesson of these projects: the individual services you learned in isolation are the **building blocks**, and tools like Beanstalk (or ECS) **assemble them into a working system** for you. Understanding the blocks is what lets you debug, tune, and trust the assembled result instead of treating it as magic.
+
+## A reminder before you start building
+
+<Callout type="warn">
+These projects create **real, billable resources** - EC2 instances, a load balancer, an RDS database. They run (and bill) until you delete them. Stay on free-tier sizes, and when you finish a project, **tear it down**: terminate the Beanstalk environment (which removes the EC2/LB/ASG it created) and delete the RDS instance. Your billing alarm from the monitoring section is your backstop if you forget.
+</Callout>
+
+Ready? The next page builds the simple web app we'll deploy first.

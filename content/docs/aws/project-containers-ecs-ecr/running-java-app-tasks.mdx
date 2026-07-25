@@ -1,0 +1,141 @@
+---
+title: "Running the Java App as ECS Tasks"
+---
+
+Everything converges here. The image is in ECR, the cluster is running, MySQL is up. Now we write a task definition that runs the Java app from your ECR image, point it at the database, and launch it. When the task reaches RUNNING and the app serves traffic backed by MySQL, the containerized deployment is complete - and you've done it the modern, portable way.
+
+## The finish line
+
+```text
+   ECR (telusko-app:v1)
+        │ ECS pulls the image
+        ▼
+   telusko-cluster (Fargate)
+   ┌──────────────────────────────────────────────┐
+   │  app task  ──► reads DB_HOST/DB_USER/... env   │
+   │      │ port 3306                                │
+   │      ▼                                          │
+   │  mysql task / RDS  (the database)               │
+   └──────────────────────────────────────────────┘
+```
+
+## Step 1 - Define the app task
+
+Create a **task definition** for the Java app, pointing at your ECR image:
+
+```text
+   Task definition: telusko-app-task   (Fargate)
+   ├── container: app
+   │     image: <account>.dkr.ecr.ap-south-1.amazonaws.com/telusko-app:v1
+   │     port mappings: 8080
+   │     environment:
+   │       DB_HOST     = <mysql task DNS / RDS endpoint>
+   │       DB_NAME     = appdb
+   │       DB_USER     = root (or admin)
+   │       DB_PASSWORD = ********
+   │     log configuration: CloudWatch
+   ├── task size: 0.5 vCPU, 1 GB
+   └── task role / execution role (see below)
+```
+
+The environment variables are the same `DB_*` values the Spring Boot app reads via `${DB_HOST:...}` - identical externalized-config pattern as the Beanstalk project. **The image doesn't change between environments; only the env vars do.**
+
+### The two IAM roles ECS wants
+
+This trips people up - ECS tasks reference *two* different roles:
+
+| Role | Purpose |
+|------|---------|
+| **Task execution role** | Lets ECS itself **pull the image from ECR** and write logs to CloudWatch |
+| **Task role** | Lets your **app code** call AWS services (S3, etc.) at runtime |
+
+<Callout type="warn">
+A task that won't start with an **image pull / `CannotPullContainerError`** almost always means the **task execution role** is missing the ECR permissions (attach `AmazonECSTaskExecutionRolePolicy`). The execution role is how ECS authenticates to *your private* ECR repo - without it, ECS can't fetch the image you pushed. This is the single most common first-task failure.
+</Callout>
+
+## Step 2 - Run the task (and connect to the DB)
+
+**Run task** into `telusko-cluster`, choosing the VPC/subnets and a **security group** that:
+
+- allows inbound **8080** (so you/an ALB can reach the app), and
+- can reach the database on **3306** (the DB's security group must allow the app's).
+
+How the app addresses MySQL depends on the choice from the cluster page:
+
+```text
+   Same task (app + mysql together):  DB_HOST = localhost
+   Service discovery:                 DB_HOST = mysql.telusko.local
+   RDS instead of a MySQL task:       DB_HOST = the RDS endpoint  (recommended for real data)
+```
+
+## Step 3 - Verify it's alive
+
+When the task status is **RUNNING**, find its public IP (or the load balancer URL) and hit port 8080. `POST` an item, `GET` it back - served by your container, persisted in the database.
+
+If it isn't healthy, the answer is in the logs:
+
+```text
+   ECS → cluster → task → Logs (CloudWatch)
+     "Started Application in 4.2s"        → app booted fine
+     "Communications link failure"        → can't reach DB (SG / DB_HOST)
+     "Access denied for user"             → wrong DB_USER / DB_PASSWORD
+     CannotPullContainerError             → execution role / ECR permissions
+```
+
+<Callout type="info">
+Notice the debugging is the *same shape* as Beanstalk: read the logs, then classify the failure as **app**, **connectivity**, **credentials**, or **permissions**. The tooling changed (ECS + CloudWatch instead of the EB console), but the diagnostic instinct transfers directly. That transfer is the real skill - services come and go, the way you reason about failures doesn't.
+</Callout>
+
+## From "task" to "service" - the production step
+
+Running a one-off **task** is great for testing, but it doesn't self-heal: if the task crashes, it stays down. For anything real, you wrap it in an **ECS service**:
+
+```text
+   Task   = run one container once (dies → stays dead)
+   Service = "always keep N tasks running"
+             ├── replaces crashed tasks automatically
+             ├── integrates with a load balancer + target group
+             ├── does rolling deployments (new image, zero downtime)
+             └── scales the task count up/down with load
+```
+
+A **service** is to a task what an Auto Scaling group is to a single EC2 instance - the thing that keeps the right number alive and healthy over time. Production ECS runs **services**, fronted by an **ALB**, pulling images from **ECR**.
+
+## The full production shape
+
+Step back and see the whole pattern - it rhymes with the Beanstalk stack, container-native:
+
+```text
+   Route 53 ──► ALB ──► ECS Service (N app tasks, Fargate)
+                          │ image from ECR
+                          ▼
+                       RDS (managed MySQL, durable)
+```
+
+| Beanstalk project | This container project |
+|-------------------|------------------------|
+| Upload a JAR | Push an image to ECR |
+| Beanstalk environment | ECS cluster + service |
+| EB manages EC2/ASG/ALB | ECS + Fargate + ALB |
+| RDS for data | RDS for data |
+| Env properties for config | Task definition env vars |
+
+Same destination, two routes - and you've now walked both.
+
+## Tear it down
+
+<Callout type="warn">
+Containerized doesn't mean free. Running Fargate tasks bill per vCPU/memory by the second, the ALB bills hourly, and any RDS/EFS storage persists. When done:
+
+1. **Stop the running tasks** and **delete the ECS service** (set desired count to 0 first).
+2. **Delete the cluster** if it's a learning one.
+3. **Delete the RDS instance / MySQL task** and any **EFS** volume.
+4. **Delete the ECR repository** (or its old images) - stored images cost a little per GB.
+5. Remove the **ALB**, **target group**, and any **Elastic IPs**.
+
+ECR images and idle Fargate services are quiet recurring charges. Your billing alarm is the safety net - but the discipline is to delete what the demo no longer needs.
+</Callout>
+
+## You've reached the end
+
+From "what is a cloud" to a containerized Java app running on ECS with a managed database - you've built the full picture. The services you learned in isolation (EC2, S3, IAM, VPC, RDS, ELB, CloudWatch, the CLI) are the building blocks; Beanstalk and ECS are two ways to assemble them into a living system. Understanding the blocks is what lets you choose, debug, and trust whatever you assemble next.

@@ -1,0 +1,135 @@
+---
+title: "Spring Boot Project with a Database"
+---
+
+A "hello world" proves the deployment works. A real app *remembers things* - and that means a database. This page steps up to a Spring Boot service backed by MySQL, and focuses on the part that actually matters for cloud deployment: **never hardcode your database connection.** Get that right and deploying to Beanstalk (with RDS) becomes trivial.
+
+## The app: a small CRUD service
+
+Something realistic but minimal - say, a service that stores and lists items. The shape is the usual Spring Boot stack:
+
+```text
+   Controller  → handles HTTP requests
+   Service     → business logic
+   Repository  → talks to the database (Spring Data JPA)
+   Entity      → maps to a table
+        │
+        ▼
+   MySQL database (locally now; RDS on AWS later)
+```
+
+```java title="Item.java"
+@Entity
+public class Item {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String name;
+    // getters / setters
+}
+```
+
+```java title="ItemRepository.java"
+public interface ItemRepository extends JpaRepository<Item, Long> { }
+```
+
+That's enough to `POST` items and `GET` them back - and enough to need a database.
+
+## The cloud-critical part: externalized configuration
+
+Here's the rule that makes or breaks cloud deployment:
+
+<Callout type="warn">
+**Never hardcode database credentials or the database host in your code or committed config.** The database is `localhost` on your machine and an RDS endpoint on AWS - the *same build* must work in both places. Hardcode `localhost` and your deployed app can't find its database; hardcode the RDS endpoint and you can't run locally (and you've leaked your DB host into git). The connection details must come from **outside** the artifact - environment variables.
+</Callout>
+
+Spring Boot makes this clean: `application.properties` can read values from the environment, with a local fallback:
+
+```properties title="application.properties"
+spring.datasource.url=jdbc:mysql://${DB_HOST:localhost}:3306/${DB_NAME:appdb}
+spring.datasource.username=${DB_USER:root}
+spring.datasource.password=${DB_PASSWORD:}
+spring.jpa.hibernate.ddl-auto=update
+```
+
+The `${DB_HOST:localhost}` syntax means *"use the `DB_HOST` environment variable; if it's not set, fall back to `localhost`."* So:
+
+```text
+   On your laptop:  no env vars set → uses localhost (your local MySQL)
+   On Beanstalk:    env vars set    → uses the RDS endpoint
+   Same JAR, two environments, zero code changes.
+```
+
+## Why this matters so much
+
+The same build artifact moving unchanged between environments is the entire point of [externalized config](/docs/aws/project-elastic-beanstalk/deploying-on-elastic-beanstalk) - and it follows the [Twelve-Factor App](https://12factor.net) principle of keeping config in the environment:
+
+| Approach | Local works? | AWS works? | Secrets in git? |
+|----------|:---:|:---:|:---:|
+| Hardcoded `localhost` | ✅ | ❌ | - |
+| Hardcoded RDS endpoint | ❌ | ✅ | ❌ leaked |
+| **Env vars + local fallback** | ✅ | ✅ | ✅ none |
+
+Only the third approach is deployable *and* safe. It's the same lesson as IAM roles over hardcoded keys: **configuration and secrets live outside the artifact.**
+
+## Add the MySQL driver
+
+The app needs the JDBC driver on the classpath:
+
+```xml title="pom.xml"
+<dependency>
+    <groupId>com.mysql</groupId>
+    <artifactId>mysql-connector-j</artifactId>
+    <scope>runtime</scope>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-jpa</artifactId>
+</dependency>
+```
+
+## Test locally against a local MySQL first
+
+Before AWS enters the picture, prove the app works end to end on your machine:
+
+<Steps>
+<Step>
+### Run a local MySQL and create the database
+
+`CREATE DATABASE appdb;` in your local MySQL.
+</Step>
+<Step>
+### Run the app with no env vars
+
+It falls back to `localhost` and connects to your local MySQL.
+</Step>
+<Step>
+### Exercise the endpoints
+
+`POST` an item, `GET` the list back, restart the app, `GET` again - the data persists. Now you *know* the app and its persistence logic are correct.
+</Step>
+<Step>
+### Build the artifact
+
+```bash
+mvn clean package   # → target/app.jar
+```
+</Step>
+</Steps>
+
+<Callout type="info">
+Proving persistence works locally is the same "deploy the simple thing first" discipline applied to data: when the app later can't reach RDS, you'll *know* the app logic is fine and the problem is connectivity (endpoint, security group, or env vars) - not your code. You've isolated the variable before changing it.
+</Callout>
+
+## What's left for AWS
+
+The app is built and proven. Two AWS pieces remain, and they're the next two pages:
+
+```text
+   1. Create the database in RDS        → an empty managed MySQL for the app
+   2. Deploy the app on Beanstalk       → set DB_HOST/DB_USER/DB_PASSWORD as
+                                          environment properties pointing at RDS
+```
+
+The app itself doesn't change at all from here - we just give it a real database to talk to and the environment variables to find it. That's the payoff of doing the configuration right.
+
+Next: provisioning the RDS MySQL database the app will connect to.

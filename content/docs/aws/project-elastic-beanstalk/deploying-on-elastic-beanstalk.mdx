@@ -1,0 +1,141 @@
+---
+title: "Deploying on Elastic Beanstalk"
+---
+
+Elastic Beanstalk is the "just run my app" button for AWS. You upload your code; it provisions the EC2 instances, the load balancer, the auto-scaling group, the security groups, and the health monitoring - and hands you a URL. You don't click through any of that infrastructure yourself. It's the fastest legitimate path from a built artifact to a running, scalable app.
+
+## What Beanstalk actually does
+
+```text
+   You upload:  myapp.jar  (just your code)
+        │
+        ▼
+   Elastic Beanstalk provisions and wires together:
+        ├── EC2 instance(s)        (runs your app)
+        ├── Load balancer          (one stable URL, spreads traffic)
+        ├── Auto Scaling group     (grows/shrinks with load)
+        ├── Security groups        (the firewall rules)
+        ├── CloudWatch monitoring  (health + metrics)
+        └── an S3 bucket           (stores your uploaded versions)
+        │
+        ▼
+   You get:  http://myapp-env.eba-xxxx.ap-south-1.elasticbeanstalk.com
+```
+
+Crucially, **Beanstalk doesn't hide these resources** - it creates them in *your* account, where you can see and even tweak them. It's not a black box; it's an automation layer over the services you already learned.
+
+<Callout type="info">
+This is why the earlier sections matter even though Beanstalk automates them. When the app misbehaves, you'll look at the EC2 instances, the load balancer's target health, the security groups, and CloudWatch logs - all things you now understand. Beanstalk makes the easy path easy without taking away your ability to debug the hard path.
+</Callout>
+
+## The Beanstalk vocabulary
+
+Three terms organize everything:
+
+| Term | What it is |
+|------|------------|
+| **Application** | The top-level container for your project (e.g. "telusko-app") |
+| **Environment** | A running instance of the app - its own infrastructure and URL (e.g. `dev`, `prod`) |
+| **Application version** | A specific uploaded artifact (a labelled JAR/zip) you can deploy or roll back to |
+
+```text
+   Application: telusko-app
+   ├── Environment: telusko-dev   (running v3)
+   └── Environment: telusko-prod  (running v2)
+   Versions: v1, v2, v3 (each a stored artifact you can deploy/roll back to)
+```
+
+One application can have several environments (dev/prod), and you deploy versions into them.
+
+## Deploying the simple app
+
+<Steps>
+<Step>
+### Open Elastic Beanstalk and create an application
+
+EB console → **Create application.** Name it, then choose the **platform** matching your app (e.g. **Java** for the Spring Boot JAR, **Node.js** for the JS app).
+</Step>
+
+<Step>
+### Upload your code
+
+Choose **Upload your code** and provide the artifact from the last page (the `.jar` or zipped project). Beanstalk stores it as an application version.
+</Step>
+
+<Step>
+### Pick the environment settings
+
+For learning, the **single-instance** preset (free-tier friendly) is cheapest - it skips the load balancer. The **load-balanced** preset creates the ALB + Auto Scaling group (closer to production). Use a `t2.micro`/`t3.micro` instance.
+</Step>
+
+<Step>
+### Create the environment
+
+Beanstalk now provisions everything. This takes several minutes - watch the events log as it creates the instance, security group, and (if chosen) load balancer.
+</Step>
+
+<Step>
+### Visit the URL
+
+When the environment health turns **green/OK**, click the environment URL. Your "Hello from Elastic Beanstalk!" page loads - served by infrastructure you never manually created.
+</Step>
+</Steps>
+
+## Health: the colour that tells you everything
+
+Beanstalk shows environment health as a colour, and learning to read it saves hours:
+
+| Health | Meaning |
+|--------|---------|
+| 🟢 **Green / OK** | App is up and passing health checks |
+| 🟡 **Yellow / Warning** | Degraded - some requests failing, or a deploy in progress |
+| 🔴 **Red / Severe** | App is down or failing health checks |
+| ⚪ **Grey** | Environment updating or in transition |
+
+<Callout type="warn">
+A **red environment right after a successful upload** almost always means the app started but **failed its health check** - most often the port problem from the last page (app not listening on the port Beanstalk expects), a crash on startup, or a missing environment variable. Don't re-upload blindly: open **Logs → Request logs** in the EB console and read the application log. The error is in there.
+</Callout>
+
+## Updating and rolling back
+
+Deploying a new version is just uploading again:
+
+```text
+   upload v2 ──► Beanstalk deploys it to the environment ──► live
+   v2 broken? ──► select v1 ──► "Deploy" ──► rolled back in minutes
+```
+
+Because every upload is a stored **application version**, rollback is trivial - pick a previous version and deploy it. Beanstalk also supports deployment strategies (all-at-once, rolling, immutable) so updates don't take the whole environment down at once.
+
+## Configuration without redeploying
+
+You can change a running environment's settings - environment variables, instance type, scaling rules, health-check path - through **Configuration**, without rebuilding the app:
+
+```text
+   Configuration → Software → Environment properties
+     DB_HOST = mydb.xxxx.rds.amazonaws.com
+     DB_USER = admin
+     SPRING_PROFILES_ACTIVE = prod
+```
+
+This is exactly how we'll feed database connection details to the Spring Boot app later - as environment properties, not hardcoded in the JAR.
+
+## The eb CLI (optional, but nicer)
+
+Beyond the console, the **EB CLI** makes deploys a one-liner from your project folder:
+
+```bash
+eb init        # one-time: link the folder to an EB application
+eb create      # create an environment
+eb deploy      # build & push the current code
+eb open        # open the URL in a browser
+eb logs        # tail the logs
+```
+
+For iterative development this beats zipping and uploading by hand every time.
+
+<Callout type="info">
+Beanstalk's sweet spot: you want your app running with production-grade infrastructure (load balancer, scaling, monitoring) but you **don't want to assemble or maintain it.** The trade-off is less fine-grained control than building it yourself. For most standard web apps that trade is a clear win - which is exactly why Beanstalk exists.
+</Callout>
+
+The simple app is live. Next we build something that actually needs to *store* data - a Spring Boot app with a database.

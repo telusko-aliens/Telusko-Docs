@@ -28,4 +28,7 @@ next-env.d.ts
 .env
 
 /public/images/java/
+/public/images/fastapi/
+/public/images/aws/
 /prompts-local/
+/devops/

@@ -1,0 +1,109 @@
+---
+title: "Configuring the AWS CLI for ECR"
+---
+
+Before Docker can push an image to your private ECR repository, two things have to be true: the **AWS CLI** must be authenticated as an identity allowed to use ECR, and **Docker** must be logged in to your ECR registry. This page sets up both - it's the handshake that makes the rest of the project possible.
+
+## The two logins you need
+
+People conflate these and then wonder why `docker push` fails. They're separate:
+
+```text
+   1. AWS CLI authenticated   → "AWS knows who you are" (IAM identity)
+   2. Docker logged in to ECR → "Docker can push to your registry"
+        (the CLI generates a token that step 2 uses)
+```
+
+Step 2 *depends on* step 1: the CLI mints a short-lived token, and you feed that token to `docker login`.
+
+## Step 1 - Configure the AWS CLI
+
+If you set this up in the [CLI section](/docs/aws/monitoring-cli-and-iac/aws-command-line-interface), you're done. If not:
+
+```bash
+aws configure
+# AWS Access Key ID     : AKIA...        (from an IAM user)
+# AWS Secret Access Key : ********
+# Default region name   : ap-south-1     (must match where your ECR repo is)
+# Default output format : json
+
+aws sts get-caller-identity   # verify: returns your account + user
+```
+
+<Callout type="warn">
+The CLI's **region must match the region of your ECR repository.** ECR is regional - a repo in `ap-south-1` is invisible to a CLI defaulted to `us-east-1`, and your push will fail with a confusing "repository does not exist." Set the region deliberately, and use an **IAM user with ECR permissions** (e.g. `AmazonEC2ContainerRegistryFullAccess` for learning), never root.
+</Callout>
+
+## Step 2 - Create an ECR repository
+
+You need somewhere to push to:
+
+```bash
+aws ecr create-repository --repository-name telusko-app
+```
+
+Or in the console: **ECR → Create repository → name it `telusko-app`.** Note the repository URI it returns:
+
+```text
+   <account-id>.dkr.ecr.ap-south-1.amazonaws.com/telusko-app
+```
+
+## Step 3 - Log Docker in to ECR
+
+This is the key command. The CLI generates an authentication token and pipes it into `docker login`:
+
+```bash
+aws ecr get-login-password --region ap-south-1 \
+  | docker login --username AWS \
+      --password-stdin <account-id>.dkr.ecr.ap-south-1.amazonaws.com
+```
+
+Breaking it down:
+
+| Part | What it does |
+|------|--------------|
+| `aws ecr get-login-password` | Asks AWS for a temporary registry password (valid ~12 hours) |
+| `\| docker login --password-stdin` | Pipes that password straight into Docker's login (never echoed to screen) |
+| `--username AWS` | ECR's fixed username is literally `AWS` |
+| the registry URL | Your account-specific ECR endpoint (no `/repo` suffix here) |
+
+A successful run prints **`Login Succeeded`**. Now Docker can push to your ECR.
+
+<Callout type="info">
+Piping the password via `--password-stdin` instead of typing it as an argument is deliberate security hygiene - it keeps the credential out of your shell history and the process list. It's the recommended way and worth doing even in a learning setup, so the habit sticks.
+</Callout>
+
+## Verify the whole chain
+
+A quick confidence check before moving on:
+
+```bash
+# CLI authenticated?
+aws sts get-caller-identity
+
+# can the CLI see your repo?
+aws ecr describe-repositories --repository-names telusko-app
+
+# Docker logged in? (re-running login should say "Login Succeeded")
+```
+
+If all three succeed, the pipeline from your machine to ECR is open.
+
+## When it fails - the usual culprits
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `repository does not exist` | Wrong region, or repo not created | Match CLI region to repo; create the repo |
+| `denied: not authorized` | IAM identity lacks ECR permissions | Attach an ECR policy to the user/role |
+| `no basic auth credentials` | Docker not logged in to ECR | Re-run the `get-login-password \| docker login` command |
+| Login token expired | Token is ~12 hours old | Just re-run the login command |
+
+<Callout type="warn">
+The ECR login token **expires after about 12 hours.** If a `docker push` suddenly fails the next day with an auth error, you don't have a real problem - just re-run the `get-login-password | docker login` command to get a fresh token. This trips up nearly everyone the second day; now you'll recognize it instantly.
+</Callout>
+
+## On EC2/CI, use a role instead
+
+Just like the plain CLI, when this runs on an EC2 instance or in a CI pipeline, you should **not** store access keys - attach an **IAM role** with ECR permissions, and `get-login-password` works using the role's temporary credentials. Same security principle as everywhere else in this course: roles over long-lived keys.
+
+The handshake is done - CLI authenticated, repo created, Docker logged in. Next we stand up the ECS cluster and run our first container in it: MySQL.

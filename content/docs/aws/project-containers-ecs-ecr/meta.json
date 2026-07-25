@@ -1,0 +1,10 @@
+{
+    "title": "Project: Containers (ECS & ECR)",
+    "pages": [
+        "introduction-to-ecr.mdx",
+        "configuring-aws-cli-for-ecr.mdx",
+        "creating-cluster-and-mysql-task.mdx",
+        "pushing-the-docker-image.mdx",
+        "running-java-app-tasks.mdx"
+    ]
+}

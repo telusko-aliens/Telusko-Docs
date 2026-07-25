@@ -12,6 +12,8 @@
         "storage-and-static-hosting",
         "databases-with-rds",
         "networking-vpc-and-route53",
-        "monitoring-cli-and-iac"
+        "monitoring-cli-and-iac",
+        "project-containers-ecs-ecr",
+        "project-elastic-beanstalk"
     ]
 }

@@ -1,0 +1,126 @@
+---
+title: "Introduction to ECR (and Containers on AWS)"
+---
+
+Beanstalk asked "what's your code?" Containers ask a better question: "what's your *whole environment*?" A Docker image packages your app **and** its runtime, libraries, and OS dependencies into one artifact that runs identically on your laptop, a teammate's machine, and AWS. This project deploys a containerized app - and it starts with **ECR**, the place AWS stores your images.
+
+## Why containers, in one diagram
+
+```text
+   "Works on my machine" (no containers)
+   ────────────────────────────────────
+   your laptop: Java 21, libX 2.3   ──► app works
+   the server:  Java 17, libX 1.9   ──► app breaks
+        (different environment = surprise failures)
+
+   Containers
+   ──────────
+   image = app + Java 21 + libX 2.3 + OS bits, frozen together
+   runs the SAME everywhere Docker runs → no "works on my machine"
+```
+
+A **container** is a lightweight, isolated package of your app and everything it needs to run. The **image** is the frozen template; a **container** is a running instance of it. Build once, run anywhere.
+
+## The AWS container cast
+
+Three services work together for this project. Keep their roles straight:
+
+| Service | Role | Analogy |
+|---------|------|---------|
+| **Docker** | Builds images, runs containers (your tool) | The packing machine |
+| **ECR** | Stores your images in AWS | The warehouse |
+| **ECS** | Runs your containers at scale | The crew that runs them |
+
+```text
+   docker build ──► image ──► push to ECR ──► ECS pulls & runs it
+   (your machine)            (the registry)    (the runtime)
+```
+
+## ECR - Elastic Container Registry
+
+**ECR is a managed Docker image registry** - like Docker Hub, but inside AWS, private to your account, and integrated with IAM. You push images to it; ECS (or anything else) pulls from it.
+
+Why use ECR instead of Docker Hub:
+
+- **Private by default** - your images aren't public unless you choose.
+- **IAM-controlled** - the same permission model as the rest of AWS; no separate registry credentials to manage.
+- **Close to ECS** - fast pulls within the same region, no internet round-trip.
+- **Integrated** - scans images for vulnerabilities, manages lifecycle (auto-expire old images).
+
+### Repositories and image tags
+
+ECR organizes images into **repositories** - one repo per application (e.g. `telusko-app`). Inside a repo, images are distinguished by **tags**:
+
+```text
+   ECR repository: telusko-app
+   ├── telusko-app:latest    ← convention for "newest"
+   ├── telusko-app:v1
+   └── telusko-app:v2        ← deploy a specific version by tag
+```
+
+Each image's full address looks like:
+
+```text
+   <account-id>.dkr.ecr.<region>.amazonaws.com/telusko-app:v2
+   └──────── the ECR registry for your account/region ────────┘
+```
+
+<Callout type="info">
+**Tag deliberately, don't just push `latest`.** `latest` is convenient but ambiguous - "which build is latest right now?" Tagging with versions (`v1`, a git commit SHA, a build number) means you can deploy and **roll back to an exact image**. Treat image tags like the application versions Beanstalk kept for you - they're your rollback points.
+</Callout>
+
+## ECS - Elastic Container Service (a preview)
+
+**ECS runs your containers** - it pulls images from ECR and keeps the right number of them running, healthy, and (optionally) behind a load balancer. We'll go deep in the cluster page, but the vocabulary to start carrying:
+
+| ECS term | What it is |
+|----------|------------|
+| **Cluster** | A logical group where your containers run |
+| **Task definition** | The blueprint: which image, how much CPU/memory, ports, env vars |
+| **Task** | A running instance of a task definition (your container, alive) |
+| **Service** | Keeps N tasks running, replaces failures, integrates the load balancer |
+
+### EC2 launch type vs. Fargate
+
+ECS can run your containers two ways - and this is the choice that defines the experience:
+
+```text
+   EC2 launch type:  YOU manage the EC2 instances the containers run on
+                     (more control, you patch/scale the hosts)
+
+   Fargate:          AWS runs the containers serverlessly - NO servers to manage
+                     (you just say "run this task"; AWS finds the capacity)
+```
+
+<Callout type="info">
+**Fargate** is the easier path for most people: there are no EC2 hosts to provision, patch, or scale - you hand ECS a task and it runs, and you pay per task's CPU/memory by the second. Choose the **EC2 launch type** when you need specific instance types, GPUs, or the cheapest cost at steady high scale. For learning and most apps, Fargate removes a whole layer of work.
+</Callout>
+
+## The project ahead
+
+Here's the route the next pages take, end to end:
+
+<Steps>
+<Step>
+### Configure the AWS CLI for ECR
+
+Authenticate Docker to your private ECR registry.
+</Step>
+<Step>
+### Create an ECS cluster and run MySQL as a task
+
+Stand up the cluster and run a database container for the app to use.
+</Step>
+<Step>
+### Build and push the app's Docker image
+
+Containerize the Java app and push the image to ECR.
+</Step>
+<Step>
+### Run the Java app as ECS tasks
+
+Define and run the app task, connected to the MySQL task - the full app, containerized, on AWS.
+</Step>
+</Steps>
+
+The destination is the same as the Beanstalk project - a running app with a database - but the machinery is container-native: portable images in ECR, orchestrated by ECS. First, get the CLI talking to ECR.

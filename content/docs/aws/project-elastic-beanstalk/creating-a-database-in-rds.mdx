@@ -1,0 +1,116 @@
+---
+title: "Creating the Database in RDS"
+---
+
+The Spring Boot app is ready and proven locally. Now it needs a real, cloud-hosted database to talk to - a managed MySQL instance in RDS. This page provisions it and, more importantly, gets the **networking and security** right so the Beanstalk app can reach the database while the rest of the internet cannot.
+
+## The connection picture
+
+```text
+   Beanstalk environment              RDS
+   ┌──────────────────────┐          ┌──────────────────────┐
+   │  EC2 instance(s)      │          │   MySQL database      │
+   │  running the Spring   │──3306───►│   (private, managed)  │
+   │  Boot app             │  allowed │                       │
+   └──────────────────────┘  by SG   └──────────────────────┘
+        same VPC; the DB's security group allows 3306
+        ONLY from the app's security group - not the world
+```
+
+The goal: the app reaches the DB on port 3306; nobody else can.
+
+## Provisioning the instance
+
+This reuses everything from the [RDS section](/docs/aws/databases-with-rds/rds-mysql-practical-demo) - here's the project-specific path:
+
+<Steps>
+<Step>
+### Create a MySQL database, free-tier template
+
+RDS → **Create database** → **MySQL** → **Free tier** template (`db.t3.micro`). Single-AZ to stay free.
+</Step>
+
+<Step>
+### Set the identifiers and master credentials
+
+Note the **master username** and **password** - these become the app's `DB_USER` and `DB_PASSWORD` environment properties. Set an initial **database name** (e.g. `appdb`) so the app has a schema to use.
+</Step>
+
+<Step>
+### Put it in the same VPC as Beanstalk, and keep it private
+
+Use the **default VPC** (same one Beanstalk uses) and set **Public access = No.** The app talks to it over the private network; it should not be internet-reachable.
+</Step>
+
+<Step>
+### Configure the security group
+
+This is the crucial step - see below.
+</Step>
+
+<Step>
+### Create and grab the endpoint
+
+When it's **Available**, copy the **endpoint** hostname. That's the app's `DB_HOST`.
+</Step>
+</Steps>
+
+## Get the security group right
+
+This is where most people either lock themselves out or dangerously expose the database. The clean approach uses **security-group-to-security-group** rules:
+
+```text
+   DB security group inbound rule:
+     Type: MySQL/Aurora  Port: 3306
+     Source: <the Beanstalk environment's security group>   ← not an IP!
+```
+
+Referencing the app's security group as the source means "any instance in the app's security group may connect" - so when Beanstalk scales out and adds instances, they're automatically allowed, with no IP juggling.
+
+<Callout type="warn">
+Do **not** set the database's inbound source to `0.0.0.0/0` to "make it work." That exposes your MySQL to the entire internet, where it will be found and attacked within hours. The correct source is the **app's security group** (or, if you must connect from your laptop temporarily, *your* IP only - removed afterwards). A private, SG-scoped database is the whole point of putting it in a VPC.
+</Callout>
+
+## Verify connectivity before deploying
+
+Don't wait until the full app deploy to discover the DB is unreachable. Test the path first:
+
+```text
+   From a machine in the same VPC (e.g. an EC2 instance in the app's SG):
+     mysql -h <rds-endpoint> -u admin -p
+     → connects? networking + security group are correct
+     → times out? security group or VPC placement is wrong
+```
+
+If you can open a MySQL session from inside the VPC, the app will be able to too. This isolates "can anything reach the DB?" from "does the app connect correctly?" - debug them separately.
+
+<Callout type="info">
+A connection **timeout** is a *network/security-group* problem (the packets aren't getting there). A connection **refused** or **access denied** is a *credentials/database* problem (you reached it, but auth or the DB name is wrong). Reading which error you get tells you which layer to fix - a distinction that saves a lot of guessing.
+</Callout>
+
+## The values the app will need
+
+By the end of this page you have the three (well, four) pieces the Beanstalk app needs as environment properties:
+
+| Env property | Value | From |
+|--------------|-------|------|
+| `DB_HOST` | the RDS endpoint hostname | RDS console |
+| `DB_NAME` | `appdb` | the initial DB name you set |
+| `DB_USER` | the master username | you chose at creation |
+| `DB_PASSWORD` | the master password | you chose at creation |
+
+Keep these handy - the next page plugs them into Beanstalk's environment configuration so the running app finds its database.
+
+## A note on the "right" way for production
+
+For learning, master credentials as environment properties is fine. In production you'd go further:
+
+- Store the password in **AWS Secrets Manager** (or SSM Parameter Store), not as a plain env value.
+- Often let RDS sit in a dedicated **private subnet** with no route to the internet at all.
+- Consider **IAM database authentication** to avoid passwords entirely.
+
+<Callout type="info">
+Don't bolt all of that on now - it would bury the lesson. But know the direction: secrets move out of environment variables into a secrets manager, and the database moves further from the internet. The pattern you're learning (externalized config, SG-scoped access) is the foundation those production hardening steps build on.
+</Callout>
+
+The database is live and reachable from inside the VPC. The final Beanstalk page connects the app to it and ships the whole thing.
