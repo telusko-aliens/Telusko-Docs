@@ -1,0 +1,114 @@
+---
+title: Go Setup
+description: Installing Go, verifying the toolchain, and setting up VS Code to start programming in Golang.
+---
+
+## Before You Write Any Code
+
+Every Go journey starts with one thing: getting the language onto your machine. This first step covers downloading and installing Go, confirming it works, and setting up an editor so you get helpful features like code completion and instant error detection. Once this is done, everything after it is just writing code.
+
+## Downloading and Installing Go
+
+Go is distributed from its official website, and the install is a single package with no complicated setup.
+
+<Steps>
+
+<Step>
+### Visit the official site
+
+Go to [go.dev](https://go.dev) and open the downloads page to find the latest release.
+</Step>
+
+<Step>
+### Choose the stable version
+
+Always pick the **stable** version rather than a beta or release candidate. Stable builds are tested and avoid the bugs that pre-release versions can carry.
+</Step>
+
+<Step>
+### Download the installer for your OS
+
+Pick the installer that matches your operating system - **macOS**, **Windows**, or **Linux** - and run it, following the prompts to finish.
+</Step>
+
+</Steps>
+
+<Callout type="info">
+Go is **backward compatible**. Code you write today will keep working even after you update to newer versions later, so you can install the latest stable release without worrying about it breaking your programs down the line.
+</Callout>
+
+## Verifying the Installation
+
+Once the installer finishes, confirm that Go is available from your terminal.
+
+Open your system **terminal** and type:
+
+```bash
+go
+```
+
+This prints the list of available Go commands, which confirms the installation succeeded. To check exactly which version you installed, run:
+
+```bash
+go version
+```
+
+You should see output similar to this:
+
+```text
+go version go1.22.0 windows/amd64
+```
+
+If you see a version number, Go is installed correctly. If the terminal says the command is not found, close and reopen the terminal so it picks up the new installation.
+
+## Choosing an IDE
+
+You can write Go in any editor, but a good one makes learning smoother. Two common choices:
+
+| Editor | Notes |
+| ------ | ----- |
+| **GoLand** | A dedicated Go IDE from JetBrains. Powerful and popular in professional production environments, but it requires a paid subscription. |
+| **VS Code** | Free, lightweight, and a great fit for beginners. This is the recommended choice for learners. |
+
+For this course we use **VS Code**, since it is free and efficient for getting started.
+
+## Setting Up VS Code for Go
+
+VS Code becomes a proper Go environment once you add the official Go extension.
+
+<Steps>
+
+<Step>
+### Install VS Code
+
+Download and install [VS Code](https://code.visualstudio.com) if you do not already have it.
+</Step>
+
+<Step>
+### Add the Go extension
+
+Open the Extensions marketplace, search for **"Go"**, and install the official Go extension.
+</Step>
+
+</Steps>
+
+### Why the extension matters
+
+The Go extension is not optional in practice - it gives you the features that make writing Go pleasant:
+
+- **Code completion** - suggestions as you type, so you write faster and remember less
+- **Real-time error detection** - Go-specific mistakes are flagged immediately while you type, instead of only when you try to run the program
+
+<Callout type="info">
+When you open your first `.go` file, VS Code will offer to install a set of Go tools. Accept the prompt and it sets everything up for you automatically.
+</Callout>
+
+## Common Mistakes
+
+A frequent early hiccup is running `go version` in a terminal that was already open before installation. If the command is not found, open a fresh terminal so it sees the newly installed Go.
+
+Another is skipping the Go extension in VS Code and then missing out on completion and error highlighting. Install it before writing your first program so you get that help from the start.
+
+## Summary
+
+To start with Go, download the **stable** version from [go.dev](https://go.dev) and run the installer for your operating system, confident that Go's backward compatibility keeps your code working across updates. Verify the install with `go` and `go version`, then set up an editor - **VS Code** with the official **Go extension** is the recommended free choice, giving you code completion and real-time error detection. With this in place, you are ready to write your first Go program.

@@ -1,0 +1,105 @@
+---
+title: Hello World
+description: Writing and running your first Go program, and understanding the structure every Go file shares.
+---
+
+## Your First Program
+
+There is a tradition in programming: your first program prints a greeting. It is small, but it teaches the exact structure every Go program shares and proves your setup works end to end. In this lesson you write "Hello World", print your own name, and learn the rules the Go compiler expects.
+
+## The Code
+
+Create a file ending in `.go` - for example `main.go` - and add this:
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello World")
+    fmt.Println("My name is Akshay")
+}
+```
+
+Run it from the terminal:
+
+```bash
+go run main.go
+```
+
+Output:
+
+```text
+Hello World
+My name is Akshay
+```
+
+That is a complete, working Go program.
+
+## Key Concepts
+
+Small as it is, this program introduces the pieces you will use in every Go file.
+
+### File extension
+
+Go source files must end with `.go`, such as `main.go`. This is how the tooling knows a file contains Go code.
+
+### Package declaration
+
+Every Go file must declare which package it belongs to. To make a program that can actually run, the file must be part of `package main`. This is always the first line.
+
+### Imports
+
+The `fmt` package - short for "format" - provides functions for input and output, like printing text to the console. The `import "fmt"` line brings it in so you can use `fmt.Println`.
+
+### The main function
+
+`func main()` is the **entry point** of the program. When you run the program, the Go compiler looks for this function and starts execution there.
+
+### Running the code
+
+The command `go run <filename>.go` compiles and runs your program in one step, which is exactly what you want while learning.
+
+```text
+   go run main.go
+        │
+        ▼
+   compile the file  ──►  start at func main()  ──►  fmt.Println runs
+        │                                                 │
+        ▼                                                 ▼
+   (temporary program)                            output printed
+```
+
+## Print vs Println
+
+The `fmt` package gives you more than one way to print:
+
+| Function | Behavior |
+| -------- | -------- |
+| `fmt.Print` | Prints the text with no newline after it |
+| `fmt.Println` | Prints the text and automatically adds a newline |
+
+The `ln` in `Println` stands for "line". It adds a newline after the output, which keeps successive lines from running together and makes your output cleaner. That is why the example above prints each sentence on its own line.
+
+## Important Rules
+
+Three rules are worth locking in from this first program.
+
+<Callout type="warn">
+The compiler specifically looks for `package main` and `func main`. If either is missing or named something else, the program will not run.
+</Callout>
+
+1. **The compiler requires `package main` and `func main`.** Together they mark the program as runnable and tell Go where to begin. Rename or remove either and execution fails.
+2. **The file name is up to you.** The package and function must be `main`, but the file itself can be named anything, such as `first.go`, as long as it contains the correct `package main` and `func main` declarations.
+3. **Choose the right print function.** Use `fmt.Print` when you want no trailing newline, and `fmt.Println` when you want each output on its own line.
+
+## Common Mistakes
+
+A frequent first error is declaring a different package name, like `package hello`, and then wondering why the program will not run. For a runnable program it must be `package main`.
+
+Another is confusing the file name with the package name. The file can be `first.go`, but the package inside it still has to be `main` with a `main` function - the compiler cares about those, not the file name.
+
+## Summary
+
+Your first Go program shows the shape of every Go program: a `.go` file declaring `package main`, an `import` for the packages you need such as `fmt`, and a `func main` where execution begins. You run it with `go run <filename>.go`, and you print with `fmt.Print` or, more commonly, `fmt.Println`, which adds a newline for cleaner output. Remember that the compiler insists on `package main` and `func main`, while the file name itself is entirely your choice.

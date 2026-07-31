@@ -1,0 +1,119 @@
+---
+title: Variable Declaration
+description: The eight ways to declare variables in Go, from the var keyword to short declaration and grouped forms.
+---
+
+## Many Ways to Say the Same Thing
+
+The last lesson introduced variables with the `var` keyword. Go actually gives you several ways to declare them, each suited to a slightly different situation. This lesson walks through **eight** of them. You will not need all eight every day, but knowing them means you can read any Go code and pick the cleanest form for each case.
+
+## 1. var with Type Inference
+
+Use `var` and let Go work out the type from the value:
+
+```go
+var person = "Arshad" // Go infers string
+```
+
+You do not state the type; Go sees the string value and knows `person` is a `string`.
+
+## 2. var with an Explicit Type
+
+State the type yourself. This is strict - the value must match the declared type:
+
+```go
+var person2 string = "Telusko"
+```
+
+Useful when you want to be explicit, or when the type is not obvious from the value.
+
+## 3. Short Variable Declaration with :=
+
+The shorthand `:=` declares and assigns in one step, with no `var` keyword, inferring the type. This is the most idiomatic form in everyday Go:
+
+```go
+person3 := "नवीन"
+```
+
+You will see `:=` far more than any other form inside functions.
+
+## 4. Multiple Variables in One Line
+
+Declare several variables at once with comma-separated names and values:
+
+```go
+var person4, person5 = "Akshay", "Naman"
+```
+
+`person4` becomes `"Akshay"` and `person5` becomes `"Naman"`, both with their types inferred.
+
+## 5. Typed Multiple Declaration
+
+Declare several variables of the **same type** together, stating the type once:
+
+```go
+var person6, person7 string = "Harsh", "Sushil"
+```
+
+Both are explicitly `string`.
+
+## 6. Shorthand Multiple Declaration
+
+Combine the short form with multiple variables. The types can even differ:
+
+```go
+person8, age8 := "Shramik", 16
+```
+
+Here `person8` is a `string` and `age8` is an `int`, each inferred from its value.
+
+## 7. Deferred Initialization
+
+Declare a variable now and assign it later. When you leave out the value, Go gives it a **zero value** based on its type:
+
+```go
+var person9 string // starts as "" (empty string)
+```
+
+You can assign `person9` a real value further down in the program.
+
+## 8. Grouped Same-Type Declaration
+
+Declare multiple variables of one type together, without values, so each gets its zero value:
+
+```go
+var person10, age10 int // both start at 0
+```
+
+## The Eight at a Glance
+
+| # | Form | Example |
+| - | ---- | ------- |
+| 1 | `var` with inference | `var person = "Arshad"` |
+| 2 | `var` with explicit type | `var person2 string = "Telusko"` |
+| 3 | short declaration `:=` | `person3 := "नवीन"` |
+| 4 | multiple with inference | `var person4, person5 = "Akshay", "Naman"` |
+| 5 | typed multiple | `var person6, person7 string = "Harsh", "Sushil"` |
+| 6 | shorthand multiple `:=` | `person8, age8 := "Shramik", 16` |
+| 7 | deferred initialization | `var person9 string` |
+| 8 | grouped same-type | `var person10, age10 int` |
+
+## Important Rules
+
+Two rules from this lesson are worth locking in.
+
+<Callout type="warn">
+**Unused variables are a compile error.** If you declare a variable and never use it, Go refuses to build the program. This is intentional - it keeps code clean - but it surprises people coming from other languages.
+</Callout>
+
+- **Zero values:** when you declare a variable without an initial value, Go initializes it to its type's default - `0` for numbers, `""` for strings, `false` for booleans. There is no such thing as an uninitialized variable in Go.
+
+## Common Mistakes
+
+The most common early error is declaring a variable you do not end up using, which stops the program from compiling. Either use it, or remove the declaration.
+
+Another is trying to use `:=` outside a function, at the package level. Short declaration only works inside functions; use the `var` forms for package-level variables.
+
+## Summary
+
+Go offers eight ways to declare variables: `var` with inference or an explicit type, the idiomatic short form `:=`, multiple-variable and typed-multiple forms, shorthand multiple with `:=`, deferred declaration that relies on zero values, and grouped same-type declaration. Inside functions, `:=` is the everyday choice; the `var` forms cover explicit types, package-level variables, and declaring now to assign later. Remember Go's two firm rules: every declared variable must be used, and any variable without an assigned value starts at its type's zero value.

@@ -1,0 +1,93 @@
+---
+title: Variable Introduction
+description: Why variables matter in Go and how to declare them so values can be defined once and reused.
+---
+
+## Why Variables Matter
+
+Imagine writing a program that calculates the area and perimeter of a rectangle using the raw numbers `3` and `4` directly in every formula. Now the rectangle changes size. You have to hunt down and update those numbers in every single line that used them - the area calculation, the perimeter calculation, the printed output. Miss one, and your program is quietly wrong.
+
+Variables solve this. A variable lets you define a value **once**, give it a name, and reuse it everywhere. Change it in one place, and the whole program updates automatically.
+
+## The Problem with Static Values
+
+Here is the fragile approach, using literal numbers everywhere:
+
+```go
+fmt.Println("Area:", 3*4)
+fmt.Println("Perimeter:", 2*(3+4))
+```
+
+If the dimensions change from `3` and `4` to something else, you must edit both lines by hand and keep them in sync. That is tedious and error-prone.
+
+## Declaring Variables with var
+
+Go uses the `var` keyword to declare a variable. You give it a name, and Go can infer the type from the value you assign:
+
+```go
+var length int = 7
+var width int = 5
+```
+
+Here `length` and `width` are named values you can use anywhere in the program. Go also **infers the data type** automatically from the value, so it knows `7` is an `int` and, for a value like `10.8`, that it is a `float64`.
+
+<Callout type="info">
+Go figures out the type for you when you assign a value, which is called type inference. You will see even shorter ways to declare variables in the next lesson, but `var` is the explicit form to start with.
+</Callout>
+
+## Reusing Variables in Calculations
+
+Once declared, you use the variables in your formulas instead of raw numbers:
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    // Declaring variables
+    var length int = 7
+    var width int = 5
+
+    // Using variables for calculations
+    area := length * width
+    perimeter := 2 * (length + width)
+
+    fmt.Println("Length:", length)
+    fmt.Println("Width:", width)
+    fmt.Println("Area:", area)
+    fmt.Println("Perimeter:", perimeter)
+}
+```
+
+Output:
+
+```text
+Length: 7
+Width: 5
+Area: 35
+Perimeter: 24
+```
+
+Now the payoff is clear: change `length` or `width` in that one spot at the top, and the area, perimeter, and printed values all update on their own. Nothing else needs touching.
+
+```text
+   without variables          with variables
+   ─────────────────          ──────────────
+   3 and 4 hard-coded    →     length = 7, width = 5 (defined once)
+   edit every line       →     edit one place, everything follows
+```
+
+## A Note on the Short Form
+
+You may have noticed two styles above: `var length int = 7` and `area := length * width`. Both create variables. The `:=` form is a shorter way to declare and assign at the same time, letting Go infer the type. The next lesson looks at these declaration styles in detail.
+
+## Common Mistakes
+
+A common early habit, carried from simple examples, is hard-coding the same number in several places. The moment a value appears more than once, put it in a variable - it saves you from inconsistent edits later.
+
+Another is expecting to change a value in one line and have unrelated hard-coded copies update too. Only variables give you that single-source-of-truth behavior; literal numbers scattered around do not.
+
+## Summary
+
+Variables let you define a value once, name it, and reuse it throughout a program, so a change in one place flows everywhere it is used. Go declares them with the `var` keyword and infers the type from the assigned value, as in `var length int = 7`. Using variables like `length` and `width` in your calculations makes a program flexible and easy to maintain, which is exactly why they matter. The next lesson explores the different ways Go lets you declare variables.

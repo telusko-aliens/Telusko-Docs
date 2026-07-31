@@ -1,0 +1,10 @@
+{
+    "title": "Variables and Data Types",
+    "pages": [
+        "value-types-and-basic-operations.mdx",
+        "variable-introduction.mdx",
+        "variable-declaration.mdx",
+        "data-types-and-variables.mdx",
+        "data-conversions.mdx"
+    ]
+}

@@ -1,0 +1,7 @@
+{
+    "title": "Getting Started",
+    "pages": [
+        "go-setup.mdx",
+        "hello-world.mdx"
+    ]
+}

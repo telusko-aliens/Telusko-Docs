@@ -7,6 +7,7 @@
         "fastapi",
         "spring-ai",
         "aws",
+        "go",
         "system-design"
     ]
 }

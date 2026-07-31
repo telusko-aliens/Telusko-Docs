@@ -1,0 +1,17 @@
+{
+    "root": false,
+    "title": "Go",
+    "icon": "Squirrel",
+    "pages": [
+        "getting-started.mdx",
+        "introduction.mdx",
+        "getting-started-with-go",
+        "variables-and-data-types",
+        "disabled-user-inputs",
+        "disabled-control-flow",
+        "disabled-collections",
+        "disabled-core-concepts",
+        "disabled-packages-and-scope",
+        "disabled-final-project"
+    ]
+}
