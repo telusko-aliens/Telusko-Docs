@@ -1,6 +1,87 @@
 ---
 title: Data Types and Variables
-description: The built-in data types in Go and how they work with variables.
+description: A tour of Go's core data types, the difference between variables and constants, and how to inspect a value's type at runtime.
 ---
 
-<ComingSoonCard title="Data Types and Variables" description="Lesson notes are being prepared." />
+Every value in Go has a type, and the type decides what the value can hold and how much memory it takes. This lesson tours the types you will reach for most, then looks at the difference between a value that can change and one that cannot.
+
+## A Tour of the Types
+
+| Type | Holds | Example |
+| ---- | ----- | ------- |
+| `bool` | true or false | `isLoggedIn := false` |
+| `int` | whole numbers, positive or negative | `42` |
+| `uint` | whole numbers, positive only | `255` |
+| `float32`, `float64` | numbers with decimals | `10.8` |
+| `string` | text | `"Telusko"` |
+
+A few of these deserve a closer look.
+
+### Signed and unsigned integers
+
+`int` holds whole numbers including negatives. `uint` is **unsigned**, meaning it only holds zero and positive numbers. When you know a value can never be negative - a roll number, a count, an age - `uint` says so clearly.
+
+Go also offers sized versions like `uint8`, `int16`, `int32`, and `int64`. The number is how many bits the value uses. Smaller sizes save memory when you know the range is small - a `uint8` holds `0` to `255`, which is plenty for something like a roll number.
+
+```go
+var rollNumber uint8 = 255 // fits exactly; 255 is the max for uint8
+```
+
+### Floating-point numbers
+
+For decimals, you have `float32` and `float64`. Prefer **`float64`** in most code - it uses more bits, so it holds numbers with higher precision and is the sensible default for calculations.
+
+## Variables and Constants
+
+So far every value could change. Sometimes that is wrong. A bank's name does not change while the program runs, and letting it change would be a bug waiting to happen. That is what a **constant** is for.
+
+- A **variable** (`var`) can be declared and then updated anywhere in the program.
+- A **constant** (`const`) is fixed once defined. Try to change it and the program will not compile.
+
+```go
+var balance int = 1000        // can change later
+const bankName string = "Telusko Bank" // fixed forever
+```
+
+Reach for `const` whenever a value should never change. The compiler then guarantees it for you.
+
+## Seeing a Value and Its Type
+
+While learning, it is genuinely useful to print not just a value but also what type Go thinks it is. `fmt.Printf` has two format specifiers for exactly this:
+
+- `%v` prints the **value**
+- `%T` prints the **type**
+
+```go
+fmt.Printf("Value: %v, Type: %T\n", isLoggedIn, isLoggedIn)
+```
+
+## Putting It Together
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    var isLoggedIn bool = false
+    var rollNumber uint8 = 255
+    const bankName string = "Telusko Bank"
+
+    fmt.Printf("Value: %v, Type: %T\n", isLoggedIn, isLoggedIn)
+    fmt.Printf("Value: %v, Type: %T\n", rollNumber, rollNumber)
+    fmt.Printf("Value: %v, Type: %T\n", bankName, bankName)
+}
+```
+
+Output:
+
+```text
+Value: false, Type: bool
+Value: 255, Type: uint8
+Value: Telusko Bank, Type: string
+```
+
+<Callout type="info">
+The `%T` specifier is one of the best learning tools in Go. Whenever you are unsure what type a value ended up as - especially with inferred `:=` declarations - print it with `%T` and Go tells you exactly.
+</Callout>
