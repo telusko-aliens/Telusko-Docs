@@ -1,0 +1,6 @@
+{   "title":"Git Fundamentals",
+    "pages":[
+        "git-installation.mdx",
+        "basic-git-workflow.mdx"
+    ]
+}

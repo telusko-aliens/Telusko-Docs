@@ -8,6 +8,7 @@
         "spring-ai",
         "aws",
         "go",
-        "system-design"
+        "system-design",
+        "git"
     ]
 }

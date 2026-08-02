@@ -1,0 +1,294 @@
+---
+title: Git Installation
+---
+
+<Video id="vwj89i2FmG0" start={728}/>
+
+---
+
+
+Before you can start using Git, you need to install it and configure your identity. This is a one-time setup that allows Git to track who makes each commit and ensures your development environment is ready for version control.
+
+
+## Installing Git
+
+The installation process varies slightly depending on your operating system, but once installed, Git works the same across all platforms.
+
+### Installing Git on macOS
+
+Git is typically available through the **Xcode Command Line Tools**.
+
+If you have already installed Xcode or its Command Line Tools, Git is likely ready to use without any additional installation.
+
+To verify whether Git is installed, open the **Terminal** and run:
+
+```bash
+git --version
+```
+
+If Git is installed, you'll see output similar to:
+
+```text
+git version 2.50.1
+```
+
+If Git is not installed, macOS will usually prompt you to install the Command Line Tools automatically.
+
+
+### Installing Git on Windows
+
+Windows does not include Git by default, so you need to install it manually.
+
+**Step 1: Download Git**
+
+Visit the official Git website:
+
+> https://git-scm.com/install/
+
+Choose **Windows** and download the latest installer.
+
+
+**Step 2: Install Git**
+
+Run the downloaded installer and follow the installation wizard.
+
+For beginners, the **default installation options are recommended**, as they work well for most users.
+
+The installer includes useful tools such as:
+- Git
+- Git Bash
+- Git GUI
+
+
+**Step 3: Verify the Installation**
+
+After the installation is complete, open either Command Prompt, PowerShell or Git Bash.
+
+Then execute:
+
+```bash
+git --version
+```
+
+Example output:
+
+```text
+git version 2.50.1
+```
+
+Seeing a version number confirms that Git has been installed successfully.
+
+
+---
+
+
+## Understanding Git Configuration
+
+Installing Git is only the first step.
+
+Before making commits, Git needs to know **who you are** so it can attach your identity to every commit.
+
+Git stores configuration information such as:
+
+- Your name
+- Your email address
+- Default editor
+- Preferred settings
+- Aliases and other customizations
+
+These settings can be configured globally (for all repositories) or locally (for a single repository).
+
+
+<Steps>
+<Step>
+## Checking the Installed Git Version
+
+The first command most developers run after installation is:
+
+```bash
+git --version
+```
+
+**Purpose**
+
+- Confirms Git is installed correctly.
+- Displays the currently installed version.
+- Useful for troubleshooting installation issues.
+
+</Step>
+
+<Step>
+## Viewing Git Configuration
+
+To see Git's available configuration options, use:
+
+```bash
+git config
+```
+
+This command displays information about Git's configuration system and the available configuration commands.
+
+It is commonly used as the starting point when learning Git configuration.
+
+</Step>
+
+<Step>
+## Listing Global Configuration
+
+Git allows you to view all globally configured settings using:
+
+```bash
+git config --global --list
+```
+
+**Purpose**
+
+Displays all global Git settings currently stored on your computer.
+
+Typical output may include:
+
+```text
+user.name=Muskan Garg
+user.email=muskan@example.com
+init.defaultBranch=main
+```
+
+These settings are automatically applied to every Git repository you create on your machine.
+
+</Step>
+
+<Step>
+## Setting Your Git Username
+
+Every commit records the name of the person who made it.
+
+To configure your name globally, run:
+
+```bash
+git config --global user.name "Your Name"
+```
+
+**Example**
+
+```bash
+git config --global user.name "Muskan Garg"
+```
+
+**Why is this important?**
+
+Your configured name appears in the commit history.
+
+Example:
+
+```text
+Author: Muskan Garg
+```
+
+This allows team members to identify who made each change.
+
+</Step>
+
+<Step>
+## Setting Your Git Email Address
+
+Git also records the email address associated with every commit.
+
+Configure it using:
+
+```bash
+git config --global user.email "your_email@example.com"
+```
+
+**Example**
+
+```bash
+git config --global user.email "muskan@example.com"
+```
+
+**Why is this important?**
+
+Your email serves as your unique identity in Git.
+
+Platforms like **GitHub**, **GitLab**, and **Bitbucket** use this email to associate commits with your account.
+
+Example:
+
+```text
+Author: Muskan Garg <muskan@example.com>
+```
+
+If the configured email matches the one registered with your Git hosting platform, your commits will appear under your profile automatically.
+
+</Step>
+</Steps>
+---
+
+
+## Global vs Local Configuration
+
+Git settings can be applied at different levels.
+
+### Global Configuration
+
+```bash
+git config --global
+```
+
+- Applies to every Git repository on your computer.
+- Typically used for your name and email.
+- Configured only once.
+
+
+### Local Configuration
+
+```bash
+git config
+```
+
+(without the `--global` flag, when executed inside a repository)
+
+- Applies only to the current repository.
+- Overrides global settings for that project.
+- Useful when working on projects that require a different identity.
+
+**Example**
+
+Suppose you use:
+
+- Personal GitHub account for personal projects
+- Company GitHub account for office work
+
+You can keep your personal identity globally and configure a different name and email only for your company's repository.
+
+![Configure_Git_Identity](https://dyz1pdcuffwr5.cloudfront.net/Git/git_identity.png)
+
+
+---
+
+
+## Common Git Setup Commands
+
+| Command | Purpose |
+|---------|---------|
+| `git --version` | Displays the installed Git version |
+| `git config` | Shows Git configuration information and available options |
+| `git config --global --list` | Lists all globally configured Git settings |
+| `git config --global user.name "Your Name"` | Sets your username for all repositories |
+| `git config --global user.email "your_email@example.com"` | Sets your email address for all repositories |
+
+
+---
+
+
+# Summary
+
+- Git must be installed before you can use version control.
+- Use `git --version` to verify that Git has been installed successfully.
+- Git records the **author's name** and **email** with every commit.
+- Global configuration applies to all repositories on your computer.
+- Local configuration affects only the current repository and overrides global settings when needed.
+- Setting the correct email helps platforms like GitHub associate your commits with your account.
+
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>
