@@ -1,0 +1,59 @@
+---
+title: Modules and the Workspace
+description: How a Go project is defined by a go.mod file, and how dependencies are tracked for you.
+---
+
+Every Go project begins with one command and produces one small file. That file, `go.mod`, is what turns a loose folder of code into a proper project Go can build, import, and share. Understanding it early saves a surprising amount of confusion later, so this page is about that single file and what it does for you.
+
+## Turning a Folder Into a Project
+
+Make a folder, step into it, and initialize a module:
+
+```bash
+mkdir hello
+cd hello
+go mod init example.com/hello
+```
+
+That last command writes `go.mod`:
+
+```text
+module example.com/hello
+
+go 1.22
+```
+
+The name you gave it, `example.com/hello`, is the module path. It is your project's identity and the prefix other code uses to import your packages. For a project you plan to publish, this is usually the repository URL, like `github.com/yourname/hello`. For learning, any sensible name works. You run `go mod init` exactly once per project, and after that Go maintains the file for you.
+
+## Why the Name Matters
+
+Inside your module, packages are imported relative to that path. If your module is `example.com/hello` and you add a folder `math` with its own package, other files reach it as `example.com/hello/math`. Get the module path right at the start and every internal import stays clean.
+
+## Bringing in Someone Else's Code
+
+The moment you import a third-party package and build, Go fetches it and records the exact version. Say you want a popular router:
+
+```go
+import "github.com/gorilla/mux"
+```
+
+Then run:
+
+```bash
+go mod tidy
+```
+
+`go mod tidy` reads what your code actually imports, downloads anything missing, and removes anything you no longer use. Now `go.mod` lists the dependency, and a companion file appears: `go.sum`, which stores a checksum for every dependency so that future builds - yours or a teammate's - fetch byte-for-byte the same code.
+
+| File | What it holds |
+| ---- | ------------- |
+| `go.mod` | your module name, Go version, and direct dependencies |
+| `go.sum` | checksums of every dependency, for reproducible builds |
+
+Both belong in version control. Together they let anyone rebuild your project identically.
+
+<Callout type="info">
+Older Go tutorials spend pages on `GOPATH` and insist your code live inside a specific `go/src` folder. Modules ended that. You can keep your projects anywhere on disk now. If a guide tells you otherwise, it predates modern Go.
+</Callout>
+
+The habit to carry forward is simple: one project, one `go.mod`, created with `go mod init`. Everything about dependencies flows from there, and we return to it in depth once you are building larger programs.

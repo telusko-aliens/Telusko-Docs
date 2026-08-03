@@ -1,0 +1,43 @@
+---
+title: What Is Go?
+description: A short introduction to what Go is, where it came from, and the kind of software it is built for.
+---
+
+Open your terminal and list the tools you rely on. Docker. Kubernetes. Terraform. The command-line client for half the services you use. There is a good chance most of them are written in the same language, and that language is Go. It quietly runs a huge slice of the modern internet, and yet it is one of the easiest languages to pick up. That combination is exactly what its creators were after.
+
+## The Language, in One Breath
+
+Go, often called Golang after its old website, is an open-source language built at Google. Three words describe it best:
+
+- **Compiled** - your code is turned into a fast native program before it runs, so there is nothing to interpret while the program executes.
+- **Statically typed** - the type of every value is known while you write, so a whole class of mistakes is caught before the program ever starts.
+- **Small** - the entire language is deliberately tiny. There is one way to loop, one way to format code, and very little syntax to memorize.
+
+That smallness is not a limitation the designers ran out of time to fix. It is the point. A language you can hold in your head is a language you can be productive in quickly.
+
+## What a Go Program Looks Like
+
+You will meet this shape again and again, so here it is up front:
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Welcome to Go")
+}
+```
+
+Four ideas live in those six lines: a file belongs to a **package**, it can **import** other packages, a **function** holds the logic, and the one named `main` is where the program starts. Run it and Go compiles everything into a single program that prints one line and exits.
+
+## What It Is Actually For
+
+Go did not set out to be good at everything. It set out to be excellent at a specific job: building the servers, tools, and networked services that hold systems together. That is where you find it:
+
+- web servers and REST APIs
+- command-line tools
+- cloud and DevOps infrastructure
+- microservices and high-concurrency systems
+
+If you have ever felt lost in a large language crowded with features, Go will feel like a relief. There is less to learn, fewer decisions to make, and the language gets out of your way so you can focus on the problem. The rest of this course is about turning that small language into real programs.

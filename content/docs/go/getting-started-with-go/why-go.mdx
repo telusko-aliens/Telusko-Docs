@@ -1,0 +1,39 @@
+---
+title: Why Go?
+description: The trade-offs Go was designed to avoid, and the kinds of work it is a genuinely great fit for.
+---
+
+For decades, picking a language meant accepting a compromise. You could have something easy to read and quick to write, like Python, but pay for it with slower programs. Or you could have raw speed, like C, but wrestle with a language that punishes the smallest mistake. Easy or fast. Pick one.
+
+Go was built by people who were tired of that choice. Nearly everything distinctive about it comes from refusing the compromise.
+
+## Fast to Run, Fast to Build
+
+Go compiles straight to native machine code, so programs start instantly and run quick. Older compiled languages made you wait ages for that speed - large builds could take minutes. Go compiles in seconds, even for big projects. You change a line, run it, see the result, and the loop stays tight and pleasant. You get compiled performance without the compiled-language grind.
+
+## A Language Small on Purpose
+
+Go leaves things out that other languages pile on. There is one loop keyword. There is one official code formatter, `gofmt`, and every Go project uses it, so nobody argues about tabs versus spaces or where the brace goes. Fewer features means less to learn before you are useful, and code that stays readable as a project grows from ten lines to ten thousand.
+
+<Callout type="info">
+This is why Go code from a stranger's repository feels familiar within seconds. The formatting is identical everywhere, and there simply are not many ways to express the same idea.
+</Callout>
+
+## Concurrency Without the Dread
+
+Most languages bolted concurrency on years after they were designed, and it shows - it is fiddly and easy to get wrong. Go was built with it from the start. Running something concurrently is as simple as putting `go` in front of a call:
+
+```go
+go sendEmail()   // runs alongside the next line, does not wait
+doOtherWork()
+```
+
+These lightweight tasks, called goroutines, are cheap enough to launch by the thousand. It is a huge reason Go became the language of high-traffic servers, and a whole later section is devoted to it.
+
+## One File, and You Are Done
+
+When you finish a Go program, you get a single executable with no runtime attached. Copy that one file to a server and run it. There is no interpreter to install, no virtual environment to activate, no dependency to chase down on the target machine. For shipping software, especially to the cloud, this is enormous.
+
+## The Honest Caveat
+
+Go is not the answer to everything. For a five-line data-crunching script, a scripting language may get you there faster. For a rich native mobile interface, other tools fit better. But for backend services, command-line tools, and anything that lives on a network, Go is one of the finest choices you can make - and the reason this course exists.

@@ -1,0 +1,59 @@
+---
+title: go run vs go build
+description: Two commands for turning source into a running program, and when to reach for each.
+---
+
+You have already used `go run`. Its sibling, `go build`, sounds like it does the same thing, and in a sense it does - both take your source code and compile it. But they hand you the result in very different ways, and the difference maps neatly onto a single question: are you still working on this, or are you ready to ship it?
+
+## go run: For While You Work
+
+`go run` compiles your program, runs it right away, and throws the compiled file away when it finishes:
+
+```bash
+go run main.go
+```
+
+Nothing is left behind on disk. That is exactly what you want while developing - change a line, run, see the result, repeat, with no clutter piling up. When your program grows past one file, point it at the whole package instead of a single file:
+
+```bash
+go run .
+```
+
+The `.` means "compile and run everything in this folder," so it picks up all your `.go` files together.
+
+## go build: For When It Is Ready
+
+`go build` compiles your code into a standalone executable and leaves it sitting on disk. It does **not** run it:
+
+```bash
+go build
+```
+
+In a module called `hello`, that produces a file named `hello` (or `hello.exe` on Windows). You run it yourself:
+
+```bash
+./hello
+```
+
+The result is self-contained. Copy that one file to another machine with the same operating system and processor, and it runs there with no Go installed at all. This is the artifact you deploy, share, or drop onto a server.
+
+```text
+   go run   →  compile → run → discard          (nothing saved)
+   go build →  compile → write ./hello           (you run it later)
+```
+
+## The Party Trick: Building for Another Machine
+
+Here is where Go delights people. You can build a binary for a *different* operating system right from your own laptop, by setting two variables:
+
+```bash
+GOOS=linux GOARCH=amd64 go build
+```
+
+Develop on your Mac or Windows machine, produce the exact Linux binary your server needs, and ship it - no extra toolchain, no build server required. It is a big part of why Go became the default for cloud and DevOps software.
+
+<Callout type="info">
+There is a third command worth knowing: `go install`. It builds a program and drops the binary into your Go bin directory, so you can run it by name from anywhere. It is the natural choice for command-line tools you want permanently on your path.
+</Callout>
+
+So the rule of thumb writes itself. While you are iterating, `go run` is the shortest path from a change to a result. When you want a real thing to keep, deploy, or hand to someone else, `go build`.

@@ -1,7 +1,11 @@
 {
     "title": "Getting Started",
     "pages": [
+        "what-is-go.mdx",
+        "why-go.mdx",
         "go-setup.mdx",
-        "hello-world.mdx"
+        "hello-world.mdx",
+        "go-run-vs-go-build.mdx",
+        "modules-and-workspace.mdx"
     ]
 }
