@@ -5,6 +5,10 @@
         "variable-introduction.mdx",
         "variable-declaration.mdx",
         "data-types-and-variables.mdx",
-        "data-conversions.mdx"
+        "constants-and-iota.mdx",
+        "zero-values.mdx",
+        "data-conversions.mdx",
+        "formatted-output-printf.mdx",
+        "operators.mdx"
     ]
 }

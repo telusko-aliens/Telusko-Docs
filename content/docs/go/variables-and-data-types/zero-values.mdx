@@ -1,0 +1,67 @@
+---
+title: Zero Values
+description: Why Go has no uninitialized variables, and how a well-chosen zero value saves you work.
+---
+
+In a lot of languages, a variable you declare but never assign holds whatever junk happened to be sitting in that slice of memory. Read it too early and you get a random, unpredictable value - a bug that hides until it doesn't. Go erases that entire category of problem with one rule: every variable you declare without a value gets a defined **zero value** for its type. There is no such thing as uninitialized memory in Go.
+
+## What Zero Looks Like
+
+The zero value is whatever "empty" means for that type:
+
+| Type | Zero value |
+| ---- | ---------- |
+| numbers (`int`, `float64`, ...) | `0` |
+| `bool` | `false` |
+| `string` | `""` |
+| pointers, slices, maps, channels, interfaces | `nil` |
+
+```go
+var count int      // 0
+var price float64  // 0
+var name string    // ""
+var active bool    // false
+var data []int     // nil
+```
+
+Print any of those the instant after declaring them and you get exactly that, every time, on every machine.
+
+## Not Just Safe - Useful
+
+Here is the part that separates Go from languages that merely zero things out: Go's types are designed so their zero value is immediately *usable*. That turns a safety feature into a design tool.
+
+Take `strings.Builder`. You do not construct it or initialize it. The moment it exists, it works:
+
+```go
+var sb strings.Builder // zero value, ready to go
+sb.WriteString("Hello")
+```
+
+The same holds for `sync.Mutex` and many others. There is a phrase Go programmers repeat - "make the zero value useful" - and you feel its payoff as constructors and setup steps you never have to write.
+
+Structs inherit this automatically. Create one without setting any fields and each field falls back to its own zero value:
+
+```go
+type User struct {
+    Name  string
+    Age   int
+    Admin bool
+}
+
+var u User // Name "", Age 0, Admin false
+```
+
+## The One Corner to Watch
+
+The zero value for anything that refers to something else - slices, maps, pointers - is `nil`, and `nil` is not always ready to use. A `nil` slice you can happily `append` to. A `nil` map, though, will panic the moment you try to write a key into it:
+
+```go
+var m map[string]int // nil
+m["x"] = 1           // panic: assignment to entry in nil map
+```
+
+<Callout type="warn">
+Reading a `nil` map is fine and gives you zero values, but writing to one crashes. Create it first with `make` or a literal. This is the single most common way the zero value catches people out.
+</Callout>
+
+There is also a subtler trap: because `0` and `""` are both real values *and* zero values, "is this field zero because nobody set it, or because someone set it to zero?" can be genuinely ambiguous. When that difference matters - say, distinguishing "quantity not entered" from "quantity is zero" - a pointer or a separate boolean makes your intent explicit. Most of the time, though, the zero value is exactly the sensible default you wanted, handed to you for free.

@@ -1,0 +1,71 @@
+---
+title: Operators
+description: The symbols Go uses to combine and compare values, and the couple that behave unusually.
+---
+
+If types are the nouns of a program, operators are the verbs. They add two numbers, compare two strings, join two conditions. Go's set is small and holds no surprises in how it groups things, but a couple of operators behave differently than you might expect from other languages, and those are worth calling out.
+
+## Arithmetic
+
+The everyday math symbols, plus one you may not have met:
+
+| Operator | Does | `10 op 3` |
+| -------- | ---- | --------- |
+| `+` | add | `13` |
+| `-` | subtract | `7` |
+| `*` | multiply | `30` |
+| `/` | divide | `3` (whole numbers truncate) |
+| `%` | remainder | `1` |
+
+That `%`, the remainder or "modulo," is quietly useful. `n % 2 == 0` is how you ask "is this number even?" And remember from earlier that `+` pulls double duty, joining strings as well as adding numbers.
+
+## Comparison
+
+Compare two values and you get a `bool` back:
+
+```go
+10 > 5      // true
+"a" == "a"  // true
+```
+
+The full set is the familiar one: `==`, `!=`, `<`, `>`, `<=`, `>=`.
+
+## Logic, With a Twist
+
+Logical operators combine booleans: `&&` (and), `||` (or), `!` (not). The twist is that Go **short-circuits** them. With `&&`, if the left side is already false, it never bothers evaluating the right. With `||`, if the left is true, it stops there. That is not just an optimization - it is a safety tool:
+
+```go
+if user != nil && user.Active {
+    // user.Active is only touched when user is not nil
+}
+```
+
+The `nil` check on the left guards the field access on the right, and short-circuiting is what makes that pattern safe.
+
+## Assignment Shorthands
+
+Beyond plain `=`, Go bundles an operation into the assignment:
+
+```go
+count := 10
+count += 5 // count = count + 5  → 15
+count *= 2 // 30
+```
+
+`-=`, `/=`, and the rest work the same way.
+
+## The Two That Break the Pattern
+
+Here is where Go quietly differs from C or Java. It has `++` and `--`, but they are **statements, not expressions**. They stand on their own line and produce no value you can use:
+
+```go
+i := 0
+i++        // fine, i is now 1
+// x := i++ // NOT allowed
+```
+
+<Callout type="info">
+This restriction is deliberate. In some languages, an expression like `a = b++ + ++b` is legal and genuinely baffling to read. Go makes `i++` a plain standalone statement so that code stays honest and readable.
+</Callout>
+
+Down at the bit level, Go also has `&`, `|`, `^`, `<<`, and `>>` for bitwise work - you saw `<<` doubling byte sizes in the iota lesson. You will not need them often as a beginner, but they are there when flags or performance-sensitive code call for them.

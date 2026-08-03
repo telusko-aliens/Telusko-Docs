@@ -1,0 +1,66 @@
+---
+title: Constants and iota
+description: Locking a value so it can never change, and letting iota number a series of them for you.
+---
+
+Some values have no business changing. The name of your app, the number of days in a week, the value of pi. Declare those as variables and nothing stops a stray line from reassigning them later, turning a fixed fact into a moving target. A **constant** closes that door: it is a value fixed at compile time that the compiler will refuse to let you reassign.
+
+## Fixed Means Fixed
+
+You declare one with `const`:
+
+```go
+const Pi = 3.14159
+const AppName = "Telusko"
+const MaxUsers = 100
+```
+
+Try to move it afterward and the program simply will not build:
+
+```go
+const MaxUsers = 100
+MaxUsers = 200 // compile error: cannot assign to MaxUsers
+```
+
+That refusal is the whole value of a constant. You are not just documenting that something should stay put - you are asking the compiler to enforce it.
+
+## When You Need a Whole Series
+
+Constants really start to shine when you need a run of related numbers: the days of the week, the levels of a log, the states of an order. Writing `0, 1, 2, 3` by hand is dull and easy to get wrong. Go has a purpose-built tool for it called `iota`.
+
+Inside a `const` block, `iota` is a counter that starts at `0` and ticks up by one for every line:
+
+```go
+const (
+    Sunday    = iota // 0
+    Monday           // 1
+    Tuesday          // 2
+    Wednesday        // 3
+    Thursday         // 4
+    Friday           // 5
+    Saturday         // 6
+)
+```
+
+You write `iota` once. Each line below silently reuses the same expression with the counter advanced, and you get a clean, numbered set for free.
+
+## iota Is Just a Number, So You Can Do Math
+
+Because `iota` is an ordinary value in an expression, you can build patterns with it. The classic is byte sizes that double each step:
+
+```go
+const (
+    _  = iota             // skip the 0 with the blank identifier
+    KB = 1 << (10 * iota) // 1 << 10 = 1024
+    MB                    // 1 << 20
+    GB                    // 1 << 30
+)
+```
+
+Each constant shifts `1` further left, producing kilobytes, megabytes, gigabytes. The `_` on the first line throws away the `0` we do not want.
+
+<Callout type="info">
+`iota` resets to `0` at the start of every new `const` block. It counts lines within one block only, so a fresh `const (...)` begins its count again from zero.
+</Callout>
+
+There is one boundary worth knowing: a constant must be knowable at compile time. That means `const now = time.Now()` will not compile, because the current time is only known when the program runs. Values like that belong in variables. Constants are for the facts that are already settled before your program ever starts.

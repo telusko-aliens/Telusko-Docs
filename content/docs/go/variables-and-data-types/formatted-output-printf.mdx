@@ -1,0 +1,73 @@
+---
+title: Formatted Output with Printf
+description: Taking control of how values print with fmt.Printf and its format verbs.
+---
+
+`fmt.Println` is a blunt instrument. It prints your values separated by spaces and moves to the next line, which is perfect until you want something more precise: a price to exactly two decimals, values slotted into a sentence, or the *type* of a value while you are debugging. That is where `fmt.Printf` earns its keep. The `f` is for "format," and it works from a template studded with little placeholders called **verbs**.
+
+## The Shape of a Printf Call
+
+```go
+name := "Navin"
+age := 30
+
+fmt.Printf("%s is %d years old\n", name, age)
+// Navin is 30 years old
+```
+
+The first argument is the format string. Each verb in it - `%s`, `%d` - gets replaced, in order, by the values that follow. One thing to notice right away: there is a `\n` at the end. Unlike `Println`, `Printf` does not add a newline for you, so you write one yourself.
+
+## The Verbs Worth Memorizing
+
+| Verb | For | Prints like |
+| ---- | --- | ----------- |
+| `%d` | integers | `42` |
+| `%f` | floats | `3.140000` |
+| `%s` | strings | `Go` |
+| `%t` | booleans | `true` |
+| `%v` | any value, default format | `{Navin 30}` |
+| `%+v` | a struct with field names | `{Name:Navin Age:30}` |
+| `%T` | the type of the value | `int` |
+| `%q` | a quoted string | `"Go"` |
+
+## Taming Numbers
+
+The real reason to use `%f` over `%v` for a price is control. `%.2f` means "two digits after the decimal point":
+
+```go
+fmt.Printf("Price: %.2f\n", 19.5) // Price: 19.50
+```
+
+You can also demand a minimum width, which lines numbers up into columns:
+
+```go
+fmt.Printf("%5d\n", 42)   // "   42"  (width 5, right-aligned)
+fmt.Printf("%-5d|\n", 42) // "42   |" (left-aligned)
+```
+
+## The Two That Do Everything
+
+When you are unsure which verb fits, `%v` prints a reasonable default for any value at all. And for peering inside a struct while debugging, `%+v` adds the field names, which is almost always what you actually want to see:
+
+```go
+type User struct {
+    Name string
+    Age  int
+}
+
+u := User{"Navin", 30}
+fmt.Printf("%v\n", u)  // {Navin 30}
+fmt.Printf("%+v\n", u) // {Name:Navin Age:30}
+```
+
+## When You Want the String, Not the Print
+
+Sometimes you do not want to print the formatted text - you want to *keep* it. `fmt.Sprintf` is `Printf`'s twin that returns the result instead of printing it, and it is the standard way to build a formatted string in Go:
+
+```go
+label := fmt.Sprintf("user-%d", 42) // "user-42"
+```
+
+<Callout type="info">
+Hand a verb the wrong kind of value - `%d` for a string - and Go does not crash. It prints a visible marker like `%!d(string=Go)` right in the output. Treat that marker as a hint that a verb and a value have gotten out of step.
+</Callout>
