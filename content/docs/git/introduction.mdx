@@ -1,5 +1,5 @@
 ---
-title: Introduction
+title: Introduction to Git & Version Control
 description: A comprehensive introduction to Git and Version Control
 ---
 
@@ -95,135 +95,48 @@ This makes debugging and maintenance much easier.
 
 ---
 
-![Core_Features_Of_Git](https://dyz1pdcuffwr5.cloudfront.net/Git/git_features.png)
+## Evolution of Version Control
+Software development has changed significantly over the years. As projects became larger and teams started working together, developers needed better ways to manage code changes. This led to the evolution of different version control systems, with each generation solving the limitations of the previous one.
 
----
-
-
-## Types of Version Control Systems
-
-Over time, version control systems have evolved into three major categories.
-
-### 1. Local Version Control System (Local VCS)
-
-In a Local Version Control System, all project versions are stored **only on the developer's own computer**.
-
-There is no central server and no built-in collaboration.
-
-**How It Works**
+The evolution of version control can be understood in four stages:
 
 ```text
-Developer's Computer
-
-Project
-├── Version 1
-├── Version 2
-├── Version 3
-└── Version 4
+No Version Control
+        ↓
+Local Version Control
+        ↓
+Centralized Version Control
+        ↓
+Distributed Version Control (Git)
 ```
 
-All project history exists on a single machine.
-
-**Advantages**
-
-- Very simple to use
-- No internet connection required
-- Fast access to project history
-
-**Disadvantages**
-
-- No collaboration support
-- If the computer fails, all history is lost
-- Not suitable for team projects
-
-
-### 2. Centralized Version Control System (CVCS)
-
-A Centralized Version Control System stores the complete project history on **one central server**.
-
-Developers connect to this server to download projects, commit changes, and access the latest updates.
-
-**How It Works**
-
-![CVCS](https://dyz1pdcuffwr5.cloudfront.net/Git/git_cvcs.png)
-
-Every developer communicates with the same server.
-
-**Advantages**
-
-- Multiple developers can collaborate
-- Easy centralized management
-- Everyone shares the same project history
-
-**Disadvantages**
-
-- Single point of failure
-- If the server crashes, development is disrupted
-- Network connectivity is required for many operations
-- If backups are unavailable, project history can be lost
-
-
-### 3. Distributed Version Control System (DVCS)
-
-A Distributed Version Control System stores the **entire repository history** on both the remote server and every developer's local machine.
-
-**How It Works**
-
-![DVCS](https://dyz1pdcuffwr5.cloudfront.net/Git/git_dvcs.png)
-
-Each developer owns a complete copy of the repository and its history. Unlike CVCS, developers can continue working even if the remote server becomes unavailable.
-
-**Advantages**
-
-- Complete project history available locally
-- Work offline without interruption
-- No single point of failure
-- Every clone acts as a backup
-- Excellent collaboration support
-- Faster operations because most actions happen locally
-
-**Examples of DVCS**
-
-- Git
-- GitHub (hosting platform for Git repositories)
-- GitLab
-- Bitbucket
-
-> **Git is a Distributed Version Control System (DVCS).**
-
-
----
-
-## Understanding Remote Copies
-
-One of Git's biggest strengths is that the project history exists in multiple places.
-
-A Git repository typically has:
-
-1. **Local Repository** – Stored on your computer
-2. **Remote Repository** – Stored on a remote hosting service
-
-![Git_Remote_Local](https://dyz1pdcuffwr5.cloudfront.net/Git/git_remote_copies.png)
-
-This means:
-
-- Every developer has a complete project history.
-- Even if the remote server becomes unavailable, local development can continue.
-- Multiple developers can synchronize their work by pushing and pulling changes.
-
-This distributed design makes Git highly reliable.
-
-
 ---
 
 
-## History of Git
+## What is Git?
+
+Git is a **Distributed Version Control System (DVCS)** that runs on your local computer.
+
+It allows developers to:
+
+* Track changes to source code
+* Maintain complete project history
+* Create branches and merge changes
+* Restore previous versions
+* Work offline without an internet connection
+
+Git performs most operations locally, making it fast and efficient.
+
+![Core_Features_Of_Git](https://dyz1pdcuffwr5.cloudfront.net/Git/git_features.png)
+
+
+### History of Git
 
 Before Git, developers managed source code in much simpler ways.
 
 ![History_of_Git](https://dyz1pdcuffwr5.cloudfront.net/Git/git_history.png)
 
-### Before 2002
+**Before 2002**
 
 Developers often shared code by exchanging:
 
@@ -234,14 +147,14 @@ Developers often shared code by exchanging:
 As projects became larger, this process became slow, inefficient, and difficult to manage.
 
 
-### 2002 – BitKeeper
+**2002 – BitKeeper**
 
 To improve collaboration, many Linux kernel developers adopted **BitKeeper**, a proprietary version control system that supported version tracking and code merging.
 
 Although it solved several problems, it required licensing and was not open source.
 
 
-### 2005 – Birth of Git
+**2005 – Birth of Git**
 
 In 2005, **Linus Torvalds**, the creator of Linux, developed **Git** as a free and open-source alternative after the Linux community could no longer use BitKeeper under the same terms.
 
@@ -255,18 +168,74 @@ Git was designed to be:
 
 Today, Git is the most widely used version control system in software development.
 
+
 ---
+
+
+## What is GitHub?
+
+GitHub is a **cloud-based hosting platform** built around Git.
+
+It stores remote repositories online and provides collaboration features that help developers work together on the same project.
+
+In addition to hosting Git repositories, GitHub offers features such as:
+
+* Remote repository hosting
+* Pull Requests
+* Code Reviews
+* Issue Tracking
+* Project Management
+* GitHub Actions for automation
+* Repository Security
+* Release Management
+
+GitHub uses Git internally but adds powerful collaboration and project management capabilities.
+
+
+---
+
+
+## How Git and GitHub Work Together
+
+Git and GitHub complement each other during software development.
+
+A typical workflow looks like this:
+
+```text
+Write Code
+      │
+      ▼
+Track Changes using Git
+      │
+      ▼
+Commit Changes Locally
+      │
+      ▼
+Push Repository to GitHub
+      │
+      ▼
+Collaborate with Other Developers
+```
+
+Developers use **Git** to manage code on their local machines and **GitHub** to share repositories, review code, and collaborate with team members.
+
+> **Git can be used without GitHub, but GitHub cannot manage version history without Git. Together, they provide a complete solution for version control and collaborative software development.**
+
+
+---
+
+![Git_vs_Github](https://dyz1pdcuffwr5.cloudfront.net/Git/git_vs_github.png)
+
+
+---
+
 
 ## Summary
 
-- Version Control tracks every change made to a project over time.
-- It makes collaboration, backup, and project management much easier.
-- There are three major types of Version Control Systems:
-  - Local VCS
-  - Centralized VCS (CVCS)
-  - Distributed VCS (DVCS)
-- Git is a free, open-source **Distributed Version Control System**, meaning every developer has a complete copy of the repository.
-- Git supports offline development, fast operations, branching, and reliable collaboration.
-
+* Version Control tracks, manages, and maintains project changes throughout development.
+* Git is a distributed version control system that enables version tracking, branching, merging, and offline development.
+* GitHub is a cloud-based platform for hosting Git repositories and enabling team collaboration.
+* **Git** manages code and version history locally, while **GitHub** provides remote hosting and collaboration features.
+* Version control improves collaboration, traceability, backup, and code recovery.
 
 Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

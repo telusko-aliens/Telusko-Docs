@@ -1,5 +1,5 @@
 ---
-title: Git Installation
+title: Git Installation & Initial Configuration
 ---
 
 <Video id="vwj89i2FmG0" start={728}/>
@@ -99,9 +99,7 @@ Git stores configuration information such as:
 These settings can be configured globally (for all repositories) or locally (for a single repository).
 
 
-<Steps>
-<Step>
-## Checking the Installed Git Version
+## 1. Checking the Installed Git Version
 
 The first command most developers run after installation is:
 
@@ -115,10 +113,7 @@ git --version
 - Displays the currently installed version.
 - Useful for troubleshooting installation issues.
 
-</Step>
-
-<Step>
-## Viewing Git Configuration
+## 2. Viewing Git Configuration
 
 To see Git's available configuration options, use:
 
@@ -130,10 +125,8 @@ This command displays information about Git's configuration system and the avail
 
 It is commonly used as the starting point when learning Git configuration.
 
-</Step>
 
-<Step>
-## Listing Global Configuration
+## 3. Listing Global Configuration
 
 Git allows you to view all globally configured settings using:
 
@@ -155,10 +148,8 @@ init.defaultBranch=main
 
 These settings are automatically applied to every Git repository you create on your machine.
 
-</Step>
 
-<Step>
-## Setting Your Git Username
+## 4. Setting Your Git Username
 
 Every commit records the name of the person who made it.
 
@@ -186,10 +177,8 @@ Author: Muskan Garg
 
 This allows team members to identify who made each change.
 
-</Step>
 
-<Step>
-## Setting Your Git Email Address
+## 5. Setting Your Git Email Address
 
 Git also records the email address associated with every commit.
 
@@ -219,8 +208,7 @@ Author: Muskan Garg <muskan@example.com>
 
 If the configured email matches the one registered with your Git hosting platform, your commits will appear under your profile automatically.
 
-</Step>
-</Steps>
+
 ---
 
 
@@ -272,9 +260,14 @@ You can keep your personal identity globally and configure a different name and 
 |---------|---------|
 | `git --version` | Displays the installed Git version |
 | `git config` | Shows Git configuration information and available options |
+| `git config --list` | Lists all Git configuration settings (system, global, and local) |
 | `git config --global --list` | Lists all globally configured Git settings |
+| `git config --local --list` | Lists configuration settings for the current repository only |
 | `git config --global user.name "Your Name"` | Sets your username for all repositories |
 | `git config --global user.email "your_email@example.com"` | Sets your email address for all repositories |
+| `git config --unset --global user.name` | Removes the globally configured username |
+| `git config --unset --global user.email` | Removes the globally configured email |
+| `git config --global init.defaultBranch "main"` | Sets the default branch name for new repositories |
 
 
 ---

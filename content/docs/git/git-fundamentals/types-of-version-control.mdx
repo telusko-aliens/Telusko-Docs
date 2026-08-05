@@ -1,0 +1,181 @@
+---
+title: Types of Version Control
+---
+
+<Video id="vwj89i2FmG0" start={300}/>
+
+---
+
+
+## Types of Version Control Systems
+
+As software development evolved, developers needed better ways to manage source code and collaborate efficiently. This led to the development of different types of Version Control Systems (VCS).
+
+Each type stores project history differently and offers different levels of collaboration, reliability, and performance.
+
+Version Control Systems are broadly classified into three categories:
+
+* Local Version Control System (LVCS)
+* Centralized Version Control System (CVCS)
+* Distributed Version Control System (DVCS)
+
+
+<Steps>
+<Step>
+## 1. Local Version Control System (Local VCS)
+
+In a Local Version Control System, all project versions are stored **only on the developer's own computer**.
+
+There is no central server and no built-in collaboration.
+
+**How It Works**
+
+```text
+Developer's Computer
+
+Project
+├── Version 1
+├── Version 2
+├── Version 3
+└── Version 4
+```
+
+All project history exists on a single machine.
+
+**Advantages**
+
+- Very simple to use
+- No internet connection required
+- Fast access to project history
+
+**Disadvantages**
+
+- No collaboration support
+- If the computer fails, all history is lost
+- Not suitable for team projects
+
+</Step>
+
+---
+
+<Step>
+## 2. Centralized Version Control System (CVCS)
+
+A Centralized Version Control System stores the complete project history on **one central server**.
+
+Developers connect to this server to download projects, commit changes, and access the latest updates.
+
+**How It Works**
+
+![CVCS](https://dyz1pdcuffwr5.cloudfront.net/Git/git_cvcs.png)
+
+Every developer communicates with the same server.
+
+**Advantages**
+
+- Multiple developers can collaborate
+- Easy centralized management
+- Everyone shares the same project history
+
+**Disadvantages**
+
+- Single point of failure
+- If the server crashes, development is disrupted
+- Network connectivity is required for many operations
+- If backups are unavailable, project history can be lost
+
+</Step>
+
+---
+
+<Step>
+## 3. Distributed Version Control System (DVCS)
+
+A Distributed Version Control System stores the **entire repository history** on both the remote server and every developer's local machine.
+
+**How It Works**
+
+![DVCS](https://dyz1pdcuffwr5.cloudfront.net/Git/git_dvcs.png)
+
+Each developer owns a complete copy of the repository and its history. Unlike CVCS, developers can continue working even if the remote server becomes unavailable.
+
+**Advantages**
+
+- Complete project history available locally
+- Work offline without interruption
+- No single point of failure
+- Every clone acts as a backup
+- Excellent collaboration support
+- Faster operations because most actions happen locally
+
+**Examples of DVCS**
+
+- Git
+- GitHub (hosting platform for Git repositories)
+- GitLab
+- Bitbucket
+
+> **Git is a Distributed Version Control System (DVCS).**
+
+</Step>
+</Steps>
+
+---
+
+
+![Git_DVCS_System](https://dyz1pdcuffwr5.cloudfront.net/Git/git_dvcs_system.png)
+
+
+---
+
+
+## Understanding Remote Copies
+
+One of Git's biggest strengths is that the project history exists in multiple places.
+
+A Git repository typically has:
+
+1. **Local Repository** – Stored on the developer's computer.
+
+2. **Remote Repository** – Stored on a remote hosting service such as **GitHub**, **GitLab**, or **Bitbucket**.
+
+![Git_Remote_Local](https://dyz1pdcuffwr5.cloudfront.net/Git/git_remote_copies.png)
+
+This means:
+
+- Every developer has a complete project history.
+- Even if the remote server becomes unavailable, local development can continue.
+- Multiple developers can synchronize their work by pushing and pulling changes.
+
+This distributed design makes Git highly reliable.
+
+
+---
+
+
+## CVCS vs DVCS
+
+| Feature              | CVCS                         | DVCS (Git)                          |
+| -------------------- | ---------------------------- | ----------------------------------- |
+| Repository History   | Stored only on the server    | Stored on every developer's machine |
+| Internet Requirement | Required for many operations | Most operations work offline        |
+| Performance          | Slower                       | Faster                              |
+| Backup               | Central server only          | Every clone acts as a backup        |
+| Failure Risk         | Single point of failure      | Highly fault tolerant               |
+| Branching & Merging  | Comparatively slower         | Fast and lightweight                |
+
+
+---
+
+
+## Summary
+* Version Control Systems are categorized into Local, Centralized, and Distributed models.
+* Local VCS is suitable for individual projects but does not support collaboration.
+* Centralized VCS enables teamwork but depends on a central server.
+* Distributed VCS gives every developer a complete copy of the repository.
+* Git is a Distributed Version Control System designed for speed, reliability, and efficient collaboration.
+* Git repositories typically consist of both local and remote copies that synchronize changes when required.
+
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

@@ -1,6 +1,8 @@
 {   "title":"Git Fundamentals",
     "pages":[
+        "types-of-version-control.mdx",
         "git-installation.mdx",
-        "basic-git-workflow.mdx"
+        "git-repo-and-workflow",
+        "git-commit-workflow"
     ]
 }
