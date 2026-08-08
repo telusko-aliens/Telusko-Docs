@@ -1,66 +1,254 @@
 ---
 title: Constants and iota
-description: Locking a value so it can never change, and letting iota number a series of them for you.
 ---
 
-Some values have no business changing. The name of your app, the number of days in a week, the value of pi. Declare those as variables and nothing stops a stray line from reassigning them later, turning a fixed fact into a moving target. A **constant** closes that door: it is a value fixed at compile time that the compiler will refuse to let you reassign.
+Go has no `enum` keyword. It also has no `final`, no `readonly`, and no frozen objects. What it has is `const` and a small counter called `iota`, and between them they cover the ground that those features occupy in other languages. The combination is unusual enough that it is worth a page of its own.
 
-## Fixed Means Fixed
-
-You declare one with `const`:
+## Declaring constants
 
 ```go
 const Pi = 3.14159
-const AppName = "Telusko"
-const MaxUsers = 100
+const AppName = "orders-api"
+const MaxRetries = 3
 ```
 
-Try to move it afterward and the program simply will not build:
-
-```go
-const MaxUsers = 100
-MaxUsers = 200 // compile error: cannot assign to MaxUsers
-```
-
-That refusal is the whole value of a constant. You are not just documenting that something should stay put - you are asking the compiler to enforce it.
-
-## When You Need a Whole Series
-
-Constants really start to shine when you need a run of related numbers: the days of the week, the levels of a log, the states of an order. Writing `0, 1, 2, 3` by hand is dull and easy to get wrong. Go has a purpose-built tool for it called `iota`.
-
-Inside a `const` block, `iota` is a counter that starts at `0` and ticks up by one for every line:
+Grouped, which is how you will usually see them:
 
 ```go
 const (
-    Sunday    = iota // 0
-    Monday           // 1
-    Tuesday          // 2
-    Wednesday        // 3
-    Thursday         // 4
-    Friday           // 5
-    Saturday         // 6
+    StatusActive   = "active"
+    StatusInactive = "inactive"
+    StatusPending  = "pending"
 )
 ```
 
-You write `iota` once. Each line below silently reuses the same expression with the counter advanced, and you get a clean, numbered set for free.
+A constant is fixed at compile time. That is a stronger statement than "cannot be reassigned", and it leads directly to the main restriction.
 
-## iota Is Just a Number, So You Can Do Math
+## What can and cannot be a constant
 
-Because `iota` is an ordinary value in an expression, you can build patterns with it. The classic is byte sizes that double each step:
+The value has to be computable by the compiler, which rules out anything that only exists while the program runs.
 
 ```go
-const (
-    _  = iota             // skip the 0 with the blank identifier
-    KB = 1 << (10 * iota) // 1 << 10 = 1024
-    MB                    // 1 << 20
-    GB                    // 1 << 30
-)
+const good = 10 * 60          // arithmetic on literals, fine
+const alsoGood = "a" + "b"    // string concatenation of constants, fine
+const stillGood = len("hello") // len of a string constant, fine
+
+const bad = time.Now()        // compile error, a function call at runtime
+const alsoBad = []int{1, 2}   // compile error, slices are runtime values
+const nope = os.Getenv("KEY") // compile error, same reason
 ```
 
-Each constant shifts `1` further left, producing kilobytes, megabytes, gigabytes. The `_` on the first line throws away the `0` we do not want.
+Constants can only hold booleans, numbers, strings, and runes. There are no constant slices, maps, or structs. When you want a fixed collection, use a package level `var` and rely on convention:
+
+```go
+var defaultPorts = []int{80, 443, 8080}    // not truly constant, but conventional
+```
 
 <Callout type="info">
-`iota` resets to `0` at the start of every new `const` block. It counts lines within one block only, so a fresh `const (...)` begins its count again from zero.
+The absence of constant composite values is a real gap, and Go programmers work around it with unexported package level variables plus an accessor function when immutability actually matters. Most of the time, a comment and a capital letter convention is considered enough.
 </Callout>
 
-There is one boundary worth knowing: a constant must be knowable at compile time. That means `const now = time.Now()` will not compile, because the current time is only known when the program runs. Values like that belong in variables. Constants are for the facts that are already settled before your program ever starts.
+## Typed and untyped constants
+
+This is the part that makes Go constants more useful than they first appear.
+
+```go
+const timeout = 30              // untyped
+const timeoutTyped int = 30     // typed
+```
+
+An untyped constant has no fixed type until you use it. At the point of use it adopts whatever the context needs, and it is evaluated at arbitrary precision along the way.
+
+```go
+const factor = 3
+
+var a int     = factor      // becomes int
+var b float64 = factor      // becomes float64
+var c int64   = factor      // becomes int64
+```
+
+Do the same thing with a typed constant and two of those lines stop compiling:
+
+```go
+const factor int = 3
+
+var a int     = factor      // fine
+var b float64 = factor      // compile error, int is not float64
+```
+
+The practical guidance is simple: leave your constants untyped unless you have a specific reason to pin the type. Untyped constants slot into more places without conversions cluttering the call sites.
+
+### Arbitrary precision is not a detail
+
+```go
+const huge = 1 << 62          // fine, no type yet
+const bigger = huge * 4       // still fine, the compiler uses big numbers
+
+fmt.Println(bigger / 1000)    // works, the result fits in an int
+var x int = bigger            // compile error, this one does not fit
+```
+
+Intermediate constant expressions are not limited by machine word size. Only the final assignment to a variable has to fit. This lets you write constant arithmetic naturally without worrying about overflow at each step.
+
+## iota, the constant counter
+
+`iota` is a compiler-managed counter that resets to zero at the start of every `const` block and increments by one for each line in it.
+
+```go
+const (
+    Sunday = iota      // 0
+    Monday             // 1
+    Tuesday            // 2
+    Wednesday          // 3
+    Thursday           // 4
+    Friday             // 5
+    Saturday           // 6
+)
+```
+
+Notice that only the first line mentions `iota`. Inside a `const` block, a line with no expression repeats the previous one, so every subsequent line is implicitly `= iota` and picks up the incremented value.
+
+That is the entire mechanism. Everything below is a variation on it.
+
+### Skipping values
+
+```go
+const (
+    _  = iota          // discard 0
+    KB = 1 << (10 * iota)   // 1 << 10 = 1024
+    MB                      // 1 << 20
+    GB                      // 1 << 30
+    TB                      // 1 << 40
+)
+
+fmt.Println(MB)        // 1048576
+```
+
+The blank identifier absorbs the zero value so the first real constant starts at one. This particular block appears in a great many Go codebases.
+
+### Starting from something other than zero
+
+```go
+const (
+    StatusOK = iota + 200    // 200
+    StatusCreated            // 201
+    StatusAccepted           // 202
+)
+```
+
+### Several constants per line
+
+`iota` increments per line, not per constant:
+
+```go
+const (
+    a, b = iota, iota * 10   // a=0, b=0
+    c, d                     // c=1, d=10
+    e, f                     // e=2, f=20
+)
+```
+
+### Bit flags
+
+Shifting `iota` gives you a set of values that can be combined:
+
+```go
+type Permission uint8
+
+const (
+    Read Permission = 1 << iota    // 00000001
+    Write                          // 00000010
+    Execute                        // 00000100
+    Delete                         // 00001000
+)
+
+perms := Read | Write
+
+fmt.Println(perms&Read != 0)     // true
+fmt.Println(perms&Delete != 0)   // false
+```
+
+Four permissions in a single byte, with set membership tested by a bitwise `and`. This is how file modes, feature flags, and protocol options are usually represented.
+
+## Building a real enum
+
+Constants plus a named type plus a `String` method is Go's answer to enumerations, and it produces something quite pleasant to use.
+
+```go
+type OrderStatus int
+
+const (
+    StatusPending OrderStatus = iota
+    StatusPaid
+    StatusShipped
+    StatusDelivered
+    StatusCancelled
+)
+
+func (s OrderStatus) String() string {
+    switch s {
+    case StatusPending:
+        return "pending"
+    case StatusPaid:
+        return "paid"
+    case StatusShipped:
+        return "shipped"
+    case StatusDelivered:
+        return "delivered"
+    case StatusCancelled:
+        return "cancelled"
+    default:
+        return fmt.Sprintf("OrderStatus(%d)", int(s))
+    }
+}
+```
+
+Because `OrderStatus` is its own type, the compiler stops you passing a plain `int` where a status is expected. Because it has a `String` method, `fmt` uses it automatically:
+
+```go
+s := StatusShipped
+fmt.Println(s)                  // shipped
+fmt.Printf("status is %v\n", s) // status is shipped
+```
+
+Add a validity check and the type starts defending itself:
+
+```go
+func (s OrderStatus) Valid() bool {
+    return s >= StatusPending && s <= StatusCancelled
+}
+```
+
+<Callout type="warn">
+Writing `String` methods by hand gets tedious and they drift out of sync when someone adds a constant. The `stringer` tool generates them for you: install it with `go install golang.org/x/tools/cmd/stringer@latest`, add `//go:generate stringer -type=OrderStatus` above the const block, and run `go generate ./...`.
+</Callout>
+
+## When to leave iota alone
+
+`iota` gives you values that depend on their position in the block, and that is exactly wrong in two situations.
+
+**When the numbers are stored somewhere.** If these constants get written into a database or sent over the wire, inserting a new one in the middle silently changes the meaning of every value after it. Write the numbers explicitly instead:
+
+```go
+const (
+    StatusPending   OrderStatus = 1
+    StatusPaid      OrderStatus = 2
+    StatusShipped   OrderStatus = 3
+)
+```
+
+**When the values are strings.** String constants carry their meaning in logs, JSON, and error messages, which is often worth more than the compactness of an integer:
+
+```go
+type Environment string
+
+const (
+    Development Environment = "development"
+    Staging     Environment = "staging"
+    Production  Environment = "production"
+)
+```
+
+The named type still gives you compile time checking, and now a misconfigured value is obvious the moment you print it.
+
+Constants take care of the values that never change. Next, let's deal with the values that need to change form, which in Go means being explicit about every single conversion.

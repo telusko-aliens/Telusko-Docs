@@ -1,0 +1,228 @@
+---
+title: Zero Values and Type Inference
+---
+
+In C, a variable you declare without a value holds whatever garbage was in that memory. In Java, an uninitialised object reference is `null` and waits patiently to throw at you. Go took a third path: every type has a defined zero value, and a declaration without an initialiser always produces it. There is no uninitialised state in Go at all.
+
+This turns out to be one of the quiet reasons Go code has fewer crashes than you might expect.
+
+## Every type has a zero
+
+```go
+var i int
+var f float64
+var b bool
+var s string
+var p *int
+var sl []int
+var m map[string]int
+
+fmt.Println(i, f, b, s == "", p == nil, sl == nil, m == nil)
+// 0 0 false true true true true
+```
+
+| Category | Types | Zero value |
+| --- | --- | --- |
+| Numbers | all integer and float types | `0` |
+| Boolean | `bool` | `false` |
+| Text | `string` | `""`, the empty string |
+| Reference-like | pointer, slice, map, channel, function, interface | `nil` |
+| Composite | struct | a struct with every field at its own zero |
+| Fixed size | array | an array with every element at its own zero |
+
+Structs and arrays recurse, which is neater than it sounds:
+
+```go
+type Config struct {
+    Host    string
+    Port    int
+    Debug   bool
+    Tags    []string
+}
+
+var c Config
+fmt.Printf("%+v\n", c)
+// {Host: Port:0 Debug:false Tags:[]}
+```
+
+No constructor ran, and yet the value is fully defined and safe to use.
+
+## Designing for a useful zero value
+
+Here is where the idea stops being trivia and becomes a design technique. Go's standard library repeatedly arranges its types so that the zero value is immediately usable, and you can do the same.
+
+```go
+var b bytes.Buffer
+b.WriteString("works without any setup")
+
+var mu sync.Mutex
+mu.Lock()                    // ready to use as declared
+
+var wg sync.WaitGroup
+wg.Add(1)                    // same
+```
+
+Compare that with a type that needs initialising before it does anything. Every user has to remember the constructor, and forgetting it produces a runtime failure.
+
+When you design your own types, ask what a reader gets if they write `var x YourType` and use it straight away. If the answer is "a panic", consider rearranging the fields so the answer becomes "sensible defaults".
+
+```go
+type Counter struct {
+    mu     sync.Mutex
+    counts map[string]int
+}
+
+// Works on a zero value, because it creates the map on first use.
+func (c *Counter) Inc(key string) {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    if c.counts == nil {
+        c.counts = make(map[string]int)
+    }
+    c.counts[key]++
+}
+```
+
+## The nil values that behave differently
+
+`nil` is where the zero value story gets interesting, because different nil types tolerate different things. This table is worth reading carefully, since two of these rows account for a good share of beginner panics.
+
+| Zero value | Reading it | Writing to it | Calling `len` |
+| --- | --- | --- | --- |
+| `nil` slice | safe, ranges over nothing | `append` works and allocates | returns 0 |
+| `nil` map | safe, returns the zero value | **panics** | returns 0 |
+| `nil` pointer | **panics** on dereference | **panics** | not applicable |
+| `nil` channel | blocks forever | blocks forever | returns 0 |
+| `nil` function | **panics** when called | not applicable | not applicable |
+
+The slice case is genuinely useful:
+
+```go
+var names []string          // nil
+names = append(names, "a")  // fine, append allocates for you
+fmt.Println(len(names))     // 1
+```
+
+You never need `names := []string{}` just to make `append` work. A `nil` slice is a perfectly good empty slice.
+
+The map case is the trap:
+
+```go
+var scores map[string]int
+fmt.Println(scores["missing"])   // 0, reading is fine
+scores["shiva"] = 10             // panic: assignment to entry in nil map
+```
+
+Maps must be created before you write to them:
+
+```go
+scores := make(map[string]int)
+scores["shiva"] = 10             // now fine
+```
+
+<Callout type="warn">
+The asymmetry between slices and maps is arbitrary from the outside, and everybody hits it once. The mental shortcut: `append` returns a new slice header so it can allocate on your behalf, while a map write has nowhere to put the new map. Remember that maps need `make`, and slices do not.
+</Callout>
+
+## Type inference
+
+The other half of this page is the opposite question. When you do supply a value, how does Go decide the type?
+
+```go
+x := 42          // int
+y := 3.14        // float64
+z := "hello"     // string
+w := true        // bool
+r := 'A'         // rune (int32), note the single quotes
+b := []byte("A") // []byte
+```
+
+The rule is that an untyped constant gets its **default type**:
+
+| Literal kind | Default type |
+| --- | --- |
+| integer literal | `int` |
+| float literal | `float64` |
+| rune literal, in single quotes | `rune`, which is `int32` |
+| string literal | `string` |
+| `true` or `false` | `bool` |
+
+### Untyped constants are more flexible than variables
+
+This is a genuinely surprising corner of Go, and understanding it explains several things that otherwise look inconsistent.
+
+```go
+const big = 1 << 40      // no type yet, just a very large number
+
+var a int64 = big        // fine
+var b float64 = big      // also fine
+```
+
+An untyped constant has no type until it is used, at which point it adopts whatever type the context requires. It is also evaluated at arbitrary precision, so intermediate values are not limited by any machine type.
+
+The moment you assign it to a variable, that flexibility is gone:
+
+```go
+count := 10              // now definitely an int
+var total float64 = count // compile error, cannot use int as float64
+var total float64 = 10    // fine, 10 is still untyped here
+```
+
+This is why `var x float64 = 3` compiles while `y := 3; var x float64 = y` does not. The literal `3` bends to fit, the variable `y` does not.
+
+<Callout type="info">
+The same rule explains why `time.Sleep(2 * time.Second)` works. `2` is untyped and adopts `time.Duration` from the multiplication. Try `n := 2; time.Sleep(n * time.Second)` and it fails, because `n` is committed to `int`. You would need `time.Duration(n) * time.Second`.
+</Callout>
+
+### Inference across multiple values
+
+```go
+a, b := 1, "two"         // a is int, b is string, each inferred separately
+```
+
+Each variable gets its own inferred type. There is no attempt to find a common type across the list.
+
+### Where inference does not reach
+
+Function signatures always need explicit types, on both the parameters and the results:
+
+```go
+func add(a, b int) int {      // types required
+    return a + b
+}
+```
+
+Struct fields do too:
+
+```go
+type User struct {
+    Name string             // required
+    Age  int
+}
+```
+
+Inference is a convenience inside function bodies. Anywhere a declaration forms part of an interface that other code reads, Go insists you write the type down.
+
+## Putting the two ideas together
+
+Zero values and inference are the reason this compiles and does something sensible without a single explicit type in sight:
+
+```go
+func summarise(items []string) (int, string) {
+    var longest string          // zero value, "" 
+    count := 0                  // inferred int
+
+    for _, item := range items {
+        count++
+        if len(item) > len(longest) {
+            longest = item
+        }
+    }
+
+    return count, longest
+}
+```
+
+`longest` starts as the empty string, which is exactly the right starting point for a "longest so far" comparison. No sentinel value, no null check, no constructor. That pattern repeats all over Go code once you start looking for it.
+
+Next, let's look at values that are not allowed to change at all, and the small piece of magic Go uses to build enumerations out of them.

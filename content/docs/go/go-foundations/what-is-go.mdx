@@ -1,0 +1,144 @@
+---
+title: What is Go
+---
+
+Go is a compiled, statically typed programming language with garbage collection and built-in concurrency. That single sentence contains four decisions that shape everything else about the language, so it is worth unpacking each one before you write any code.
+
+## Compiled
+
+When you build a Go program, the toolchain turns your source into machine code for a specific operating system and processor. The result is one executable file. There is no interpreter reading your source at runtime and no bytecode being translated as it goes.
+
+```text
+   main.go  ──►  go build  ──►  main.exe  ──►  runs directly on the CPU
+   (source)                      (binary)
+```
+
+Compare that with the alternatives you may already know. Python ships source and requires a Python interpreter on the machine. Java ships bytecode and requires a JVM. Go ships a finished binary and requires nothing at all.
+
+The practical consequences show up immediately:
+
+- Deployment is a file copy, not an environment setup
+- Startup is measured in milliseconds because there is nothing to warm up
+- Type errors and many logic mistakes are caught before the program ever runs
+- The binary is larger than a script, usually a few megabytes, because the runtime is bundled inside it
+
+## Statically typed
+
+Every variable in Go has a type that is fixed when the program is compiled. The compiler knows the type of every expression, and it refuses to build code where the types do not line up.
+
+```go
+var count int = 42
+count = "hello"   // compile error, cannot use string as int
+```
+
+Go softens this with type inference, so you rarely write the type out yourself:
+
+```go
+count := 42          // Go infers int
+name := "Telusko"    // Go infers string
+price := 19.99       // Go infers float64
+```
+
+The variable still has one fixed type. Inference only saves you the typing, it does not make Go dynamic. This distinction matters, and the section on variables goes into it properly.
+
+## Garbage collected
+
+Go manages memory for you. You allocate values, and when nothing in your program can reach a value any more, the garbage collector reclaims it. You never call `free`, and you cannot corrupt memory by releasing something twice.
+
+This puts Go in an unusual middle position. C and C++ give you manual control with the risk that comes with it. Java and C# hide memory almost entirely. Go lets you take the address of a value, pass pointers around, and control layout, while still cleaning up after you.
+
+<Callout type="info">
+Go's collector is tuned for low pause times rather than maximum throughput. Pauses are typically well under a millisecond, which is what you want in a server that must answer requests predictably. You will feel this as an absence of hiccups rather than as anything you configure.
+</Callout>
+
+## Concurrent by design
+
+Concurrency in Go is part of the language, not a library. Two features carry it:
+
+```go
+go doWork()                 // start a goroutine
+results := make(chan int)   // create a channel to communicate
+```
+
+A goroutine is a function running independently, managed by Go's own scheduler rather than the operating system. It starts with about two kilobytes of stack that grows on demand, so running a hundred thousand goroutines at once is ordinary rather than reckless. Channels are typed pipes that let goroutines hand values to each other safely.
+
+The guiding idea, repeated often in the Go community, is worth remembering early:
+
+<Quote>
+Do not communicate by sharing memory, share memory by communicating.
+</Quote>
+
+The concurrency section returns to this at length. For now, just note that it is a language level concern in Go, which is unusual.
+
+## What a Go program looks like
+
+Every Go file follows the same shape. Package declaration, imports, then code.
+
+```go
+package main
+
+import (
+    "fmt"
+    "strings"
+)
+
+func main() {
+    words := []string{"Go", "is", "small"}
+    fmt.Println(strings.Join(words, " "))
+}
+```
+
+A few things are visible here that will hold for every Go file you ever read:
+
+- The file belongs to exactly one package, declared on the first line
+- Imports are grouped and the compiler rejects any import you do not use
+- There are no semicolons, because the compiler inserts them for you
+- Braces are required even on single statement blocks
+- The opening brace must sit on the same line as the declaration
+
+That last rule is not a style preference. Putting the brace on its own line is a compile error in Go, because of how automatic semicolon insertion works.
+
+## The parts of the language you will actually meet
+
+Go has twenty five keywords. Here they are in full, which tells you something about the size of the language:
+
+```text
+break      default      func     interface   select
+case       defer        go       map         struct
+chan       else         goto     package     switch
+const      fallthrough  if       range       type
+continue   for          import   return      var
+```
+
+For comparison, Java has around fifty and C++ has more than ninety. A short keyword list means less to memorise and fewer ways for two programmers to write the same idea differently.
+
+## Versions and the compatibility promise
+
+Go releases twice a year, in February and August. Version numbers move as `1.21`, `1.22`, `1.23`, and so on. There has been no Go 2, and the team has said the number will only change if compatibility ever has to break.
+
+That promise is the important part. Code written against Go 1.0 in 2012 still compiles with today's toolchain. Upgrading Go is nearly always a matter of installing the new version and rebuilding, which is a claim very few language ecosystems can make.
+
+<Callout type="warn">
+The compatibility promise covers the language and the standard library. It does not cover third party packages, which follow their own versioning. Your `go.mod` file pins those, and the packages and modules section explains how.
+</Callout>
+
+## Common questions before you start
+
+<Accordions>
+<Accordion title="Is Go object oriented?">
+Partly, and not in the way you are used to. Go has types with methods, which covers a lot of what people want from objects. It has no classes, no inheritance, and no constructors as language features. Reuse happens through composition and interfaces instead, and the section on structs and interfaces shows what that looks like in practice.
+</Accordion>
+<Accordion title="Is Go faster than Java or Python?">
+Go is far faster than Python for computation, typically by one to two orders of magnitude. Against Java the picture is more even. The JVM often wins on long running throughput because of its just in time compiler, while Go usually wins on startup time, memory footprint, and predictable latency. For typical backend services the difference is rarely the deciding factor.
+</Accordion>
+<Accordion title="Do I need to know C to learn Go?">
+No. Go borrows syntax and the pointer concept from C, but it removes the parts that make C dangerous. There is no pointer arithmetic, no manual memory management, and no undefined behaviour waiting to bite you. Pointers in Go are explained from scratch later in this course.
+</Accordion>
+<Accordion title="Why does everyone talk about the gopher?">
+The gopher is Go's mascot, designed by Renée French. It has no technical significance whatsoever, but it does explain why Go conference talks are full of cartoon rodents.
+</Accordion>
+</Accordions>
+
+Four decisions, then, and everything else follows from them: native binaries, types checked at build time, memory managed for you, and concurrency built into the language rather than bolted on.
+
+Next up is the practical case for choosing Go on a real backend project, including the situations where it is the wrong answer.

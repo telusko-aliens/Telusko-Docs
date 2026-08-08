@@ -1,0 +1,236 @@
+---
+title: Printing and Formatting Output
+---
+
+You have already used `fmt.Println`. It is the first function every Go programmer learns and the last one they stop using. But `fmt` is doing considerably more than printing, and the twenty minutes you spend on this page will pay back every time you need to debug a struct, format a report, or build an error message.
+
+## The naming scheme
+
+Once you see the pattern in `fmt`'s function names, you can predict every one of them without looking it up.
+
+```text
+   prefix    where it goes
+   ──────    ─────────────
+   (none)    standard output
+   S         returns a string
+   F         writes to an io.Writer you choose
+   E         (in errors) returns an error value
+
+   suffix    how it formats
+   ──────    ──────────────
+   (none)    values with spaces between operands when neither is a string
+   ln        values with spaces between all operands, plus a newline
+   f         formatted, using a template string with verbs
+```
+
+Cross them and you get the whole family:
+
+| | plain | `ln` | `f` |
+| --- | --- | --- | --- |
+| **to stdout** | `Print` | `Println` | `Printf` |
+| **to a string** | `Sprint` | `Sprintln` | `Sprintf` |
+| **to a writer** | `Fprint` | `Fprintln` | `Fprintf` |
+
+Plus `fmt.Errorf`, which formats like `Printf` but returns an `error`. You will use that one constantly in the error handling section.
+
+```go
+fmt.Println("to the terminal")
+
+msg := fmt.Sprintf("user %s has %d orders", name, count)   // into a variable
+
+fmt.Fprintf(os.Stderr, "warning: %v\n", err)               // to standard error
+fmt.Fprintf(w, "<h1>%s</h1>", title)                       // to an HTTP response
+```
+
+`Fprintf` is the one that unlocks things. Any `io.Writer` works, which means files, network connections, HTTP responses, buffers, and compressors are all valid destinations with no change in how you write the call.
+
+## The verbs worth knowing
+
+### General purpose
+
+```go
+type User struct {
+    Name  string
+    Email string
+    Age   int
+}
+
+u := User{"Shiva", "shiva@example.com", 28}
+
+fmt.Printf("%v\n", u)    // {Shiva shiva@example.com 28}
+fmt.Printf("%+v\n", u)   // {Name:Shiva Email:shiva@example.com Age:28}
+fmt.Printf("%#v\n", u)   // main.User{Name:"Shiva", Email:"shiva@example.com", Age:28}
+fmt.Printf("%T\n", u)    // main.User
+```
+
+Those four lines are the most useful debugging tools in Go.
+
+- `%v` is the default representation, and it works on absolutely anything
+- `%+v` adds field names, which is what you almost always want for a struct
+- `%#v` prints valid Go syntax you could paste back into code
+- `%T` prints the type, which settles arguments about what a value actually is
+
+<Callout type="info">
+When a print statement is not telling you what you expected, switch `%v` to `%+v` first and `%#v` second. The difference between `{ 0 false}` and `{Name: Age:0 Active:false}` is the difference between guessing and knowing.
+</Callout>
+
+### Numbers
+
+```go
+n := 255
+
+fmt.Printf("%d\n", n)      // 255
+fmt.Printf("%b\n", n)      // 11111111
+fmt.Printf("%o\n", n)      // 377
+fmt.Printf("%x\n", n)      // ff
+fmt.Printf("%X\n", n)      // FF
+fmt.Printf("%c\n", 65)     // A, as a character
+fmt.Printf("%q\n", 65)     // 'A', quoted character
+fmt.Printf("%U\n", 0x1F600) // U+1F600
+```
+
+```go
+f := 1234.5678
+
+fmt.Printf("%f\n", f)      // 1234.567800, six decimals by default
+fmt.Printf("%.2f\n", f)    // 1234.57
+fmt.Printf("%e\n", f)      // 1.234568e+03
+fmt.Printf("%g\n", f)      // 1234.5678, shortest form that round-trips
+```
+
+`%g` is the one to use when you do not know the magnitude in advance. It switches between fixed and exponential notation and never prints trailing zeros.
+
+### Strings
+
+```go
+s := "Go\tlang"
+
+fmt.Printf("%s\n", s)      // Go	lang
+fmt.Printf("%q\n", s)      // "Go\tlang", quoted and escaped
+fmt.Printf("%x\n", s)      // 476f096c616e67, hex of each byte
+```
+
+`%q` is quietly excellent for debugging. It shows you the quotes, so trailing spaces and stray tabs become visible instead of invisible:
+
+```go
+input := "admin "
+fmt.Printf("got %s\n", input)    // got admin      ← looks fine
+fmt.Printf("got %q\n", input)    // got "admin "   ← there it is
+```
+
+### Booleans, pointers, and errors
+
+```go
+fmt.Printf("%t\n", true)     // true
+fmt.Printf("%p\n", &u)       // 0xc000010030
+fmt.Printf("%v\n", err)      // whatever err.Error() returns
+```
+
+## Width, alignment, and padding
+
+The number between `%` and the verb controls the minimum width. A minus sign left-aligns, a zero pads with zeros.
+
+```go
+fmt.Printf("|%10s|\n", "go")     // |        go|
+fmt.Printf("|%-10s|\n", "go")    // |go        |
+fmt.Printf("|%06d|\n", 42)       // |000042|
+fmt.Printf("|%8.2f|\n", 3.14159) // |    3.14|
+```
+
+Which makes a readable table out of a loop:
+
+```go
+products := []struct {
+    Name  string
+    Price float64
+    Qty   int
+}{
+    {"Keyboard", 2499.00, 3},
+    {"Monitor", 18999.50, 1},
+    {"USB Cable", 299.99, 12},
+}
+
+fmt.Printf("%-12s %10s %5s\n", "PRODUCT", "PRICE", "QTY")
+fmt.Println(strings.Repeat("-", 29))
+for _, p := range products {
+    fmt.Printf("%-12s %10.2f %5d\n", p.Name, p.Price, p.Qty)
+}
+```
+
+```text
+PRODUCT           PRICE   QTY
+-----------------------------
+Keyboard        2499.00     3
+Monitor        18999.50     1
+USB Cable        299.99    12
+```
+
+Widths can also come from arguments, using `*`:
+
+```go
+width := 15
+fmt.Printf("%*s\n", width, "right aligned")
+```
+
+## Making your own types print nicely
+
+Implement `String() string` and every `fmt` function will use it automatically. This is the `fmt.Stringer` interface, and it is probably the most valuable single method you can add to a type.
+
+```go
+type Money struct {
+    Paise    int64
+    Currency string
+}
+
+func (m Money) String() string {
+    return fmt.Sprintf("%s %d.%02d", m.Currency, m.Paise/100, m.Paise%100)
+}
+
+price := Money{249950, "INR"}
+fmt.Println(price)              // INR 2499.50
+fmt.Printf("total: %v\n", price) // total: INR 2499.50
+```
+
+No configuration, no registration. `fmt` checks whether the value has a `String` method and calls it.
+
+<Callout type="warn">
+Never call `fmt.Sprintf("%v", m)` on the same type inside its own `String` method. `%v` will call `String` again, which calls `%v` again, and the program dies in infinite recursion. Format the individual fields instead, as the example above does.
+</Callout>
+
+## Errors you will actually hit
+
+Bad format strings do not stop compilation, they show up in your output.
+
+```go
+fmt.Printf("%d and %d\n", 1)           // 1 and %!d(MISSING)
+fmt.Printf("%d\n", 1, 2)               // 1
+                                       // %!(EXTRA int=2)
+fmt.Printf("%d\n", "hello")            // %!d(string=hello)
+fmt.Printf("50%\n")                    // 50%!(NOVERB)
+```
+
+That last one bites regularly. A literal percent sign has to be doubled:
+
+```go
+fmt.Printf("battery at 50%%\n")        // battery at 50%
+```
+
+<Callout type="info">
+`go vet` checks `Printf` format strings against their arguments and reports mismatches at build time. It runs automatically as part of `go test`, which is one more reason to write tests early. Custom logging wrappers can be checked too, with `go vet -printfuncs`.
+</Callout>
+
+## Choosing the right function
+
+```text
+   Just show me the value             →  fmt.Println(v)
+   Debug a struct                     →  fmt.Printf("%+v\n", v)
+   What type is this really           →  fmt.Printf("%T\n", v)
+   Build a string for later           →  fmt.Sprintf(...)
+   Write to a file, socket, response  →  fmt.Fprintf(w, ...)
+   Report an error to the user         →  fmt.Errorf(...)
+   High volume application logging    →  log/slog, not fmt
+```
+
+That last line deserves emphasis. `fmt` is for output that a human reads right now: CLI output, debugging, building strings. For application logs that get collected and searched, use `log/slog` from the standard library, which produces structured key and value output. The going to production section covers it.
+
+You can now declare values, convert them, combine them, and display them. Next, let's make programs that decide and repeat, starting with conditions.

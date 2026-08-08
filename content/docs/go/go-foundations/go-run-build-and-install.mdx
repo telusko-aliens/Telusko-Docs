@@ -1,0 +1,141 @@
+---
+title: go run, go build and go install
+---
+
+Three commands, one compiler, three different destinations for the result. Beginners tend to learn `go run` and stop there, then get confused the first time a tutorial says "now build the binary". The distinction is simple once you see where each command puts its output.
+
+```text
+                        ┌─────────────────────────────────┐
+   your .go files  ──►  │   the Go compiler does its job  │
+                        └────────────┬────────────────────┘
+                                     │
+              ┌──────────────────────┼──────────────────────┐
+              ▼                      ▼                      ▼
+          go run                 go build              go install
+     temp dir, run, delete   binary in this folder   binary in $GOPATH/bin
+        (nothing kept)          (you ship this)     (on your PATH, run anywhere)
+```
+
+## go run
+
+`go run` compiles your code into a temporary directory, executes it, and throws the binary away when the program exits.
+
+```bash
+go run .              # run the main package in this folder
+go run main.go        # run one specific file
+go run . serve --port 8080   # arguments after the package go to your program
+```
+
+This is the command for the write, run, fix loop. You will type it hundreds of times while learning, because the feedback is immediate and your working directory stays clean.
+
+What it is not good for is anything you intend to keep. There is no artifact afterwards, so you cannot copy the result to a server, and the compile happens again on every run. Go caches aggressively so repeat runs are quick, but you are still paying for a build each time.
+
+<Callout type="info">
+`go run .` and `go run main.go` are not identical. The first builds the whole package in the current folder, which is what you want once your program spans several files. The second builds only the file you named, and will fail with undefined symbol errors the moment a helper lives elsewhere. Get into the habit of `go run .` early.
+</Callout>
+
+## go build
+
+`go build` compiles and leaves an executable in your current directory, named after the module or the folder.
+
+```bash
+go build
+```
+
+```text
+hello        (or hello.exe on Windows)
+```
+
+Run it like any other program:
+
+```bash
+./hello
+```
+
+The binary is self contained. It has the Go runtime, the garbage collector, the scheduler, and every package you imported linked inside it. Copy that one file to a machine with the same operating system and architecture and it runs, with nothing installed there.
+
+A few flags earn their keep:
+
+```bash
+go build -o bin/api ./cmd/api      # choose the output path and the package
+go build -race                     # include the race detector, for testing only
+go build -ldflags="-s -w"          # strip debug info, smaller binary
+go build ./...                     # build every package, a quick sanity check
+```
+
+That last one is worth adopting as a habit. `go build ./...` compiles everything in the module without producing binaries for library packages, which makes it a fast way to confirm the whole project still holds together.
+
+### Building for another platform
+
+This is one of Go's genuinely delightful features. Set two environment variables and you cross compile, with no toolchain to install and no container involved.
+
+```bash
+GOOS=linux   GOARCH=amd64 go build -o bin/app-linux
+GOOS=darwin  GOARCH=arm64 go build -o bin/app-mac
+GOOS=windows GOARCH=amd64 go build -o bin/app.exe
+```
+
+On Windows PowerShell, set them first:
+
+```powershell
+$env:GOOS="linux"; $env:GOARCH="amd64"; go build -o bin/app-linux
+```
+
+A developer on a Mac can produce the Linux binary that ships to production, from the same laptop, in one command. The going to production section uses this for real.
+
+## go install
+
+`go install` builds the program and places the binary in `$GOPATH/bin`, which should be on your `PATH` from the setup page. The point is to make a tool available system wide by name.
+
+```bash
+go install
+hello          # now runs from any directory
+```
+
+Its more common use is installing somebody else's tool straight from a repository:
+
+```bash
+go install golang.org/x/tools/gopls@latest
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+```
+
+The `@latest` suffix, or a specific version like `@v1.55.2`, is required. Without it the command operates on the current module instead, which is usually not what you meant.
+
+<Callout type="warn">
+If `go install` succeeds but the command is not found afterwards, the binary landed somewhere your shell does not look. Run `go env GOPATH`, confirm that path plus `/bin` is on your `PATH`, and reopen the terminal. This accounts for the large majority of "go install is broken" reports.
+</Callout>
+
+## Choosing between them
+
+| Situation | Command |
+| --- | --- |
+| Trying an idea while learning | `go run .` |
+| Iterating on a service locally | `go run .` |
+| Producing something to deploy | `go build -o bin/app` |
+| Producing a binary for another OS | `GOOS=... GOARCH=... go build` |
+| Making your own tool available in the shell | `go install` |
+| Installing a tool written by someone else | `go install path@version` |
+| Checking that everything still compiles | `go build ./...` |
+
+## What the build cache is doing
+
+The first build of a project takes a moment. The second is close to instant, even after you change a file. Go caches compiled packages, so only what changed and what depends on it gets rebuilt.
+
+```bash
+go env GOCACHE     # where the cache lives
+go clean -cache    # wipe it, rarely needed
+```
+
+You will almost never touch this. It is worth knowing about mainly so that a suspiciously fast build does not make you wonder whether the compiler skipped something.
+
+## A note on binary size
+
+A hello world binary in Go is around 2 MB, which surprises people coming from C. That size is the runtime, the garbage collector, the scheduler, and the reflection metadata, all bundled in so the target machine needs nothing.
+
+```bash
+go build -ldflags="-s -w"     # drops the symbol table and DWARF info
+```
+
+That typically saves 25 to 30 percent. The trade is that stack traces from a crash become far less readable, so keep the symbols in development builds. Compressing further with a tool like `upx` is possible, though it is rarely worth the trouble now that a few megabytes of container image costs nothing.
+
+You can now compile, run, and ship a Go program. Next, let's look at the `go.mod` file that has been quietly sitting in your project folder this whole time.

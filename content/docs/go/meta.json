@@ -1,17 +1,25 @@
 {
     "root": false,
     "title": "Go",
-    "icon": "Squirrel",
+    "icon": "Gauge",
     "pages": [
         "getting-started.mdx",
         "introduction.mdx",
-        "getting-started-with-go",
+        "go-foundations",
         "variables-and-data-types",
-        "disabled-user-inputs",
         "disabled-control-flow",
-        "disabled-collections",
-        "disabled-core-concepts",
-        "disabled-packages-and-scope",
-        "disabled-final-project"
+        "disabled-functions",
+        "disabled-arrays-slices-and-maps",
+        "disabled-structs-pointers-and-methods",
+        "disabled-interfaces-and-generics",
+        "disabled-error-handling",
+        "disabled-packages-and-modules",
+        "disabled-concurrency",
+        "disabled-standard-library-essentials",
+        "disabled-building-web-services",
+        "disabled-working-with-databases",
+        "disabled-testing-and-tooling",
+        "disabled-going-to-production",
+        "disabled-projects"
     ]
 }

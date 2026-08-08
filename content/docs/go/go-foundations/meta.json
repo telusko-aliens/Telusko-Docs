@@ -1,0 +1,11 @@
+{
+    "title": "Go Foundations",
+    "pages": [
+        "what-is-go.mdx",
+        "why-go-for-backend-development.mdx",
+        "installing-go-and-the-toolchain.mdx",
+        "writing-your-first-program.mdx",
+        "go-run-build-and-install.mdx",
+        "modules-and-project-layout.mdx"
+    ]
+}

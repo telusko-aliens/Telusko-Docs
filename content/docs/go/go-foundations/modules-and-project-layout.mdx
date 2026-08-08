@@ -1,0 +1,187 @@
+---
+title: Modules and Project Layout
+---
+
+Open the `go.mod` file that `go mod init` created. It is three lines long and it looks like it could not possibly be doing much:
+
+```go title="go.mod"
+module example.com/hello
+
+go 1.24
+```
+
+Those three lines answer the two questions Go needs settled before it can compile anything. What is this project called, and which version of the language should it be read as. Everything else in the module system grows out of those answers.
+
+## What a module actually is
+
+A module is a collection of Go packages versioned together as one unit. In practice it means a folder with a `go.mod` at the top and any number of subfolders below it.
+
+```text
+   hello/               ← module root, go.mod lives here
+   ├── go.mod
+   ├── main.go          ← package main
+   └── internal/
+       └── greet/
+           └── greet.go ← package greet
+```
+
+The module path on the first line of `go.mod` becomes the prefix for importing anything inside it. If your module is `example.com/hello`, then the package in `internal/greet` is imported as `example.com/hello/internal/greet`. The import path is the module path plus the folder path, always.
+
+### Choosing a module path
+
+For anything you might publish, use the repository URL without the scheme:
+
+```bash
+go mod init github.com/yourname/projectname
+```
+
+This is not decoration. When someone runs `go get github.com/yourname/projectname`, Go fetches from that URL, so the path has to match reality. For throwaway learning projects any unique string works, and `example.com/something` is the conventional placeholder.
+
+<Callout type="warn">
+Renaming a module later means editing `go.mod` and every internal import that referenced the old path. It is a mechanical change, but it touches a lot of files. Spend ten seconds picking the right path now.
+</Callout>
+
+## The `go` directive
+
+The `go 1.24` line is not "the version I happen to have installed". It is the minimum language version this module needs, and it changes how the compiler reads your code.
+
+Set it too low and newer language features are rejected even on a new toolchain. Set it higher than the Go on the build machine and the build fails with a clear message telling you to upgrade. Leave it at whatever `go mod init` wrote unless you have a reason.
+
+## Adding a dependency
+
+Write an import for a package you do not have yet:
+
+```go title="main.go"
+package main
+
+import (
+    "fmt"
+
+    "github.com/google/uuid"
+)
+
+func main() {
+    id := uuid.New()
+    fmt.Println("generated:", id)
+}
+```
+
+Then let the toolchain sort it out:
+
+```bash
+go mod tidy
+```
+
+Two things change. Your `go.mod` gains a `require` block, and a new file called `go.sum` appears:
+
+```go title="go.mod"
+module example.com/hello
+
+go 1.24
+
+require github.com/google/uuid v1.6.0
+```
+
+`go.sum` holds cryptographic checksums for every dependency and every dependency of those dependencies. Its job is to guarantee that the code you download today is byte for byte the code someone else downloads next year. Commit both files to version control and never edit either by hand.
+
+### The commands that manage dependencies
+
+| Command | What it does |
+| --- | --- |
+| `go mod tidy` | Add every import you use, remove every requirement you do not |
+| `go get package@version` | Move a dependency to a specific version |
+| `go get -u ./...` | Update dependencies to their latest minor and patch releases |
+| `go list -m all` | Print the full dependency graph |
+| `go mod download` | Fetch everything into the local cache without building |
+| `go mod verify` | Confirm cached modules match the checksums in `go.sum` |
+
+`go mod tidy` is the one you will run most. Make it a reflex after adding or deleting imports, and your `go.mod` will always describe what the code actually needs.
+
+<Callout type="info">
+Dependencies are not vendored into your project by default. They live in a shared cache at `$GOPATH/pkg/mod`, so ten projects using the same library store it once. If you do need the dependencies committed alongside your source, `go mod vendor` creates a `vendor/` folder and the build will prefer it.
+</Callout>
+
+## Laying out a project
+
+Go has no enforced project structure. A single `main.go` in a folder is a completely legitimate Go project, and for a small tool it is the right answer. Structure should arrive when the lack of it starts to hurt, not before.
+
+That said, three conventions are near universal and worth following from the start.
+
+### `cmd/` for entry points
+
+When a project produces more than one binary, each gets a folder under `cmd/`:
+
+```text
+   myapp/
+   ├── go.mod
+   ├── cmd/
+   │   ├── api/
+   │   │   └── main.go      → builds the API server
+   │   └── worker/
+   │       └── main.go      → builds the background worker
+   └── internal/
+```
+
+```bash
+go build -o bin/api ./cmd/api
+go build -o bin/worker ./cmd/worker
+```
+
+Both binaries share the same code underneath while keeping their startup logic separate.
+
+### `internal/` for code that is yours alone
+
+`internal` is the one folder name the Go compiler treats specially. Packages inside it can only be imported by code in the same module.
+
+```text
+   github.com/you/myapp/
+   ├── internal/
+   │   └── database/       ← only myapp can import this
+   └── pkg/
+       └── validator/      ← anyone can import this
+```
+
+If another project tries to import your `internal/database`, the compiler refuses. This gives you a genuine private area where you can refactor freely, because you know nobody outside could have depended on it.
+
+### `pkg/` for code meant to be shared
+
+Anything you are deliberately offering to other projects goes in `pkg/`. It carries no special compiler behaviour, it is purely a signal to readers.
+
+<Callout type="warn">
+Do not create `cmd/`, `internal/`, and `pkg/` on day one out of habit. A project with three folders and one file in each is harder to read than a flat one. Start flat, and split when a file gets long enough or a boundary becomes obvious.
+</Callout>
+
+## How a real service tends to end up
+
+For reference, here is the shape a small Go API usually settles into after it has grown past a single file:
+
+```text
+   orders-api/
+   ├── go.mod
+   ├── go.sum
+   ├── Makefile
+   ├── cmd/
+   │   └── api/
+   │       └── main.go          wiring and startup only
+   └── internal/
+       ├── config/              environment and settings
+       ├── handler/             HTTP layer, decode and respond
+       ├── service/             business rules
+       ├── repository/          database access
+       └── model/               shared types
+```
+
+Notice that `main.go` does almost nothing. It reads configuration, constructs the pieces, hands them to each other, and starts the server. All the interesting code lives in `internal/`, where it can be tested without an HTTP request in sight. The web services section builds exactly this layout step by step.
+
+## A rule that saves confusion
+
+One folder is one package, and the package name should match the folder name.
+
+```go
+// file: internal/repository/user.go
+package repository
+```
+
+Go does not force this, but every tool and every reader assumes it. A folder called `handler` containing `package handlers` will work and will annoy everyone who touches it, including you in three months.
+
+That is the whole foundation: a module, a `go.mod`, packages in folders, and a layout that grows only when it needs to. Next, let's start writing actual Go code, beginning with variables and the types they hold.

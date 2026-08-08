@@ -1,0 +1,136 @@
+---
+title: Why Go for Backend Development
+---
+
+Picture a small team that has to ship an API. It needs to handle a few thousand requests per second, talk to a database, call two external services, and run on infrastructure the team pays for out of its own budget. Every language on the shortlist can do this. The question is what each one costs you in build time, deployment complexity, memory bills, and late night debugging.
+
+This page is the practical argument for Go, told through the parts of that job that actually hurt.
+
+## The deployment story
+
+Most backend pain is not in writing code. It is in getting the code onto a machine and keeping it running.
+
+```text
+   Typical Python service          Typical Go service
+   ──────────────────────          ──────────────────
+   install Python 3.11          →  copy one binary
+   create a virtualenv          →  run it
+   pip install requirements
+   configure a WSGI server
+   supervise the process
+   hope the versions match
+```
+
+`go build` gives you a single executable with everything statically linked. There is no runtime to install on the target machine, no dependency resolution at deploy time, and no version drift between your laptop and production. This is why Docker images for Go services are routinely under 20 MB while equivalent JVM or Python images run into the hundreds.
+
+The same property is why the tooling world adopted Go so completely. When your product is a command line tool that strangers will install, "download this file and run it" beats every alternative.
+
+## The concurrency story
+
+A backend service spends most of its life waiting. Waiting on the database, waiting on an HTTP call, waiting on disk. How a language handles that waiting decides how it scales.
+
+Traditional thread based servers give each request an operating system thread. Threads are expensive, roughly a megabyte of stack each plus kernel bookkeeping, so you cannot have many. The usual answer is a thread pool, which means requests queue up when the pool is busy.
+
+Go takes a different route. Each request gets a goroutine, and goroutines are cheap.
+
+| | OS thread | Goroutine |
+| --- | --- | --- |
+| Initial stack | around 1 MB | around 2 KB, grows as needed |
+| Created by | the kernel | the Go runtime |
+| Switching cost | kernel context switch | user space, much cheaper |
+| Practical count | thousands | hundreds of thousands |
+
+Go's scheduler multiplexes many goroutines onto a small number of OS threads. When a goroutine blocks on I/O, the scheduler parks it and runs another one on the same thread. You get the throughput of asynchronous code while writing plain sequential code.
+
+```go
+// This is a complete concurrent HTTP handler.
+// Nothing here is async, and yet thousands can run at once.
+func handler(w http.ResponseWriter, r *http.Request) {
+    user, err := db.FindUser(r.Context(), r.PathValue("id"))
+    if err != nil {
+        http.Error(w, "not found", http.StatusNotFound)
+        return
+    }
+    json.NewEncoder(w).Encode(user)
+}
+```
+
+There is no `async`, no `await`, no callback, and no promise. The runtime handles it. This is the single biggest reason experienced backend engineers enjoy writing Go.
+
+## The cost story
+
+Memory is a line item on a cloud bill. Go services typically idle in the tens of megabytes and stay flat under load, because there is no virtual machine reserving heap up front and no interpreter overhead per object.
+
+Fast startup matters more than it used to. Autoscaling, spot instances, and serverless platforms all reward a process that is ready to serve in a few milliseconds. A Go binary is serving traffic before a JVM has finished loading classes.
+
+<Callout type="info">
+The usual pattern teams report after moving a service to Go is not "it got dramatically faster". It is "we run the same traffic on a third of the machines". Latency improvements are often modest, resource savings are often large.
+</Callout>
+
+## The maintenance story
+
+This is the argument that convinces people slowly and then permanently.
+
+Go was designed for codebases with many contributors and long lifetimes, and several of its choices only make sense in that light.
+
+- **`gofmt` has no options.** Every Go project in the world is formatted identically, so unfamiliar code reads like your own.
+- **Unused imports and variables are compile errors.** Dead code cannot quietly accumulate.
+- **Errors are returned, not thrown.** You can see every failure path by reading the function, without tracing exception handlers upward.
+- **The feature list is short.** There is rarely a clever way to write something, so there is rarely a clever thing to decode later.
+- **The compatibility promise holds.** Upgrading the language does not turn into a migration project.
+
+The result is code that is a little boring to write and unusually pleasant to inherit.
+
+## Where Go genuinely wins
+
+<Cards>
+<Card title="HTTP APIs and microservices">
+Fast startup, low memory, and a standard library that already contains a production grade HTTP server.
+</Card>
+<Card title="Command line tools">
+One static binary, cross compiled for every platform from a single machine.
+</Card>
+<Card title="Network services and proxies">
+Cheap goroutines make holding tens of thousands of open connections routine.
+</Card>
+<Card title="Infrastructure and DevOps">
+The ecosystem is already here. Kubernetes, Docker, Terraform, and Prometheus are all written in Go.
+</Card>
+<Card title="Data pipelines and workers">
+Worker pools and channels map naturally onto queue processing.
+</Card>
+<Card title="Anything that must be deployed widely">
+No runtime dependency means no support burden explaining how to install one.
+</Card>
+</Cards>
+
+## When Go is the wrong choice
+
+An honest case includes the cases against. Do not pick Go for these:
+
+**Machine learning and data science.** The libraries are not there and will not be. NumPy, PyTorch, and the surrounding ecosystem represent decades of work that Go has no equivalent for. Use Python, and if a piece needs to be fast, write that piece in Go and call it over a network boundary.
+
+**Heavy user interface work.** Go has no strong story for desktop or mobile UI. There are projects, but none you would bet a product on.
+
+**Deeply generic library design.** Go's generics are useful but deliberately limited. If your design leans on rich type level abstraction, Rust, Scala, or Haskell will fit better and Go will fight you.
+
+**Small scripts glued to a rich ecosystem.** For a fifteen line script that parses a CSV and posts to an API, Python will be shorter and you will be finished sooner.
+
+<Callout type="warn">
+Go's error handling is also a genuine trade, not just a preference. `if err != nil` will appear in your code hundreds of times. Some engineers find the explicitness clarifying, others find it noisy. It is worth being honest with yourself about which camp you land in, ideally after a few weeks rather than a few hours.
+</Callout>
+
+## A short decision checklist
+
+Ask these four questions about the service you are about to build:
+
+1. Does it need to handle many concurrent connections or requests? Go is strong here.
+2. Does deployment simplicity matter, for example many environments or customer installs? Go is strong here.
+3. Does it depend on a library ecosystem that lives elsewhere, such as machine learning? Go is weak here.
+4. Will several people maintain it for several years? Go is strong here.
+
+Two or more yes answers in the first, second, and fourth positions make Go an easy recommendation. A yes on the third usually decides the matter the other way, and that is fine.
+
+Knowing both halves of that picture is what lets you pick Go for the right reasons rather than because it was trending.
+
+Next, let's get the toolchain installed so the rest of this course can be typed rather than read.

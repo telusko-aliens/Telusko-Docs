@@ -1,71 +1,286 @@
 ---
 title: Operators
-description: The symbols Go uses to combine and compare values, and the couple that behave unusually.
 ---
 
-If types are the nouns of a program, operators are the verbs. They add two numbers, compare two strings, join two conditions. Go's set is small and holds no surprises in how it groups things, but a couple of operators behave differently than you might expect from other languages, and those are worth calling out.
+Go's operator set holds almost no surprises for anyone who has written C, Java, or JavaScript. The interesting parts are the three things Go leaves out, one operator it borrowed from nowhere else, and a couple of behaviours that differ from what you might assume. So rather than listing symbols you already know, this page front-loads the differences.
 
-## Arithmetic
+## Three things Go does not have
 
-The everyday math symbols, plus one you may not have met:
-
-| Operator | Does | `10 op 3` |
-| -------- | ---- | --------- |
-| `+` | add | `13` |
-| `-` | subtract | `7` |
-| `*` | multiply | `30` |
-| `/` | divide | `3` (whole numbers truncate) |
-| `%` | remainder | `1` |
-
-That `%`, the remainder or "modulo," is quietly useful. `n % 2 == 0` is how you ask "is this number even?" And remember from earlier that `+` pulls double duty, joining strings as well as adding numbers.
-
-## Comparison
-
-Compare two values and you get a `bool` back:
+### No ternary operator
 
 ```go
-10 > 5      // true
-"a" == "a"  // true
+max := a > b ? a : b        // does not exist in Go
 ```
 
-The full set is the familiar one: `==`, `!=`, `<`, `>`, `<=`, `>=`.
-
-## Logic, With a Twist
-
-Logical operators combine booleans: `&&` (and), `||` (or), `!` (not). The twist is that Go **short-circuits** them. With `&&`, if the left side is already false, it never bothers evaluating the right. With `||`, if the left is true, it stops there. That is not just an optimization - it is a safety tool:
+Write the branch:
 
 ```go
-if user != nil && user.Active {
-    // user.Active is only touched when user is not nil
+max := b
+if a > b {
+    max = a
 }
 ```
 
-The `nil` check on the left guards the field access on the right, and short-circuiting is what makes that pattern safe.
-
-## Assignment Shorthands
-
-Beyond plain `=`, Go bundles an operation into the assignment:
+Since Go 1.21 the built-in `max` and `min` functions cover the common numeric case:
 
 ```go
-count := 10
-count += 5 // count = count + 5  → 15
-count *= 2 // 30
+largest := max(a, b)
+smallest := min(3, 7, 2)
 ```
 
-`-=`, `/=`, and the rest work the same way.
+The team's reasoning for omitting `?:` was that nested ternaries are unreadable and there is no way to allow the simple form without allowing the nested one. Whether you agree or not, this is settled.
 
-## The Two That Break the Pattern
+### No operator overloading
 
-Here is where Go quietly differs from C or Java. It has `++` and `--`, but they are **statements, not expressions**. They stand on their own line and produce no value you can use:
+`+` means addition for numbers and concatenation for strings, and those are the only meanings it will ever have. Your own types cannot redefine it.
 
 ```go
-i := 0
-i++        // fine, i is now 1
-// x := i++ // NOT allowed
+type Vector struct{ X, Y float64 }
+
+v3 := v1 + v2               // compile error
+
+func (v Vector) Add(o Vector) Vector {    // write a method instead
+    return Vector{v.X + o.X, v.Y + o.Y}
+}
+```
+
+### No increment as an expression
+
+`++` and `--` exist, but they are statements, not expressions. They cannot appear inside a larger expression and there is no prefix form.
+
+```go
+i++                 // fine, a statement on its own
+x := i++            // compile error
+++i                 // compile error
+arr[i++] = value    // compile error
+```
+
+This removes an entire category of "what order does this evaluate in" puzzles.
+
+## Arithmetic
+
+```go
+a, b := 17, 5
+
+fmt.Println(a + b)    // 22
+fmt.Println(a - b)    // 12
+fmt.Println(a * b)    // 85
+fmt.Println(a / b)    // 3, integer division truncates
+fmt.Println(a % b)    // 2, remainder
+```
+
+Two behaviours to note.
+
+**Integer division truncates toward zero.** `17 / 5` is 3, not 3.4, and `-17 / 5` is -3, not -4. To get a fractional result, convert first:
+
+```go
+fmt.Println(float64(a) / float64(b))    // 3.4
+```
+
+**Modulo takes the sign of the dividend.** `-7 % 3` is -1 in Go, where some languages give 2. If you need a always-positive result:
+
+```go
+func mod(a, b int) int {
+    return ((a % b) + b) % b
+}
+```
+
+**Integer division by zero panics.** Float division by zero gives infinity. Guard integer divisors when the value comes from outside your code:
+
+```go
+if divisor == 0 {
+    return 0, errors.New("division by zero")
+}
+```
+
+`%` works only on integers. For floating point remainder use `math.Mod`.
+
+## Comparison
+
+```go
+==   !=   <   <=   >   >=
+```
+
+All six return a `bool`, and none of them do any implicit conversion. Comparing an `int` with an `int64` is a compile error until you convert one of them.
+
+What can be compared with `==` is worth knowing precisely:
+
+| Type | Comparable with `==`? |
+| --- | --- |
+| numbers, strings, booleans | yes |
+| pointers | yes, compares addresses |
+| channels | yes |
+| interfaces | yes, compares dynamic type and value |
+| structs | yes, if every field is comparable |
+| arrays | yes, if the element type is comparable |
+| **slices** | **no**, only against `nil` |
+| **maps** | **no**, only against `nil` |
+| **functions** | **no**, only against `nil` |
+
+Struct comparison is a small gift:
+
+```go
+type Point struct{ X, Y int }
+
+fmt.Println(Point{1, 2} == Point{1, 2})    // true
+```
+
+Field by field, no method needed. But add a slice field and the whole struct stops being comparable:
+
+```go
+type Config struct {
+    Name string
+    Tags []string        // now Config cannot use ==
+}
+```
+
+For those, `reflect.DeepEqual` works, or in Go 1.21 and later `slices.Equal` and `maps.Equal` for the individual fields. In tests, `google/go-cmp` is the usual choice.
+
+## Logical
+
+```go
+&&   ||   !
+```
+
+Both `&&` and `||` short circuit, evaluating the right operand only when the result is still undecided. This is what makes nil checks safe:
+
+```go
+if user != nil && user.IsActive {
+    // user.IsActive is never evaluated when user is nil
+}
+
+if cached != "" || fetchFromDB() != "" {
+    // fetchFromDB is never called when cached has a value
+}
+```
+
+Both operands must already be `bool`. There is no truthiness, so `if count && ready` does not compile when `count` is a number.
+
+## Bitwise, and the one Go invented
+
+```go
+a, b := 12, 10     // 1100 and 1010 in binary
+
+fmt.Println(a & b)     // 8   1000  AND
+fmt.Println(a | b)     // 14  1110  OR
+fmt.Println(a ^ b)     // 6   0110  XOR
+fmt.Println(a &^ b)    // 4   0100  AND NOT
+fmt.Println(a << 2)    // 48        left shift
+fmt.Println(a >> 2)    // 3         right shift
+```
+
+`&^` is Go's own contribution, called AND NOT or bit clear. `a &^ b` clears every bit in `a` that is set in `b`. Other languages spell it `a & ~b`, and Go gives it a single operator because clearing flags is common enough to deserve one.
+
+```go
+const (
+    Read = 1 << iota
+    Write
+    Execute
+)
+
+perms := Read | Write | Execute   // 111
+perms = perms &^ Write            // 101, Write removed
+```
+
+Shifts are also a fast way to multiply or divide by powers of two, though the compiler already does that optimisation, so write the shift only when you actually mean bits.
+
+## Assignment operators
+
+Every binary operator has a compound form:
+
+```go
+x := 10
+
+x += 5      // 15
+x -= 3      // 12
+x *= 2      // 24
+x /= 4      // 6
+x %= 4      // 2
+x <<= 3     // 16
+x |= 1      // 17
+x &^= 1     // 16
+```
+
+`+=` also works on strings, though in a loop `strings.Builder` is the better choice.
+
+## Precedence
+
+Go has five levels of binary operator precedence, which is fewer than most languages and easier to hold in your head:
+
+```text
+   5    *   /   %   <<   >>   &   &^
+   4    +   -   |   ^
+   3    ==  !=  <   <=   >    >=
+   2    &&
+   1    ||
+```
+
+Unary operators bind tightest of all. Everything at the same level associates left to right.
+
+The one that catches people is that `&` and `|` sit at the arithmetic levels, well above the comparisons:
+
+```go
+if flags & Read != 0 {      // parses as flags & (Read != 0), a type error
+```
+
+Go's parser will reject that with a confusing message. Parenthesise bitwise tests:
+
+```go
+if flags&Read != 0 {        // gofmt writes it tightly, and it means (flags&Read) != 0
 ```
 
 <Callout type="info">
-This restriction is deliberate. In some languages, an expression like `a = b++ + ++b` is legal and genuinely baffling to read. Go makes `i++` a plain standalone statement so that code stays honest and readable.
+`gofmt` uses spacing to signal precedence. It writes `a*b + c` rather than `a * b + c`, tightening the higher precedence operation. Once you notice this, the formatter is quietly documenting the parse for you on every line.
 </Callout>
 
-Down at the bit level, Go also has `&`, `|`, `^`, `<<`, and `>>` for bitwise work - you saw `<<` doubling byte sizes in the iota lesson. You will not need them often as a beginner, but they are there when flags or performance-sensitive code call for them.
+## Pointer and channel operators
+
+Two more that are technically operators, both covered properly in later sections:
+
+```go
+p := &value        // address of
+v := *p            // dereference
+
+ch <- 42           // send to a channel
+x := <-ch          // receive from a channel
+```
+
+## A worked example
+
+Everything on this page, doing something small and real:
+
+```go
+func classify(score int) string {
+    switch {
+    case score >= 90 && score <= 100:
+        return "excellent"
+    case score >= 75:
+        return "good"
+    case score >= 50:
+        return "pass"
+    case score >= 0:
+        return "fail"
+    default:
+        return "invalid"
+    }
+}
+
+func isEven(n int) bool {
+    return n&1 == 0        // faster than n%2 == 0, and clearer about intent
+}
+
+func average(values []int) float64 {
+    if len(values) == 0 {
+        return 0
+    }
+    total := 0
+    for _, v := range values {
+        total += v
+    }
+    return float64(total) / float64(len(values))
+}
+```
+
+That last function shows the conversion habit in its natural home. Dividing two integers would truncate, so both operands are converted before the division, not after.
+
+Next, let's finish this section with `fmt`, the package that turns all these values back into text you can read.

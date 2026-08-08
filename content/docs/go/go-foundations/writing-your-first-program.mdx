@@ -1,0 +1,232 @@
+---
+title: Writing Your First Program
+---
+
+Every Go program you will ever write has the same skeleton as the one below. Nine lines, and once you understand each of them properly there is nothing structural left to learn about Go files. So rather than typing it and moving on, we are going to take it apart line by line and then deliberately break it four different ways.
+
+## Create the project
+
+Go wants your code to live inside a module, so start there.
+
+```bash
+mkdir hello
+cd hello
+go mod init example.com/hello
+```
+
+That last command creates a file called `go.mod` containing two lines. It marks this folder as the root of a module, and everything below it belongs to that module. The next page in this section explains modules properly, so for now treat it as the thing that makes Go stop complaining.
+
+Now create `main.go`:
+
+```go title="main.go"
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello, Go")
+}
+```
+
+Run it:
+
+```bash
+go run .
+```
+
+```text
+Hello, Go
+```
+
+## Line by line
+
+### `package main`
+
+Every Go file starts by declaring which package it belongs to. Packages are how Go groups code, and a folder maps to exactly one package.
+
+The name `main` is special. It tells the compiler this package should be built into an executable program rather than a library. Any other name, such as `package storage` or `package auth`, produces a package that other code can import but that cannot be run on its own.
+
+```text
+   package main      →  go build gives you a runnable binary
+   package anything  →  go build gives you a reusable library
+```
+
+### `import "fmt"`
+
+`fmt` is short for format, and it is the standard library package for printing and formatting text. Importing it makes its exported names available under the `fmt` prefix.
+
+When you need more than one package, group them in parentheses. This is the form you will see in real code, and `gofmt` will sort them alphabetically for you:
+
+```go
+import (
+    "fmt"
+    "os"
+    "strings"
+)
+```
+
+### `func main()`
+
+`func` declares a function. The function named `main`, inside the package named `main`, is where execution begins. It takes no parameters and returns nothing, and those are not choices you get to make. This exact signature is required.
+
+When `main` returns, the program exits.
+
+### `fmt.Println("Hello, Go")`
+
+A call to the `Println` function from the `fmt` package. It prints its arguments and adds a newline.
+
+Notice the capital `P`. In Go, a name that starts with a capital letter is exported, meaning it can be used from outside its own package. A lowercase name is private to its package. There is no `public` or `private` keyword because capitalisation carries that information.
+
+```go
+fmt.Println("visible")   // exported, you can call it
+fmt.println("nope")      // unexported, compile error
+```
+
+This rule applies everywhere in Go, to functions, types, struct fields, constants, and variables. It is one of the most useful things to internalise early.
+
+## Break it on purpose
+
+Reading rules teaches you less than watching the compiler enforce them. Try each of these, read the error, then undo it.
+
+<Steps>
+<Step>
+### Import something and do not use it
+
+```go
+import (
+    "fmt"
+    "os"
+)
+```
+
+```text
+./main.go:5:5: "os" imported and not used
+```
+
+Most languages warn about unused imports. Go refuses to compile. This feels harsh for about a week, and then you notice you have never once seen a Go file with a stale import in it.
+</Step>
+<Step>
+### Declare a variable and ignore it
+
+```go
+func main() {
+    message := "Hello, Go"
+    fmt.Println("something else")
+}
+```
+
+```text
+./main.go:6:5: declared and not used: message
+```
+
+Same principle. An unused local variable is usually a bug or a leftover, so Go treats it as an error rather than a suggestion.
+</Step>
+<Step>
+### Move the opening brace to its own line
+
+```go
+func main()
+{
+    fmt.Println("Hello, Go")
+}
+```
+
+```text
+./main.go:5:1: syntax error: unexpected semicolon or newline before {
+```
+
+Go's lexer inserts semicolons at the end of lines automatically. Putting the brace on the next line means a semicolon lands after `main()`, which ends the declaration before the body arrives. This is why Go has exactly one brace style, and why nobody argues about it.
+</Step>
+<Step>
+### Rename `main` to something else
+
+```go
+func start() {
+    fmt.Println("Hello, Go")
+}
+```
+
+```text
+runtime.main_main·f: function main is undeclared in the main package
+```
+
+The entry point is fixed by name. There is no configuration file, no manifest, and no annotation that points at a different one.
+</Step>
+</Steps>
+
+## Printing, three ways
+
+`fmt` gives you three printing functions you will use constantly, and the difference between them is worth learning now rather than guessing at later.
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    name := "Telusko"
+    count := 3
+
+    fmt.Print("no newline at the end")
+    fmt.Println("adds a newline for you")
+    fmt.Printf("%s has %d courses\n", name, count)
+}
+```
+
+```text
+no newline at the endadds a newline for you
+Telusko has 3 courses
+```
+
+`Printf` uses verbs to say how each value should be rendered. These five cover nearly everything early on:
+
+| Verb | Prints | Example output |
+| --- | --- | --- |
+| `%s` | a string | `Telusko` |
+| `%d` | an integer in base ten | `42` |
+| `%f` | a floating point number | `19.990000` |
+| `%t` | a boolean | `true` |
+| `%v` | any value in its default format | works for all of the above |
+
+<Callout type="info">
+When you do not know or do not care which verb applies, `%v` is the safe answer. There is also `%+v`, which prints struct field names alongside their values, and it is the single most useful debugging tool in the language. You will meet it in the section on structs.
+</Callout>
+
+## A slightly bigger first program
+
+Printing a fixed string is not much of a program. This version reads a command line argument, which makes it something you could actually run twice with different results.
+
+```go title="main.go"
+package main
+
+import (
+    "fmt"
+    "os"
+)
+
+func main() {
+    if len(os.Args) < 2 {
+        fmt.Println("usage: hello <name>")
+        os.Exit(1)
+    }
+
+    name := os.Args[1]
+    fmt.Printf("Hello, %s. Welcome to Go.\n", name)
+}
+```
+
+```bash
+go run . Shiva
+```
+
+```text
+Hello, Shiva. Welcome to Go.
+```
+
+`os.Args` is a slice of strings holding the command line arguments, where position zero is the program's own path and the real arguments start at position one. `os.Exit(1)` ends the program immediately with a non zero status, which is how a command line tool signals failure to whatever launched it.
+
+<Callout type="warn">
+`os.Exit` stops the program on the spot. Any pending `defer` calls are skipped, and buffered output may never be flushed. It is the right tool for a usage error at the top of `main`, and the wrong tool almost everywhere else.
+</Callout>
+
+You now have a program that compiles, runs, takes input, and fails cleanly. Next, let's look at what `go run` was actually doing, and how it differs from `go build` and `go install`.
