@@ -1,0 +1,10 @@
+{
+    "title": "GitHub & Remote Repositories",
+    "pages": [
+        "getting-started-with-github.mdx",
+        "working-with-remote-repos.mdx",
+        "cloning-repos-and-gitignore.mdx",
+        "synchronizing-repositories.mdx",
+        "git-tag-and-github-release.mdx"
+    ]
+}

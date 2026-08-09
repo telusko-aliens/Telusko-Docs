@@ -3,6 +3,7 @@
     "pages":[
         "getting-started.mdx",
         "introduction.mdx",
-        "git-fundamentals"
+        "git-fundamentals",
+        "github-and-remote-repos"
     ]
 } 

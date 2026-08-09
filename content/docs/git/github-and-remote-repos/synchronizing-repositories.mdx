@@ -1,0 +1,299 @@
+---
+title: Synchronizing Repositories
+---
+
+<Video id="vwj89i2FmG0" start={4271}/>
+
+---
+
+
+Once a local repository is connected to a remote repository, developers need a way to **keep both repositories synchronized**.
+
+Synchronization happens in two directions:
+
+```text
+              Remote Repository
+               (GitHub)
+                  ↕
+        ┌─────────┴─────────┐
+        │                   │
+     Download             Upload
+   fetch / pull            push
+        │                   │
+        ▼                   ▼
+           Local Repository
+```
+
+The three commands you'll use most often are:
+
+* `git fetch` - download remote changes without integrating them
+* `git pull` - download and integrate remote changes
+* `git push` - upload your local commits
+
+
+## `git fetch` - Download Without Integrating
+
+The `git fetch` command downloads the latest information from the remote repository **without changing your current working files or branch**.
+
+```bash
+git fetch origin
+```
+
+Think of it as:
+
+> "GitHub has new changes. Download the information so I can inspect them first."
+
+```text
+GitHub
+   │
+   │ git fetch
+   ▼
+Local Repository
+```
+
+Your working directory remains unchanged.
+
+This makes `git fetch` useful when you want to **inspect remote changes before deciding whether to integrate them**.
+
+**Example**
+
+Suppose another developer pushed three commits to GitHub.
+
+You can run:
+
+```bash
+git fetch origin
+```
+
+Git downloads those commits, allowing you to examine the updated remote history before merging or rebasing them into your current branch.
+
+
+---
+
+
+## `git pull` - Download and Integrate
+
+If you want to download remote changes and integrate them into your current branch in one step, use:
+
+```bash
+git pull origin main
+```
+
+Conceptually, a typical `git pull` is:
+
+```text
+git pull
+   │
+   ├── git fetch
+   │
+   └── integrate changes
+```
+
+By default, the integration step is typically a **merge**, although Git can also be configured to use **rebase**.
+
+### When to use `git pull`
+
+Use it when:
+
+* You want the latest remote changes immediately.
+* You are ready to integrate those changes into your current branch.
+* You don't need to inspect the remote updates separately first.
+
+
+---
+
+![Git_Fetch_Pull](https://dyz1pdcuffwr5.cloudfront.net/Git/git_fetch_pull.png)
+
+---
+
+## `git push` - Upload Local Commits
+
+While `fetch` and `pull` bring changes **from the remote**, `push` sends your local commits **to the remote**.
+
+```bash
+git push
+```
+
+Or explicitly:
+
+```bash
+git push origin main
+```
+
+```text
+Local Repository
+       │
+       │ git push
+       ▼
+GitHub
+```
+
+Remember that `git push` sends **commits**, not uncommitted changes.
+
+You normally need to:
+
+```text
+Edit → Stage → Commit → Push
+```
+
+Only after a change has been committed can it be pushed to the remote repository.
+
+
+---
+
+
+## Synchronization in a Team
+
+Consider a team where two developers work on the same project.
+
+```text
+                 GitHub
+                /      \
+               /        \
+        Developer A   Developer B
+```
+
+Developer A pushes new changes:
+
+```bash
+git push
+```
+
+Developer B can then retrieve those changes:
+
+```bash
+git fetch
+```
+
+and inspect them before integrating, or use:
+
+```bash
+git pull
+```
+
+to retrieve and integrate them directly.
+
+This cycle allows developers to keep their local repositories synchronized with the shared remote repository.
+
+
+---
+
+
+## Working with Multiple Remotes
+
+A repository is not limited to one remote.
+
+You can connect multiple remote repositories when your workflow requires it.
+
+A common example is contributing to an open-source project.
+
+```text
+Your GitHub Fork
+     origin
+        │
+        │
+     Local Repository
+        │
+        │
+     upstream
+        │
+Original GitHub Repository
+```
+
+Here:
+
+* `origin` → your fork
+* `upstream` → the original project
+
+This allows you to download updates from the original project while pushing your own work to your fork.
+
+
+---
+
+
+## Adding Another Remote
+
+Use:
+
+```bash
+git remote add upstream git@github.com:original-owner/project.git
+```
+
+Now the repository has two remotes:
+
+```bash
+git remote -v
+```
+
+Example:
+
+```text
+origin    git@github.com:your-name/project.git (fetch)
+origin    git@github.com:your-name/project.git (push)
+
+upstream  git@github.com:original-owner/project.git (fetch)
+upstream  git@github.com:original-owner/project.git (push)
+```
+
+You can work with each remote independently.
+
+For example:
+
+```bash
+git fetch upstream
+```
+
+downloads changes from the original project.
+
+
+---
+
+
+## Renaming a Remote
+
+If you want to change the name of an existing remote:
+
+```bash
+git remote rename origin new-name
+```
+
+For example:
+
+```bash
+git remote rename origin github
+```
+
+The remote URL remains the same; only its local alias changes.
+
+
+---
+
+
+## Common Commands
+
+| Command                           | Purpose                                                 |
+| --------------------------------- | ------------------------------------------------------- |
+| `git remote -v`                   | View configured remote URLs                             |
+| `git fetch origin`                | Download updates from `origin` without integrating them |
+| `git pull origin main`            | Fetch and integrate changes from `main`                 |
+| `git push origin main`            | Push local `main` commits to the remote                 |
+| `git push`                        | Push to the configured upstream branch                  |
+| `git remote add upstream <URL>`   | Add another remote                                      |
+| `git remote rename origin <name>` | Rename an existing remote                               |
+
+
+---
+
+
+## Summary
+
+* `origin` is the conventional name for the primary remote.
+* `git remote -v` shows the configured fetch and push URLs.
+* **Fetch** downloads remote information without integrating it.
+* **Pull** downloads and integrates remote changes.
+* **Push** uploads your local commits to the remote repository.
+* A repository can have multiple remotes, such as `origin` and `upstream`.
+* `fetch` is useful when you want to inspect remote changes before integrating them.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>
