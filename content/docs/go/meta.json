@@ -7,7 +7,7 @@
         "introduction.mdx",
         "go-foundations",
         "variables-and-data-types",
-        "disabled-control-flow",
+        "control-flow",
         "disabled-functions",
         "disabled-arrays-slices-and-maps",
         "disabled-structs-pointers-and-methods",

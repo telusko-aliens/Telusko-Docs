@@ -1,0 +1,250 @@
+---
+title: If and Else
+---
+
+There is one statement you will write more than any other in Go:
+
+```go
+if err != nil {
+    return err
+}
+```
+
+Everything about how Go's `if` works is visible in those three lines. No parentheses around the condition, braces required even for a single statement, and a comparison that produces a real boolean rather than something Go decides is truthy. Learn the shape from that one block and the rest of this page is refinement.
+
+## The basics, and what is missing
+
+```go
+score := 85
+
+if score >= 90 {
+    fmt.Println("excellent")
+} else if score >= 75 {
+    fmt.Println("good")
+} else {
+    fmt.Println("keep going")
+}
+```
+
+Three rules that the compiler enforces rather than suggests:
+
+**No parentheses.** `if (score >= 90)` compiles, because the parentheses are just grouping, but `gofmt` will strip them and every Go programmer will find them odd.
+
+**Braces are mandatory.** There is no single statement form:
+
+```go
+if score > 90
+    fmt.Println("nice")     // syntax error
+```
+
+This closes off a whole family of bugs, including the one where someone adds a second line to an unbraced branch and it silently runs unconditionally.
+
+**`else` must share a line with the closing brace.** This is not style, it is required by semicolon insertion:
+
+```go
+if x {
+    // ...
+}
+else {           // syntax error
+    // ...
+}
+```
+
+## The initialiser, which you should use constantly
+
+An `if` can declare variables before it tests anything. They live only inside the `if` and its `else` branches.
+
+```go
+if value, err := strconv.Atoi(input); err == nil {
+    fmt.Println("parsed:", value)
+} else {
+    fmt.Println("bad input:", err)
+}
+
+// value and err do not exist here
+```
+
+This is not a shortcut, it is a scoping tool. Without it, `value` and `err` leak into the surrounding function and stay visible long after they stop being meaningful. With it, their lifetime matches their usefulness.
+
+The pattern shows up everywhere in real Go:
+
+```go
+if user, ok := cache[id]; ok {
+    return user
+}
+
+if fi, err := os.Stat(path); err == nil && fi.IsDir() {
+    return errors.New("expected a file, got a directory")
+}
+
+if n := len(items); n > maxBatch {
+    return fmt.Errorf("batch of %d exceeds limit %d", n, maxBatch)
+}
+```
+
+<Callout type="info">
+Restricting a variable to the smallest scope that needs it is one of Go's quiet themes. The `if` initialiser, the short `for` declaration, and the `switch` initialiser all exist for the same reason: a variable that cannot be seen cannot be misused.
+</Callout>
+
+## No truthiness, and why that helps
+
+Only a `bool` can be a condition. There is no implicit conversion from anything else.
+
+```go
+count := 0
+if count { }           // compile error
+
+name := ""
+if name { }            // compile error
+
+var p *User
+if p { }               // compile error
+```
+
+Each of these needs an explicit comparison:
+
+```go
+if count != 0 { }
+if name != "" { }
+if p != nil { }
+```
+
+The verbosity buys you something concrete. In a language with truthiness, `if items` and `if len(items)` and `if items != nil` can all mean subtly different things, and a nil slice, an empty slice, and a slice containing a zero are easy to confuse. In Go the condition says exactly which question you are asking.
+
+## Guard clauses and the happy path
+
+This is the single most important style habit in Go, and it is what makes idiomatic Go readable despite all the error checking.
+
+Handle the failures first, return early, and let the successful path stay unindented.
+
+```go
+// Nested, and the real work drifts rightward
+func process(id string) error {
+    user, err := findUser(id)
+    if err == nil {
+        if user.IsActive {
+            if user.HasCredit() {
+                return charge(user)
+            } else {
+                return errors.New("insufficient credit")
+            }
+        } else {
+            return errors.New("user is inactive")
+        }
+    } else {
+        return err
+    }
+}
+```
+
+```go
+// Flat, and the successful path is the last line
+func process(id string) error {
+    user, err := findUser(id)
+    if err != nil {
+        return err
+    }
+    if !user.IsActive {
+        return errors.New("user is inactive")
+    }
+    if !user.HasCredit() {
+        return errors.New("insufficient credit")
+    }
+
+    return charge(user)
+}
+```
+
+Both versions do the same thing. The second one can be read top to bottom as a list of conditions that must hold, followed by what happens when they do. Every Go codebase you will encounter is written this way.
+
+<Quote>
+The happy path should be aligned to the left. Errors and edge cases indent, the main flow does not.
+</Quote>
+
+## What Go's if does not have
+
+**No ternary.** Covered in the operators page, but worth repeating here since this is where you would reach for it:
+
+```go
+status := active ? "on" : "off"      // does not exist
+```
+
+```go
+status := "off"
+if active {
+    status = "on"
+}
+```
+
+**No `else if` chain optimisation.** A long chain of `else if` is a signal to reach for `switch`, which the next page covers.
+
+**No pattern matching.** Go has a type switch for interfaces, but nothing like destructuring on shape.
+
+## Comparing structs and interfaces
+
+`==` works on structs whose fields are all comparable, which is occasionally very handy in a condition:
+
+```go
+type Point struct{ X, Y int }
+
+if p == (Point{0, 0}) {
+    fmt.Println("at origin")
+}
+```
+
+Those parentheses around the composite literal are required, otherwise the parser reads the opening brace as the start of the `if` body. This is a small, specific irritation that everyone meets once.
+
+Interface comparison has a genuinely subtle case that is worth knowing before it bites you:
+
+```go
+type MyError struct{}
+func (e *MyError) Error() string { return "boom" }
+
+func doWork() error {
+    var e *MyError = nil
+    return e             // returns a non-nil interface holding a nil pointer
+}
+
+if err := doWork(); err != nil {
+    fmt.Println("this prints, even though the pointer was nil")
+}
+```
+
+An interface value holds a type and a value. Here the type is `*MyError` and the value is nil, so the interface itself is not nil. The fix is to return a literal `nil` rather than a typed nil variable:
+
+```go
+func doWork() error {
+    return nil           // untyped nil, the interface really is nil
+}
+```
+
+<Callout type="warn">
+This is the most notorious gotcha in Go. It appears when a function declares `var err *SomeError` at the top and returns it at the end. Return `nil` explicitly on the success path, and never declare a concrete error pointer that you intend to return as an `error` interface.
+</Callout>
+
+## A realistic example
+
+Validation is where `if` earns its keep, and this shape appears in every Go service:
+
+```go
+func validateSignup(email, password string, age int) error {
+    if email == "" {
+        return errors.New("email is required")
+    }
+    if !strings.Contains(email, "@") {
+        return fmt.Errorf("invalid email format: %q", email)
+    }
+    if len(password) < 8 {
+        return fmt.Errorf("password must be at least 8 characters, got %d", len(password))
+    }
+    if age < 13 {
+        return errors.New("must be 13 or older")
+    }
+
+    return nil
+}
+```
+
+Each condition is one line, each failure returns immediately, and the successful case is a single `return nil` at the bottom. There is nothing clever here, and that is the point.
+
+Next, let's look at what happens when the chain of `else if` gets long enough that Go offers you something better.

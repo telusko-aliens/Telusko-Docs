@@ -1,0 +1,243 @@
+---
+title: Switch Statements
+---
+
+Most languages treat `switch` as a slightly awkward optimisation over `if else`, hedged with break statements and fallthrough bugs. Go rebuilt it. Go's `switch` compares any comparable type, needs no `break`, matches several values per case, works with no expression at all, and doubles as the tool for inspecting interface types.
+
+The result is a statement you will reach for far more often than you did in Java or C.
+
+## The three things Go changed
+
+```go
+switch day {
+case "saturday", "sunday":
+    fmt.Println("weekend")
+case "friday":
+    fmt.Println("almost there")
+default:
+    fmt.Println("weekday")
+}
+```
+
+**No `break` needed.** Each case ends by itself. Forgetting a `break` is not a class of bug that exists in Go.
+
+**Any type, not just integers.** Strings, floats, booleans, structs, anything comparable with `==`.
+
+**Multiple values in one case.** Comma separated, no stacked empty cases.
+
+Add the initialiser, which works exactly as it does in `if`:
+
+```go
+switch level := getLogLevel(); level {
+case "debug", "trace":
+    enableVerbose()
+case "error", "fatal":
+    enableQuiet()
+}
+```
+
+## Switch with no expression
+
+Leave out the expression and every case becomes a boolean test. This is Go's replacement for a long `else if` chain, and it is genuinely nicer to read.
+
+```go
+switch {
+case score >= 90:
+    grade = "A"
+case score >= 80:
+    grade = "B"
+case score >= 70:
+    grade = "C"
+case score >= 60:
+    grade = "D"
+default:
+    grade = "F"
+}
+```
+
+Cases are evaluated top to bottom and the first true one wins, so ordering matters exactly as it would in an `if else` chain. Written this way the conditions line up vertically, which makes an off by one in the thresholds much easier to spot.
+
+The conditions do not have to be related to each other:
+
+```go
+switch {
+case req.Method != http.MethodPost:
+    http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+case req.ContentLength > maxUpload:
+    http.Error(w, "payload too large", http.StatusRequestEntityTooLarge)
+case !authorised(req):
+    http.Error(w, "forbidden", http.StatusForbidden)
+default:
+    handleUpload(w, req)
+}
+```
+
+<Callout type="info">
+An expressionless `switch` is exactly equivalent to `switch true`. Knowing that makes the syntax feel less like a special case and more like a natural consequence of the design.
+</Callout>
+
+## fallthrough, when you actually want it
+
+If you need the next case's body to run as well, say so:
+
+```go
+switch tier {
+case "platinum":
+    fmt.Println("dedicated support")
+    fallthrough
+case "gold":
+    fmt.Println("priority queue")
+    fallthrough
+case "silver":
+    fmt.Println("email support")
+default:
+    fmt.Println("community forum")
+}
+```
+
+For `tier` of `"gold"` that prints the priority queue line and the email support line.
+
+Two rules to remember. `fallthrough` must be the last statement in the case, and it transfers control unconditionally without evaluating the next case's condition. That second point is the reason it is rare in real code: falling into a case whose condition you have not checked is usually a mistake waiting to happen.
+
+<Callout type="warn">
+`fallthrough` appears in a tiny fraction of Go code, and when it does it is usually in a state machine or a tier system like the example above. If you find yourself reaching for it often, the logic probably wants to be a function call shared between cases instead.
+</Callout>
+
+## The type switch
+
+This is the form that has no equivalent in most languages. It inspects the concrete type inside an interface value.
+
+```go
+func describe(v any) string {
+    switch value := v.(type) {
+    case nil:
+        return "nothing at all"
+    case int:
+        return fmt.Sprintf("an int: %d", value)
+    case string:
+        return fmt.Sprintf("a string of length %d", len(value))
+    case []int:
+        return fmt.Sprintf("a slice with %d numbers", len(value))
+    case error:
+        return fmt.Sprintf("an error: %v", value)
+    case fmt.Stringer:
+        return "something that can print itself: " + value.String()
+    default:
+        return fmt.Sprintf("some other type: %T", value)
+    }
+}
+```
+
+The syntax `v.(type)` is only legal inside a `switch`. Inside each case, the declared variable takes on that specific type, so `value.String()` compiles in the `fmt.Stringer` case and `len(value)` compiles in the string case.
+
+Order matters here in a way it does not for value switches. Interface cases like `error` and `fmt.Stringer` match anything satisfying them, so put concrete types above interfaces or the general case will swallow the specific one.
+
+```go
+// This works
+case *json.SyntaxError:
+    // handle the specific error
+case error:
+    // handle everything else
+
+// This does not, the second case is unreachable in practice
+case error:
+case *json.SyntaxError:
+```
+
+If you do not need the value, omit the assignment:
+
+```go
+switch v.(type) {
+case int, int64, float64:
+    fmt.Println("some kind of number")
+case string:
+    fmt.Println("text")
+}
+```
+
+When a case lists several types, the variable would have no single type to be, so Go keeps it as the interface type. That is why the assignment form is less useful with multi-type cases.
+
+## Switching on a custom type
+
+Pair a type switch with the enum pattern from the constants page and you get something that reads almost like a specification:
+
+```go
+type PaymentMethod int
+
+const (
+    Card PaymentMethod = iota
+    UPI
+    NetBanking
+    Wallet
+)
+
+func processingFee(m PaymentMethod, amount int64) int64 {
+    switch m {
+    case Card:
+        return amount * 2 / 100
+    case UPI:
+        return 0
+    case NetBanking:
+        return 1500
+    case Wallet:
+        return amount * 1 / 100
+    default:
+        return 0
+    }
+}
+```
+
+<Callout type="warn">
+Go does not check that a `switch` covers every value of an enum type. Add a `PaymentMethod` and this function keeps compiling while quietly charging zero. Some linters, including `exhaustive` in golangci-lint, will flag the missing case. Turning that on is worth the two minutes it takes.
+</Callout>
+
+## break inside a switch
+
+`break` exits the switch, not the enclosing loop. This surprises people who use it to leave a loop from inside a case:
+
+```go
+for _, item := range items {
+    switch item.Kind {
+    case "stop":
+        break            // leaves the switch, the loop continues
+    }
+}
+```
+
+To exit the loop, label it:
+
+```go
+loop:
+for _, item := range items {
+    switch item.Kind {
+    case "stop":
+        break loop       // leaves the for loop
+    }
+}
+```
+
+Labels get their own treatment at the end of this section.
+
+An explicit `break` inside a case is otherwise redundant, though it is occasionally used to leave a case early:
+
+```go
+case "process":
+    if !ready {
+        break            // skip the rest of this case
+    }
+    doWork()
+```
+
+## Choosing between if and switch
+
+```text
+   One or two conditions                    →  if
+   Three or more branches on one value      →  switch value
+   Three or more unrelated conditions       →  switch { }
+   Branching on the type inside an interface →  switch v.(type)
+   Two outcomes from one boolean            →  if, always
+```
+
+The practical threshold is around three branches. Below that an `if else` reads fine, above it the switch form lines up the cases and makes the shape of the decision visible at a glance.
+
+Next, let's look at Go's loop, singular, and the four different jobs it does.

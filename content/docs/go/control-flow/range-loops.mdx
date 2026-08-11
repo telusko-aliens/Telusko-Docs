@@ -1,0 +1,301 @@
+---
+title: Range Loops
+---
+
+`range` iterates over a collection and hands you each element in turn. It works on slices, arrays, strings, maps, channels, integers, and since Go 1.23, functions you write yourself. One keyword, seven behaviours, and the differences between them are exactly what this page is about.
+
+## What range gives you, per type
+
+The two values you receive change meaning depending on what you are ranging over. This table is the thing to remember:
+
+| Ranging over | First value | Second value |
+| --- | --- | --- |
+| slice or array | index | a copy of the element |
+| string | byte index | the rune at that index |
+| map | key | value |
+| channel | the received value | nothing |
+| integer | 0 up to n-1 | nothing |
+| function (iterator) | whatever it yields | whatever it yields |
+
+That string row is the one that catches people, and it gets a section of its own below.
+
+## Slices and arrays
+
+```go
+langs := []string{"Go", "Rust", "Zig"}
+
+for i, lang := range langs {
+    fmt.Println(i, lang)
+}
+// 0 Go
+// 1 Rust
+// 2 Zig
+```
+
+Drop what you do not need:
+
+```go
+for _, lang := range langs {     // values only, by far the most common
+    fmt.Println(lang)
+}
+
+for i := range langs {           // indexes only
+    langs[i] = strings.ToUpper(langs[i])
+}
+```
+
+Notice that second form. To modify elements you must index into the slice, because the range variable is a copy.
+
+### The copy, and why it matters
+
+```go
+type Counter struct{ Hits int }
+
+counters := []Counter{{1}, {2}, {3}}
+
+for _, c := range counters {
+    c.Hits = 100                 // modifies the copy, not the slice
+}
+fmt.Println(counters)            // [{1} {2} {3}], unchanged
+
+for i := range counters {
+    counters[i].Hits = 100       // modifies the actual elements
+}
+fmt.Println(counters)            // [{100} {100} {100}]
+```
+
+This is not a quirk, it follows from Go's rule that everything is passed by value. `c` is a fresh `Counter` on every iteration. Once you internalise this, the behaviour stops being surprising and starts being predictable.
+
+<Callout type="info">
+Copying matters for performance too. Ranging over a slice of large structs copies each one. When the struct is big and the loop is hot, range over the index and access `items[i]` directly, or use a slice of pointers.
+</Callout>
+
+### The range expression is evaluated once
+
+```go
+items := []int{1, 2, 3}
+
+for i, v := range items {
+    if i == 0 {
+        items = append(items, 99)    // does not extend this loop
+    }
+    fmt.Println(v)
+}
+// 1
+// 2
+// 3
+```
+
+`range` captures the slice header before the first iteration. Appending inside the loop changes `items` but not what the loop is walking. This makes range loops predictable, and it means you cannot accidentally write an infinite loop by appending inside it.
+
+## Strings, bytes, and runes
+
+Ranging over a string is the one place where the index does not increment by one.
+
+```go
+for i, r := range "héllo" {
+    fmt.Printf("%d: %c\n", i, r)
+}
+// 0: h
+// 1: é
+// 3: l      ← jumped from 1 to 3
+// 4: l
+// 5: o
+```
+
+`range` decodes UTF-8 as it goes. `i` is the **byte** offset where each character starts, and `r` is a `rune` holding the full code point. Because `é` occupies two bytes, the index skips one.
+
+Compare that with indexing directly, which gives you raw bytes:
+
+```go
+s := "héllo"
+
+for i := 0; i < len(s); i++ {
+    fmt.Printf("%d: %v\n", i, s[i])
+}
+// 0: 104
+// 1: 195     ← half of é
+// 2: 169     ← the other half
+// 3: 108
+```
+
+The rule that follows: **range over a string when you want characters, index into it when you want bytes.** Ranging is correct for text in any language. Indexing is correct for protocol parsing and ASCII, and wrong for anything else.
+
+```go
+// Correct character count
+count := 0
+for range text {
+    count++
+}
+// or simply
+count = utf8.RuneCountInString(text)
+```
+
+## Maps
+
+```go
+scores := map[string]int{
+    "shiva": 92,
+    "navin": 88,
+    "hyder": 95,
+}
+
+for name, score := range scores {
+    fmt.Printf("%s: %d\n", name, score)
+}
+```
+
+Keys only, which is common when you need the set of keys:
+
+```go
+for name := range scores {
+    fmt.Println(name)
+}
+```
+
+### Map order is deliberately random
+
+Run that first loop three times and you will get three different orderings. This is not an implementation detail that might change, it is a guarantee: Go randomises map iteration order on purpose, so nobody can write code that accidentally depends on it.
+
+When you need a stable order, sort the keys:
+
+```go
+import "sort"
+
+names := make([]string, 0, len(scores))
+for name := range scores {
+    names = append(names, name)
+}
+sort.Strings(names)
+
+for _, name := range names {
+    fmt.Printf("%s: %d\n", name, scores[name])
+}
+```
+
+Go 1.21 and later shortens the first half of that:
+
+```go
+import "maps"
+import "slices"
+
+names := slices.Sorted(maps.Keys(scores))
+```
+
+<Callout type="warn">
+Modifying a map while ranging over it is allowed but the results are only partly defined. Entries you delete will not be visited if they have not been reached yet. Entries you add may or may not appear. If you need to delete based on a condition, collect the keys first and delete in a second pass.
+</Callout>
+
+## Channels
+
+Ranging over a channel receives values until the channel is closed:
+
+```go
+results := make(chan int)
+
+go func() {
+    for i := 0; i < 5; i++ {
+        results <- i * i
+    }
+    close(results)          // without this, the range blocks forever
+}()
+
+for r := range results {
+    fmt.Println(r)
+}
+```
+
+There is only one value per iteration, because a channel receive yields one thing. The loop ends when the channel is closed and drained. Forgetting to close is the classic cause of a deadlock here, and the concurrency section returns to it in detail.
+
+## The loop variable change in Go 1.22
+
+This deserves its own section because it silently changed the meaning of code that used to be a classic bug.
+
+**Before Go 1.22**, the range variables were created once and reused across iterations. Capturing one in a goroutine or closure captured the same variable every time:
+
+```go
+for _, v := range []int{1, 2, 3} {
+    go func() {
+        fmt.Println(v)      // old Go: often prints 3 3 3
+    }()
+}
+```
+
+**From Go 1.22 onward**, each iteration gets a fresh variable, and this prints 1, 2, and 3 in some order.
+
+The behaviour is selected by the `go` directive in your `go.mod`. A module declaring `go 1.22` or later gets the new semantics.
+
+<Callout type="info">
+If you read older Go tutorials or Stack Overflow answers, you will see the workaround `v := v` at the top of loop bodies. On modern Go it is unnecessary. It does no harm, so you do not need to hunt it down in existing code, but do not write new copies of it.
+</Callout>
+
+## Ranging over integers and functions
+
+Two newer forms round out the list.
+
+```go
+for i := range 5 {          // Go 1.22, counts 0 to 4
+    fmt.Println(i)
+}
+```
+
+```go
+// Go 1.23, range over a function
+func evens(limit int) func(func(int) bool) {
+    return func(yield func(int) bool) {
+        for i := 0; i < limit; i += 2 {
+            if !yield(i) {
+                return
+            }
+        }
+    }
+}
+
+for n := range evens(10) {
+    fmt.Println(n)          // 0 2 4 6 8
+}
+```
+
+Range over function turns any producer into something a `for range` can consume, which is how the standard library now exposes iteration over maps, slices, and trees without allocating an intermediate slice. You will meet it mostly through `maps.Keys`, `slices.Values`, and similar helpers rather than writing your own, at least at first.
+
+## Patterns you will use constantly
+
+```go
+// Filter
+var active []User
+for _, u := range users {
+    if u.IsActive {
+        active = append(active, u)
+    }
+}
+
+// Transform
+names := make([]string, 0, len(users))
+for _, u := range users {
+    names = append(names, u.Name)
+}
+
+// Group
+byRole := make(map[string][]User)
+for _, u := range users {
+    byRole[u.Role] = append(byRole[u.Role], u)
+}
+
+// Aggregate
+var total int64
+for _, o := range orders {
+    total += o.Amount
+}
+
+// Find first match
+for _, u := range users {
+    if u.Email == target {
+        return u, true
+    }
+}
+return User{}, false
+```
+
+That grouping example is worth pausing on. Appending to `byRole[u.Role]` works even when the key is absent, because reading a missing key gives you a nil slice and `append` handles nil slices happily. Two of Go's zero value rules combining to remove a check you would have written in most other languages.
+
+Next, let's look at how to get out of these loops early, including the nested ones.
