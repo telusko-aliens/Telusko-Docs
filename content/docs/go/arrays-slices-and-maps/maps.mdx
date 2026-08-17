@@ -1,0 +1,325 @@
+---
+title: Maps
+---
+
+A map is Go's hash table: unordered key to value storage with roughly constant time lookup. The syntax is small and you will pick it up in five minutes. The parts worth real attention are the four rules that catch people out, so this page leads with those and fills in the basics around them.
+
+## The four rules
+
+1. **You must `make` a map before writing to it.** Reading from a nil map is fine, writing panics.
+2. **Reading a missing key returns the zero value, not an error.** Use the comma ok form to tell absent from zero.
+3. **Iteration order is randomised on purpose.** Never depend on it.
+4. **Map values are not addressable.** You cannot take a pointer to one or modify a struct field in place.
+
+Everything below expands on those.
+
+## Creating and using
+
+```go
+// Empty map, ready to use
+scores := make(map[string]int)
+
+// With a size hint, avoids rehashing as it fills
+scores := make(map[string]int, 100)
+
+// Literal
+scores := map[string]int{
+    "shiva": 92,
+    "navin": 88,
+}
+
+// Nil map, reads work, writes panic
+var scores map[string]int
+```
+
+```go
+scores["hyder"] = 95        // insert or update
+value := scores["shiva"]    // read
+delete(scores, "navin")     // remove, safe even if absent
+count := len(scores)        // number of entries
+```
+
+`delete` on a key that is not there does nothing and does not complain, which saves a check.
+
+<Callout type="warn">
+The nil map write is the single most common map panic:
+
+```go
+var m map[string]int
+m["key"] = 1        // panic: assignment to entry in nil map
+```
+
+It bites hardest when a map is a struct field that nobody initialised. Either construct the struct through a function that makes the map, or check for nil before writing.
+</Callout>
+
+## Comma ok, and why it exists
+
+```go
+scores := map[string]int{"navin": 0}
+
+fmt.Println(scores["navin"])      // 0
+fmt.Println(scores["missing"])    // 0, indistinguishable
+```
+
+The second form separates them:
+
+```go
+v, ok := scores["navin"]      // 0, true
+v, ok := scores["missing"]    // 0, false
+
+if _, exists := scores["shiva"]; exists {
+    fmt.Println("shiva has a score")
+}
+```
+
+For a `map[string]bool` used as a set, the plain read is enough, because a missing key gives `false` which is exactly what you want:
+
+```go
+allowed := map[string]bool{"admin": true, "editor": true}
+
+if allowed[role] {           // false for unknown roles, no check needed
+    proceed()
+}
+```
+
+## Which types can be keys
+
+A key type must be comparable with `==`.
+
+| Usable as a key | Not usable |
+| --- | --- |
+| all numeric types | slices |
+| `string` | maps |
+| `bool` | functions |
+| pointers | structs containing any of the above |
+| channels | |
+| arrays of comparable types | |
+| structs whose fields are all comparable | |
+| interfaces holding comparable values | |
+
+Struct keys are genuinely useful for composite lookups:
+
+```go
+type CacheKey struct {
+    UserID   int
+    Resource string
+}
+
+cache := map[CacheKey][]byte{}
+cache[CacheKey{42, "profile"}] = data
+```
+
+Two structs with equal fields are the same key, since struct equality is field by field. No hash function to write.
+
+<Callout type="warn">
+An interface key can panic at runtime. `map[any]int` compiles, but storing a slice in it panics with "hash of unhashable type". If a map key is an interface, be sure the concrete values are always comparable.
+</Callout>
+
+## Maps are reference-like
+
+Assigning a map copies a pointer to the same underlying table, not the contents:
+
+```go
+a := map[string]int{"x": 1}
+b := a
+
+b["x"] = 99
+fmt.Println(a["x"])     // 99
+```
+
+The same is true for function parameters, and unlike slices there is no capacity subtlety. A function that receives a map can add, update, and delete entries and the caller sees all of it:
+
+```go
+func addDefaults(cfg map[string]string) {
+    if _, ok := cfg["timeout"]; !ok {
+        cfg["timeout"] = "30s"
+    }
+}
+```
+
+No pointer needed, no return value. This makes maps convenient and also means you should be deliberate about handing one to code that might mutate it. To pass a snapshot, clone it:
+
+```go
+snapshot := maps.Clone(cfg)     // Go 1.21
+```
+
+## Not addressable
+
+```go
+type User struct {
+    Name string
+    Age  int
+}
+
+users := map[string]User{"u1": {"Shiva", 28}}
+
+users["u1"].Age = 29     // compile error: cannot assign to struct field
+p := &users["u1"]        // compile error: cannot take address
+```
+
+The reason is that a map may relocate its values internally when it grows, so a pointer into it could become stale. Go removes the possibility rather than leaving you a dangling reference.
+
+Three ways around it, in rough order of preference:
+
+```go
+// 1. Store pointers
+users := map[string]*User{"u1": {"Shiva", 28}}
+users["u1"].Age = 29                            // works
+
+// 2. Read, modify, write back
+u := users["u1"]
+u.Age = 29
+users["u1"] = u
+
+// 3. Store the map value inside a struct you own
+```
+
+The pointer form is the usual answer when the values are structs you will update. Watch out for the nil check though: `users["missing"]` returns a nil pointer, and dereferencing it panics.
+
+## Iteration and ordering
+
+```go
+for key, value := range scores {
+    fmt.Println(key, value)
+}
+
+for key := range scores {
+    fmt.Println(key)
+}
+```
+
+Order is randomised on every run. This is deliberate, added early in Go's history precisely so that nobody would write code that accidentally relied on the incidental ordering of an implementation.
+
+When you need order, sort:
+
+```go
+keys := slices.Sorted(maps.Keys(scores))      // Go 1.23
+for _, k := range keys {
+    fmt.Printf("%s: %d\n", k, scores[k])
+}
+```
+
+The pre-generics version, which you will still see everywhere:
+
+```go
+keys := make([]string, 0, len(scores))
+for k := range scores {
+    keys = append(keys, k)
+}
+sort.Strings(keys)
+```
+
+To iterate in insertion order, you need to track it yourself with a parallel slice, or use one of the ordered map libraries. Go has no built-in ordered map.
+
+## Maps are not safe for concurrent use
+
+```go
+m := map[string]int{}
+
+go func() { m["a"] = 1 }()
+go func() { m["b"] = 2 }()
+```
+
+```text
+fatal error: concurrent map writes
+```
+
+This is not a data race that corrupts silently. The runtime detects it and crashes the program, deliberately, because a corrupted hash table is far worse than a clear failure.
+
+Concurrent reads are fine. Any write alongside anything else is not.
+
+The standard fix is a mutex:
+
+```go
+type SafeCounter struct {
+    mu     sync.RWMutex
+    counts map[string]int
+}
+
+func NewSafeCounter() *SafeCounter {
+    return &SafeCounter{counts: make(map[string]int)}
+}
+
+func (c *SafeCounter) Inc(key string) {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    c.counts[key]++
+}
+
+func (c *SafeCounter) Get(key string) int {
+    c.mu.RLock()
+    defer c.mu.RUnlock()
+    return c.counts[key]
+}
+```
+
+`sync.Map` exists too, and is optimised for a specific shape of workload: keys written once and read many times, or disjoint key sets per goroutine. For general use a plain map with a mutex is faster and much easier to reason about. Reach for `sync.Map` only when a profile points you there.
+
+## Patterns worth memorising
+
+```go
+// Counting
+counts := map[string]int{}
+for _, word := range words {
+    counts[word]++                     // missing key reads as 0, then increments
+}
+
+// Set membership
+seen := map[string]struct{}{}
+seen["item"] = struct{}{}
+if _, ok := seen["item"]; ok { }
+
+// Grouping
+byRole := map[string][]User{}
+for _, u := range users {
+    byRole[u.Role] = append(byRole[u.Role], u)
+}
+
+// Index by key
+byID := make(map[int]User, len(users))
+for _, u := range users {
+    byID[u.ID] = u
+}
+
+// Invert
+inverted := make(map[int]string, len(scores))
+for k, v := range scores {
+    inverted[v] = k
+}
+
+// Deduplicate a slice, preserving order
+seen := map[string]bool{}
+out := make([]string, 0, len(items))
+for _, item := range items {
+    if !seen[item] {
+        seen[item] = true
+        out = append(out, item)
+    }
+}
+```
+
+That counting one is a small piece of Go elegance. `counts[word]++` on an absent key reads zero, adds one, and stores one, all without a check.
+
+<Callout type="info">
+`map[string]struct{}` is the idiomatic set type, because an empty struct occupies zero bytes. `map[string]bool` costs one byte per entry and reads slightly better. For small sets the difference is irrelevant, so use whichever is clearer. For sets of millions of entries, the empty struct is worth it.
+</Callout>
+
+## Memory behaviour
+
+Two things worth knowing.
+
+**Deleting does not shrink the map.** A map that held a million entries keeps its buckets after you delete them all. To actually reclaim the memory, build a new map and let the old one go.
+
+```go
+fresh := make(map[string]int, len(old)/2)
+for k, v := range old {
+    if keep(k) {
+        fresh[k] = v
+    }
+}
+old = fresh
+```
+
+**Size hints avoid rehashing.** `make(map[string]int, 10000)` allocates enough buckets up front. Without the hint, filling it triggers repeated rehashing as it grows, and that shows up clearly in benchmarks.
+
+Next, let's go back to strings and take apart the byte and rune relationship properly, since text handling is where slices and maps both meet real data.

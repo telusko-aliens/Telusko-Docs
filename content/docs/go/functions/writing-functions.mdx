@@ -1,0 +1,245 @@
+---
+title: Writing Functions
+---
+
+```go
+func add(a int, b int) int {
+    return a + b
+}
+```
+
+Read that left to right and you have Go's entire function syntax: the keyword, the name, the parameters with their types, the return type, and the body. The types come after the names, which is backwards from C and Java and takes about a day to get used to.
+
+What is genuinely worth your attention is not the syntax but the semantics, and there is one rule underneath all of it.
+
+## Everything is passed by value
+
+Go copies every argument. There are no exceptions, no reference parameters, and no `out` keyword.
+
+```go
+func double(n int) {
+    n = n * 2
+}
+
+func main() {
+    x := 5
+    double(x)
+    fmt.Println(x)      // 5, unchanged
+}
+```
+
+To modify the caller's variable, pass its address:
+
+```go
+func double(n *int) {
+    *n = *n * 2
+}
+
+func main() {
+    x := 5
+    double(&x)
+    fmt.Println(x)      // 10
+}
+```
+
+The pointer itself is still copied. What is shared is the address it holds, which is why the function can reach back and change the original.
+
+The rule holds even where it looks like it does not:
+
+```go
+func addItem(items []string) {
+    items = append(items, "new")     // caller does not see this
+}
+
+func setFirst(items []string) {
+    items[0] = "changed"             // caller does see this
+}
+```
+
+Both receive a copy of the slice header. `append` may allocate a new backing array and reassign the local copy, so the caller is unaffected. Writing to `items[0]` reaches through the pointer inside the header to the shared backing array, so the caller does see it. The slices page unpacks this properly, but the principle is the same one: the value is copied, and what that value contains determines what the copy shares.
+
+## Shortening parameter lists
+
+Consecutive parameters of the same type can share one type name:
+
+```go
+func add(a, b int) int { }              // both are int
+func rect(w, h, d float64) float64 { }  // all three are float64
+func greet(name, title string, age int) string { }
+```
+
+This is idiomatic and you should use it. It is also occasionally a trap for the reader, since `func f(a, b int)` and `func f(a string, b int)` look similar at a glance.
+
+## Named return values
+
+Go lets you name the results in the signature. They are declared as ordinary variables initialised to their zero values.
+
+```go
+func divide(a, b float64) (result float64, err error) {
+    if b == 0 {
+        err = errors.New("division by zero")
+        return           // a naked return, sends back result and err as they stand
+    }
+    result = a / b
+    return
+}
+```
+
+The naked `return` at the end returns whatever the named values currently hold.
+
+**Use named returns for documentation.** When two results share a type, names are the only thing telling the reader which is which:
+
+```go
+func split(sum int) (low, high int)         // clear
+func split(sum int) (int, int)              // which one is which?
+
+func bounds() (min, max float64)            // clear
+func parse(s string) (remaining string, consumed int, err error)
+```
+
+**Avoid naked returns in anything longer than a few lines.** In a thirty line function, a bare `return` forces the reader to scroll back to the signature to find out what is being returned, and to trace the whole body to find out what those variables hold at that moment.
+
+```go
+// Good: names document, but the returns are explicit
+func divide(a, b float64) (result float64, err error) {
+    if b == 0 {
+        return 0, errors.New("division by zero")
+    }
+    return a / b, nil
+}
+```
+
+<Callout type="info">
+There is one place where named returns are doing real work rather than documenting: a deferred function can modify them after `return` has executed. That technique is covered on the `defer` page, and it is the main reason the feature exists at all.
+</Callout>
+
+## Functions are package level
+
+You cannot nest a named function inside another function:
+
+```go
+func outer() {
+    func inner() { }        // syntax error
+}
+```
+
+What you can do is assign a function literal to a variable, which covers the same ground:
+
+```go
+func outer() {
+    inner := func() {
+        fmt.Println("this works")
+    }
+    inner()
+}
+```
+
+Function literals get a page of their own shortly.
+
+## Visibility is spelled with a capital letter
+
+```go
+func ProcessOrder(id string) error { }    // exported, usable from other packages
+func validateOrder(o Order) error { }     // unexported, private to this package
+```
+
+There is no `public` or `private`. The first letter of the name is the access modifier, and this applies to functions, types, struct fields, constants, and variables alike.
+
+A useful design habit follows from this: write the unexported version first and export it only when another package genuinely needs it. Everything unexported can be renamed, resigned, or deleted without breaking anyone.
+
+## Documenting a function
+
+A comment directly above a declaration, starting with the name, becomes its documentation. `go doc` and every Go editor read it.
+
+```go
+// ParseDuration converts a human readable duration such as "1h30m"
+// into a time.Duration. It returns an error if the format is not
+// recognised or if the value would overflow.
+func ParseDuration(s string) (time.Duration, error) {
+    // ...
+}
+```
+
+Starting with the function name is the convention, not a requirement, and it exists so that generated documentation reads as complete sentences. Try it on the standard library:
+
+```bash
+go doc strings.Split
+go doc net/http.HandleFunc
+```
+
+## Designing a good signature
+
+A few habits separate Go functions that are pleasant to use from ones that are not.
+
+**Return errors, do not panic.** A function that panics on bad input forces every caller into a `recover`. Return an error and let them decide.
+
+```go
+func GetUser(id string) (User, error)     // yes
+func GetUser(id string) User              // panics on missing? no
+```
+
+**Accept interfaces, return concrete types.** This makes your function usable with more inputs while giving callers something specific to work with:
+
+```go
+func Copy(dst io.Writer, src io.Reader) (int64, error)   // takes any writer and reader
+func NewClient(url string) *Client                        // returns something concrete
+```
+
+**Put the context first, the error last.** These two positions are conventions strong enough that breaking them looks like a mistake:
+
+```go
+func Fetch(ctx context.Context, url string) ([]byte, error)
+```
+
+**Keep the parameter list short.** More than four or five parameters, and an options struct reads better at the call site:
+
+```go
+// Hard to read at the call site
+func NewServer(host string, port int, timeout time.Duration, tls bool, maxConns int) *Server
+
+// Better
+type ServerConfig struct {
+    Host     string
+    Port     int
+    Timeout  time.Duration
+    TLS      bool
+    MaxConns int
+}
+
+func NewServer(cfg ServerConfig) *Server
+```
+
+The struct version also gives you sensible zero values for free, and adding a field later does not break existing callers.
+
+<Callout type="warn">
+Go has no default parameter values and no function overloading. Two functions in the same package cannot share a name, whatever their signatures. When you need variations, either use distinct names such as `Parse` and `ParseWithOptions`, or take a config struct. Both are common in the standard library.
+</Callout>
+
+## A function that shows the conventions
+
+```go
+// LoadConfig reads configuration from the given path and applies
+// environment variable overrides. It returns an error if the file
+// cannot be read or contains invalid values.
+func LoadConfig(path string) (*Config, error) {
+    data, err := os.ReadFile(path)
+    if err != nil {
+        return nil, fmt.Errorf("reading config %s: %w", path, err)
+    }
+
+    var cfg Config
+    if err := yaml.Unmarshal(data, &cfg); err != nil {
+        return nil, fmt.Errorf("parsing config %s: %w", path, err)
+    }
+
+    if err := cfg.applyEnvOverrides(); err != nil {
+        return nil, fmt.Errorf("applying environment overrides: %w", err)
+    }
+
+    return &cfg, nil
+}
+```
+
+Exported name with a doc comment, error last, wrapped errors that say where the failure happened, an unexported helper doing part of the work, and a pointer returned because `Config` is likely large and the caller may want to mutate it.
+
+Next, let's look properly at that second return value, because Go's use of multiple returns shapes almost everything about how its APIs are designed.

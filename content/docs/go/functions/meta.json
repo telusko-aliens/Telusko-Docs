@@ -1,0 +1,11 @@
+{
+    "title": "Functions",
+    "pages": [
+        "writing-functions.mdx",
+        "multiple-return-values.mdx",
+        "variadic-functions.mdx",
+        "functions-as-values-and-closures.mdx",
+        "defer.mdx",
+        "recursion.mdx"
+    ]
+}

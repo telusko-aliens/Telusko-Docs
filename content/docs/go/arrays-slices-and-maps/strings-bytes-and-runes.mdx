@@ -1,0 +1,278 @@
+---
+title: Strings, Bytes and Runes
+---
+
+```go
+s := "café"
+
+fmt.Println(len(s))          // 5
+fmt.Println(s[3])            // 195
+fmt.Println(string(s[3]))    // Ã
+```
+
+Four characters, five bytes, and indexing gives you something that is not a letter at all. None of this is a bug. It is what happens when a language is honest about the fact that text is not a sequence of characters, it is a sequence of bytes that encode characters.
+
+Getting this right once saves you from a category of bug that appears the moment a user types a name in Hindi, an emoji, or an accented vowel.
+
+## The three types
+
+```text
+   string    an immutable sequence of bytes, conventionally UTF-8
+   byte      alias for uint8, one raw byte
+   rune      alias for int32, one Unicode code point
+```
+
+`byte` and `rune` are not distinct types. They are alternative names for `uint8` and `int32` that tell the reader what a number represents. `byte` means raw data, `rune` means a character.
+
+## How UTF-8 encodes text
+
+UTF-8 is variable width. A character takes between one and four bytes depending on where it sits in Unicode.
+
+| Range | Bytes | Examples |
+| --- | --- | --- |
+| ASCII | 1 | `A`, `9`, `~` |
+| Latin accents, Greek, Cyrillic, Hebrew | 2 | `é`, `ñ`, `Ω` |
+| Devanagari, CJK, most of the world | 3 | `न`, `中`, `한` |
+| Emoji, rare scripts, mathematical symbols | 4 | most emoji |
+
+```go
+fmt.Println(len("A"))     // 1
+fmt.Println(len("é"))     // 2
+fmt.Println(len("न"))     // 3
+```
+
+The design has a property that turns out to be very useful: ASCII text is unchanged in UTF-8, and no multi-byte character contains a byte that could be mistaken for an ASCII character. That is why searching for `'\n'` or `','` byte by byte is safe even in text full of Devanagari.
+
+## Indexing gives bytes, ranging gives runes
+
+```go
+s := "héllo"
+
+// Byte by byte
+for i := 0; i < len(s); i++ {
+    fmt.Printf("%d ", s[i])
+}
+// 104 195 169 108 108 111      six bytes
+
+// Rune by rune
+for i, r := range s {
+    fmt.Printf("%d:%c ", i, r)
+}
+// 0:h 1:é 3:l 4:l 5:o          five characters, byte offsets jump
+```
+
+`range` decodes UTF-8 as it walks. The index is the byte offset where each character starts, which is why it goes 0, 1, 3, 4, 5.
+
+This gives you the rule to work from:
+
+- **Indexing and `len` are byte operations.** Correct for protocols, file formats, and pure ASCII.
+- **`range` and `[]rune` are character operations.** Correct for anything a human typed.
+
+## Counting characters
+
+```go
+s := "नमस्ते"
+
+fmt.Println(len(s))                          // 18 bytes
+fmt.Println(utf8.RuneCountInString(s))       // 6 runes
+fmt.Println(len([]rune(s)))                  // 6, but allocates
+```
+
+Use `utf8.RuneCountInString`. It scans without allocating, where the conversion builds a whole slice just to measure it.
+
+<Callout type="info">
+Even runes are not quite the same as what a person calls a character. An emoji with a skin tone modifier is two runes rendered as one glyph, and `é` can be either one rune or two (`e` plus a combining accent). For counting user-perceived characters properly you need grapheme clusters, from `golang.org/x/text` or a package such as `rivo/uniseg`. For most applications rune counting is close enough, but be aware of the limit before you build a character counter for a chat app.
+</Callout>
+
+## Converting between the three
+
+```go
+s := "héllo"
+
+b := []byte(s)        // the raw bytes, len 6
+r := []rune(s)        // the code points, len 5
+
+back1 := string(b)    // "héllo"
+back2 := string(r)    // "héllo"
+```
+
+Both conversions copy, because strings are immutable and slices are not. Converting a large string inside a loop is a common and easily missed performance problem.
+
+Single character conversions have their own trap:
+
+```go
+n := 65
+
+string(n)              // vet error, and gives "A" not "65"
+string(rune(n))        // "A", and now you clearly meant it
+strconv.Itoa(n)        // "65", which is usually what you wanted
+```
+
+## Slicing a string
+
+```go
+s := "héllo"
+
+fmt.Println(s[0:2])     // "hé", 2 bytes happens to be one and a half characters
+fmt.Println(s[0:1])     // "h"
+fmt.Println(s[1:2])     // invalid UTF-8, prints as a replacement character
+```
+
+String slicing operates on byte offsets, so cutting mid-character produces broken text. Truncating user input is where this bites:
+
+```go
+// Wrong: may split a character
+func truncate(s string, n int) string {
+    if len(s) <= n {
+        return s
+    }
+    return s[:n]
+}
+
+// Right: counts characters
+func truncate(s string, n int) string {
+    r := []rune(s)
+    if len(r) <= n {
+        return s
+    }
+    return string(r[:n])
+}
+```
+
+Slicing itself does not copy. A substring shares the original's bytes, which is efficient and carries the same retention caveat as slices: a short substring keeps a long string alive.
+
+## Reversing a string
+
+The classic interview question, and a good demonstration of why the distinction matters.
+
+```go
+// Wrong for anything but ASCII
+func reverse(s string) string {
+    b := []byte(s)
+    for i, j := 0, len(b)-1; i < j; i, j = i+1, j-1 {
+        b[i], b[j] = b[j], b[i]
+    }
+    return string(b)
+}
+
+reverse("héllo")     // garbage, the two bytes of é get separated
+```
+
+```go
+// Correct for text
+func reverse(s string) string {
+    r := []rune(s)
+    for i, j := 0, len(r)-1; i < j; i, j = i+1, j-1 {
+        r[i], r[j] = r[j], r[i]
+    }
+    return string(r)
+}
+
+reverse("héllo")     // "olléh"
+```
+
+Even this is not perfect for combining characters and emoji sequences, which is a reasonable thing to point out in an interview.
+
+## Building strings efficiently
+
+```go
+// Slow: allocates a new string every iteration
+s := ""
+for i := 0; i < 10000; i++ {
+    s += "x"
+}
+
+// Fast: one growing buffer
+var b strings.Builder
+b.Grow(10000)                  // optional, but free performance when you know the size
+for i := 0; i < 10000; i++ {
+    b.WriteString("x")
+}
+s := b.String()
+```
+
+Because strings are immutable, `+=` must allocate and copy the whole accumulated string every time. Ten thousand iterations means ten thousand allocations and roughly fifty million bytes copied. `strings.Builder` writes into a growing byte slice and converts once at the end.
+
+For a handful of pieces, `+` or `fmt.Sprintf` is perfectly fine and reads better. The rule is about loops.
+
+`strings.Join` is the right tool when you already have a slice:
+
+```go
+parts := []string{"a", "b", "c"}
+s := strings.Join(parts, ", ")     // "a, b, c"
+```
+
+## The strings package
+
+The functions you will reach for most:
+
+```go
+strings.Contains(s, "go")            // bool
+strings.HasPrefix(s, "http://")      // bool
+strings.HasSuffix(s, ".json")        // bool
+strings.Index(s, "@")                // byte offset, or -1
+strings.Count(s, "a")                // occurrences
+
+strings.ToUpper(s)
+strings.ToLower(s)
+strings.TrimSpace(s)
+strings.Trim(s, "\"")                // trims any of the given characters
+strings.TrimPrefix(s, "Bearer ")
+strings.ReplaceAll(s, "old", "new")
+
+strings.Split("a,b,c", ",")          // ["a" "b" "c"]
+strings.SplitN("a,b,c", ",", 2)      // ["a" "b,c"]
+strings.Fields("  a  b  c  ")        // ["a" "b" "c"], splits on any whitespace
+strings.Join(parts, "-")
+strings.Repeat("-", 40)
+
+strings.EqualFold("Go", "GO")        // true, case insensitive comparison
+```
+
+`strings.Fields` is underused. For splitting on whitespace it handles multiple spaces, tabs, and leading or trailing gaps correctly, where `strings.Split(s, " ")` gives you empty strings between them.
+
+<Callout type="warn">
+`strings.ToUpper` and `ToLower` use simple Unicode case mapping, which is wrong for a few languages. Turkish dotless i is the standard example: uppercasing `i` should give `İ` in Turkish and gives `I` here. For locale-correct case conversion, use `golang.org/x/text/cases`. For case-insensitive comparison, `strings.EqualFold` is more correct than lowercasing both sides.
+</Callout>
+
+## Working with bytes instead
+
+The `bytes` package mirrors `strings` almost function for function, operating on `[]byte`:
+
+```go
+bytes.Contains(b, []byte("go"))
+bytes.Split(b, []byte(","))
+bytes.TrimSpace(b)
+
+var buf bytes.Buffer
+buf.WriteString("hello")
+buf.Write(data)
+result := buf.Bytes()
+```
+
+Use `bytes` when the data arrives as bytes, from a file, a network read, or an HTTP body. Converting to a string just to use the `strings` package copies the data for no reason.
+
+```go
+// Wasteful
+body, _ := io.ReadAll(resp.Body)
+if strings.Contains(string(body), "error") { }
+
+// Direct
+body, _ := io.ReadAll(resp.Body)
+if bytes.Contains(body, []byte("error")) { }
+```
+
+## A practical checklist
+
+```text
+   Parsing a protocol or binary format     →  []byte, index by byte
+   Text a human typed                      →  range or []rune
+   Counting characters                     →  utf8.RuneCountInString
+   Truncating for display                  →  convert to []rune first
+   Building a string in a loop             →  strings.Builder
+   Joining a slice                         →  strings.Join
+   Data already in []byte                  →  the bytes package, do not convert
+   Case-insensitive comparison             →  strings.EqualFold
+```
+
+Next, let's finish this section with sorting and searching, where Go's approach changed significantly with generics.

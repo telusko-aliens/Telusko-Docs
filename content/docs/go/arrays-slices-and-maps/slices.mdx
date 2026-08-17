@@ -1,0 +1,297 @@
+---
+title: Slices
+---
+
+A slice is three words of memory: a pointer, a length, and a capacity. That is it. Everything a slice does, and every way a slice surprises you, follows from those three fields.
+
+```text
+   s := []int{10, 20, 30}
+
+   ┌─────────┬─────┬─────┐
+   │ pointer │ len │ cap │      the slice header (24 bytes on 64-bit)
+   └────┬────┴──3──┴──3──┘
+        │
+        ▼
+   ┌────┬────┬────┐
+   │ 10 │ 20 │ 30 │              the backing array, somewhere in memory
+   └────┴────┴────┘
+```
+
+Hold that picture. It answers most of the questions in this section before you have to ask them.
+
+## Creating slices
+
+```go
+var s []int                        // nil, len 0, cap 0
+s := []int{}                       // empty but not nil
+s := []int{1, 2, 3}                // literal
+s := make([]int, 5)                // len 5, cap 5, all zeros
+s := make([]int, 0, 10)            // len 0, cap 10, ready to grow
+s := arr[1:4]                      // a view over an existing array
+```
+
+The `make` form with two lengths is the one worth forming a habit around:
+
+```go
+results := make([]string, 0, len(items))     // no length yet, room for len(items)
+for _, item := range items {
+    results = append(results, item.Name)
+}
+```
+
+Reserving capacity up front means `append` never has to reallocate. In a loop over a few thousand items that is a measurable difference for a single extra argument.
+
+<Callout type="info">
+A `nil` slice and an empty slice behave identically for `len`, `cap`, `range`, and `append`. They differ only in `== nil` and in how `encoding/json` renders them: a nil slice marshals to `null`, an empty slice to `[]`. If your API returns JSON arrays, prefer the empty form so clients never have to handle both.
+</Callout>
+
+## len and cap
+
+```go
+s := make([]int, 3, 8)
+
+fmt.Println(len(s))     // 3, how many elements you can access
+fmt.Println(cap(s))     // 8, how many fit before a reallocation
+```
+
+`len` is what you can read and write. `cap` is how much room the backing array has from the slice's starting point. Indexing past `len` panics even when there is capacity:
+
+```go
+s := make([]int, 3, 8)
+s[5] = 1        // panic: index out of range [5] with length 3
+```
+
+The capacity is not accessible storage. It is headroom that `append` can use.
+
+## Appending
+
+```go
+s := []int{1, 2}
+s = append(s, 3)
+s = append(s, 4, 5)
+s = append(s, []int{6, 7}...)
+
+fmt.Println(s)     // [1 2 3 4 5 6 7]
+```
+
+Always assign the result. `append` may or may not reallocate, and it returns a new header either way:
+
+```go
+append(s, 3)        // the result is discarded, and go vet will tell you so
+s = append(s, 3)    // correct
+```
+
+## The slicing expression
+
+```go
+s := []int{0, 1, 2, 3, 4, 5}
+
+fmt.Println(s[2:4])     // [2 3]      from 2 up to but not including 4
+fmt.Println(s[:3])      // [0 1 2]
+fmt.Println(s[3:])      // [3 4 5]
+fmt.Println(s[:])       // the whole thing
+```
+
+Slicing never copies. The result shares the same backing array, which leads directly to the two behaviours everyone has to learn.
+
+### Sharing: writes are visible through every slice
+
+```go
+data := []int{1, 2, 3, 4, 5}
+view := data[1:3]        // [2 3]
+
+view[0] = 99
+fmt.Println(data)        // [1 99 3 4 5]
+```
+
+Both slices point at the same memory. This is a feature when you are passing sub-ranges around without copying, and a bug when you did not realise it was happening.
+
+When you need independence, copy explicitly:
+
+```go
+independent := make([]int, len(view))
+copy(independent, view)
+```
+
+Or, since Go 1.21:
+
+```go
+independent := slices.Clone(view)
+```
+
+### Retention: a small slice can pin a large array
+
+```go
+func firstLine(data []byte) []byte {
+    i := bytes.IndexByte(data, '\n')
+    return data[:i]          // ten bytes, holding a ten megabyte array alive
+}
+```
+
+The returned slice points into the original backing array, so the garbage collector cannot free any of it. Reading a large file and keeping one small piece leaks the whole thing.
+
+The fix is to copy when you are deliberately keeping a small part of something large:
+
+```go
+func firstLine(data []byte) []byte {
+    i := bytes.IndexByte(data, '\n')
+    return bytes.Clone(data[:i])
+}
+```
+
+<Callout type="warn">
+This is a real source of production memory problems, and it is invisible in code review unless you know to look for it. The rule: when a function returns a small slice derived from a much larger one, and the result outlives the call, copy it.
+</Callout>
+
+## The three index form
+
+The full slicing syntax takes a third number that caps the capacity:
+
+```go
+s := []int{0, 1, 2, 3, 4, 5}
+
+a := s[1:3]        // len 2, cap 5
+b := s[1:3:3]      // len 2, cap 2
+```
+
+Why this matters:
+
+```go
+original := []int{1, 2, 3, 4, 5}
+
+sub := original[0:2]          // cap 5, room to spare
+sub = append(sub, 99)         // writes into original's memory
+fmt.Println(original)         // [1 2 99 4 5], corrupted
+
+safe := original[0:2:2]       // cap 2, no room
+safe = append(safe, 99)       // must allocate a new array
+fmt.Println(original)         // [1 2 3 4 5], intact
+```
+
+Use the three index form whenever you hand a sub-slice to code you do not control. It converts a silent shared-memory bug into a harmless allocation.
+
+## copy
+
+```go
+dst := make([]int, 3)
+src := []int{1, 2, 3, 4, 5}
+
+n := copy(dst, src)
+fmt.Println(n, dst)     // 3 [1 2 3]
+```
+
+`copy` moves `min(len(dst), len(src))` elements and returns how many it moved. It handles overlapping slices correctly, so it is safe for shifting elements within one slice.
+
+A common mistake:
+
+```go
+dst := make([]int, 0, 5)      // len 0
+copy(dst, src)                // copies nothing, len(dst) is 0
+```
+
+`copy` is bounded by length, not capacity. Use `make([]int, len(src))` when you intend to copy into it.
+
+## The operations you will keep needing
+
+Go has no built-in insert or delete, so these idioms are worth knowing. As of Go 1.21 the `slices` package covers most of them, and the manual versions are shown alongside because you will read both in existing code.
+
+```go
+// Append
+s = append(s, item)
+
+// Prepend
+s = append([]int{item}, s...)
+
+// Insert at index i
+s = append(s[:i], append([]int{item}, s[i:]...)...)
+s = slices.Insert(s, i, item)                        // Go 1.21
+
+// Delete index i, preserving order
+s = append(s[:i], s[i+1:]...)
+s = slices.Delete(s, i, i+1)                         // Go 1.21
+
+// Delete index i, order does not matter (fast)
+s[i] = s[len(s)-1]
+s = s[:len(s)-1]
+
+// Pop from the end
+last := s[len(s)-1]
+s = s[:len(s)-1]
+
+// Reverse
+slices.Reverse(s)                                    // Go 1.21
+
+// Contains and find
+ok := slices.Contains(s, target)                     // Go 1.21
+i := slices.Index(s, target)                         // -1 when absent
+
+// Filter in place, no allocation
+kept := s[:0]
+for _, v := range s {
+    if keep(v) {
+        kept = append(kept, v)
+    }
+}
+s = kept
+```
+
+That last one is worth a second look. `s[:0]` gives a zero length slice sharing the same array, so appending overwrites the original in place. It is the standard zero allocation filter and it appears throughout the standard library.
+
+<Callout type="warn">
+When deleting from a slice of pointers or of structs containing pointers, the removed elements are still referenced by the backing array beyond the new length, so the garbage collector cannot free them. Set the leftover positions to their zero value before shrinking, or use `slices.Delete`, which does it for you.
+</Callout>
+
+## Multidimensional slices
+
+Unlike arrays, a slice of slices is a set of independent allocations, so each row must be created:
+
+```go
+rows, cols := 3, 4
+grid := make([][]int, rows)
+for i := range grid {
+    grid[i] = make([]int, cols)
+}
+
+grid[1][2] = 7
+```
+
+Rows can have different lengths, which arrays cannot do:
+
+```go
+jagged := [][]int{
+    {1},
+    {1, 2},
+    {1, 2, 3},
+}
+```
+
+For performance sensitive numeric work, a single flat slice with index arithmetic beats a slice of slices, because everything stays contiguous:
+
+```go
+grid := make([]int, rows*cols)
+get := func(r, c int) int { return grid[r*cols+c] }
+```
+
+## Slices as function parameters
+
+A slice parameter shares the backing array with the caller, but the header itself is still copied. That distinction produces the behaviour from the functions section:
+
+```go
+func fill(s []int) {
+    for i := range s {
+        s[i] = 1        // caller sees this
+    }
+}
+
+func grow(s []int) {
+    s = append(s, 1)    // caller does not see this
+}
+
+func growProperly(s []int) []int {
+    return append(s, 1) // caller assigns the result
+}
+```
+
+The convention is clear: if a function changes the length of a slice, it returns the new slice. If it only modifies elements, it does not need to.
+
+Next, let's look at what `append` is really doing when it runs out of room, because the growth behaviour explains several things that otherwise look arbitrary.

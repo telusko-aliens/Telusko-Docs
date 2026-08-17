@@ -1,0 +1,270 @@
+---
+title: Recursion
+---
+
+Recursion in Go works exactly as it does anywhere else, so this page spends little time on the concept and most of it on the two things that are specific to Go: the absence of tail call optimisation, and the growable stack that makes deep recursion safer than you might expect.
+
+## The shape of a recursive function
+
+```go
+func factorial(n int) int {
+    if n <= 1 {          // base case, stops the recursion
+        return 1
+    }
+    return n * factorial(n-1)     // recursive case, moves toward the base
+}
+```
+
+Every correct recursive function has both halves. Miss the base case and you recurse until the stack gives out. Fail to move toward it and you do the same.
+
+```text
+   factorial(4)
+   └─ 4 * factorial(3)
+         └─ 3 * factorial(2)
+               └─ 2 * factorial(1)
+                     └─ 1          ← base case
+   unwinds:  1 → 2 → 6 → 24
+```
+
+## Go does not optimise tail calls
+
+This is the important difference from Scheme, Scala, or Kotlin. A function that calls itself as its final action still consumes a stack frame in Go. There is no rewriting into a loop.
+
+```go
+func sum(n, acc int) int {
+    if n == 0 {
+        return acc
+    }
+    return sum(n-1, acc+n)     // tail call, still allocates a frame
+}
+```
+
+The Go team has consistently declined to add tail call optimisation, on the grounds that it would make stack traces incomplete and debugging harder. Since Go's whole approach to errors and panics leans on readable stack traces, that is a coherent position even if it is inconvenient.
+
+The consequence for you: if a recursion could go tens of thousands of levels deep, write a loop.
+
+```go
+func sum(n int) int {
+    total := 0
+    for i := 1; i <= n; i++ {
+        total += i
+    }
+    return total
+}
+```
+
+## The stack grows, which changes the calculation
+
+Go's stacks are not fixed. A goroutine starts with about 2 KB and the runtime grows it by copying to a larger block when needed, up to a default limit of 1 GB on 64 bit systems.
+
+That means recursion depth in the tens or hundreds of thousands is genuinely fine, where in a language with 1 MB fixed stacks it would blow up. You can check the limit and adjust it:
+
+```go
+import "runtime/debug"
+
+debug.SetMaxStack(2 << 30)     // raise to 2 GB if you really need to
+```
+
+When you do exceed it, the failure is clear rather than mysterious:
+
+```text
+runtime: goroutine stack exceeds 1000000000-byte limit
+fatal error: stack overflow
+```
+
+<Callout type="info">
+This is not permission to recurse carelessly. Stack growth copies the whole stack each time it doubles, so very deep recursion is slower than the equivalent loop even when it succeeds. It does mean you rarely need to rewrite a recursion that is naturally a few thousand levels deep.
+</Callout>
+
+## Where recursion is the right answer
+
+Recursion earns its place when the data itself is recursive. Trees, nested structures, and file systems are all defined in terms of themselves, and code that mirrors that definition is far clearer than the loop-plus-explicit-stack version.
+
+### Walking a tree
+
+```go
+type Node struct {
+    Value       int
+    Left, Right *Node
+}
+
+func (n *Node) Sum() int {
+    if n == nil {
+        return 0            // nil is the base case, and it is free
+    }
+    return n.Value + n.Left.Sum() + n.Right.Sum()
+}
+```
+
+That nil check is doing something worth noticing. Calling a method on a nil pointer is legal in Go as long as the method does not dereference it, so `n.Left.Sum()` works even when `Left` is nil. The base case handles itself.
+
+```go
+func (n *Node) Depth() int {
+    if n == nil {
+        return 0
+    }
+    return 1 + max(n.Left.Depth(), n.Right.Depth())
+}
+
+func (n *Node) InOrder(visit func(int)) {
+    if n == nil {
+        return
+    }
+    n.Left.InOrder(visit)
+    visit(n.Value)
+    n.Right.InOrder(visit)
+}
+```
+
+Three tree operations, each about four lines, each obviously correct. The iterative versions all require you to manage a stack by hand.
+
+### Walking a directory
+
+```go
+func totalSize(dir string) (int64, error) {
+    entries, err := os.ReadDir(dir)
+    if err != nil {
+        return 0, err
+    }
+
+    var total int64
+    for _, e := range entries {
+        path := filepath.Join(dir, e.Name())
+        if e.IsDir() {
+            sub, err := totalSize(path)
+            if err != nil {
+                return 0, err
+            }
+            total += sub
+            continue
+        }
+
+        info, err := e.Info()
+        if err != nil {
+            return 0, err
+        }
+        total += info.Size()
+    }
+
+    return total, nil
+}
+```
+
+The standard library also gives you `filepath.WalkDir`, which handles the recursion for you and is what you should use in real code. Writing it once by hand is still a good exercise in seeing how the pieces fit.
+
+### Parsing nested data
+
+```go
+func countLeaves(v any) int {
+    switch value := v.(type) {
+    case map[string]any:
+        total := 0
+        for _, item := range value {
+            total += countLeaves(item)
+        }
+        return total
+    case []any:
+        total := 0
+        for _, item := range value {
+            total += countLeaves(item)
+        }
+        return total
+    default:
+        return 1        // a scalar
+    }
+}
+```
+
+Decoded JSON is exactly this shape, so recursion over it is the natural fit.
+
+## The classic trap
+
+Naive recursion can do exponentially redundant work, and Fibonacci is the standard demonstration:
+
+```go
+func fib(n int) int {
+    if n <= 1 {
+        return n
+    }
+    return fib(n-1) + fib(n-2)
+}
+```
+
+`fib(40)` makes over 300 million calls, because `fib(38)` is computed twice, `fib(37)` three times, and so on. On a modern machine it takes roughly a second, which for a function returning a single number is absurd.
+
+Memoisation fixes it:
+
+```go
+func fibMemo() func(int) int {
+    cache := map[int]int{}
+
+    var fib func(int) int
+    fib = func(n int) int {
+        if n <= 1 {
+            return n
+        }
+        if v, ok := cache[n]; ok {
+            return v
+        }
+        result := fib(n-1) + fib(n-2)
+        cache[n] = result
+        return result
+    }
+
+    return fib
+}
+
+fib := fibMemo()
+fmt.Println(fib(90))     // instant
+```
+
+Note the two step declaration of `fib`. A recursive closure cannot be written with `:=`, because the variable does not exist yet when the literal on the right is compiled. Declaring it with `var` first and assigning on the next line is the standard workaround, and you will see it whenever a closure needs to call itself.
+
+The loop version is simpler still, and this is usually the honest answer:
+
+```go
+func fib(n int) int {
+    a, b := 0, 1
+    for i := 0; i < n; i++ {
+        a, b = b, a+b
+    }
+    return a
+}
+```
+
+## Mutual recursion
+
+Two functions calling each other is fine, and Go's package level scoping means declaration order does not matter:
+
+```go
+func isEven(n int) bool {
+    if n == 0 {
+        return true
+    }
+    return isOdd(n - 1)
+}
+
+func isOdd(n int) bool {
+    if n == 0 {
+        return false
+    }
+    return isEven(n - 1)
+}
+```
+
+A silly example, but the pattern appears for real in recursive descent parsers, where `parseExpression` calls `parseTerm` which calls `parseFactor` which calls back into `parseExpression` for a parenthesised subexpression.
+
+## Choosing between recursion and a loop
+
+```text
+   Data is a tree or nested structure     →  recursion, almost always
+   Depth is bounded and modest            →  recursion if it reads better
+   Depth depends on input size            →  loop
+   Simple sequence or accumulation        →  loop
+   Backtracking or permutations           →  recursion
+   Performance critical inner path        →  loop, measure to be sure
+```
+
+The honest guidance is that Go's culture leans toward loops. Go programmers reach for recursion when the problem is genuinely recursive and use a `for` otherwise, and that preference is worth adopting rather than arguing with. A recursive solution to a flat problem will read as unusual in a Go code review even when it is correct.
+
+That completes functions. Next, let's look at the data structures you will spend most of your time manipulating, starting with arrays and the slices built on top of them.
