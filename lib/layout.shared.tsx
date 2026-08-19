@@ -5,7 +5,7 @@ export function baseOptions(): BaseLayoutProps {
     nav: {
       title: <img className="h-[32px]" src="/logo.png" />,
     },
-    githubUrl: 'https://github.com/teluskoOrg/Telusko-Docs',
+    githubUrl: 'https://github.com/telusko-aliens/Telusko-Docs',
     
   };
 }

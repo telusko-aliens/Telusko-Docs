@@ -2,7 +2,7 @@ import { App, Octokit } from 'octokit';
 import type { ActionResponse, Feedback } from '@/components/feedback';
 
 export const repo = 'Telusko-Docs';
-export const owner = 'teluskoOrg';
+export const owner = 'telusko-aliens';
 export const DocsCategory = 'Docs Feedback';
 
 let instance: Octokit | undefined;
@@ -21,8 +21,8 @@ async function getOctokit(): Promise<Octokit> {
     );
   }
 
-    privateKey = privateKey.replace(/\\n/g, '\n');
- 
+  privateKey = privateKey.replace(/\\n/g, '\n');
+
   const app = new App({
     appId,
     privateKey,
