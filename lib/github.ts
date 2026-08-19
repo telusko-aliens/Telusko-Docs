@@ -125,7 +125,7 @@ export async function onRateAction(
             }`);
   } else {
     const result: {
-      discussion: { id: string; url: string };
+      createDiscussion: { discussion: { id: string; url: string } };
     } = await octokit.graphql(`
             mutation {
               createDiscussion(input: { repositoryId: "${destination.id}", categoryId: "${category!.id}", body: ${JSON.stringify(body)}, title: ${JSON.stringify(title)} }) {
@@ -133,7 +133,7 @@ export async function onRateAction(
               }
             }`);
 
-    discussion = result.discussion;
+    discussion = result.createDiscussion.discussion;
   }
 
   return {
