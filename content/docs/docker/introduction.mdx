@@ -1,0 +1,143 @@
+---
+title: Introduction
+description: Why Docker exists, what containers solve, and how images, containers, registries, Dockerfiles, and networks fit together.
+---
+
+Most deployment problems begin with a boring sentence: "but it worked on my machine." The code is the same, but the server has a different Java version, a missing environment variable, a different operating system package, a different port, or a dependency installed in a slightly different way. The application is not just the source code. It is the source code plus the runtime, libraries, operating system expectations, configuration, startup command, and network setup around it.
+
+Docker gives all of that a standard package.
+
+Instead of manually preparing every machine, you build an image. That image contains the application and the instructions needed to run it. When Docker starts the image, it creates a container: an isolated process with its own filesystem, environment, ports, and network view. The container is lightweight like a process, but packaged enough to behave consistently across machines.
+
+## What Docker is
+
+Docker is a platform for building, sharing, and running containers. It gives developers a repeatable way to package applications and gives operations teams a predictable unit to deploy.
+
+The three ideas you will use constantly are simple:
+
+| Term | Meaning |
+| --- | --- |
+| Image | A read-only package that contains an application, runtime, dependencies, and startup instructions |
+| Container | A running instance of an image |
+| Registry | A place to store and download images, such as Docker Hub or a private registry |
+
+That means you do not "install" your app on every server in the old sense. You build an image once, push it to a registry, then pull and run that same image wherever it needs to live.
+
+## Why containers changed deployment
+
+Virtual machines solved an important part of deployment by letting teams run multiple isolated servers on one physical machine. But each virtual machine still includes a full guest operating system, which makes it heavier to start, heavier to store, and slower to scale.
+
+Containers take a different approach. They share the host machine's operating system kernel, then isolate each application with filesystem, process, and network boundaries. That is why containers usually start in seconds and why a machine can run many of them without the overhead of many full virtual machines.
+
+```text
+Virtual machine approach
+hardware -> host OS -> hypervisor -> guest OS -> app runtime -> app
+
+Container approach
+hardware -> host OS -> container engine -> app runtime -> app
+```
+
+The practical result is speed and consistency. Developers can run the same packaging format locally, on a Linux server, in CI, and later in orchestration platforms like Kubernetes or ECS.
+
+## The Docker workflow
+
+A normal Docker workflow has a rhythm:
+
+1. Write application code
+2. Write a `Dockerfile`
+3. Build an image with `docker build`
+4. Run a container with `docker run`
+5. Test the app through mapped ports
+6. Tag the image
+7. Push the image to a registry
+8. Pull and run it on another machine
+
+This course follows that rhythm repeatedly. First with basic containers, then with Java and Spring Boot applications, then with React and Flask, and finally with networking.
+
+## Images are built in layers
+
+Docker images are not one big blob. They are built in layers, where each Dockerfile instruction creates a new layer. This is why Docker can cache builds. If nothing changed in an earlier instruction, Docker can reuse that layer instead of rebuilding everything from scratch.
+
+That layer model explains many Dockerfile habits:
+
+- Put slow changing dependency steps before fast changing source code steps
+- Keep images small by avoiding unnecessary packages
+- Prefer multi-stage builds when compiling code produces files you can copy into a smaller runtime image
+- Rebuild often enough to know what changed and where the cache helps
+
+## Containers are meant to be replaceable
+
+A container should not feel precious. If it breaks, you remove it and start a new one from the image. If you need a new version, you build a new image and run a new container. This is different from the older habit of logging into one server and slowly changing it by hand until nobody remembers how it got that way.
+
+<Callout type="info">
+The image is the recipe and package. The container is the running copy. When that distinction is clear, most Docker commands become easier to remember.
+</Callout>
+
+## Ports, processes, and filesystems
+
+A container usually runs one main process. If that process exits, the container stops. The container also has its own filesystem, so files written inside it are separate from your host machine unless you deliberately mount something.
+
+Networking has the same shape. An application might listen on port `8080` inside the container, but your browser cannot reach it until Docker maps that internal port to a port on your machine:
+
+```bash
+docker run -p 8080:8080 my-app
+```
+
+The first `8080` is the host port. The second `8080` is the container port. This one line explains a lot of beginner Docker confusion.
+
+## Dockerfiles are deployment documentation that can run
+
+A Dockerfile is a written record of how to prepare and start your application. Instead of writing a README that says "install Java, copy the WAR file, expose this port, then run this command", the Dockerfile turns those steps into something Docker can execute.
+
+For example, a Dockerfile answers questions like:
+
+- Which base image should this app use?
+- Which directory should the app run from?
+- Which files should be copied into the image?
+- Which commands should run while building?
+- Which port does the app expect?
+- Which command starts the app?
+
+That is why Dockerfiles are central to this course. They are where application knowledge becomes deployment knowledge.
+
+## Where Docker fits with AWS and DevOps
+
+Docker is not a cloud provider and it is not a replacement for AWS. Docker packages the application. AWS, Kubernetes, ECS, or another platform runs and manages those packaged applications at scale.
+
+The relationship is easier to see like this:
+
+| Tool or platform | Job |
+| --- | --- |
+| Docker | Build and run containers |
+| Docker Hub | Store and share images |
+| AWS EC2 | Run Docker on a virtual server |
+| AWS ECR | Store container images inside AWS |
+| AWS ECS | Run and manage containers as a service |
+| Kubernetes | Orchestrate containers across many machines |
+
+You can learn Docker locally first, then carry the same ideas into cloud deployments.
+
+## What to focus on first
+
+Do not try to memorize every Docker command. Focus on the small set that appears everywhere:
+
+- `docker run`
+- `docker ps`
+- `docker images`
+- `docker logs`
+- `docker exec`
+- `docker stop`
+- `docker rm`
+- `docker rmi`
+- `docker build`
+- `docker tag`
+- `docker push`
+- `docker pull`
+
+Once those are comfortable, Dockerfiles and networking become much easier because you can experiment without fear.
+
+<Callout type="warn">
+Containers are isolated, but they are not magic security boxes. Do not run random images from unknown sources with sensitive files or credentials mounted into them.
+</Callout>
+
+Start with [Welcome To The Docker Course](/docs/docker/docker-foundations/welcome-to-the-docker-course) and move through the sidebar in order. The early theory makes the commands much easier to understand later.

@@ -1,0 +1,10 @@
+{
+    "title": "Docker Foundations",
+    "pages": [
+        "welcome-to-the-docker-course.mdx",
+        "understanding-the-real-problem.mdx",
+        "how-virtualization-tried-to-solve-deployment-issues.mdx",
+        "solution-with-containerization.mdx",
+        "docker-basic-overview.mdx"
+    ]
+}

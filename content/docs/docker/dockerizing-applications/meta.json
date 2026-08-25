@@ -1,0 +1,17 @@
+{
+    "title": "Dockerizing Applications",
+    "pages": [
+        "dockerizing-a-maven-web-application.mdx",
+        "pushing-image-into-docker-hub-maven.mdx",
+        "pulling-and-running-docker-images-from-docker-hub.mdx",
+        "dockerizing-spring-boot-web-application.mdx",
+        "push-spring-boot-image-to-docker-hub.mdx",
+        "dockerizing-spring-boot-rest-api-gradle.mdx",
+        "pull-and-run-spring-boot-rest-api-gradle.mdx",
+        "single-stage-dockerfile-with-maven-spring-boot.mdx",
+        "why-single-stage-dockerfiles-are-not-recommended.mdx",
+        "multi-stage-dockerfile-explained-using-spring-boot-application.mdx",
+        "dockerizing-a-react-application-using-multi-stage-dockerfile.mdx",
+        "dockerizing-a-basic-python-flask-application.mdx"
+    ]
+}
