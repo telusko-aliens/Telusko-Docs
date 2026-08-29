@@ -1,45 +1,133 @@
 ---
 title: Getting Started
+description: A complete beginner to advanced roadmap for learning Go, from your first program to concurrent, production-ready services.
 icon: Sparkles
-description: A beginner-friendly Go course that follows the Golang tutorial series lecture by lecture.
 ---
 
-Welcome to the Go course. This series takes you from installing Go to building a complete Todo App, following the lectures in order so each topic builds on the one before it.
+Go is a small language with a big reach. You can learn most of the syntax in a weekend, and yet the same language runs Docker, Kubernetes, Terraform, and a large share of the backend services quietly powering the internet. That gap between "easy to learn" and "used for serious systems" is exactly what makes Go worth your time.
 
-The course is organized into the following sections, mapping one page to each lecture:
+This course walks that whole distance. You will start by installing the toolchain and printing a line of text, and you will finish by writing concurrent programs, HTTP services, database layers, and containers that you could reasonably ship.
 
-## 01 - Getting Started
+## Who this is for
 
-Setting up Go and writing your first program.
+You do not need previous Go experience. You do need to be comfortable with the idea of writing code, running it, and reading an error message without panicking. If you have written a bit of Java, Python, JavaScript, or C, you will recognise plenty here, and the notes will point out the places where Go deliberately does things differently.
+
+## What you will be able to do
+
+By the end of these sections you should be able to:
+
+- Read and write idiomatic Go without constantly reaching for a reference
+- Model data with structs, slices, and maps, and know which one fits a problem
+- Use interfaces the way Go intends, which is smaller and looser than most people expect
+- Handle errors as ordinary values instead of hiding them behind exceptions
+- Write concurrent code with goroutines and channels, and explain why it is safe
+- Build a JSON API on top of the standard library, backed by a real database
+- Test, profile, build, containerise, and deploy a Go program
+
+## How the course is organised
+
+The sections below run in order, and each one assumes the ones before it. If you are already comfortable with the basics, the table gives you an honest place to jump in.
+
+| Stage | Sections | What it covers |
+| --- | --- | --- |
+| Foundations | 01 to 04 | Setup, syntax, types, control flow, functions |
+| Core Go | 05 to 09 | Collections, structs, interfaces, errors, packages |
+| Real Go | 10 to 13 | Concurrency, standard library, web services, databases |
+| Shipping | 14 to 16 | Testing, tooling, production practices, projects |
+
+## 01 - Go Foundations
+
+What Go actually is, the problems it was built to solve, installing the toolchain, and the anatomy of your very first program. You also learn the difference between `go run`, `go build`, and `go install`, and why every project starts with a module.
 
 ## 02 - Variables and Data Types
 
-Value types and basic operations, declaring variables, data types, and converting between them.
+Declarations, the short variable form, numeric types and their sizes, strings, booleans, zero values, constants and `iota`, explicit conversion, operators, and formatted output with `fmt`.
 
-## 03 - User Inputs
+## 03 - Control Flow
 
-Reading input from the user, in two parts.
+Conditions, the switch statement Go gives you instead of a long chain of `else if`, the single loop keyword that covers every looping case, `range`, and the labels that let you break out of nested work cleanly.
 
-## 04 - Control Flow
+## 04 - Functions
 
-Making decisions with if-else and switch, and repeating work with loops.
+Writing and calling functions, returning more than one value, variadic parameters, treating functions as values, closures that capture state, `defer` for cleanup, and recursion.
 
-## 05 - Collections
+## 05 - Arrays, Slices and Maps
 
-Storing groups of values with arrays, slices, and maps.
+Fixed arrays versus growable slices, what actually happens in memory when a slice grows, maps for key and value lookups, the real relationship between strings, bytes, and runes, and sorting.
 
-## 06 - Core Concepts
+## 06 - Structs, Pointers and Methods
 
-Pointers, functions, structs, and methods - the building blocks of real Go programs.
+Defining your own types, understanding pointers without fear, attaching methods to types, choosing between value and pointer receivers, and embedding one struct inside another.
 
-## 07 - Packages and Scope
+## 07 - Interfaces and Generics
 
-Organizing code into packages and understanding how scope works.
+Why Go interfaces are satisfied implicitly, how to keep them small, type assertions and type switches, composition instead of inheritance, and type parameters for code that works across many types.
 
-## 08 - Final Project
+## 08 - Error Handling
 
-Building a Todo App in Go, step by step.
+Errors as ordinary return values, creating and wrapping them, defining your own error types, inspecting them with `errors.Is` and `errors.As`, and the narrow situations where `panic` and `recover` belong.
+
+## 09 - Packages and Modules
+
+How packages group code, what capitalisation has to do with visibility, working with `go.mod`, pulling in third party libraries, and laying out a project that will still make sense in a year.
+
+## 10 - Concurrency
+
+Goroutines, channels, buffered channels, `select`, `sync.WaitGroup` and `sync.Mutex`, worker pools, the `context` package for cancellation, and the race detector that proves your code is safe.
+
+## 11 - Standard Library Essentials
+
+The packages you will reach for constantly: `fmt`, `strings`, `strconv`, `time`, `os`, file handling, and JSON encoding and decoding.
+
+## 12 - Building Web Services
+
+The `net/http` package, handlers and routing, building a JSON API by hand, middleware, calling other services as a client, HTML templates, and how to structure a service that grows.
+
+## 13 - Working with Databases
+
+`database/sql`, connecting to PostgreSQL, running CRUD queries safely, transactions and connection pooling, and the repository pattern applied in a Go way.
+
+## 14 - Testing and Tooling
+
+The built-in testing package, table driven tests, using interfaces to make code testable, benchmarks and profiling, `go vet` and linters, and debugging techniques that work.
+
+## 15 - Going to Production
+
+Configuration and environment variables, structured logging, graceful shutdown, cross compilation, Docker images measured in megabytes, and practical performance advice.
+
+## 16 - Projects
+
+Five builds that pull everything together: a CLI task manager, a concurrent web scraper, a REST API with a database, a file processing tool, and a small service written the way a team would write it.
+
+## How to actually learn this
+
+Reading Go is easy, which is a trap. The syntax is simple enough that pages slide past without resistance, and then you sit down to write something and find you have absorbed nothing. A few habits fix that.
+
+<Steps>
+<Step>
+### Type the examples, do not copy them
+
+Typing forces you to notice the parts you skimmed over. It also means you meet the compiler errors, and Go's compiler errors are unusually good teachers.
+</Step>
+<Step>
+### Break every example on purpose
+
+Remove a return value, change a receiver, delete a `defer`. Watching how the program fails teaches you far more about the rule than reading the rule did.
+</Step>
+<Step>
+### Keep one scratch module open
+
+Create a folder called `go-practice` with a `go.mod` in it and keep it open in a second editor window. Every idea you meet gets tried there within a minute of reading about it.
+</Step>
+<Step>
+### Run `go vet` and `gofmt` from day one
+
+They are not advanced tools. They are the tools that stop bad habits from forming while your habits are still soft.
+</Step>
+</Steps>
 
 <Callout type="info">
-Work through the sidebar in order. Each lecture assumes the ones before it.
+Go rewards patience with fundamentals. The language has very few features, so almost every real Go program is built from the same small set of ideas used well. Time spent understanding slices, interfaces, and channels properly pays back for years.
 </Callout>
+
+When you are ready, the next page covers where Go came from and why it looks the way it does.

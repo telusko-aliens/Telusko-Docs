@@ -1,0 +1,225 @@
+---
+title: Arrays
+---
+
+Here is an unusual thing about Go: you will read this page, understand arrays properly, and then almost never use one. Go programmers work with slices. Arrays exist underneath slices, they turn up in a handful of specific situations, and the reason to learn them is that slices make no sense until you do.
+
+So treat this as the foundation page rather than the practical one.
+
+## Length is part of the type
+
+```go
+var scores [5]int
+names := [3]string{"a", "b", "c"}
+```
+
+`[5]int` and `[3]int` are **different types**. Not different sizes of the same type, genuinely different types, in the same way `int` and `string` are.
+
+```go
+var a [3]int
+var b [5]int
+
+a = b        // compile error: cannot use b (type [5]int) as type [3]int
+```
+
+This single fact explains everything else about arrays. A function taking `[5]int` accepts only arrays of exactly five ints. You cannot write one function that handles arrays of any length, which is precisely why slices exist.
+
+## Creating them
+
+```go
+var zeros [4]int                       // [0 0 0 0]
+primes := [4]int{2, 3, 5, 7}           // all four given
+partial := [4]int{2, 3}                // [2 3 0 0], rest are zero values
+counted := [...]int{1, 2, 3, 4, 5}     // [5]int, compiler counts for you
+
+sparse := [5]string{2: "third", 4: "fifth"}
+// ["" "" "third" "" "fifth"]
+```
+
+That `[...]` form is worth using. It gives you a genuine array whose length the compiler works out, so adding an element does not mean editing the number too.
+
+The indexed form is occasionally useful for lookup tables where most entries are the zero value:
+
+```go
+var httpStatusText = [600]string{
+    200: "OK",
+    404: "Not Found",
+    500: "Internal Server Error",
+}
+```
+
+## Arrays are values, and that is the whole story
+
+This is the behaviour that distinguishes Go's arrays from those in nearly every other C-family language.
+
+```go
+a := [3]int{1, 2, 3}
+b := a               // full copy of all three elements
+
+b[0] = 99
+fmt.Println(a)       // [1 2 3], untouched
+fmt.Println(b)       // [99 2 3]
+```
+
+Assignment copies. Passing to a function copies. Returning from a function copies.
+
+```go
+func modify(arr [3]int) {
+    arr[0] = 100     // modifies the copy
+}
+
+nums := [3]int{1, 2, 3}
+modify(nums)
+fmt.Println(nums)    // [1 2 3]
+```
+
+For a three element array this is free. For `[1000000]int` it is eight megabytes copied on every call, which is the kind of thing that shows up in a profile as a mystery.
+
+To modify the caller's array, pass a pointer:
+
+```go
+func modify(arr *[3]int) {
+    arr[0] = 100     // no explicit dereference needed, Go does it for you
+}
+
+nums := [3]int{1, 2, 3}
+modify(&nums)
+fmt.Println(nums)    // [100 2 3]
+```
+
+<Callout type="info">
+Notice `arr[0]` rather than `(*arr)[0]`. Go automatically dereferences a pointer to an array when you index it, and `len` works on it too. This convenience is one of the small places where Go smooths over pointer syntax.
+</Callout>
+
+## Arrays are comparable
+
+Because arrays are values with a fixed shape, `==` works on them, provided the element type is comparable:
+
+```go
+a := [3]int{1, 2, 3}
+b := [3]int{1, 2, 3}
+c := [3]int{1, 2, 4}
+
+fmt.Println(a == b)     // true
+fmt.Println(a == c)     // false
+```
+
+Slices cannot do this. It is one of the few things arrays offer that slices do not, and it means an array can be a map key:
+
+```go
+type Coordinate [2]int
+
+visited := map[Coordinate]bool{}
+visited[Coordinate{3, 4}] = true
+
+if visited[Coordinate{3, 4}] {
+    fmt.Println("been here")
+}
+```
+
+That pattern is genuinely useful in grid and graph problems, and there is no slice equivalent.
+
+## Multidimensional arrays
+
+```go
+var grid [3][3]int
+
+grid[1][1] = 5
+
+board := [2][3]string{
+    {"a", "b", "c"},
+    {"d", "e", "f"},
+}
+
+for _, row := range board {
+    for _, cell := range row {
+        fmt.Print(cell, " ")
+    }
+    fmt.Println()
+}
+```
+
+A `[3][3]int` is one contiguous block of nine integers, laid out row by row. That contiguity is a real performance advantage over a slice of slices, where each row is a separate allocation potentially scattered across memory. For fixed size matrices in numeric code, it matters.
+
+## Where arrays actually appear
+
+Four places, and they are the reason the type is not simply a historical footnote.
+
+**Fixed size buffers, especially for cryptography.**
+
+```go
+hash := sha256.Sum256(data)     // returns [32]byte, not a slice
+fmt.Printf("%x\n", hash)
+```
+
+Returning an array here says the length is 32, always, guaranteed by the type. A `[]byte` would leave the caller wondering.
+
+**Comparable composite keys**, as in the coordinate example above.
+
+**Backing storage on the stack**, avoiding an allocation:
+
+```go
+func encode(data []byte) string {
+    var buf [64]byte                  // on the stack, no heap allocation
+    n := hex.Encode(buf[:], data)
+    return string(buf[:n])
+}
+```
+
+`buf[:]` turns the array into a slice pointing at it, which is the usual way to hand array storage to something that wants a slice.
+
+**Struct fields with a known fixed size**, in protocol or file format parsing:
+
+```go
+type Header struct {
+    Magic   [4]byte
+    Version uint16
+    Flags   uint16
+}
+```
+
+The struct has a fixed size in memory, which is exactly what you need when reading a binary format.
+
+## Slicing an array
+
+The bridge to the next page:
+
+```go
+arr := [5]int{1, 2, 3, 4, 5}
+
+s1 := arr[:]        // slice over the whole array
+s2 := arr[1:4]      // [2 3 4]
+s3 := arr[:3]       // [1 2 3]
+s4 := arr[2:]       // [3 4 5]
+```
+
+The result is a slice, and it does **not** copy. It points into the array's memory:
+
+```go
+arr := [5]int{1, 2, 3, 4, 5}
+s := arr[1:4]
+
+s[0] = 99
+fmt.Println(arr)    // [1 99 3 4 5], the array changed
+```
+
+That sharing is the whole reason slices are efficient, and it is also the source of every slice gotcha you will meet. The next page takes it apart properly.
+
+## Arrays versus slices, at a glance
+
+| | Array | Slice |
+| --- | --- | --- |
+| Length | fixed, part of the type | dynamic |
+| Assignment | copies everything | copies a small header, shares data |
+| Comparable with `==` | yes | no, only against nil |
+| Usable as a map key | yes | no |
+| Can grow | no | yes, via `append` |
+| Zero value | fully usable, all zeros | `nil`, but `append` still works |
+| Passing to a function | copies the data | shares the data |
+| How often you use it | rarely | constantly |
+
+<Callout type="warn">
+Because a function taking `[5]int` will not accept `[6]int`, arrays are nearly useless as parameters. Any function that wants to handle a sequence of unknown length must take a slice. If you find yourself writing an array parameter, check whether you meant `[]T`.
+</Callout>
+
+Next, let's look at slices, which is where Go actually keeps its data.

@@ -1,0 +1,289 @@
+---
+title: Defer
+---
+
+Cleanup code has a habit of getting lost. You open a file at the top of a function, add three early returns over the following months, and one of them forgets to close it. Go's answer is `defer`: schedule the cleanup on the line right after you acquire the thing, and let the runtime guarantee it runs.
+
+```go
+f, err := os.Open("data.txt")
+if err != nil {
+    return err
+}
+defer f.Close()          // will run no matter how this function exits
+```
+
+Open on one line, close on the next. Every future return, panic, or early exit is already handled.
+
+## The rules
+
+Three of them, and each one has consequences worth understanding.
+
+### Deferred calls run when the function returns
+
+Not when the block ends, not when the loop iteration ends. When the enclosing **function** returns.
+
+```go
+func main() {
+    defer fmt.Println("third")
+    fmt.Println("first")
+    fmt.Println("second")
+}
+// first
+// second
+// third
+```
+
+They run on a panic too, which is what makes them reliable for cleanup. The only thing that skips them is `os.Exit`.
+
+### They run in last in, first out order
+
+```go
+func main() {
+    for i := 1; i <= 3; i++ {
+        defer fmt.Println(i)
+    }
+}
+// 3
+// 2
+// 1
+```
+
+The stack ordering is deliberate, and it is exactly right for cleanup. Resources acquired later depend on ones acquired earlier, so they must be released first.
+
+```go
+db, _ := sql.Open(...)
+defer db.Close()                 // released last
+
+tx, _ := db.Begin()
+defer tx.Rollback()              // released first
+
+// tx is torn down before db, which is the only sane order
+```
+
+### Arguments are evaluated immediately
+
+This is the rule that surprises people.
+
+```go
+func main() {
+    x := 10
+    defer fmt.Println("deferred:", x)
+    x = 20
+    fmt.Println("current:", x)
+}
+// current: 20
+// deferred: 10
+```
+
+`x` was evaluated the moment the `defer` statement executed, and the value 10 was stored with the scheduled call. The later assignment does not reach it.
+
+When you want the value at exit time, wrap it in a closure:
+
+```go
+func main() {
+    x := 10
+    defer func() {
+        fmt.Println("deferred:", x)     // reads x when it runs
+    }()
+    x = 20
+}
+// deferred: 20
+```
+
+Method calls follow the same rule for the receiver:
+
+```go
+defer mu.Unlock()          // mu is evaluated now, the call happens later
+```
+
+## Modifying named return values
+
+A deferred closure runs after the return value has been set but before the caller sees it. If the returns are named, the closure can change them. This is the one thing that makes named returns genuinely necessary rather than merely descriptive.
+
+```go
+func process() (err error) {
+    defer func() {
+        if r := recover(); r != nil {
+            err = fmt.Errorf("recovered from panic: %v", r)
+        }
+    }()
+
+    riskyOperation()      // may panic
+    return nil
+}
+```
+
+If `riskyOperation` panics, the deferred function catches it and sets `err`. The caller receives an ordinary error instead of a crashing program.
+
+The same technique adds context to errors on the way out:
+
+```go
+func loadConfig(path string) (err error) {
+    defer func() {
+        if err != nil {
+            err = fmt.Errorf("loading config %s: %w", path, err)
+        }
+    }()
+
+    // every return below gets the wrapping for free
+    data, err := os.ReadFile(path)
+    if err != nil {
+        return err
+    }
+    return yaml.Unmarshal(data, &cfg)
+}
+```
+
+<Callout type="warn">
+This only works with named return values. With `func process() error`, the deferred function has no variable to assign to, and the returned error is whatever the `return` statement set. Silent no-ops from this mistake are hard to spot, so double check the signature when you use this pattern.
+</Callout>
+
+## The loop problem
+
+`defer` schedules for function exit, so putting one inside a loop piles them up:
+
+```go
+func processAll(paths []string) error {
+    for _, p := range paths {
+        f, err := os.Open(p)
+        if err != nil {
+            return err
+        }
+        defer f.Close()        // nothing closes until processAll returns
+
+        parse(f)
+    }
+    return nil
+}
+```
+
+Ten thousand paths means ten thousand open file descriptors, and on most systems the process hits its limit long before the loop finishes.
+
+The standard fix is to give the body its own function, so its defers fire per iteration:
+
+```go
+func processAll(paths []string) error {
+    for _, p := range paths {
+        if err := processOne(p); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+
+func processOne(path string) error {
+    f, err := os.Open(path)
+    if err != nil {
+        return err
+    }
+    defer f.Close()            // runs at the end of this call
+
+    return parse(f)
+}
+```
+
+An anonymous function inline works too, though the named version usually reads better and is easier to test.
+
+## Handling errors from deferred calls
+
+`defer f.Close()` discards whatever `Close` returns. For a file you only read, that is fine. For a file you wrote to, `Close` is where the final flush happens, and a failure there means your data did not land.
+
+```go
+func writeReport(path string, data []byte) (err error) {
+    f, err := os.Create(path)
+    if err != nil {
+        return err
+    }
+
+    defer func() {
+        closeErr := f.Close()
+        if err == nil {
+            err = closeErr        // report the close failure if nothing else failed
+        }
+    }()
+
+    _, err = f.Write(data)
+    return err
+}
+```
+
+The condition matters. If the write already failed, that error is more informative than the close error, so it wins.
+
+<Callout type="info">
+A quick rule: `defer f.Close()` is fine for readers, and needs the error checked for writers. The same applies to anything that buffers, including `bufio.Writer`, gzip writers, and database transactions.
+</Callout>
+
+## What defer costs
+
+Very little, and less than it used to. Go 1.14 introduced open coded defers, which the compiler inlines directly into the function exit path. A defer in a straightforward function now costs a handful of nanoseconds, close to a normal function call.
+
+The optimisation does not apply when a defer appears inside a loop or when a function has more than eight of them. Those fall back to the older, slower mechanism. This almost never matters, and it is worth knowing only so you do not avoid `defer` out of vague performance anxiety.
+
+## Where defer belongs
+
+```go
+// Files
+f, _ := os.Open(path)
+defer f.Close()
+
+// Mutexes
+mu.Lock()
+defer mu.Unlock()
+
+// Database transactions
+tx, _ := db.Begin()
+defer tx.Rollback()      // no-op if Commit already succeeded
+
+// HTTP response bodies
+resp, _ := http.Get(url)
+defer resp.Body.Close()
+
+// Timing
+start := time.Now()
+defer func() { log.Printf("took %v", time.Since(start)) }()
+
+// Context cancellation
+ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+defer cancel()
+```
+
+That transaction pattern is particularly neat. `Rollback` on an already committed transaction returns an error that you ignore, so a single deferred rollback handles every failure path while the successful path commits normally:
+
+```go
+func transfer(db *sql.DB, from, to string, amount int64) error {
+    tx, err := db.Begin()
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback()
+
+    if _, err := tx.Exec("UPDATE accounts SET balance = balance - ? WHERE id = ?", amount, from); err != nil {
+        return err
+    }
+    if _, err := tx.Exec("UPDATE accounts SET balance = balance + ? WHERE id = ?", amount, to); err != nil {
+        return err
+    }
+
+    return tx.Commit()
+}
+```
+
+Three failure points, one line of cleanup, and no way to leave a transaction hanging.
+
+<Callout type="warn">
+`os.Exit` and `log.Fatal` terminate the process immediately and skip every pending defer. `log.Fatal` calls `os.Exit(1)` internally, which makes it a poor choice anywhere except the top of `main`. In a library or a handler, return an error instead.
+</Callout>
+
+## The habit to form
+
+Put the `defer` on the line immediately after acquiring the resource, before any code that might return. That way the cleanup and the acquisition are adjacent, and a reviewer can verify the pairing without reading the rest of the function.
+
+```go
+f, err := os.Open(path)
+if err != nil {
+    return err
+}
+defer f.Close()          // right here, not fifteen lines down
+```
+
+Next, let's finish this section with recursion, and the specific things Go does and does not do to support it.

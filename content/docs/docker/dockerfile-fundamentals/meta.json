@@ -1,0 +1,10 @@
+{
+    "title": "Dockerfile Fundamentals",
+    "pages": [
+        "dockerfile-basics-with-a-hands-on-example.mdx",
+        "workdir-instruction.mdx",
+        "run-vs-cmd-in-dockerfile.mdx",
+        "expose-instruction.mdx",
+        "cmd-vs-entrypoint-basics.mdx"
+    ]
+}

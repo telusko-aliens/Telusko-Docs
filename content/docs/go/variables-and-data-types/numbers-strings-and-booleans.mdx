@@ -1,0 +1,243 @@
+---
+title: Numbers, Strings and Booleans
+---
+
+Go's basic types fit on one screen. There are integers in a handful of sizes, two floating point types, two complex types you will probably never use, booleans, and strings. What takes longer than memorising the list is understanding the three or four places where these types behave differently from what you expect, so most of this page is about those.
+
+## Integers
+
+Go gives you signed and unsigned integers in four explicit sizes each, plus one that depends on the platform.
+
+| Type | Size | Range |
+| --- | --- | --- |
+| `int8` | 8 bits | -128 to 127 |
+| `int16` | 16 bits | -32,768 to 32,767 |
+| `int32` | 32 bits | about -2.1 billion to 2.1 billion |
+| `int64` | 64 bits | about -9.2 quintillion to 9.2 quintillion |
+| `uint8` | 8 bits | 0 to 255 |
+| `uint16` | 16 bits | 0 to 65,535 |
+| `uint32` | 32 bits | 0 to about 4.3 billion |
+| `uint64` | 64 bits | 0 to about 18.4 quintillion |
+| `int` | 64 bits on modern machines | matches the platform word size |
+| `uint` | 64 bits on modern machines | matches the platform word size |
+
+### Just use `int`
+
+Unless you have a reason, use `int`. It is the default for integer literals, it is what `len()` returns, it is what array indexes are, and it is the size the processor handles most efficiently.
+
+Reach for a sized type only when something outside your program dictates it. A binary file format that specifies 32 bit fields, a database column declared as `BIGINT`, a network protocol with fixed width headers, or a struct where you are counting bytes because there will be millions of them.
+
+<Callout type="warn">
+Resist the temptation to use `uint` for values that "cannot be negative", such as a count or an age. It looks tidy and it causes real bugs, because subtracting past zero wraps around to an enormous number instead of going negative. `var count uint = 0; count--` gives you 18446744073709551615, and nothing warns you.
+</Callout>
+
+### Overflow wraps silently
+
+Go does not panic on integer overflow. It wraps, following two's complement rules:
+
+```go
+var x int8 = 127
+x++
+fmt.Println(x)      // -128
+```
+
+There is no runtime check and no error. If you are working near the limits of a small type, you have to check the bounds yourself. This is one of the few places where Go chooses speed over safety, because a check on every arithmetic operation would be expensive.
+
+### Writing integer literals
+
+```go
+decimal := 42
+binary  := 0b101010     // 42
+octal   := 0o52         // 42
+hex     := 0x2A         // 42
+readable := 1_000_000   // underscores are ignored, purely for humans
+```
+
+Those underscores are a small thing that makes a real difference when a constant has nine digits in it.
+
+## Floating point numbers
+
+Two types, and the choice is easy:
+
+```go
+var precise float64 = 3.141592653589793   // use this
+var small   float32 = 3.14159             // only when memory or a format demands it
+```
+
+`float64` is the default for a decimal literal and is what every function in the `math` package takes and returns. Use `float32` only when an external constraint pushes you there.
+
+### The precision trap
+
+This catches every programmer once, in every language that uses IEEE 754:
+
+```go
+fmt.Println(0.1 + 0.2)              // 0.30000000000000004
+fmt.Println(0.1+0.2 == 0.3)         // false
+```
+
+Binary floating point cannot represent 0.1 exactly, any more than decimal can represent one third exactly. The tiny error is real and it accumulates.
+
+Two consequences that matter in real code:
+
+**Never compare floats with `==`.** Compare the difference against a tolerance:
+
+```go
+import "math"
+
+func nearlyEqual(a, b float64) bool {
+    return math.Abs(a-b) < 1e-9
+}
+```
+
+**Never store money as a float.** Use integer minor units, so an amount is a count of paise or cents rather than a fraction of rupees or dollars:
+
+```go
+type Money struct {
+    Amount   int64   // 199900 means 1999.00
+    Currency string
+}
+```
+
+Every payment system that has ever been debugged at two in the morning agrees on this one.
+
+### Special float values
+
+```go
+positiveInf := math.Inf(1)
+negativeInf := math.Inf(-1)
+notANumber  := math.NaN()
+
+fmt.Println(notANumber == notANumber)   // false, NaN equals nothing
+fmt.Println(math.IsNaN(notANumber))     // true, this is how you test for it
+```
+
+Dividing a float by zero gives infinity rather than a panic. Dividing an integer by zero does panic. The asymmetry is deliberate, and it follows the IEEE standard for floats.
+
+## Booleans
+
+```go
+var ready bool          // false, the zero value
+active := true
+```
+
+Two things distinguish Go's `bool` from the loose booleans you may know from other languages.
+
+**There is no truthiness.** Only a genuine `bool` can go in an `if`:
+
+```go
+count := 0
+if count {              // compile error
+    fmt.Println("nonzero")
+}
+
+if count != 0 {         // this is what you write
+    fmt.Println("nonzero")
+}
+```
+
+**There is no conversion to or from numbers.** `int(true)` does not compile, and neither does `bool(1)`. If you need to count booleans, write the branch out.
+
+The logical operators `&&` and `||` short circuit, which is what lets this common pattern be safe:
+
+```go
+if user != nil && user.IsActive {
+    // the second check never runs when user is nil
+}
+```
+
+## Strings
+
+A Go string is an immutable sequence of bytes, and it is almost always UTF-8 encoded text.
+
+```go
+name := "Telusko"
+fmt.Println(len(name))     // 7
+fmt.Println(name[0])       // 84, a byte, not "T"
+```
+
+Two details in that snippet catch people out, and both come from the same source: a string is bytes, not characters.
+
+### `len` counts bytes
+
+```go
+english := "hello"
+hindi   := "नमस्ते"
+
+fmt.Println(len(english))   // 5
+fmt.Println(len(hindi))     // 18
+```
+
+Six visible characters, eighteen bytes, because Devanagari characters take three bytes each in UTF-8. If you need the count of characters, use `utf8.RuneCountInString`:
+
+```go
+import "unicode/utf8"
+
+fmt.Println(utf8.RuneCountInString(hindi))   // 6
+```
+
+### Indexing gives you a byte
+
+`name[0]` is a `uint8`, so printing it shows a number. To get the character, convert it or slice it:
+
+```go
+fmt.Println(string(name[0]))   // "T"
+```
+
+The full story of bytes, runes, and how to iterate text correctly lives in the arrays and slices section. For now, the rule to carry forward is that indexing a string is safe for ASCII and wrong for anything else.
+
+### Strings cannot be modified
+
+```go
+name := "Telusko"
+name[0] = 'X'      // compile error, cannot assign
+```
+
+Immutability is why passing a string around is cheap. Under the hood a string is a pointer to bytes plus a length, so copying one copies sixteen bytes regardless of how long the text is.
+
+To build a modified version, convert to a byte slice and back, or use `strings.Builder` when you are assembling text in a loop:
+
+```go
+var b strings.Builder
+for i := 0; i < 5; i++ {
+    b.WriteString("go ")
+}
+fmt.Println(b.String())    // "go go go go go "
+```
+
+Concatenating with `+=` in a loop allocates a whole new string every iteration. For five iterations nobody cares. For fifty thousand, `strings.Builder` is dramatically faster.
+
+### Raw string literals
+
+Backticks give you a string with no escape processing, spanning as many lines as you like:
+
+```go
+path := `C:\Users\shiva\go`          // no need to double the backslashes
+
+query := `
+SELECT id, name
+FROM users
+WHERE active = true
+`
+```
+
+This is the natural choice for SQL, regular expressions, JSON fixtures, and Windows paths. Everything between the backticks is taken literally, including newlines.
+
+## The types in one glance
+
+```text
+   integers   int, int8/16/32/64, uint, uint8/16/32/64
+              default: int
+
+   floats     float64, float32
+              default: float64
+
+   bool       true, false. no truthiness, no numeric conversion
+
+   string     immutable UTF-8 bytes. len() counts bytes, not characters
+
+   aliases    byte = uint8      rune = int32
+```
+
+Those last two aliases are worth remembering now. `byte` and `rune` are not separate types, they are alternative spellings that tell a reader what the number represents. `byte` means raw data, `rune` means a Unicode code point.
+
+Next, let's look at what happens when you declare a variable and give it no value at all, which in Go is a far more useful thing than it sounds.

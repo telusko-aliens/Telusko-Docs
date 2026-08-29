@@ -1,0 +1,97 @@
+---
+title: Getting Started
+description: A practical roadmap for learning Docker, from the deployment problem to images, containers, Dockerfiles, networking, and real application packaging.
+icon: Sparkles
+---
+
+Docker is the tool that made modern application deployment feel predictable. Instead of saying "it works on my machine" and hoping the server agrees, you package the application, its runtime, and its configuration into an image that can run the same way almost anywhere.
+
+This course starts from that exact pain. You will first understand why deployment breaks, how virtualization tried to solve it, and why containers became the lighter, faster answer. From there, you will install Docker, run containers, build your own images, write Dockerfiles, push images to Docker Hub, and containerize real applications from Java, Spring Boot, React, and Python.
+
+By the end you will be able to:
+
+- Explain the difference between virtual machines, containers, images, and registries
+- Install and use Docker Desktop, Docker on Linux, and browser based Docker playgrounds
+- Run containers in foreground and detached mode, map ports, inspect running containers, and clean them up
+- Build Docker images with clear names and tags
+- Write Dockerfiles using `WORKDIR`, `RUN`, `CMD`, `EXPOSE`, and `ENTRYPOINT`
+- Package Maven, Spring Boot, Gradle, React, and Flask applications into Docker images
+- Push and pull images using Docker Hub
+- Understand why multi-stage Dockerfiles produce better production images
+- Work with Docker default networks, bridge networking, and custom bridge networks
+
+## Who this is for
+
+This course is for developers who know how to build an application but want to understand how that application actually runs outside their laptop. You do not need previous Docker experience. It helps if you have used a terminal, installed software, and run at least one Java, Spring Boot, React, or Python project before.
+
+If you are learning backend development, DevOps, cloud deployment, or microservices, Docker is one of the first tools that makes the whole deployment story click.
+
+## How the course is organised
+
+The sections build from concept to practice. Early lessons explain the problem Docker solves. The middle lessons make you comfortable with commands, images, containers, and Dockerfiles. The final lessons apply Docker to real applications and networking.
+
+| Stage | Sections | What it covers |
+| --- | --- | --- |
+| Foundations | 01 | Deployment problems, virtualization, and containerization |
+| Setup | 02 | Docker Desktop, AWS practice setup, terminal setup, and Docker playgrounds |
+| Daily Docker | 03 | Architecture, commands, containers, port mapping, image tags, and cleanup |
+| Dockerfiles | 04 | Dockerfile instructions and the difference between `CMD` and `ENTRYPOINT` |
+| Applications | 05 | Maven, Spring Boot, Gradle, React, Flask, Docker Hub, and multi-stage builds |
+| Networking | 06 | Default networks, bridge networking, `docker0`, `veth`, `eth0`, and custom networks |
+
+## 01 - Docker Foundations
+
+Why application deployment becomes painful, how virtualization reduced the problem, why it still felt heavy, and how containerization gives teams a lighter packaging model. This section also gives you the basic mental model of Docker before commands enter the picture.
+
+## 02 - Docker Setup & Practice
+
+Installing Docker Desktop, configuring it correctly, preparing a terminal, creating an AWS account for cloud based practice, launching an EC2 instance, installing Docker on it, and using Docker Labs or online playgrounds when you want a quick sandbox.
+
+## 03 - Containers & Images
+
+The everyday Docker workflow: understanding Docker architecture, running containers, detaching from them, mapping ports, tagging images, entering a running container, and automatically removing containers after short experiments.
+
+## 04 - Dockerfile Fundamentals
+
+How Docker images are built from instructions. You will write Dockerfiles by hand and learn what `WORKDIR`, `RUN`, `CMD`, `EXPOSE`, and `ENTRYPOINT` really do, including the practical difference between commands that run at build time and commands that run when a container starts.
+
+## 05 - Dockerizing Applications
+
+Packaging real applications instead of toy examples. You will dockerize Maven web apps, Spring Boot apps, Gradle REST APIs, React apps, and a Python Flask app. You will also push and pull images from Docker Hub and compare single-stage and multi-stage Dockerfiles.
+
+## 06 - Docker Networking
+
+How containers talk to each other and to the outside world. This section covers Docker default networks, the bridge network, how `docker0`, `veth`, and `eth0` fit together, and when to create a custom bridge network for cleaner application setups.
+
+## How to actually learn this
+
+Docker becomes clear when you treat containers as disposable experiments. Run them, inspect them, break them, remove them, and rebuild them. The faster you get comfortable deleting and recreating containers, the faster Docker stops feeling mysterious.
+
+<Steps>
+<Step>
+### Type every command yourself
+
+Small command differences matter in Docker. Typing commands helps you notice image names, tags, flags, ports, volumes, and container names instead of treating them as noise.
+</Step>
+<Step>
+### Inspect before you delete
+
+Use commands like `docker ps`, `docker images`, `docker logs`, and `docker inspect` before cleaning up. Docker is much easier when you can see what is running and why.
+</Step>
+<Step>
+### Rebuild the same app more than once
+
+The first Dockerfile teaches syntax. The second and third builds teach caching, layers, image size, and why production Dockerfiles look different from beginner examples.
+</Step>
+<Step>
+### Clean up often
+
+Containers and images are easy to create, so they are also easy to accumulate. Build the habit of removing demo containers and unused images as part of the workflow.
+</Step>
+</Steps>
+
+<Callout type="info">
+You only need Docker Desktop or a Linux machine with Docker installed to begin. AWS and EC2 are useful for practicing a server setup, but the core ideas can be learned locally first.
+</Callout>
+
+Head to the [Introduction](/docs/docker/introduction) for the big picture, then start with Docker foundations.

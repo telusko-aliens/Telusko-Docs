@@ -1,0 +1,204 @@
+---
+title: Declaring Variables
+---
+
+Go gives you four ways to bring a variable into existence. That sounds like a lot for a language famous for having only one way to do things, but each form exists for a genuinely different situation, and Go programmers pick between them almost without thinking. This page is about making that choice deliberate before it becomes automatic.
+
+## The four forms
+
+```go
+var name string = "Telusko"   // 1. full form, type and value
+var count = 42                // 2. type inferred from the value
+var enabled bool              // 3. type only, value is the zero value
+message := "ready"            // 4. short form, inside functions only
+```
+
+Read them as a progression. The first spells out everything. Each one after it removes something the compiler can work out for itself.
+
+## The short form is the one you will use
+
+```go
+func main() {
+    name := "Shiva"
+    age := 28
+    active := true
+}
+```
+
+The `:=` operator declares a new variable and assigns to it in one step, inferring the type from the value on the right. In real Go code this accounts for the large majority of declarations, and reaching for `var` inside a function usually means you had a specific reason.
+
+It comes with two hard rules.
+
+**It only works inside a function.** At package level there is no `:=`, only `var`. The compiler needs every package level declaration to start with a keyword so it can process them in any order.
+
+```go
+package main
+
+count := 10          // syntax error, not inside a function
+
+var count = 10       // this is the package level form
+```
+
+**It must declare at least one new variable on the left.** This is the rule that catches people, because a line that looks like a redeclaration is often perfectly legal:
+
+```go
+a, err := doSomething()      // both new
+b, err := doSomethingElse()  // b is new, err is reassigned, this is fine
+err := doAnother()           // nothing new, compile error
+```
+
+That second line is the reason your Go code will be full of `:=` next to a repeated `err`. It is not a mistake, it is the language letting you reuse the error variable across a sequence of calls.
+
+## When to reach for `var` instead
+
+### You want the zero value
+
+If you are declaring something now and assigning to it later, `var` states that plainly:
+
+```go
+var result string
+
+if user.IsAdmin {
+    result = "full access"
+} else {
+    result = "read only"
+}
+```
+
+Writing `result := ""` here would work identically, but it implies an empty string was meaningful. `var result string` says the value is coming later.
+
+### The inferred type is not the one you want
+
+Inference always picks the default type, and sometimes that is wrong for your purpose:
+
+```go
+count := 42          // int
+var count int64 = 42 // int64, because a database column needs it
+
+ratio := 1.5         // float64
+var ratio float32    // float32, because a graphics API expects it
+```
+
+### You are declaring at package level
+
+Outside functions, `var` is your only option:
+
+```go
+package main
+
+var (
+    appName    = "orders-api"
+    maxRetries = 3
+    debug      bool
+)
+```
+
+Grouping several declarations in a single `var` block like this is idiomatic and keeps related settings together.
+
+## Declaring several at once
+
+Both forms handle multiple variables on one line:
+
+```go
+var host, port = "localhost", 8080
+name, age := "Navin", 35
+```
+
+And the classic swap, which needs no temporary variable because Go evaluates the whole right hand side before assigning:
+
+```go
+a, b := 1, 2
+a, b = b, a          // a is 2, b is 1
+```
+
+## Every variable must be used
+
+Go treats an unused local variable as a compile error, not a warning:
+
+```go
+func main() {
+    total := 100
+    fmt.Println("done")
+}
+```
+
+```text
+./main.go:4:2: declared and not used: total
+```
+
+The reasoning is that an unused variable is almost always either a leftover from a change you did not finish or a symptom of a typo elsewhere. Both are bugs, so Go stops you.
+
+When you genuinely need to discard a value, use the blank identifier:
+
+```go
+_, err := os.Open("config.yaml")   // we only care whether it failed
+```
+
+`_` accepts any value and immediately throws it away. It is not a variable, so it does not trigger the unused check and cannot be read back.
+
+<Callout type="info">
+Package level variables are exempt from the unused check, and so are struct fields and function parameters. The rule applies only to variables declared inside a function body, which is exactly where stale ones cause confusion.
+</Callout>
+
+## Shadowing, and the bug it hides
+
+Inside a nested block you can declare a variable with the same name as one outside it. The inner one shadows the outer for the rest of that block.
+
+```go
+func main() {
+    count := 10
+
+    if true {
+        count := 20              // a different variable
+        fmt.Println(count)       // 20
+    }
+
+    fmt.Println(count)           // 10, unchanged
+}
+```
+
+Used deliberately this is harmless. The problem arrives when it happens by accident, and the classic case involves `err`:
+
+```go
+func load() error {
+    var err error
+
+    if needsRefresh {
+        data, err := fetch()     // this err is brand new
+        process(data)
+    }
+
+    return err                   // always nil, the real error was discarded
+}
+```
+
+The `:=` inside the `if` block created a fresh `err` that vanished at the closing brace. The outer `err` was never touched, so the function reports success no matter what `fetch` did.
+
+<Callout type="warn">
+This is one of the most common real bugs in Go code, and it is invisible to the compiler because both variables are used. `go vet -shadow` and most linters catch it. Run them.
+</Callout>
+
+## Naming, the Go way
+
+Go's naming conventions are short and consistently applied, and following them makes your code look like everybody else's, which is the point.
+
+| Convention | Example | Notes |
+| --- | --- | --- |
+| MixedCaps, never underscores | `maxRetries`, not `max_retries` | Applies to everything |
+| Capital first letter means exported | `MaxRetries` is public, `maxRetries` is not | This is the only visibility control |
+| Short names for short scopes | `i`, `r`, `w`, `buf` | A loop counter does not need a paragraph |
+| Longer names for wider scopes | `defaultRequestTimeout` | Package level names are read far from where they are defined |
+| Initialisms stay uppercase | `userID`, `httpClient`, `parseURL` | Not `userId` or `parseUrl` |
+
+The short scope rule surprises people arriving from languages where descriptive names are always better. In Go, a variable used on the next two lines is clearer as `r` than as `responseFromUpstreamService`, because the reader can see its entire life at a glance.
+
+## Picking a form in practice
+
+```text
+   Inside a function, value known now?          →  x := value
+   Inside a function, value comes later?        →  var x Type
+   Need a type other than the inferred one?     →  var x Type = value
+   At package level?                            →  var ( ... )
+```
+
+Four rules, and they cover essentially every declaration you will write. Next, let's look at what those types actually are, starting with numbers, strings, and booleans.

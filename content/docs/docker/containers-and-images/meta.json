@@ -1,0 +1,12 @@
+{
+    "title": "Containers & Images",
+    "pages": [
+        "docker-basic-architecture.mdx",
+        "essential-docker-commands.mdx",
+        "running-docker-containers-in-detached-mode.mdx",
+        "access-applications-using-docker-port-mapping.mdx",
+        "how-to-tag-docker-images.mdx",
+        "get-inside-a-running-docker-container.mdx",
+        "automatically-remove-containers.mdx"
+    ]
+}

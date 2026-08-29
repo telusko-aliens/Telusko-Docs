@@ -1,10 +1,12 @@
 {
     "title": "Variables and Data Types",
     "pages": [
-        "value-types-and-basic-operations.mdx",
-        "variable-introduction.mdx",
-        "variable-declaration.mdx",
-        "data-types-and-variables.mdx",
-        "data-conversions.mdx"
+        "declaring-variables.mdx",
+        "numbers-strings-and-booleans.mdx",
+        "zero-values-and-type-inference.mdx",
+        "constants-and-iota.mdx",
+        "type-conversion.mdx",
+        "operators.mdx",
+        "printing-and-formatting-output.mdx"
     ]
 }

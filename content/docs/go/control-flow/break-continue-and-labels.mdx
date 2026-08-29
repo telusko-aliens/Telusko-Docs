@@ -1,0 +1,235 @@
+---
+title: Break, Continue and Labels
+---
+
+You are three levels deep in nested loops, you find what you were looking for, and you need to get out. In most languages this is where a boolean flag appears, gets checked in two conditions, and quietly makes the code worse. Go gives you labels instead, and they solve the problem cleanly enough that the flag never has to exist.
+
+## break and continue, briefly
+
+```go
+for i := 0; i < 10; i++ {
+    if i == 5 {
+        break            // leave the loop entirely
+    }
+    if i%2 == 0 {
+        continue         // skip to the next iteration
+    }
+    fmt.Println(i)       // 1 3
+}
+```
+
+`break` ends the innermost enclosing `for`, `switch`, or `select`. `continue` skips the rest of the current iteration and jumps to the post statement, then the condition.
+
+`continue` is at its best as a filter at the top of a loop body, for the same reason early returns are good in functions. It keeps the real work unindented:
+
+```go
+for _, file := range files {
+    if file.IsDir() {
+        continue
+    }
+    if !strings.HasSuffix(file.Name(), ".go") {
+        continue
+    }
+    if file.Size() == 0 {
+        continue
+    }
+
+    process(file)        // the only line that matters, at the base indent
+}
+```
+
+## The problem labels solve
+
+Here is the situation, written without labels:
+
+```go
+found := false
+for _, row := range grid {
+    for _, cell := range row {
+        if cell == target {
+            found = true
+            break            // only breaks the inner loop
+        }
+    }
+    if found {
+        break                // and now the outer one
+    }
+}
+```
+
+Two breaks, one flag, and a reader has to trace the flag to understand the control flow. With a label:
+
+```go
+search:
+for _, row := range grid {
+    for _, cell := range row {
+        if cell == target {
+            break search     // out of both loops, in one statement
+        }
+    }
+}
+```
+
+A label is an identifier followed by a colon, placed immediately before the statement it names. `break label` exits the labelled statement, and `continue label` starts the next iteration of the labelled loop.
+
+## continue with a label
+
+```go
+rows:
+for i, row := range grid {
+    for _, cell := range row {
+        if cell < 0 {
+            fmt.Printf("row %d has a negative value, skipping\n", i)
+            continue rows      // next row, abandoning this one
+        }
+    }
+    process(row)               // only reached when no cell was negative
+}
+```
+
+Without the label, `continue` would advance the inner loop and `process(row)` would run anyway. The label is what lets you abandon an entire outer iteration from deep inside.
+
+<Callout type="info">
+Name labels after what they do, not what they are. `search`, `rows`, `outer`, and `nextFile` all read well at the `break` site. A label called `loop1` tells the reader nothing when they encounter `break loop1` forty lines later.
+</Callout>
+
+## break inside a switch or select
+
+This is the case where labels stop being a convenience and become necessary.
+
+```go
+for _, event := range events {
+    switch event.Type {
+    case "shutdown":
+        break            // breaks the switch. the loop keeps going.
+    case "data":
+        handle(event)
+    }
+}
+```
+
+That `break` does nothing useful. `break` binds to the nearest enclosing `for`, `switch`, or `select`, and here that is the `switch`.
+
+```go
+events:
+for _, event := range events {
+    switch event.Type {
+    case "shutdown":
+        break events     // now it leaves the loop
+    case "data":
+        handle(event)
+    }
+}
+```
+
+The same applies to `select` inside a loop, which is extremely common in concurrent code:
+
+```go
+loop:
+for {
+    select {
+    case job := <-jobs:
+        process(job)
+    case <-quit:
+        break loop       // without the label, this only exits the select
+    }
+}
+```
+
+<Callout type="warn">
+This is one of the most frequent real bugs in Go worker loops. A `break` in a `select` case looks like it stops the worker and instead spins the loop forever. Either use a label, or restructure so the case does a `return` instead, which is often cleaner in a function whose whole job is the loop.
+</Callout>
+
+## Labels on a bare block
+
+A label can name any statement, including a plain block, which gives you a forward jump out of a section:
+
+```go
+process:
+{
+    if !valid(input) {
+        break process
+    }
+    step1()
+    step2()
+    step3()
+}
+
+fmt.Println("continues here either way")
+```
+
+This is unusual in Go code and usually a sign that the block wants to be a function. It exists, it is legal, and you will rarely need it.
+
+## goto
+
+Go has `goto`, and it is more limited than the reputation suggests:
+
+```go
+func retry() error {
+    attempts := 0
+
+start:
+    err := doWork()
+    if err != nil && attempts < 3 {
+        attempts++
+        goto start
+    }
+
+    return err
+}
+```
+
+The rules keep it from becoming spaghetti. A `goto` cannot jump into a block from outside it, and it cannot jump over a variable declaration that is in scope at the target. Those two restrictions rule out most of the historical abuses.
+
+In practice `goto` shows up in exactly one place in real Go code: cleanup in a long function with several failure points, usually in low level or generated code. The standard library uses it a handful of times. Everywhere else, a loop, an early return, or a `defer` does the job more clearly.
+
+## Choosing between the options
+
+```text
+   Leave the current loop                  →  break
+   Skip to the next iteration              →  continue
+   Leave an outer loop from inside         →  break label
+   Skip an outer iteration from inside     →  continue label
+   Leave a loop from inside switch/select  →  break label
+   Leave the whole function                →  return
+   Guarantee cleanup on the way out        →  defer
+```
+
+That `return` line is worth taking seriously. When a nested search is the only thing a function does, returning from the inner loop beats any label:
+
+```go
+func find(grid [][]int, target int) (row, col int, ok bool) {
+    for i, r := range grid {
+        for j, v := range r {
+            if v == target {
+                return i, j, true
+            }
+        }
+    }
+    return 0, 0, false
+}
+```
+
+No label, no flag, and the caller gets the result directly. When you find yourself reaching for a label, first ask whether the loops belong in a function of their own. Often they do, and the answer stops being a control flow question.
+
+## defer still runs
+
+One reassurance, since it is easy to worry about: breaking out of a loop does not skip cleanup registered with `defer`. Deferred calls run when the **function** returns, not when a block ends.
+
+```go
+func read(paths []string) error {
+    for _, p := range paths {
+        f, err := os.Open(p)
+        if err != nil {
+            return err          // deferred closes still run
+        }
+        defer f.Close()         // but they pile up until the function ends
+        // ...
+    }
+    return nil
+}
+```
+
+That example does have a real problem, just not the one about `break`. Every `defer` in the loop waits until the whole function finishes, so a thousand paths means a thousand open files at once. The functions section shows the standard fix, which is to move the body into its own function.
+
+That completes control flow. Next, let's package logic up properly and look at functions, where Go has several ideas that will be new even if you have written functions for years.

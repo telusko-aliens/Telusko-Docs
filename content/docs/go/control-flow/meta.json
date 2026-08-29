@@ -1,0 +1,10 @@
+{
+    "title": "Control Flow",
+    "pages": [
+        "if-else-statements.mdx",
+        "switch-statements.mdx",
+        "for-loops.mdx",
+        "range-loops.mdx",
+        "break-continue-and-labels.mdx"
+    ]
+}

@@ -1,0 +1,225 @@
+---
+title: Type Conversion
+---
+
+```go
+var count int = 10
+var ratio float64 = count
+```
+
+```text
+./main.go:3:23: cannot use count (variable of type int) as float64 value
+```
+
+Most languages would have quietly widened that `int` to a `float64` and moved on. Go refuses, and it refuses even in the cases where no information could possibly be lost. Every conversion in Go is written out by hand, without exception.
+
+That rule is annoying for about a day and then it starts paying for itself, because the places where numbers change shape are exactly the places where bugs hide.
+
+## The conversion syntax
+
+Wrap the value in the target type:
+
+```go
+count := 10
+ratio := float64(count)      // 10.0
+
+price := 19.99
+whole := int(price)          // 19, the fraction is discarded
+```
+
+That is the whole syntax. `T(v)` converts value `v` to type `T`, and it is legal only when Go considers the two types convertible.
+
+## What conversion actually costs you
+
+Converting between numeric types is not a free relabelling. Each direction has something to watch for.
+
+### Float to int truncates, it does not round
+
+```go
+fmt.Println(int(9.99))     // 9
+fmt.Println(int(-9.99))    // -9, toward zero, not down
+```
+
+For rounding, be explicit:
+
+```go
+import "math"
+
+fmt.Println(int(math.Round(9.99)))   // 10
+fmt.Println(int(math.Floor(9.99)))   // 9
+fmt.Println(int(math.Ceil(9.01)))    // 10
+```
+
+### Narrowing an integer silently discards bits
+
+```go
+var big int32 = 300
+var small int8 = int8(big)
+fmt.Println(small)          // 44
+```
+
+300 does not fit in eight bits, so the top bits are thrown away and you get whatever the remaining bits spell. There is no error, no warning, and no panic. If you are narrowing a value whose range you do not control, check it first:
+
+```go
+func toInt8(v int32) (int8, error) {
+    if v < math.MinInt8 || v > math.MaxInt8 {
+        return 0, fmt.Errorf("%d does not fit in int8", v)
+    }
+    return int8(v), nil
+}
+```
+
+### Signed to unsigned wraps
+
+```go
+var n int = -1
+var u uint = uint(n)
+fmt.Println(u)              // 18446744073709551615
+```
+
+The bit pattern is preserved and reinterpreted. This is occasionally what you want and usually a bug.
+
+### Losing precision in float32
+
+```go
+var precise float64 = 3.141592653589793
+var rough float32 = float32(precise)
+fmt.Println(rough)          // 3.1415927
+```
+
+`float32` holds about seven significant decimal digits. Converting down and back up does not recover the original.
+
+## Strings are the special case
+
+Here is where people trip. Converting a number to a string with `string()` does not do what it looks like it does.
+
+```go
+n := 65
+s := string(rune(n))
+fmt.Println(s)              // "A"
+```
+
+`string(65)` treats 65 as a Unicode code point and gives you the character it represents, not the text `"65"`. Modern Go vets against the direct form and tells you to write `string(rune(n))` to show that you meant it.
+
+For actual number to text conversion, you need the `strconv` package.
+
+### strconv, the package you actually want
+
+```go
+import "strconv"
+
+// number to string
+s := strconv.Itoa(42)                        // "42"
+s2 := strconv.FormatFloat(3.14, 'f', 2, 64)  // "3.14"
+s3 := strconv.FormatBool(true)               // "true"
+s4 := strconv.FormatInt(255, 16)             // "ff", base 16
+
+// string to number
+n, err := strconv.Atoi("42")                 // 42, nil
+f, err := strconv.ParseFloat("3.14", 64)     // 3.14, nil
+b, err := strconv.ParseBool("true")          // true, nil
+i, err := strconv.ParseInt("ff", 16, 64)     // 255, nil
+```
+
+Every parsing function returns an error, because the input is text and text can be anything:
+
+```go
+n, err := strconv.Atoi("not a number")
+if err != nil {
+    fmt.Println("bad input:", err)
+    // strconv.Atoi: parsing "not a number": invalid syntax
+}
+```
+
+Ignore that error and `n` is zero, which is indistinguishable from a genuine `"0"`. This is a real source of silent bugs in configuration parsing, so handle it.
+
+| Direction | Function | Notes |
+| --- | --- | --- |
+| `int` to `string` | `strconv.Itoa` | The fast, common case |
+| `string` to `int` | `strconv.Atoi` | Returns an error |
+| `float64` to `string` | `strconv.FormatFloat` | Control format and precision |
+| `string` to `float64` | `strconv.ParseFloat` | Returns an error |
+| anything to `string` | `fmt.Sprintf` | Slower, but handles any type |
+
+<Callout type="info">
+`fmt.Sprintf("%d", n)` also turns a number into a string, and it is fine for occasional use. `strconv.Itoa` is noticeably faster because it does not go through the formatting machinery. In a hot loop the difference is measurable, everywhere else it is taste.
+</Callout>
+
+## Strings, bytes, and runes
+
+These three conversions are legal and each produces something different:
+
+```go
+s := "héllo"
+
+b := []byte(s)        // the raw UTF-8 bytes
+r := []rune(s)        // the Unicode code points
+
+fmt.Println(len(s))   // 6, byte count
+fmt.Println(len(b))   // 6, same bytes
+fmt.Println(len(r))   // 5, character count
+
+fmt.Println(string(b))  // "héllo", back again
+fmt.Println(string(r))  // "héllo", also back again
+```
+
+Use `[]byte` when you are dealing with data: file contents, network payloads, hashing, anything binary. Use `[]rune` when you are dealing with text as humans see it: reversing a string, counting characters, indexing by character position.
+
+<Callout type="warn">
+Converting a string to `[]byte` or `[]rune` copies the data, because strings are immutable and slices are not. Doing this inside a loop over a large string is a common and easily missed performance problem. Convert once outside the loop.
+</Callout>
+
+## Converting your own types
+
+A named type based on an existing one converts freely in both directions:
+
+```go
+type Celsius float64
+type Fahrenheit float64
+
+c := Celsius(100)
+f := Fahrenheit(float64(c)*9/5 + 32)
+
+fmt.Println(f)      // 212
+```
+
+The conversion to `float64` in the middle is required. `Celsius` and `float64` have the same underlying type, but they are different types, and Go will not mix them in arithmetic without being told.
+
+This is the point of defining them separately. Passing a `Celsius` where a `Fahrenheit` is expected is a compile error, which is exactly the kind of mistake that has crashed real spacecraft.
+
+Structs convert too, as long as the fields match in name, type, and order:
+
+```go
+type Point struct{ X, Y int }
+type Coord struct{ X, Y int }
+
+p := Point{1, 2}
+c := Coord(p)       // legal, identical field structure
+```
+
+## What conversion is not
+
+Two things look like conversion and are not, and confusing them causes real trouble.
+
+**A type assertion pulls a concrete type out of an interface.** It uses different syntax and can fail at runtime:
+
+```go
+var i interface{} = "hello"
+
+s := i.(string)          // type assertion, panics if i is not a string
+s, ok := i.(string)      // safe form, ok reports whether it worked
+```
+
+Interfaces and assertions get a full treatment later.
+
+**Parsing turns text into structured data.** `strconv.Atoi` is parsing, not conversion, which is why it can fail while `float64(n)` cannot.
+
+```text
+   conversion   int → float64        always succeeds, may lose precision
+   parsing      "42" → int           may fail, returns an error
+   assertion    interface{} → string may fail, returns ok or panics
+```
+
+Keeping these three straight in your head saves a surprising amount of confusion when reading unfamiliar code.
+
+Next, let's cover the operators that combine all these values, including the one Go deliberately left out.

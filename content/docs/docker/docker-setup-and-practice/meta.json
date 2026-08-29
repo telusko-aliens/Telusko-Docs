@@ -1,0 +1,11 @@
+{
+    "title": "Docker Setup & Practice",
+    "pages": [
+        "docker-setup-and-installation-overview.mdx",
+        "docker-desktop-installation-and-configuration.mdx",
+        "aws-account-creation-for-docker-practice.mdx",
+        "git-bash-and-terminal-setup-for-docker.mdx",
+        "creating-an-ec2-instance-and-installing-docker.mdx",
+        "exploring-docker-labs-and-online-playground.mdx"
+    ]
+}

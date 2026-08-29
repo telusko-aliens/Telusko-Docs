@@ -1,0 +1,169 @@
+---
+title: Installing Go and the Toolchain
+---
+
+Installing Go is genuinely one of the easiest setups in programming. There is one official installer per platform, it bundles everything you need, and when it finishes you have a compiler, a formatter, a test runner, a dependency manager, and a documentation server. No package manager to configure first, no build tool to install separately.
+
+Budget about ten minutes, including the editor setup at the bottom.
+
+## Get the installer
+
+Everything comes from one place: [go.dev/dl](https://go.dev/dl/). Download the package for your operating system and architecture. If you are unsure which architecture you have, the notes below cover it.
+
+### Windows
+
+Download the `.msi` installer and run it. The default install location is `C:\Program Files\Go`, and the installer adds Go to your `PATH` automatically.
+
+Close and reopen any terminal you already had open. `PATH` changes do not reach terminals that were already running, and this trips up a lot of people on their first install.
+
+### macOS
+
+Download the `.pkg` installer and run it. Go installs to `/usr/local/go` and the installer handles the `PATH` entry.
+
+If you prefer Homebrew:
+
+```bash
+brew install go
+```
+
+On Apple Silicon machines take the ARM64 build. The Intel build will run under Rosetta, but you will be leaving performance on the table for no reason.
+
+### Linux
+
+Download the tarball and extract it into `/usr/local`, removing any previous installation first:
+
+```bash
+rm -rf /usr/local/go
+tar -C /usr/local -xzf go1.24.0.linux-amd64.tar.gz
+```
+
+Then add Go to your `PATH` by appending this line to `~/.bashrc` or `~/.zshrc`:
+
+```bash
+export PATH=$PATH:/usr/local/go/bin
+```
+
+Reload the shell with `source ~/.bashrc` or open a new terminal.
+
+<Callout type="warn">
+Resist the temptation to use `apt install golang` or your distribution's package manager. Distribution packages are often several releases behind, and an old Go can silently miss language features you will meet in this course. The official tarball takes the same two minutes and gives you the current release.
+</Callout>
+
+## Verify the installation
+
+Two commands confirm everything worked.
+
+```bash
+go version
+```
+
+You should see something like:
+
+```text
+go version go1.24.0 windows/amd64
+```
+
+Then check the environment the toolchain has configured for itself:
+
+```bash
+go env GOROOT GOPATH GOBIN
+```
+
+That prints three paths. They are worth understanding once, because they explain where things end up.
+
+| Variable | What it points at | Do you set it? |
+| --- | --- | --- |
+| `GOROOT` | Where Go itself is installed | No, the installer handles it |
+| `GOPATH` | Your workspace for downloaded modules and installed tools, defaults to `~/go` | Rarely, the default is fine |
+| `GOBIN` | Where `go install` puts binaries, defaults to `$GOPATH/bin` | Only if you want them elsewhere |
+
+<Callout type="info">
+If you learned Go before 2018, you may remember that all your code had to live inside `GOPATH/src`. That requirement is gone. With modules, a Go project can live in any folder on your disk. `GOPATH` now only holds the module cache and installed tool binaries.
+</Callout>
+
+## Add the tools directory to your PATH
+
+`go install` places command line tools in `$GOPATH/bin`, and that folder is not on your `PATH` by default on every system. Adding it now saves confusion later when you install a linter and the shell claims it does not exist.
+
+On macOS or Linux:
+
+```bash
+export PATH=$PATH:$(go env GOPATH)/bin
+```
+
+On Windows, add `%USERPROFILE%\go\bin` to your user `PATH` through the system environment variables dialog.
+
+## Set up your editor
+
+You can write Go in any text editor, but the language server makes a real difference. It is called `gopls` and it powers autocompletion, jump to definition, inline errors, and automatic formatting on save.
+
+<Steps>
+<Step>
+### Install the editor extension
+
+For **VS Code**, install the extension named simply "Go", published by the Go team at Google. For **GoLand**, everything is built in already. For **Neovim**, configure `gopls` through your LSP setup.
+</Step>
+<Step>
+### Let it install the tools
+
+The first time you open a `.go` file, VS Code will offer to install `gopls` and a few helpers. Accept. It downloads them into `$GOPATH/bin` and takes under a minute.
+</Step>
+<Step>
+### Turn on format on save
+
+This is the setting that matters most. Go code is formatted by `gofmt`, there are no options to argue about, and having it applied automatically means you never think about layout again.
+
+```json title="settings.json"
+{
+  "editor.formatOnSave": true,
+  "[go]": {
+    "editor.defaultFormatter": "golang.go"
+  }
+}
+```
+</Step>
+<Step>
+### Check that it works
+
+Open a `.go` file, write badly indented code on purpose, and save. If it snaps into shape, your setup is complete.
+</Step>
+</Steps>
+
+## The toolchain you just installed
+
+Everything below ships with Go. There is nothing else to install for the majority of this course.
+
+| Command | What it does |
+| --- | --- |
+| `go run` | Compile and execute in one step, without leaving a binary behind |
+| `go build` | Compile into an executable file |
+| `go install` | Build and place the binary in `$GOPATH/bin` |
+| `go test` | Run tests and benchmarks |
+| `go fmt` | Reformat source to the standard style |
+| `go vet` | Report suspicious constructs the compiler allows |
+| `go mod` | Manage the module and its dependencies |
+| `go get` | Add or update a dependency |
+| `go doc` | Print documentation for a package or symbol |
+| `go clean` | Remove build artefacts and cached objects |
+
+Try one now to see what a full toolchain feels like:
+
+```bash
+go doc fmt.Println
+```
+
+That prints the documentation for a standard library function directly in your terminal, offline, with no network call.
+
+## When something goes wrong
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `go: command not found` | `PATH` does not include Go's `bin` folder | Reopen the terminal, then verify the `PATH` entry |
+| `go version` shows an old release | An older Go is earlier in `PATH` | Remove the old install, or reorder `PATH` |
+| Installed tool not found | `$GOPATH/bin` is not on `PATH` | Add it as shown above |
+| `gopls` keeps crashing in the editor | Version mismatch after a Go upgrade | Run `go install golang.org/x/tools/gopls@latest` |
+| Permission denied on Linux install | Extracting into `/usr/local` needs root | Prefix the `tar` command with `sudo` |
+
+That is the entire setup, and unlike most language environments, you will not need to revisit it.
+
+Now for the part you actually came for, which is getting a program to run.

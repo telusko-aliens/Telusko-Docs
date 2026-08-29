@@ -1,0 +1,238 @@
+---
+title: Multiple Return Values
+---
+
+Plenty of languages let a function return a tuple. Go's version looks similar and is used completely differently, because Go built its entire error handling story on top of it. Once you see how the pieces fit, a lot of Go code that looked repetitive starts to look deliberate.
+
+## The mechanics
+
+```go
+func minMax(values []int) (int, int) {
+    lo, hi := values[0], values[0]
+    for _, v := range values {
+        if v < lo {
+            lo = v
+        }
+        if v > hi {
+            hi = v
+        }
+    }
+    return lo, hi
+}
+
+low, high := minMax([]int{4, 9, 1, 7})
+fmt.Println(low, high)      // 1 9
+```
+
+Wrap the types in parentheses, return them comma separated, and receive them the same way. You must accept all of them or explicitly discard the ones you do not want:
+
+```go
+low, _ := minMax(values)        // only the minimum
+_, high := minMax(values)       // only the maximum
+low := minMax(values)           // compile error, not enough variables
+```
+
+That last line failing is the point. Go will not let a return value vanish by accident.
+
+## The pattern that defines Go
+
+```go
+func Open(name string) (*File, error)
+func Atoi(s string) (int, error)
+func Marshal(v any) ([]byte, error)
+```
+
+Value first, error second. This convention is so consistent across the standard library and the ecosystem that you can predict the shape of an unfamiliar function before reading its documentation.
+
+The caller side is equally consistent:
+
+```go
+f, err := os.Open("config.yaml")
+if err != nil {
+    return fmt.Errorf("opening config: %w", err)
+}
+defer f.Close()
+```
+
+Four lines, and you will write them thousands of times. What you get in return is that every failure is visible in the code path. There is no invisible exception route jumping over the next fifty lines to a handler somewhere up the stack.
+
+### On the value returned alongside an error
+
+When a function returns an error, the other values should be treated as meaningless. Conventionally a function returns the zero value alongside a non-nil error:
+
+```go
+func parsePort(s string) (int, error) {
+    n, err := strconv.Atoi(s)
+    if err != nil {
+        return 0, fmt.Errorf("port %q is not a number: %w", s, err)
+    }
+    if n < 1 || n > 65535 {
+        return 0, fmt.Errorf("port %d out of range", n)
+    }
+    return n, nil
+}
+```
+
+There are exceptions where partial results are useful. `io.Reader` returns the number of bytes read alongside an error, because a short read that then fails still delivered real data. When you design such a function, say so clearly in the doc comment, because the default assumption is the other way.
+
+## The comma ok idiom
+
+The second pattern is a boolean rather than an error, used where failure is expected and not exceptional.
+
+```go
+// Map lookup
+value, ok := scores["shiva"]
+if !ok {
+    fmt.Println("no score recorded")
+}
+
+// Type assertion
+s, ok := v.(string)
+if !ok {
+    fmt.Println("not a string")
+}
+
+// Channel receive
+msg, ok := <-ch
+if !ok {
+    fmt.Println("channel is closed")
+}
+```
+
+Three different features, one shape. The variable is conventionally called `ok`, and Go programmers read `, ok :=` as "this might not be there" without needing to check the signature.
+
+The map case is worth dwelling on, because reading a missing key does not fail:
+
+```go
+scores := map[string]int{"navin": 0}
+
+fmt.Println(scores["navin"])     // 0
+fmt.Println(scores["missing"])   // 0, identical
+
+_, ok1 := scores["navin"]        // true
+_, ok2 := scores["missing"]      // false
+```
+
+Without the comma ok form there is no way to distinguish a stored zero from an absent key. This is why the form exists.
+
+### Use ok for expected absence, error for real failure
+
+```go
+func (c *Cache) Get(key string) (Value, bool)          // a miss is normal
+func (r *Repo) FindUser(id string) (User, error)       // a database failure is not
+```
+
+A cache miss is part of how a cache works, so a boolean says exactly the right thing. A missing database row could mean many things and the caller usually wants to know which, so an error carries more.
+
+## Three values, and when to stop
+
+Three returns are fine when each is genuinely needed:
+
+```go
+func find(grid [][]int, target int) (row, col int, found bool) {
+    for i, r := range grid {
+        for j, v := range r {
+            if v == target {
+                return i, j, true
+            }
+        }
+    }
+    return 0, 0, false
+}
+```
+
+Beyond three, the call site starts to look like this:
+
+```go
+name, age, email, role, active, err := parseUser(line)
+```
+
+Nobody can read that without counting positions. Return a struct instead:
+
+```go
+type User struct {
+    Name   string
+    Age    int
+    Email  string
+    Role   string
+    Active bool
+}
+
+func parseUser(line string) (User, error) {
+    // ...
+}
+
+u, err := parseUser(line)
+```
+
+Now the fields are named at every use, adding a field breaks nobody, and the type can carry methods.
+
+<Callout type="info">
+A rough guideline: two returns is the norm, three is fine when one of them is an error or an ok flag, four means you probably want a struct. The standard library follows this closely, and `runtime.Caller` returning four values is one of the rare exceptions people complain about.
+</Callout>
+
+## Passing results straight through
+
+A function whose results exactly match another's can forward them in one line:
+
+```go
+func GetUserByEmail(email string) (User, error) {
+    return repo.FindByEmail(email)     // both values pass through
+}
+```
+
+This only works when the signatures line up exactly. You cannot mix a call's results with other values in the same return statement:
+
+```go
+return repo.Find(id), nil        // compile error when Find returns two values
+```
+
+You have to unpack first:
+
+```go
+u, err := repo.Find(id)
+if err != nil {
+    return User{}, err
+}
+return u, nil
+```
+
+Which is usually what you wanted anyway, since forwarding an error untouched loses the context of where it happened.
+
+## Ignoring values responsibly
+
+`_` discards a value, and it should be a deliberate act rather than a habit.
+
+```go
+_, err := fmt.Println("hello")     // nobody checks how many bytes Println wrote
+```
+
+Ignoring an error is different, and it deserves a comment when you do it:
+
+```go
+// Best effort cleanup, a failure here is not worth reporting.
+_ = os.Remove(tmpPath)
+```
+
+Writing `_ =` explicitly rather than dropping the call's result silently is a signal to reviewers that you thought about it. Linters such as `errcheck` will flag unhandled errors, and the explicit blank assignment is how you tell them the decision was intentional.
+
+<Callout type="warn">
+The one you should almost never ignore is the error from a write or a close on something that buffers. `defer f.Close()` on a file you wrote to can hide a failed flush, and the data is simply gone. For writes, close explicitly and check the error before returning success.
+</Callout>
+
+## How this shapes Go code
+
+Multiple returns are the reason Go needs no exceptions, no `Optional` type, no null-safety operator, and no out parameters. One language feature, used consistently, replaces four.
+
+```text
+   Java                     Go
+   ────                     ──
+   throw / try / catch  →   return value, error
+   Optional<T>          →   return value, ok
+   T? and ?.            →   return value, ok
+   out parameters       →   return several values
+```
+
+That consolidation is a good example of how the language stays small. Rather than adding a feature per problem, Go looks for one mechanism general enough to cover several, and then leans on it everywhere.
+
+Next, let's look at functions that accept a variable number of arguments, and the one detail about them that trips up every newcomer.

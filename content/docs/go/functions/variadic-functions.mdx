@@ -1,0 +1,248 @@
+---
+title: Variadic Functions
+---
+
+You have already used one. `fmt.Println` takes as many arguments as you care to give it, and its signature explains how:
+
+```go
+func Println(a ...any) (n int, err error)
+```
+
+The `...` before the type means "zero or more of these". Inside the function, `a` is an ordinary slice. That is the whole feature, and the interesting part is what you can build with it.
+
+## Declaring and calling
+
+```go
+func sum(numbers ...int) int {
+    total := 0
+    for _, n := range numbers {
+        total += n
+    }
+    return total
+}
+
+fmt.Println(sum())              // 0
+fmt.Println(sum(1))             // 1
+fmt.Println(sum(1, 2, 3, 4))    // 10
+```
+
+Two rules bound the feature:
+
+**The variadic parameter must be last.** Anything else would be ambiguous.
+
+```go
+func log(level string, args ...any)    // fine
+func log(args ...any, level string)    // compile error
+```
+
+**There can only be one.** A function cannot take two variadic parameters.
+
+Regular parameters can come before it, and they are required:
+
+```go
+func join(sep string, parts ...string) string {
+    return strings.Join(parts, sep)
+}
+
+join(", ", "a", "b", "c")     // "a, b, c"
+join(", ")                    // "" , the variadic part can be empty
+```
+
+## Spreading a slice
+
+You often already have a slice and want to pass it. The `...` suffix at the call site unpacks it:
+
+```go
+numbers := []int{1, 2, 3, 4, 5}
+
+sum(numbers)         // compile error, cannot use []int as int
+sum(numbers...)      // 15
+```
+
+This is the piece everyone forgets once. `sum(numbers)` tries to pass the slice as a single `int` argument, and the error message is clear enough that you only make the mistake once.
+
+The same syntax is why `append` can concatenate two slices:
+
+```go
+a := []int{1, 2}
+b := []int{3, 4}
+
+a = append(a, b...)     // [1 2 3 4]
+```
+
+`append` is declared as `append(slice []T, elems ...T) []T`, so spreading `b` feeds every element in as a separate argument.
+
+<Callout type="warn">
+When you spread a slice, the function receives that very slice, not a copy of it. Modifying the variadic parameter inside the function modifies the caller's slice. When you pass individual arguments instead, Go builds a fresh slice, so there is nothing shared. The same function can therefore behave differently depending on how it was called, which is a subtle trap.
+</Callout>
+
+Here is that trap made concrete:
+
+```go
+func zero(nums ...int) {
+    for i := range nums {
+        nums[i] = 0
+    }
+}
+
+a := []int{1, 2, 3}
+zero(a...)
+fmt.Println(a)          // [0 0 0], the caller's slice was modified
+
+b := []int{1, 2, 3}
+zero(b[0], b[1], b[2])
+fmt.Println(b)          // [1 2 3], untouched
+```
+
+If your variadic function writes to its parameter, copy it first:
+
+```go
+func zero(nums ...int) []int {
+    out := make([]int, len(nums))
+    copy(out, nums)
+    for i := range out {
+        out[i] = 0
+    }
+    return out
+}
+```
+
+## nil versus empty
+
+Calling with no arguments gives you a `nil` slice, not an empty one:
+
+```go
+func inspect(items ...string) {
+    fmt.Println(items == nil, len(items))
+}
+
+inspect()               // true 0
+inspect("a")            // false 1
+
+var s []string
+inspect(s...)           // true 0, a nil slice spread stays nil
+```
+
+In practice this rarely matters, because `len`, `range`, and `append` all treat nil slices identically to empty ones. It only shows up if you compare against nil directly, which you should not need to do.
+
+## Where variadic functions genuinely earn their place
+
+### Formatting and logging
+
+The most common use, and the one the standard library is built on:
+
+```go
+func Debugf(format string, args ...any) {
+    if !debugEnabled {
+        return
+    }
+    log.Printf("[debug] "+format, args...)
+}
+
+Debugf("user %s made %d requests", name, count)
+```
+
+Note the `args...` when forwarding. Passing `args` without the dots would give `Printf` a single slice argument and produce output like `[shiva 42]` instead of formatted text.
+
+### Functional options
+
+This is the pattern Go uses instead of default parameters, and it is worth learning properly because you will meet it in almost every serious library.
+
+```go
+type Server struct {
+    host    string
+    port    int
+    timeout time.Duration
+    tls     bool
+}
+
+type Option func(*Server)
+
+func WithPort(p int) Option {
+    return func(s *Server) { s.port = p }
+}
+
+func WithTimeout(d time.Duration) Option {
+    return func(s *Server) { s.timeout = d }
+}
+
+func WithTLS() Option {
+    return func(s *Server) { s.tls = true }
+}
+
+func NewServer(host string, opts ...Option) *Server {
+    s := &Server{
+        host:    host,
+        port:    8080,                  // defaults
+        timeout: 30 * time.Second,
+    }
+    for _, opt := range opts {
+        opt(s)
+    }
+    return s
+}
+```
+
+The call site reads well at every level of configuration:
+
+```go
+s1 := NewServer("localhost")
+s2 := NewServer("api.example.com", WithPort(443), WithTLS())
+s3 := NewServer("internal", WithTimeout(5*time.Second))
+```
+
+Every option is named, order does not matter, adding a new option breaks no existing caller, and the defaults live in one obvious place. Compare that with a constructor taking eight parameters where six are usually zero.
+
+<Callout type="info">
+You will find this pattern in `grpc.Dial`, `zap.New`, `redis.NewClient`, and many others. When you see `...Option` in a signature, this is what is going on.
+</Callout>
+
+### Building a small helper set
+
+Variadic parameters make aggregate helpers read naturally:
+
+```go
+func maxOf(first int, rest ...int) int {
+    m := first
+    for _, v := range rest {
+        if v > m {
+            m = v
+        }
+    }
+    return m
+}
+```
+
+Requiring `first` separately means `maxOf()` is a compile error rather than a runtime decision about what to return from an empty list. That is a nice technique: make the meaningless call impossible to write.
+
+<Callout type="info">
+Go 1.21 added built-in `max` and `min` that take one or more arguments, so you no longer need this particular helper. The technique of requiring the first argument separately is still worth remembering for your own code.
+</Callout>
+
+## The cost
+
+Every variadic call allocates a slice to hold the arguments, unless the compiler can prove it escapes nowhere and can stack-allocate it. For most code this is irrelevant. In a hot path called millions of times, it shows up in a profile.
+
+The standard library sometimes offers both forms for exactly this reason:
+
+```go
+fmt.Println(a, b)        // variadic, allocates
+w.WriteString(s)         // specific, does not
+```
+
+Do not restructure code for this without a profiler telling you to. Just know why `strings.Builder` has a dozen specific methods instead of one variadic one.
+
+## When not to use it
+
+Variadic parameters are a poor fit when the arguments mean different things:
+
+```go
+func createUser(fields ...string)                   // what goes where?
+func createUser(name, email, role string)           // obvious
+```
+
+They are also a poor fit when you want the compiler to insist on a specific count. `func point(coords ...int)` will happily accept one number or seven, and you are back to checking `len` at runtime.
+
+Use them for a homogeneous list of the same kind of thing, for the options pattern, and for forwarding to another variadic function. Everywhere else, name the parameters.
+
+Next, let's look at functions used as values, which is what made the options pattern above possible in the first place.

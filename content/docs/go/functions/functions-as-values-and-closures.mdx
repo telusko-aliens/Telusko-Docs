@@ -1,0 +1,326 @@
+---
+title: Functions as Values and Closures
+---
+
+In Go a function is a value like any other. It has a type, you can put it in a variable, pass it as an argument, return it from another function, and store it in a slice or a map. Nothing about it is special.
+
+That sounds like a small technical fact. It is actually the foundation of middleware, the options pattern, sorting with custom comparators, callbacks, and most of what makes Go libraries pleasant to configure.
+
+## Function values
+
+```go
+func add(a, b int) int { return a + b }
+
+operation := add                  // no parentheses, we are not calling it
+fmt.Println(operation(3, 4))      // 7
+```
+
+The type of `operation` is `func(int, int) int`. Any function with that exact signature can be assigned to it:
+
+```go
+func multiply(a, b int) int { return a * b }
+
+operation = multiply
+fmt.Println(operation(3, 4))      // 12
+```
+
+Parameter names are not part of the type. `func(a, b int) int` and `func(x, y int) int` are the same type.
+
+## Function literals
+
+An anonymous function, defined where you need it:
+
+```go
+square := func(n int) int {
+    return n * n
+}
+fmt.Println(square(5))     // 25
+```
+
+Or defined and called immediately, which is occasionally useful for scoping a chunk of setup:
+
+```go
+config := func() Config {
+    c := defaultConfig()
+    c.applyEnv()
+    return c
+}()
+```
+
+## Functions as parameters
+
+This is where function values start doing real work.
+
+```go
+func apply(numbers []int, transform func(int) int) []int {
+    result := make([]int, len(numbers))
+    for i, n := range numbers {
+        result[i] = transform(n)
+    }
+    return result
+}
+
+doubled := apply([]int{1, 2, 3}, func(n int) int { return n * 2 })
+fmt.Println(doubled)      // [2 4 6]
+```
+
+The standard library uses this constantly. `sort.Slice` is the one you will meet first:
+
+```go
+people := []Person{
+    {"Shiva", 28},
+    {"Navin", 41},
+    {"Hyder", 35},
+}
+
+sort.Slice(people, func(i, j int) bool {
+    return people[i].Age < people[j].Age
+})
+```
+
+Go 1.21 added `slices.SortFunc`, which is generic and slightly nicer:
+
+```go
+slices.SortFunc(people, func(a, b Person) int {
+    return cmp.Compare(a.Age, b.Age)
+})
+```
+
+Either way, the sorting algorithm is shared and only the comparison changes. That is the whole point of taking a function as a parameter.
+
+## Named function types
+
+When a signature appears more than once, give it a name:
+
+```go
+type Validator func(string) error
+type Middleware func(http.Handler) http.Handler
+type Handler func(ctx context.Context, msg Message) error
+```
+
+Now the intent is visible in every signature that uses it:
+
+```go
+func validateAll(input string, validators ...Validator) error {
+    for _, v := range validators {
+        if err := v(input); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+
+Named function types can even have methods, which is how `http.HandlerFunc` turns a plain function into something satisfying the `http.Handler` interface:
+
+```go
+type HandlerFunc func(ResponseWriter, *Request)
+
+func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *Request) {
+    f(w, r)
+}
+```
+
+That five line trick is worth understanding, because it is why you can write `http.HandleFunc("/", myFunc)` without declaring a type. The web services section returns to it.
+
+## Closures
+
+A function literal can refer to variables from the scope where it was defined, and it keeps them alive for as long as the function value exists. That combination of a function plus its captured environment is a closure.
+
+```go
+func counter() func() int {
+    count := 0
+    return func() int {
+        count++
+        return count
+    }
+}
+
+next := counter()
+fmt.Println(next())     // 1
+fmt.Println(next())     // 2
+fmt.Println(next())     // 3
+```
+
+`count` is a local variable in `counter`, and `counter` has already returned by the time you call `next`. It survives because the returned function still refers to it. Go's escape analysis notices this and allocates `count` on the heap instead of the stack.
+
+Each call to `counter` produces an independent closure with its own `count`:
+
+```go
+a := counter()
+b := counter()
+
+a()     // 1
+a()     // 2
+b()     // 1, separate variable
+```
+
+### Closures capture the variable, not the value
+
+This distinction is the source of most closure confusion:
+
+```go
+x := 10
+
+show := func() {
+    fmt.Println(x)
+}
+
+x = 20
+show()          // 20, not 10
+```
+
+The closure holds a reference to `x` itself. Whatever `x` contains at call time is what you see.
+
+<Callout type="info">
+Before Go 1.22, this rule combined badly with loop variables, because the loop reused one variable across all iterations. Every closure created in the loop ended up sharing it. Go 1.22 gives each iteration its own variable, so the classic "all my goroutines printed 3" bug is gone in modules declaring `go 1.22` or later.
+</Callout>
+
+## What closures are actually used for
+
+### Configuration, as seen in the options pattern
+
+```go
+type Option func(*Server)
+
+func WithPort(p int) Option {
+    return func(s *Server) {
+        s.port = p          // p is captured from the enclosing call
+    }
+}
+```
+
+`WithPort(8080)` returns a closure that remembers `8080`. That captured value is the entire mechanism behind functional options.
+
+### Middleware
+
+```go
+func Logging(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        start := time.Now()
+        next.ServeHTTP(w, r)
+        log.Printf("%s %s took %v", r.Method, r.URL.Path, time.Since(start))
+    })
+}
+```
+
+The returned handler closes over `next`, so it knows what to call. Chain several of these and you have the middleware stack that every Go web framework is built from.
+
+### Deferred cleanup with captured state
+
+```go
+func withTiming(name string) func() {
+    start := time.Now()
+    return func() {
+        log.Printf("%s took %v", name, time.Since(start))
+    }
+}
+
+func expensiveWork() {
+    defer withTiming("expensiveWork")()
+    // ...
+}
+```
+
+Read that `defer` line carefully. `withTiming("expensiveWork")` is called immediately, which records the start time. The function it returns is what gets deferred. Those trailing parentheses are doing a lot of work.
+
+### Encapsulating state without a struct
+
+```go
+func rateLimiter(perSecond int) func() bool {
+    tokens := perSecond
+    last := time.Now()
+
+    return func() bool {
+        now := time.Now()
+        tokens += int(now.Sub(last).Seconds()) * perSecond
+        if tokens > perSecond {
+            tokens = perSecond
+        }
+        last = now
+
+        if tokens > 0 {
+            tokens--
+            return true
+        }
+        return false
+    }
+}
+
+allow := rateLimiter(10)
+if allow() {
+    handleRequest()
+}
+```
+
+No struct, no methods, no exported fields. The state is genuinely private, since nothing outside the closure can reach `tokens` at all.
+
+<Callout type="warn">
+That last example is not safe for concurrent use. Two goroutines calling `allow()` at the same time will race on `tokens`. Closures give you encapsulation, not synchronisation. If several goroutines share a closure, it needs a mutex just like a struct would.
+</Callout>
+
+## Comparing and nil-checking function values
+
+Function values can only be compared against `nil`, never against each other:
+
+```go
+var f func()
+fmt.Println(f == nil)     // true
+
+if f != nil {
+    f()                   // calling a nil function panics
+}
+
+f == g                    // compile error
+```
+
+The nil check matters when a function value is an optional callback:
+
+```go
+type Config struct {
+    OnError func(error)      // optional hook
+}
+
+func (c *Config) report(err error) {
+    if c.OnError != nil {
+        c.OnError(err)
+    }
+}
+```
+
+Forgetting that check gives you a nil pointer panic the first time somebody leaves the hook unset, which is exactly the case the field exists to allow.
+
+## A small pipeline
+
+Everything on this page, assembled:
+
+```go
+type Transform func(string) string
+
+func pipeline(fns ...Transform) Transform {
+    return func(s string) string {
+        for _, fn := range fns {
+            s = fn(s)
+        }
+        return s
+    }
+}
+
+trim := strings.TrimSpace
+lower := strings.ToLower
+truncate := func(n int) Transform {
+    return func(s string) string {
+        if len(s) <= n {
+            return s
+        }
+        return s[:n]
+    }
+}
+
+clean := pipeline(trim, lower, truncate(10))
+fmt.Println(clean("   HELLO WORLD FROM GO   "))    // "hello worl"
+```
+
+A named function type, functions stored in a slice, standard library functions used as values, a closure capturing `n`, and a variadic constructor returning a composed function. Five ideas, twenty lines, and nothing about it requires a framework.
+
+Next, let's cover `defer`, which is the feature that makes cleanup in Go both reliable and readable.
