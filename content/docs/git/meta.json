@@ -4,6 +4,7 @@
         "getting-started.mdx",
         "introduction.mdx",
         "git-fundamentals",
-        "github-and-remote-repos"
+        "github-and-remote-repos",
+        "branching-and-collaboration"
     ]
 } 

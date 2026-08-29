@@ -2,7 +2,7 @@
     "pages":[
         "types-of-version-control.mdx",
         "git-installation.mdx",
-        "git-repo-and-workflow",
-        "git-commit-workflow"
+        "git-repo-and-workflow.mdx",
+        "git-commit-workflow.mdx"
     ]
 }
