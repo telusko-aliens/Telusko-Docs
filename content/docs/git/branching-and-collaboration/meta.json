@@ -1,0 +1,8 @@
+{   "title":"Branching and Collaboration",
+    "pages":[
+        "git-branching.mdx",
+        "merging-and-rebasing.mdx",
+        "merge-conflicts-and-cherry-pick.mdx",
+        "working-with-forks-and-pr.mdx"
+    ]
+}

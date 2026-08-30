@@ -1,0 +1,398 @@
+---
+title: Git Branching
+---
+
+<Video id="vwj89i2FmG0" start={728}/>
+
+---
+
+
+As a project grows, developers often need to work on multiple features, bug fixes, or experiments at the same time.
+
+**Git branching** allows you to create separate lines of development so that work can happen independently without immediately affecting the main codebase.
+
+
+## What is a Branch?
+
+A **branch** is a movable pointer to a commit that represents an independent line of development.
+
+Suppose the project currently looks like this:
+
+```text
+A --- B --- C
+          ↑
+         main
+```
+
+When you create a new branch from `main`, both branches initially point to the same commit:
+
+![Same_Pointer_Branches](https://dyz1pdcuffwr5.cloudfront.net/Git/git_same_pointer_branches.png)
+
+If you make commits on `feature`, only that branch moves forward:
+
+![Different_Pointer_Branches](https://dyz1pdcuffwr5.cloudfront.net/Git/git_different_pointerbranches.png)
+
+The `main` branch remains unchanged while the feature is being developed.
+
+> **Key idea:** A branch allows you to work on changes independently without disturbing another line of development.
+
+
+---
+
+
+## Why Use Branches?
+
+Branches are useful whenever different work needs to be developed separately.
+
+Common examples include:
+
+* Developing a new feature
+* Fixing a bug
+* Experimenting with an idea
+* Preparing a release
+* Working with multiple developers
+
+For example:
+
+```text
+main
+ ├── feature-login
+ ├── feature-payment
+ └── bugfix-validation
+```
+
+Each branch can have its own commits and can later be merged back into another branch.
+
+
+---
+
+
+## Viewing Branches
+
+To list the branches in your local repository:
+
+```bash
+git branch
+```
+
+Example:
+
+```text
+  feature-login
+* main
+  bugfix
+```
+
+The `*` indicates the **currently active branch**.
+
+To view both local and remote branches:
+
+```bash
+git branch --all
+```
+
+Example:
+
+```text
+* main
+  feature-login
+  remotes/origin/main
+  remotes/origin/feature-login
+```
+
+
+---
+
+
+## Creating a Branch
+
+### Create a Branch Without Switching to it
+
+You can create a branch without switching to it:
+
+```bash
+git branch feature-login
+```
+
+This creates the branch but keeps you on the current branch.
+
+To confirm:
+
+```bash
+git branch
+```
+
+
+### Creating and Switching to a Branch
+
+A common workflow is to create a branch and immediately start working on it.
+
+**Using `git switch`**
+
+```bash
+git switch -c feature-login
+```
+
+The `-c` option means **create a new branch and switch to it**.
+
+**Using `git checkout`**
+
+Older Git workflows commonly use:
+
+```bash
+git checkout -b feature-login
+```
+
+Both commands perform the same basic operation.
+
+> Prefer `git switch` for branch navigation because it makes the intention clearer. `git checkout` is still widely used and you'll encounter it in existing projects.
+
+
+---
+
+
+## Switching Between Branches
+
+To move to an existing branch:
+
+```bash
+git switch feature-login
+```
+
+Or:
+
+```bash
+git checkout feature-login
+```
+
+For example:
+
+```text
+main
+  ↓
+git switch feature-login
+  ↓
+feature-login
+```
+
+Git changes your working directory to reflect the selected branch.
+
+
+### Switching to the Previous Branch
+
+If you want to quickly return to the branch you were using before:
+
+```bash
+git switch -
+```
+
+For example:
+
+```text
+main
+  ↓
+switch to feature-login
+  ↓
+feature-login
+  ↓
+git switch -
+  ↓
+main
+```
+
+This is particularly convenient when moving back and forth between two branches.
+
+
+---
+
+
+## Working on a Branch
+
+Once you switch to a feature branch, your normal Git workflow continues as usual:
+
+```text
+Create / Modify Files
+        ↓
+     git add
+        ↓
+    git commit
+```
+
+For example:
+
+```bash
+git switch -c feature-login
+
+# Make changes...
+
+git add .
+git commit -m "Add login feature"
+```
+
+The new commit belongs to `feature-login`, not `main`.
+
+```text
+A --- B --- C -------- main
+          \
+           D --- E --- feature-login
+```
+
+
+### Branches and Commit History
+
+A branch does not create a separate copy of your entire project.
+
+Instead, Git uses branches as references to commits.
+
+Consider:
+
+```text
+A --- B --- C
+          \
+           D --- E
+```
+
+Here:
+
+* `main` points to `C`
+* `feature-login` points to `E`
+* Both branches share commits `A`, `B`, and `C`
+
+This is why creating branches in Git is lightweight and fast.
+
+
+---
+
+
+## Pushing a Branch to GitHub
+
+A newly created local branch is not automatically available on the remote repository.
+
+To share it with your team, push it:
+
+```bash
+git push origin feature-login
+```
+
+After pushing:
+
+```text
+Local feature-login
+        │
+        │ git push
+        ▼
+GitHub feature-login
+```
+
+The branch is now available on the remote repository.
+
+
+---
+
+
+## Deleting a Branch
+
+Once a feature has been completed and merged, the local branch can usually be deleted.
+
+```bash
+git branch -d feature-login
+```
+
+The `-d` option performs a safe deletion and normally prevents deletion if Git detects that the branch contains unmerged commits.
+
+If you intentionally want to delete a branch even though it contains unmerged commits:
+
+```bash
+git branch -D feature-login
+```
+
+> Use `-D` carefully because it can remove the branch reference to commits that have not been merged elsewhere.
+
+
+---
+
+
+## Visualizing Branches
+
+As projects develop, the commit history can become difficult to understand from a simple list.
+
+You can visualize branches and merges using:
+
+```bash
+git log --graph --oneline --all
+```
+
+Example:
+
+```text
+* e52ab91 Add payment validation
+* 8f31c22 Add payment service
+| * 72ac911 Fix login validation
+|/
+* 41cd832 Add authentication
+* 12ab453 Initial commit
+```
+
+This gives you a quick view of how branches diverged and where their commits were created.
+
+---
+
+
+![Git_Branch_Names](https://dyz1pdcuffwr5.cloudfront.net/Git/git_branchnames.png)
+
+
+---
+
+
+## Feature Branch Workflow
+
+A common development workflow looks like this:
+
+```text
+main
+  │
+  │ create branch
+  ▼
+feature/login
+  │
+  ├── commit
+  ├── commit
+  └── commit
+        │
+        ▼
+      Push
+        │
+        ▼
+      GitHub
+        │
+        ▼
+   Review / Merge
+        │
+        ▼
+       main
+```
+
+The important idea is that development happens independently first. The completed work can then be integrated into the main development line.
+
+
+---
+
+
+## Quick Reference
+
+| Command                           | Purpose                                   |
+| --------------------------------- | ----------------------------------------- |
+| `git branch`                      | List local branches                       |
+| `git branch --all`                | List local and remote branches            |
+| `git branch <name>`               | Create a branch                           |
+| `git switch -c <name>`            | Create and switch to a branch             |
+| `git checkout -b <name>`          | Create and switch using the older command |
+| `git switch <name>`               | Switch to an existing branch              |
+| `git switch -`                    | Switch to the previous branch             |
+| `git branch -d <name>`            | Safely delete a local branch              |
+| `git branch -D <name>`            | Force-delete a local branch               |
+| `git push origin <name>`          | Push a branch to the remote               |
+| `git log --graph --oneline --all` | Visualize branch and commit history       |
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>
