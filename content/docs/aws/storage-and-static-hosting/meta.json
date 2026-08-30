@@ -1,6 +1,7 @@
 {
     "title": "Storage & Static Hosting",
     "pages": [
+        "resource.mdx",
         "s3-introduction.mdx",
         "s3-versioning-and-object-lock.mdx",
         "s3-features-summary.mdx",
