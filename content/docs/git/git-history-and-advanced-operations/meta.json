@@ -1,0 +1,8 @@
+{   "title":"Git History and Advanced Operations",
+    "pages":[
+        "git-history-and-time-travel.mdx",
+        "undoing-changes-in-git.mdx",
+        "git-reflog-and-recovery.mdx",
+        "git-stash.mdx"
+    ]
+}

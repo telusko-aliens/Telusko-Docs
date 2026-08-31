@@ -1,0 +1,229 @@
+---
+title: Git Stash
+---
+
+<Video id="vwj89i2FmG0" start={728}/>
+
+---
+
+
+During development, you often need to pause your current work and switch to another task before your changes are ready to be committed. Git Stash provides a simple way to temporarily set aside those changes and return to them later.
+
+
+## What Is Git Stash?
+
+While working on a feature, you may have changes that are **not ready to commit**, but you suddenly need to switch tasks.
+
+**Git stash** temporarily stores your uncommitted changes and gives you a clean working directory. You can restore those changes later and continue where you left off.
+
+Think of it as **pausing your current work without creating a commit**.
+
+```text
+Uncommitted Work
+      ↓
+  git stash
+      ↓
+Clean Working Directory
+      ↓
+Do other work
+      ↓
+Restore Stashed Work
+```
+
+> **Important:** A stash is temporary work storage, not a replacement for a commit or backup.
+
+
+---
+
+
+## When Should You Use Stash?
+
+Stash is useful when you need to temporarily put your current work aside.
+
+| Situation                      | Why Stash Helps                                          |
+| ------------------------------ | -------------------------------------------------------- |
+| Need to switch branches        | Clears the working directory without losing your changes |
+| Urgent bug needs attention     | Pause your feature and work on the bug                   |
+| Need a clean working directory | Temporarily removes your local modifications             |
+| Need to update your branch     | Save unfinished work before synchronizing                |
+
+### Example
+
+You are halfway through a login feature when a critical bug needs immediate attention:
+
+```text
+Login Feature (unfinished)
+        ↓
+    git stash
+        ↓
+Fix Bug
+        ↓
+Return to Login Feature
+        ↓
+Restore Stash
+```
+
+This avoids creating a commit containing incomplete code just to switch tasks.
+
+
+---
+
+
+## Saving Changes
+
+### Stash Current Changes
+
+```bash
+git stash
+```
+
+Git saves your local modifications and cleans the working directory.
+
+### Add a Message
+
+A descriptive message makes it easier to identify the stash later:
+
+```bash
+git stash push -m "WIP: login page"
+```
+
+> `git stash push -m` is preferred over the older `git stash save` syntax.
+
+
+### Add Untracked Files
+
+By default, `git stash` handles changes to **tracked files**.
+
+To include untracked files as well:
+
+```bash
+git stash -u
+```
+
+or:
+
+```bash
+git stash push -u -m "WIP: login page"
+```
+
+This is useful when you have created new files that have not yet been added to Git.
+
+
+---
+
+
+## Viewing Saved Stashes
+
+Use:
+
+```bash
+git stash list
+```
+
+Example:
+
+```text
+stash@{0}: On feature-login: WIP: login page
+stash@{1}: On main: WIP: navbar changes
+```
+
+Git stores stashes in a stack-like structure.
+
+* `stash@{0}` → most recent stash
+* `stash@{1}` → previous stash
+* Higher numbers → older stashes
+
+
+---
+
+
+## Restoring Stashed Work
+
+There are two common ways to restore a stash.
+
+### `git stash apply`
+
+```bash
+git stash apply
+```
+
+Restores the latest stash **but keeps it in the stash list**.
+
+You can also select a specific stash:
+
+```bash
+git stash apply stash@{1}
+```
+
+Use `apply` when you may want to reuse the same stash again.
+
+### `git stash pop`
+
+```bash
+git stash pop
+```
+
+Restores the latest stash and **removes it from the stash list** if the operation succeeds.
+
+Use `pop` when you are finished with that stash.
+
+
+![Git_Stash_Apply_Pop](https://dyz1pdcuffwr5.cloudfront.net/Git/git_stash_apply_pop.png)
+
+
+---
+
+
+## Managing Stashes
+
+### Delete One Stash
+
+```bash
+git stash drop stash@{0}
+```
+
+Removes the specified stash without restoring it.
+
+### Delete All Stashes
+
+```bash
+git stash clear
+```
+
+Removes every stash from the repository.
+
+> **Warning:** `git stash clear` permanently removes all stash entries. Use it carefully.
+
+
+---
+
+
+## Quick Reference
+
+| Command                       | Purpose                               |
+| ----------------------------- | ------------------------------------- |
+| `git stash`                   | Temporarily save tracked-file changes |
+| `git stash push -m "message"` | Save changes with a description       |
+| `git stash -u`                | Include untracked files               |
+| `git stash list`              | View saved stashes                    |
+| `git stash apply`             | Restore latest stash and keep it      |
+| `git stash apply stash@{n}`   | Restore a specific stash              |
+| `git stash pop`               | Restore and remove latest stash       |
+| `git stash drop stash@{n}`    | Delete a specific stash               |
+| `git stash clear`             | Delete all stashes                    |
+
+
+---
+
+
+## Summary
+
+* **Stash lets you temporarily pause unfinished work.**
+* Use it when you need a clean working directory without creating an unnecessary commit.
+* `apply` restores changes **and keeps** the stash.
+* `pop` restores changes **and removes** the stash.
+* Use `-u` when untracked files also need to be saved.
+* Stashes are **local temporary storage**, not a substitute for commits or remote backups.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>
