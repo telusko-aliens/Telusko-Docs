@@ -5,6 +5,7 @@
         "introduction.mdx",
         "git-fundamentals",
         "github-and-remote-repos",
-        "branching-and-collaboration"
+        "branching-and-collaboration",
+        "git-history-and-advanced-operations"
     ]
 } 
