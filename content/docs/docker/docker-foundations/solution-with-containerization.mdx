@@ -1,0 +1,100 @@
+---
+title: "Solution With Containerization"
+description: "How containers package applications with their dependencies and make deployment more predictable."
+---
+
+Containerization solves deployment problems by packaging an application with the environment it needs to run.
+
+Instead of depending on every server to be prepared manually, we create a container image. That image contains the application, runtime, libraries, dependencies, configuration defaults, and startup command. When the image runs, Docker creates a container from it.
+
+The result is simple: the same image can run the same way on different machines.
+
+## What a container is
+
+A container is an isolated running process with its own filesystem, environment, network view, and startup command.
+
+It is not a full virtual machine. It does not boot a separate guest operating system. It shares the host operating system kernel, which makes it lightweight.
+
+```text
+Host machine
+-> Host operating system kernel
+-> Docker engine
+-> Container
+-> Application process
+```
+
+From inside the container, the application feels like it has its own small environment. From outside, Docker manages that environment for us.
+
+## Image vs container
+
+Two words matter from the beginning: image and container.
+
+| Term | Meaning |
+| --- | --- |
+| Image | A read-only package containing the application and its runtime setup |
+| Container | A running instance of an image |
+
+An image is like a prepared package. A container is what you get when you run that package.
+
+You can create many containers from the same image:
+
+```text
+my-app-image
+-> container 1
+-> container 2
+-> container 3
+```
+
+This is useful because every container starts from the same known base.
+
+## Why containers are useful
+
+Containers make application delivery more predictable.
+
+They help because:
+
+- The runtime environment is packaged with the app
+- Dependencies are defined instead of manually installed
+- Containers start quickly
+- Containers are easy to remove and recreate
+- The same image can move from laptop to server to cloud
+- Teams can share images through registries like Docker Hub
+
+This does not mean containers magically fix bad configuration. You still need to build images carefully. But once the image is correct, running it becomes repeatable.
+
+## How containerization changes deployment
+
+Without containers, deployment often means preparing a server and then copying the app into it.
+
+With containers, deployment usually means preparing the app as an image and then running that image on a server.
+
+| Old style | Container style |
+| --- | --- |
+| Configure server manually | Build image from instructions |
+| Install runtime on server | Runtime is included in image |
+| Copy files to server | Copy files during image build |
+| Start app manually | Define startup command in image |
+| Fix server when it drifts | Replace container with a new one |
+
+This shift is important. The server becomes less special. The image becomes the main deployment unit.
+
+## Containers are disposable
+
+A common beginner mistake is treating containers like long-term machines. Containers should be treated as replaceable.
+
+If a container stops, start another one. If you need a new version, build a new image and run a new container. If something is wrong, remove the container and recreate it from the image.
+
+This is why logs, databases, uploads, and important data should not live only inside a temporary container filesystem. For real projects, data should be stored outside the container using volumes, databases, or cloud storage.
+
+<Callout type="warn">
+Do not treat a container like a permanent server. A container can be removed at any time, so important data must be stored outside it.
+</Callout>
+
+## The big idea
+
+Containerization makes deployment cleaner because it gives us a repeatable package.
+
+Build once. Run anywhere Docker is available. Replace instead of repairing by hand.
+
+That is the foundation behind Docker.
+

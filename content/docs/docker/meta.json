@@ -5,7 +5,7 @@
     "pages": [
         "getting-started.mdx",
         "introduction.mdx",
-        "disabled-docker-foundations",
+        "docker-foundations",
         "disabled-docker-setup-and-practice",
         "disabled-containers-and-images",
         "disabled-dockerfile-fundamentals",

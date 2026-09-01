@@ -1,0 +1,109 @@
+---
+title: "How Virtualization Tried To Solve Deployment Issues"
+description: "How virtual machines improved deployment consistency and why they still felt heavy."
+---
+
+Before containers became popular, virtual machines were the common way to isolate applications and make server usage more efficient.
+
+Virtualization was a big improvement. It allowed one physical machine to run multiple virtual machines, and each virtual machine could have its own operating system, software, configuration, and application.
+
+That helped teams avoid many conflicts. But it also introduced extra weight.
+
+## What a virtual machine is
+
+A virtual machine is a complete computer running inside another computer.
+
+It has:
+
+- A virtual CPU
+- Virtual memory
+- Virtual disk
+- A full guest operating system
+- Application runtime and dependencies
+- The application itself
+
+This is possible because of a layer called a hypervisor. The hypervisor sits between the physical hardware and the virtual machines, sharing the real machine's resources across multiple isolated systems.
+
+```text
+Physical hardware
+-> Host operating system
+-> Hypervisor
+-> Guest operating system
+-> Runtime and dependencies
+-> Application
+```
+
+Each virtual machine behaves like a separate server.
+
+## What virtualization solved
+
+Virtual machines helped with some important problems.
+
+Earlier, companies often ran one application on one physical server. That wasted resources because many servers used only a small part of their CPU and memory. Virtual machines allowed multiple applications to run on the same physical hardware while still staying isolated from each other.
+
+Virtualization gave teams:
+
+- Better hardware usage
+- Isolation between applications
+- Easier server creation
+- Separate environments for different teams
+- A more predictable setup than random manual installation
+
+This was a major step forward.
+
+## Where virtual machines became heavy
+
+The problem is that every virtual machine carries a full operating system.
+
+If you run five virtual machines, you may also be running five guest operating systems. That means more disk usage, more memory usage, slower startup, and more patching.
+
+| Area | Virtual machine behaviour |
+| --- | --- |
+| Startup | Usually slower because a full OS boots |
+| Size | Often large because it includes an OS |
+| Resource usage | Heavier because each VM needs its own OS resources |
+| Maintenance | Guest operating systems need updates and security patches |
+| Scaling | Slower compared with starting lightweight containers |
+
+Virtual machines are powerful, but they are not always the fastest or lightest way to package an application.
+
+## The deployment problem still existed
+
+Virtual machines improved isolation, but they did not completely remove environment complexity.
+
+Someone still had to prepare the VM:
+
+- Install the correct runtime
+- Install dependencies
+- Copy application files
+- Configure environment variables
+- Open ports
+- Start services
+- Maintain OS updates
+
+If this setup was done manually, the same old problem returned. Two VMs could still become different over time.
+
+This is called configuration drift. It happens when servers slowly change because of manual fixes, patches, and one-time commands.
+
+## Why containers became attractive
+
+Containers kept the useful idea of isolation but removed much of the heavy operating-system duplication.
+
+Instead of packaging a full guest OS for every application, containers share the host machine's kernel and package only what the application needs above that level.
+
+```text
+Virtual machine
+app + runtime + guest OS
+
+Container
+app + runtime + dependencies
+```
+
+This difference is the reason containers usually start faster and use fewer resources.
+
+<Callout type="info">
+Virtual machines isolate complete machines. Containers isolate applications and their runtime environment.
+</Callout>
+
+Virtual machines are still useful, especially in cloud platforms like AWS EC2. But for packaging and running applications quickly, containers became the more lightweight solution.
+

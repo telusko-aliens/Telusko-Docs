@@ -1,0 +1,130 @@
+---
+title: "Docker Basic Overview"
+description: "The core Docker components and workflow every beginner should understand before using commands deeply."
+---
+
+Docker is a platform for building, sharing, and running containerized applications.
+
+At a high level, Docker helps you take an application and turn it into an image. That image can then be run as a container on your machine, a server, or a cloud environment.
+
+The basic workflow looks like this:
+
+```text
+Write code
+-> Write Dockerfile
+-> Build image
+-> Run container
+-> Push image to registry
+-> Pull and run somewhere else
+```
+
+Once this flow is clear, Docker commands become much easier to understand.
+
+## Main parts of Docker
+
+Docker has a few core pieces that work together.
+
+| Part | What it does |
+| --- | --- |
+| Docker Engine | Runs Docker on your machine |
+| Docker CLI | Lets you talk to Docker using commands |
+| Dockerfile | Contains instructions for building an image |
+| Image | A packaged version of your app and dependencies |
+| Container | A running instance of an image |
+| Registry | Stores images so they can be shared |
+
+When you type a Docker command, the Docker CLI sends that request to the Docker Engine. The engine does the actual work: building images, starting containers, stopping containers, downloading images, and managing networks.
+
+## Docker image
+
+A Docker image is a read-only package. It contains everything needed to start an application.
+
+For example, a Java application image may contain:
+
+- A base Linux environment
+- Java runtime
+- Application JAR or WAR file
+- Required configuration
+- Exposed port information
+- Startup command
+
+Images are built from Dockerfiles. Once built, an image can be tagged with a name and version.
+
+```bash
+docker build -t my-java-app:1.0 .
+```
+
+Here, `my-java-app` is the image name and `1.0` is the tag.
+
+## Docker container
+
+A container is a running copy of an image.
+
+If the image is the packaged application, the container is the application actually running.
+
+```bash
+docker run my-java-app:1.0
+```
+
+You can run many containers from the same image. Each container gets its own isolated environment.
+
+## Docker registry
+
+A registry stores Docker images.
+
+Docker Hub is the most common public registry. Cloud platforms also provide private registries, such as Amazon ECR in AWS.
+
+The registry lets one machine build an image and another machine download it.
+
+```text
+Developer machine
+-> build image
+-> push to Docker Hub
+
+Server
+-> pull image
+-> run container
+```
+
+This is how Docker fits naturally into real deployment pipelines.
+
+## Dockerfile
+
+A Dockerfile is a text file that describes how to build an image.
+
+It usually answers questions like:
+
+- Which base image should we start from?
+- Which files should be copied into the image?
+- Which commands should run during the build?
+- Which port does the application use?
+- Which command starts the application?
+
+A simple Dockerfile might look like this:
+
+```dockerfile
+FROM eclipse-temurin:17-jdk
+WORKDIR /app
+COPY target/app.jar app.jar
+EXPOSE 8080
+CMD ["java", "-jar", "app.jar"]
+```
+
+This is deployment knowledge written in a repeatable form.
+
+## Simple mental model
+
+Keep this model in your head:
+
+| Question | Docker answer |
+| --- | --- |
+| How do I package my app? | Build an image |
+| How do I run that package? | Start a container |
+| How do I share it? | Push it to a registry |
+| How do I reproduce it? | Use the Dockerfile |
+
+<Callout type="info">
+Docker becomes easier when you stop thinking of a container as a small computer and start thinking of it as a packaged application process.
+</Callout>
+
+This is enough foundation to start running Docker commands with confidence.

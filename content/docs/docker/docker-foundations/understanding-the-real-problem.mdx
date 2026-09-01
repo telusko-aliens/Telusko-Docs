@@ -1,0 +1,90 @@
+---
+title: "Understanding The Real Problem"
+description: "Why deployment breaks even when the application code is correct."
+---
+
+Before Docker makes sense, the deployment problem must make sense.
+
+Many beginners think an application is only the code they write. In reality, an application is the code plus the environment around it. That environment includes the runtime, libraries, system packages, configuration, ports, files, permissions, and startup process.
+
+This is why a project can work perfectly on one machine and fail on another.
+
+## The classic problem
+
+A developer builds an application locally. It runs fine. Then the same application is moved to a testing server, production server, or another teammate's laptop, and suddenly it fails.
+
+Common reasons include:
+
+- The server has a different Java, Node, or Python version
+- A required package is missing
+- Environment variables are not configured
+- A port is already being used
+- File paths are different
+- The operating system behaves differently
+- Database or network settings are not the same
+- The startup command is slightly different
+
+The source code may be correct, but the environment is not matching.
+
+```text
+Developer laptop
+code + Java 17 + Maven + correct config = works
+
+Production server
+code + Java 11 + missing config = fails
+```
+
+That gap is the real problem Docker helps solve.
+
+## "It works on my machine"
+
+The sentence "it works on my machine" usually means the developer's machine has something the other machine does not.
+
+Maybe the developer installed a dependency weeks ago and forgot about it. Maybe the local database has test data. Maybe a config file exists locally but was never copied to the server. These small differences create big deployment headaches.
+
+The problem is not laziness. The problem is that manual setup is hard to reproduce perfectly.
+
+## Manual server setup does not scale
+
+In small projects, you might fix deployment by logging into the server and installing missing software by hand. That works once or twice, but it becomes risky very quickly.
+
+Manual setup creates questions nobody enjoys answering:
+
+- What exactly was installed on the server?
+- Which version was installed?
+- Who changed the configuration?
+- Can we recreate this server tomorrow?
+- Can another developer reproduce the same setup?
+- What happens if the server crashes?
+
+If the answer is "we are not sure", deployment becomes fragile.
+
+## The real goal
+
+The real goal is not just to run the application. The goal is to run it in a repeatable way.
+
+A good deployment process should make the environment predictable:
+
+| Problem | Better goal |
+| --- | --- |
+| Different runtime versions | Package the required runtime |
+| Missing dependencies | Define dependencies clearly |
+| Manual setup steps | Automate setup |
+| Server-specific behaviour | Use a consistent runtime environment |
+| Hard-to-recreate machines | Rebuild from instructions |
+
+Docker became popular because it gives developers a practical way to package the application environment and run it consistently.
+
+<Callout type="info">
+Docker is not solving a coding problem first. It is solving an environment and deployment problem.
+</Callout>
+
+## Simple way to remember it
+
+Your application needs two things:
+
+1. The code
+2. The correct environment to run that code
+
+Docker helps package both together so the application behaves the same on your laptop, a teammate's laptop, a testing server, or a cloud machine.
+

@@ -1,0 +1,77 @@
+---
+title: "Welcome To The Docker Course"
+description: "A friendly starting point for understanding what Docker is, why developers use it, and how this course is structured."
+---
+
+Welcome to the Docker course.
+
+Docker can look like a tool full of commands at first: `docker run`, `docker ps`, `docker build`, `docker push`, and so on. But Docker is not mainly about memorising commands. It is about solving a very real problem in software development: how do we make an application run the same way on every machine?
+
+When you build an application on your laptop, it depends on more than your source code. It depends on the correct Java version, Node version, Python packages, environment variables, operating system libraries, ports, files, and startup commands. If any one of those things is different on another machine, the application may fail even though the code is correct.
+
+Docker gives us a way to package the application with everything it needs to run.
+
+## What you will learn
+
+This course starts from the real deployment problem and then slowly builds the Docker mental model. The goal is not to rush into commands. The goal is to understand what each command is doing and why it matters.
+
+You will learn:
+
+- Why applications fail when moved from one machine to another
+- How virtual machines tried to solve deployment problems
+- Why containers became a lighter and faster approach
+- What Docker images and containers are
+- How to run applications inside containers
+- How to create your own images using Dockerfiles
+- How to publish images to Docker Hub
+- How to dockerize Java, Spring Boot, React, and Python applications
+- How containers communicate using Docker networking
+
+By the end, Docker should feel less like a separate topic and more like a normal part of building and shipping applications.
+
+## Why Docker matters
+
+In real projects, developers rarely deploy only source code. They deploy a working environment. Docker makes that environment repeatable.
+
+Without Docker, setup instructions often look like this:
+
+```text
+Install Java 17
+Install Maven
+Install MySQL
+Set these environment variables
+Run this command
+Make sure this port is free
+Hope the server has the same setup
+```
+
+With Docker, much of that setup can be captured in a Docker image. Anyone who has Docker installed can run the same packaged application with the same runtime and dependencies.
+
+That is why Docker is common in backend development, DevOps, microservices, CI/CD pipelines, and cloud platforms.
+
+## How to approach this course
+
+Do not try to learn Docker by only reading. Docker becomes clear when you run containers, stop them, remove them, rebuild images, and see what changes.
+
+Treat every container as temporary. If something breaks, remove it and run it again. That mindset is important because containers are designed to be replaceable.
+
+<Callout type="info">
+The main idea of Docker is simple: build the application once as an image, then run that image as a container wherever Docker is available.
+</Callout>
+
+## The course path
+
+We will move in this order:
+
+| Stage | Focus |
+| --- | --- |
+| Foundations | Deployment problems, virtualization, and containerization |
+| Setup | Installing Docker and preparing practice environments |
+| Containers | Running, stopping, inspecting, and removing containers |
+| Images | Building and tagging images |
+| Dockerfiles | Writing repeatable build instructions |
+| Real apps | Dockerizing Java, Spring Boot, React, and Flask projects |
+| Networking | Connecting containers and exposing applications |
+
+Once the foundation is clear, the Docker commands will start to feel natural.
+
