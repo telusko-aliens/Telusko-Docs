@@ -1,0 +1,89 @@
+---
+title: "Docker Desktop Installation And Configuration"
+description: "How to install Docker Desktop and confirm that Docker is ready for local practice."
+---
+
+Docker Desktop is the easiest way to start using Docker on Windows and macOS.
+
+It gives you the Docker Engine, Docker CLI, Docker Compose support, and a desktop dashboard for viewing containers and images. Even if you mostly work from the terminal, Docker Desktop is useful because it manages the local Docker environment for you.
+
+## Install Docker Desktop
+
+Download Docker Desktop from the official Docker website and choose the version for your operating system.
+
+During installation, keep the default options unless you have a specific reason to change them. On Windows, Docker Desktop usually uses WSL 2, which lets Docker run Linux containers efficiently.
+
+After installation, restart your machine if Docker asks for it.
+
+## Start Docker Desktop
+
+Open Docker Desktop and wait until it shows that Docker is running.
+
+The first startup can take a little time because Docker prepares its internal environment. Once Docker is ready, open a terminal and check the installation.
+
+```bash
+docker version
+```
+
+This should show both client and server information.
+
+The client is the Docker CLI on your machine. The server is the Docker Engine that actually runs containers.
+
+## Run the first test container
+
+Use the `hello-world` image to confirm Docker can pull and run images.
+
+```bash
+docker run hello-world
+```
+
+Docker will look for the image locally. If it is not present, Docker downloads it from Docker Hub and starts a small test container.
+
+If the command prints a success message, your Docker setup is working.
+
+## Useful Docker Desktop settings
+
+For beginner practice, the default settings are usually enough. Still, it is good to know where the important settings live.
+
+| Setting | Why it matters |
+| --- | --- |
+| Resources | Controls CPU, memory, and disk available to Docker |
+| WSL Integration | Lets Windows terminals use Docker through WSL |
+| Containers | Shows running and stopped containers |
+| Images | Shows downloaded and built images |
+| Volumes | Shows stored data used by containers |
+
+If containers feel slow, check the resource settings. If Docker commands do not work in a Windows terminal, check WSL integration.
+
+## Common first problems
+
+Sometimes Docker Desktop installs correctly but commands still fail.
+
+Common causes include:
+
+- Docker Desktop is installed but not running
+- The terminal was opened before Docker was installed
+- WSL 2 is not enabled correctly on Windows
+- Virtualization is disabled in BIOS
+- Your user account does not have permission to use Docker
+
+Close the terminal, start Docker Desktop, then open a fresh terminal and try again.
+
+## Clean first workflow
+
+After Docker Desktop is ready, practice this short flow:
+
+```bash
+docker version
+docker run hello-world
+docker ps
+docker ps -a
+docker images
+```
+
+This confirms that Docker can run containers and that you can inspect containers and images.
+
+<Callout type="info">
+Docker Desktop is only the setup layer. The real learning begins in the terminal, where you run containers and build images yourself.
+</Callout>
+

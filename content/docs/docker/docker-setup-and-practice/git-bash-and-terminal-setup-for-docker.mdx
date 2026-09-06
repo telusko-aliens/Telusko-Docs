@@ -1,0 +1,114 @@
+---
+title: "Git Bash And Terminal Setup For Docker"
+description: "Preparing a comfortable terminal environment for running Docker commands."
+---
+
+Docker is mostly used from the command line.
+
+Docker Desktop gives you a dashboard, but real Docker work happens in a terminal. You will run commands to pull images, start containers, map ports, view logs, build images, and push images to registries.
+
+That is why a comfortable terminal setup matters.
+
+## Which terminal should you use
+
+Use the terminal that fits your operating system and course setup.
+
+| System | Good terminal options |
+| --- | --- |
+| Windows | Git Bash, PowerShell, Windows Terminal, WSL terminal |
+| macOS | Terminal or iTerm2 |
+| Linux | Default terminal |
+
+On Windows, Git Bash is popular because it gives a Linux-like command style. WSL is also excellent because it gives you a real Linux environment.
+
+PowerShell also works for Docker commands, but some command examples copied from Linux tutorials may need small changes.
+
+## Install Git Bash on Windows
+
+If you are on Windows, install Git for Windows. It includes Git Bash.
+
+After installation, open Git Bash and check that basic commands work:
+
+```bash
+git --version
+pwd
+ls
+```
+
+Then check Docker:
+
+```bash
+docker version
+```
+
+If Docker Desktop is running, Git Bash should be able to use the `docker` command.
+
+## Important command-line basics
+
+Before practicing Docker, be comfortable with these terminal commands:
+
+```bash
+pwd
+ls
+cd
+mkdir
+touch
+cat
+rm
+clear
+```
+
+You do not need to become a Linux expert first, but you should be able to move between folders and understand where commands are being run.
+
+This matters because Docker builds often depend on the current directory.
+
+## Path and folder awareness
+
+When you run a command like this:
+
+```bash
+docker build -t my-app .
+```
+
+The dot at the end means "use the current folder as the build context."
+
+If you run the command from the wrong folder, Docker may not find your Dockerfile or application files.
+
+So before building images, always check:
+
+```bash
+pwd
+ls
+```
+
+This small habit prevents many beginner mistakes.
+
+## Terminal with EC2
+
+When working with AWS EC2, the terminal is also used to connect to the server.
+
+The command usually looks like this:
+
+```bash
+ssh -i my-key.pem ubuntu@server-public-ip
+```
+
+Once connected, your terminal is controlling the remote Linux server, not your local machine. Commands like `docker ps` will show containers running on that EC2 instance.
+
+## Useful Docker command checks
+
+After your terminal is ready, check these commands:
+
+```bash
+docker version
+docker ps
+docker images
+docker run hello-world
+```
+
+If these work, your terminal can communicate with Docker.
+
+<Callout type="info">
+Most Docker confusion comes from running the right command in the wrong place. Always know whether you are in your local terminal or connected to a remote server.
+</Callout>
+

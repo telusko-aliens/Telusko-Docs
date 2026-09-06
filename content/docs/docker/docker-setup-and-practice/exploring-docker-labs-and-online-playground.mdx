@@ -1,0 +1,96 @@
+---
+title: "Exploring Docker Labs And Online Playground"
+description: "How online Docker playgrounds help you practice quickly without local installation."
+---
+
+Online Docker playgrounds are useful when you want to practice Docker quickly without installing anything on your machine.
+
+They give you a temporary Linux environment in the browser where Docker is already installed. You can run containers, test commands, build small images, and explore Docker behaviour safely.
+
+These environments are not a replacement for local Docker setup, but they are very helpful for quick experiments.
+
+## Why use an online playground
+
+An online playground is useful when:
+
+- Your laptop cannot install Docker easily
+- Docker Desktop is not working yet
+- You want to test a command quickly
+- You are using a borrowed or restricted machine
+- You want a clean temporary environment
+
+The best part is that playground environments are disposable. If something goes wrong, you can start a new session.
+
+## What you can practice
+
+You can use Docker playgrounds for beginner commands:
+
+```bash
+docker version
+docker run hello-world
+docker ps
+docker ps -a
+docker images
+docker pull nginx
+docker run -d -p 8080:80 nginx
+```
+
+You can also create a small Dockerfile and build an image:
+
+```dockerfile
+FROM nginx
+COPY index.html /usr/share/nginx/html/index.html
+```
+
+Then build it:
+
+```bash
+docker build -t my-nginx-page .
+docker run -d -p 8080:80 my-nginx-page
+```
+
+This is enough to understand the basic build-and-run cycle.
+
+## What online playgrounds are not good for
+
+Playgrounds are temporary. They usually reset after a short time.
+
+That means they are not ideal for:
+
+- Long-running projects
+- Saving important files
+- Serious production deployment
+- Large application builds
+- Anything that needs permanent storage
+
+Use them for learning, not for hosting.
+
+## Local Docker vs playground
+
+| Feature | Local Docker | Online playground |
+| --- | --- | --- |
+| Setup | Needs installation | Runs in browser |
+| Persistence | Files stay until you delete them | Temporary session |
+| Speed | Depends on your machine | Depends on playground limits |
+| Best use | Daily learning and projects | Quick practice and demos |
+
+For this course, use local Docker if possible. Use playgrounds when you want fast practice or when installation is blocked.
+
+## Good playground habits
+
+Because the environment is temporary, keep your experiments small.
+
+Practice one idea at a time:
+
+1. Run a container
+2. Inspect it
+3. Stop it
+4. Remove it
+5. Repeat with a slightly different command
+
+This rhythm builds confidence quickly.
+
+<Callout type="info">
+An online Docker playground is like a temporary lab machine. Use it to learn commands, break things freely, and reset when you need a clean start.
+</Callout>
+

@@ -1,0 +1,86 @@
+---
+title: "AWS Account Creation For Docker Practice"
+description: "Why an AWS account is useful for Docker practice and what to set up before using EC2."
+---
+
+You can learn the core Docker concepts on your own laptop, but cloud practice is also important.
+
+In real projects, containers often run on servers. AWS gives you a practical way to create a Linux server, install Docker on it, and run containers in an environment that feels closer to production.
+
+For this course, an AWS account is useful mainly for EC2 practice.
+
+## Why use AWS for Docker
+
+Docker works locally, but local practice hides some server details.
+
+When you use an EC2 instance, you also learn:
+
+- How to connect to a remote Linux machine
+- How to install Docker on a server
+- How to run containers without Docker Desktop
+- How to expose ports through AWS security groups
+- How to test a containerized application from a browser
+- How Docker fits into cloud deployment
+
+This is not a replacement for local practice. It is the next step after you are comfortable running Docker commands.
+
+## Create an AWS account
+
+Go to the AWS website and create an account using an email address, phone number, and payment method.
+
+AWS asks for billing details because cloud resources can cost money. Many services have a free tier, but the free tier still requires careful usage.
+
+After account creation, sign in to the AWS Management Console.
+
+## Set up billing safety
+
+Before launching servers, set a billing alarm or budget.
+
+This habit matters because AWS charges for resources that keep running. A small EC2 instance may be inexpensive, but leaving multiple resources active can still create unwanted bills.
+
+At minimum:
+
+- Create a budget alert
+- Use free-tier eligible resources when possible
+- Stop or terminate demo EC2 instances after practice
+- Delete unused storage if you created it
+
+<Callout type="warn">
+Do not skip billing safety. Cloud platforms bill for what is running, not for what you meant to use.
+</Callout>
+
+## Use IAM carefully
+
+Avoid doing daily practice from the AWS root account.
+
+The root account is the owner of the entire AWS account. It should be protected with a strong password and multi-factor authentication.
+
+For normal learning, create an IAM user or use an IAM identity with the permissions needed for EC2 practice.
+
+## Region selection
+
+AWS resources are created inside regions.
+
+Choose one region and use it consistently during the course. This keeps your EC2 instances, key pairs, and security groups easier to find.
+
+For example, if you launch an EC2 instance in one region, it will not appear in the EC2 dashboard of another region.
+
+## What AWS services we need here
+
+For Docker setup practice, focus on a small set of AWS services:
+
+| Service | Purpose |
+| --- | --- |
+| EC2 | Create a Linux server for Docker |
+| Security Groups | Control inbound traffic such as SSH and app ports |
+| Key Pair | Connect securely to the server |
+| Billing/Budgets | Monitor cost |
+
+Later, Docker also connects naturally with services like ECR and ECS, but those are not needed for the first setup.
+
+## Simple rule
+
+Use AWS to understand server deployment, not to make Docker harder.
+
+First learn Docker locally. Then use EC2 to repeat the same commands on a real Linux machine.
+

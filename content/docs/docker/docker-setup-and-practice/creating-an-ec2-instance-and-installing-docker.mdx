@@ -1,0 +1,133 @@
+---
+title: "Creating An EC2 Instance And Installing Docker"
+description: "How to launch an Ubuntu EC2 instance, connect to it, install Docker, and run a test container."
+---
+
+An EC2 instance is a virtual server in AWS.
+
+For Docker practice, EC2 is useful because it lets you install Docker on a real Linux machine and run containers the way you would on a server.
+
+This lesson uses Ubuntu as the operating system because it is beginner friendly and common in cloud practice.
+
+## Launch an EC2 instance
+
+Open the AWS Management Console and go to EC2.
+
+Create a new instance with these basic choices:
+
+| Setting | Suggested value |
+| --- | --- |
+| Name | docker-practice-server |
+| AMI | Ubuntu Server |
+| Instance type | Free-tier eligible small instance |
+| Key pair | Create or select an existing key pair |
+| Security group | Allow SSH from your IP |
+
+Keep the setup simple for practice.
+
+## Security group rules
+
+To connect using SSH, port `22` must be allowed from your IP address.
+
+Later, when you run a web application in Docker, you may also need to allow the application port, such as `8080`, `3000`, or `80`.
+
+| Port | Use |
+| --- | --- |
+| 22 | SSH connection |
+| 80 | HTTP web traffic |
+| 3000 | Common React/Node practice port |
+| 8080 | Common Java/Spring Boot practice port |
+
+Do not open all ports to everyone for practice. Add only the ports you need.
+
+## Connect to the instance
+
+After the instance starts, copy its public IP address.
+
+From your terminal, connect using SSH:
+
+```bash
+ssh -i my-key.pem ubuntu@public-ip-address
+```
+
+Replace `my-key.pem` with your key file name and `public-ip-address` with the actual EC2 public IP.
+
+Once connected, update the package list:
+
+```bash
+sudo apt update
+```
+
+## Install Docker
+
+Install Docker using Ubuntu packages:
+
+```bash
+sudo apt install docker.io -y
+```
+
+Start Docker and enable it to start automatically:
+
+```bash
+sudo systemctl start docker
+sudo systemctl enable docker
+```
+
+Check the installed Docker version:
+
+```bash
+docker --version
+```
+
+## Run Docker without sudo
+
+By default, Docker commands may require `sudo`.
+
+You can add the current user to the Docker group:
+
+```bash
+sudo usermod -aG docker $USER
+```
+
+Then log out and connect again for the group change to apply.
+
+After reconnecting, test:
+
+```bash
+docker run hello-world
+```
+
+If this works without `sudo`, your user can run Docker commands.
+
+## Run a simple web container
+
+Try running Nginx:
+
+```bash
+docker run -d -p 80:80 nginx
+```
+
+Then open the EC2 public IP in your browser:
+
+```text
+http://public-ip-address
+```
+
+If the security group allows port `80`, you should see the Nginx welcome page.
+
+## Clean up
+
+After practice, stop and remove the container:
+
+```bash
+docker ps
+docker stop container-id
+docker rm container-id
+```
+
+When you are done with the EC2 instance, stop or terminate it from the AWS console.
+
+<Callout type="warn">
+Do not leave EC2 instances running after practice unless you intentionally need them. Stopped and terminated are different: stopped keeps the instance saved, terminated deletes it.
+</Callout>
+

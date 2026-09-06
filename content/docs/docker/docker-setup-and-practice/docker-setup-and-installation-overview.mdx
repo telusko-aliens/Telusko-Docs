@@ -1,0 +1,63 @@
+---
+title: "Docker Setup And Installation Overview"
+description: "A practical overview of the tools and environments you can use to learn Docker."
+---
+
+Before running Docker commands, it helps to understand what you are actually installing and where you can practice.
+
+Docker is not just one command. It includes the Docker Engine that runs containers, the Docker CLI that lets you control Docker from the terminal, and sometimes Docker Desktop, which gives you a graphical interface and local Linux environment on Windows and macOS.
+
+The setup depends on your machine, but the goal is the same everywhere: you should be able to run `docker version`, download an image, start a container, and access an application through a port.
+
+## The main setup options
+
+You can practice Docker in three common ways:
+
+| Option | Best for |
+| --- | --- |
+| Docker Desktop | Local practice on Windows or macOS |
+| Docker on Linux | Server practice and production-like learning |
+| Online playground | Quick practice without installing anything |
+
+For most learners, Docker Desktop is the easiest starting point. If you want to understand how Docker runs on a real server, an AWS EC2 instance is also useful.
+
+## What Docker Desktop gives you
+
+Docker Desktop packages the tools needed to run containers locally.
+
+On Windows and macOS, containers need a Linux environment behind the scenes. Docker Desktop handles that setup for you. It installs the Docker CLI, runs the Docker Engine in a managed environment, and gives you a dashboard where you can see containers, images, volumes, and logs.
+
+You still need to learn the terminal commands because real Docker work is mostly done from the command line.
+
+## What Docker on Linux gives you
+
+On Linux, Docker runs more directly because Linux is the natural environment for containers.
+
+Installing Docker on an Ubuntu EC2 instance is a good way to practice a server-style setup. You connect through SSH, install Docker, run containers, open ports, and test applications from your browser.
+
+This gives you a clearer picture of how Docker fits into cloud deployment.
+
+## What you should verify after setup
+
+After installing Docker, check these basics:
+
+```bash
+docker version
+docker info
+docker run hello-world
+```
+
+If `hello-world` runs successfully, Docker can download an image and start a container on your machine.
+
+That small test proves the main pieces are working.
+
+## Recommended learning path
+
+Start locally if possible. Install Docker Desktop, run a few simple containers, and get comfortable with commands like `docker ps`, `docker images`, and `docker run`.
+
+Then repeat the same idea on an EC2 instance. The commands are similar, but the environment feels closer to a real server.
+
+<Callout type="info">
+Do not worry if the setup feels bigger than Docker itself. Once Docker is installed correctly, the daily workflow becomes much simpler: pull images, run containers, build images, and remove what you no longer need.
+</Callout>
+
