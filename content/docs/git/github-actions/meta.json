@@ -1,0 +1,9 @@
+{
+    "title": "GitHub Actions",
+    "pages": [
+        "github-actions-introduction.mdx",
+        "workflows-and-execution.mdx",
+        "events-jobs-and-runners.mdx",
+        "automation-build-test-deployments.mdx"
+    ]
+}
