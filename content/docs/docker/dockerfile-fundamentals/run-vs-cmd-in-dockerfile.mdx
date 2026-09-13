@@ -1,0 +1,133 @@
+---
+title: "RUN Vs CMD In Dockerfile"
+description: "Understand the difference between commands that run while building an image and commands that run when a container starts."
+---
+
+`RUN` and `CMD` are two of the most important Dockerfile instructions, and beginners often confuse them.
+
+The difference is simple:
+
+| Instruction | When it runs |
+| --- | --- |
+| `RUN` | During image build |
+| `CMD` | When a container starts |
+
+This timing difference changes everything.
+
+## RUN runs while building the image
+
+Use `RUN` for setup steps that should become part of the image.
+
+Examples:
+
+```dockerfile
+RUN apt update
+RUN apt install -y curl
+RUN npm install
+RUN mvn package
+```
+
+These commands run during `docker build`.
+
+```bash
+docker build -t my-app .
+```
+
+The result of a `RUN` command is saved into the image layer.
+
+## CMD runs when the container starts
+
+Use `CMD` to define the default command for the container.
+
+Examples:
+
+```dockerfile
+CMD ["java", "-jar", "app.jar"]
+CMD ["npm", "start"]
+CMD ["python", "app.py"]
+```
+
+These commands do not run during `docker build`. They run later when you start a container:
+
+```bash
+docker run my-app
+```
+
+## Simple example
+
+Consider this Dockerfile:
+
+```dockerfile
+FROM ubuntu
+RUN echo "Image is being built"
+CMD echo "Container is starting"
+```
+
+When you build the image:
+
+```bash
+docker build -t run-cmd-demo .
+```
+
+Docker executes the `RUN` line.
+
+When you run the container:
+
+```bash
+docker run run-cmd-demo
+```
+
+Docker executes the `CMD` line.
+
+## Why not use RUN to start the app
+
+This is a common mistake:
+
+```dockerfile
+RUN java -jar app.jar
+```
+
+That tries to start the application while building the image. But the purpose of the build is to create the image, not to run the application permanently.
+
+The correct approach is:
+
+```dockerfile
+CMD ["java", "-jar", "app.jar"]
+```
+
+Now the application starts when the container starts.
+
+## Shell form and exec form
+
+Docker supports two common forms.
+
+Shell form:
+
+```dockerfile
+CMD java -jar app.jar
+```
+
+Exec form:
+
+```dockerfile
+CMD ["java", "-jar", "app.jar"]
+```
+
+For application startup, prefer exec form. It handles signals more cleanly and avoids some shell-related surprises.
+
+## Quick memory rule
+
+Use this rule:
+
+| Need | Use |
+| --- | --- |
+| Install packages | `RUN` |
+| Build code | `RUN` |
+| Copy setup into image | `RUN` |
+| Start the app | `CMD` |
+| Define default container command | `CMD` |
+
+<Callout type="info">
+`RUN` prepares the image. `CMD` starts the container. Keep that line clear and most Dockerfile mistakes disappear.
+</Callout>
+

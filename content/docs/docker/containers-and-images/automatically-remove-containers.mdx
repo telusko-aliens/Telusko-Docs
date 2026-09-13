@@ -1,0 +1,104 @@
+---
+title: "Automatically Remove Containers"
+description: "Use the --rm option to clean up short-lived containers automatically after they stop."
+---
+
+During Docker practice, stopped containers can pile up quickly.
+
+Every time you run a container, Docker creates a container object. Even after the process stops, the stopped container may remain on your system so you can inspect logs or restart it.
+
+That is useful sometimes, but for quick tests it creates clutter.
+
+## See stopped containers
+
+Run:
+
+```bash
+docker ps -a
+```
+
+This shows both running and stopped containers.
+
+If you practice often, you may see many old containers from previous commands.
+
+## Remove containers manually
+
+You can remove a stopped container:
+
+```bash
+docker rm container-id
+```
+
+Or by name:
+
+```bash
+docker rm container-name
+```
+
+If the container is still running, stop it first:
+
+```bash
+docker stop container-name
+docker rm container-name
+```
+
+## Use --rm for temporary containers
+
+The `--rm` option tells Docker to automatically remove the container when it stops.
+
+```bash
+docker run --rm hello-world
+```
+
+For an interactive container:
+
+```bash
+docker run --rm -it ubuntu bash
+```
+
+When you exit the shell, Docker removes the container automatically.
+
+## When --rm is useful
+
+Use `--rm` for:
+
+- Quick command tests
+- Temporary shells
+- Short experiments
+- One-time utility containers
+- Learning examples where you do not need logs later
+
+It keeps your Docker environment clean.
+
+## When not to use --rm
+
+Do not use `--rm` when you want to inspect the stopped container later.
+
+For example, if an application crashes and you want to check logs, keeping the stopped container can be useful:
+
+```bash
+docker logs container-id
+```
+
+If you used `--rm`, the container is removed after it stops, so there is nothing left to inspect.
+
+## Clean up old stopped containers
+
+To remove all stopped containers:
+
+```bash
+docker container prune
+```
+
+Docker will ask for confirmation before deleting them.
+
+## Simple practice rule
+
+Use `--rm` when the container is temporary.
+
+Avoid `--rm` when you are debugging.
+
+<Callout type="info">
+Containers are cheap to create, so they are easy to forget. Build the habit of cleaning up while learning Docker.
+</Callout>
+

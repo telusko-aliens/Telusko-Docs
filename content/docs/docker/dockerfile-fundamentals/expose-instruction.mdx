@@ -1,0 +1,122 @@
+---
+title: "EXPOSE Instruction"
+description: "Understand what EXPOSE does, what it does not do, and how it differs from port mapping."
+---
+
+`EXPOSE` documents which port an application expects to use inside the container.
+
+It is useful, but it does not publish the port to your host machine by itself. This is the key point beginners must remember.
+
+## Basic syntax
+
+```dockerfile
+EXPOSE 8080
+```
+
+This tells readers and Docker tools that the containerized application is expected to listen on port `8080`.
+
+For example, a Spring Boot Dockerfile may include:
+
+```dockerfile
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY target/app.jar app.jar
+EXPOSE 8080
+CMD ["java", "-jar", "app.jar"]
+```
+
+The `EXPOSE 8080` line is a signal that the app uses port `8080` inside the container.
+
+## EXPOSE does not publish the port
+
+This is important:
+
+```dockerfile
+EXPOSE 8080
+```
+
+does not mean your browser can automatically access the app on `localhost:8080`.
+
+To access the app from your host machine, you still need port mapping:
+
+```bash
+docker run -p 8080:8080 my-app
+```
+
+The first `8080` is the host port. The second `8080` is the container port.
+
+## EXPOSE vs -p
+
+| Feature | Purpose |
+| --- | --- |
+| `EXPOSE 8080` | Documents the container port in the image |
+| `-p 8080:8080` | Publishes the container port to the host |
+
+Both are useful, but they do different jobs.
+
+`EXPOSE` belongs in the Dockerfile. Port mapping belongs in the `docker run` command.
+
+## Example with Nginx
+
+Nginx listens on port `80` inside the container.
+
+If you run:
+
+```bash
+docker run -d nginx
+```
+
+The container may be running, but your browser will not know how to reach it.
+
+Use:
+
+```bash
+docker run -d -p 8080:80 nginx
+```
+
+Now host port `8080` maps to container port `80`.
+
+Open:
+
+```text
+http://localhost:8080
+```
+
+## Why use EXPOSE at all
+
+If `EXPOSE` does not publish the port, why write it?
+
+Because it documents the image clearly.
+
+It helps:
+
+- Other developers understand which port the app uses
+- Tools inspect the expected container port
+- Dockerfiles communicate application behaviour
+- Future deployment setups become easier to read
+
+## Common mistake
+
+This Dockerfile may be correct:
+
+```dockerfile
+EXPOSE 8080
+CMD ["java", "-jar", "app.jar"]
+```
+
+But this run command may still be incomplete:
+
+```bash
+docker run my-app
+```
+
+The application may start, but the host machine cannot access it through a browser unless you map the port:
+
+```bash
+docker run -p 8080:8080 my-app
+```
+
+<Callout type="info">
+`EXPOSE` explains which port the container uses. `-p` actually connects that container port to your machine.
+</Callout>
+

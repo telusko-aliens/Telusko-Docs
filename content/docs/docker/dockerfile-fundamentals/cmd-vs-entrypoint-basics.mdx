@@ -1,0 +1,147 @@
+---
+title: "CMD Vs ENTRYPOINT Basics"
+description: "Learn how CMD and ENTRYPOINT define container startup behaviour and when to use each one."
+---
+
+`CMD` and `ENTRYPOINT` both affect what happens when a container starts.
+
+They look similar, but they are used for slightly different purposes. Understanding the difference helps you write Dockerfiles that behave predictably.
+
+## The simple difference
+
+Use this mental model:
+
+| Instruction | Best use |
+| --- | --- |
+| `CMD` | Default command or default arguments |
+| `ENTRYPOINT` | Fixed executable the container should always run |
+
+Most beginner application Dockerfiles work well with `CMD`.
+
+`ENTRYPOINT` becomes useful when the image is meant to behave like a specific command-line tool or service.
+
+## CMD example
+
+A simple Java Dockerfile may use:
+
+```dockerfile
+CMD ["java", "-jar", "app.jar"]
+```
+
+When you run:
+
+```bash
+docker run my-app
+```
+
+Docker starts:
+
+```bash
+java -jar app.jar
+```
+
+But `CMD` can be overridden from the command line:
+
+```bash
+docker run my-app echo "hello"
+```
+
+In this case, Docker runs the new command instead of the default `CMD`.
+
+## ENTRYPOINT example
+
+With `ENTRYPOINT`, you define the main executable:
+
+```dockerfile
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+Now the container is strongly tied to running that Java application.
+
+When someone runs the image, Docker uses the entrypoint as the main command.
+
+## CMD and ENTRYPOINT together
+
+They can also work together.
+
+```dockerfile
+ENTRYPOINT ["java", "-jar", "app.jar"]
+CMD ["--server.port=8080"]
+```
+
+Here:
+
+- `ENTRYPOINT` defines the fixed command
+- `CMD` provides default arguments
+
+If you run:
+
+```bash
+docker run my-app
+```
+
+Docker uses the default port argument.
+
+If you run:
+
+```bash
+docker run my-app --server.port=9090
+```
+
+The new argument replaces the `CMD` part.
+
+## Shell form and exec form
+
+Prefer exec form:
+
+```dockerfile
+CMD ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+Avoid shell form for most production-style examples:
+
+```dockerfile
+CMD java -jar app.jar
+```
+
+Exec form handles process signals more cleanly, which matters when containers stop or restart.
+
+## Which one should beginners use
+
+For normal web applications, start with `CMD`.
+
+```dockerfile
+CMD ["java", "-jar", "app.jar"]
+```
+
+Use `ENTRYPOINT` when:
+
+- The image should always run one main executable
+- You want command-line arguments to be appended to that executable
+- You are building a utility-style image
+- You want stronger control over startup behaviour
+
+## Common mistake
+
+Do not use both without understanding how they combine.
+
+This can confuse beginners:
+
+```dockerfile
+ENTRYPOINT ["java"]
+CMD ["-jar", "app.jar"]
+```
+
+It works, but it is less obvious than:
+
+```dockerfile
+CMD ["java", "-jar", "app.jar"]
+```
+
+For course examples, clarity matters more than cleverness.
+
+<Callout type="info">
+Use `CMD` for the default startup command. Use `ENTRYPOINT` when the image should behave like one fixed executable.
+</Callout>
+
