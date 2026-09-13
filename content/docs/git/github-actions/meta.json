@@ -4,6 +4,9 @@
         "github-actions-introduction.mdx",
         "workflows-and-execution.mdx",
         "events-jobs-and-runners.mdx",
-        "automation-build-test-deployments.mdx"
+        "automation-build-test-deployments.mdx",
+        "github-marketplace-and-reusable-workflows.mdx",
+        "secrets-variables-and-permissions.mdx",
+        "best-practices-and-security.mdx"
     ]
 }
