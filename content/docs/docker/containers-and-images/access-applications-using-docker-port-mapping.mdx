@@ -1,0 +1,116 @@
+---
+title: "Access Applications Using Docker Port Mapping"
+description: "Understand container ports, host ports, and how to access applications running inside Docker containers."
+---
+
+When an application runs inside a container, it is isolated from your host machine.
+
+Even if the application listens on a port inside the container, your browser cannot automatically access it. You need to map a host port to a container port.
+
+This is called port mapping.
+
+## Container port vs host port
+
+A container has its own network space. An application may listen on port `80`, `8080`, or `3000` inside the container.
+
+Your laptop or server also has its own ports.
+
+Port mapping connects the two:
+
+```text
+host port -> container port
+```
+
+For example:
+
+```bash
+docker run -p 8080:80 nginx
+```
+
+This means:
+
+| Part | Meaning |
+| --- | --- |
+| `8080` | Port on your host machine |
+| `80` | Port inside the container |
+
+Now you can open:
+
+```text
+http://localhost:8080
+```
+
+Docker sends that traffic to port `80` inside the container.
+
+## Run Nginx with port mapping
+
+Use detached mode and map the port:
+
+```bash
+docker run -d -p 8080:80 --name web nginx
+```
+
+Check the container:
+
+```bash
+docker ps
+```
+
+In the ports column, you should see something like:
+
+```text
+0.0.0.0:8080->80/tcp
+```
+
+That tells you host port `8080` is connected to container port `80`.
+
+## Why not just use the same port
+
+You can map the same port:
+
+```bash
+docker run -d -p 80:80 nginx
+```
+
+But during practice, ports like `8080` are often safer because port `80` may already be used or may require extra permissions on some systems.
+
+You can also run multiple containers from the same image by using different host ports:
+
+```bash
+docker run -d -p 8081:80 nginx
+docker run -d -p 8082:80 nginx
+```
+
+Both containers use port `80` internally, but your host exposes them on different ports.
+
+## Common mistakes
+
+Port mapping mistakes are very common.
+
+Check these things when the browser does not open your app:
+
+- Is the container running?
+- Did you use `-p` while starting it?
+- Are the host and container ports in the correct order?
+- Is the application listening inside the container?
+- On AWS, is the security group allowing the host port?
+
+Remember the order:
+
+```text
+-p host-port:container-port
+```
+
+## Stop and remove the container
+
+After practice:
+
+```bash
+docker stop web
+docker rm web
+```
+
+<Callout type="info">
+Port mapping is one of the most important Docker ideas. The container can run perfectly, but your browser still needs a mapped host port to reach it.
+</Callout>
+

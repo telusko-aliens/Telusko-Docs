@@ -7,8 +7,8 @@
         "introduction.mdx",
         "docker-foundations",
         "docker-setup-and-practice",
-        "disabled-containers-and-images",
-        "disabled-dockerfile-fundamentals",
+        "containers-and-images",
+        "dockerfile-fundamentals",
         "disabled-dockerizing-applications",
         "disabled-docker-networking"
     ]

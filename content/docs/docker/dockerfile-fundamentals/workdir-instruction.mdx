@@ -1,0 +1,113 @@
+---
+title: "WORKDIR Instruction"
+description: "Understand how WORKDIR sets the working directory inside a Docker image and why it keeps Dockerfiles clean."
+---
+
+`WORKDIR` sets the working directory inside a Docker image.
+
+It is similar to using `cd` in a terminal, but it is written as a Dockerfile instruction. After Docker reaches a `WORKDIR` line, the following instructions run from that directory.
+
+## Why WORKDIR is useful
+
+Without `WORKDIR`, you may need to write long paths again and again:
+
+```dockerfile
+COPY app.jar /app/app.jar
+CMD ["java", "-jar", "/app/app.jar"]
+```
+
+With `WORKDIR`, the Dockerfile becomes cleaner:
+
+```dockerfile
+WORKDIR /app
+COPY app.jar app.jar
+CMD ["java", "-jar", "app.jar"]
+```
+
+Now Docker understands that `app.jar` is inside `/app`.
+
+## Basic syntax
+
+The syntax is simple:
+
+```dockerfile
+WORKDIR /app
+```
+
+If the directory does not exist, Docker creates it.
+
+That means you usually do not need to run:
+
+```dockerfile
+RUN mkdir /app
+```
+
+You can directly use `WORKDIR /app`.
+
+## Example with a Java application
+
+A simple Dockerfile for a Java application may look like this:
+
+```dockerfile
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY target/myapp.jar app.jar
+EXPOSE 8080
+CMD ["java", "-jar", "app.jar"]
+```
+
+Here is what happens:
+
+| Instruction | Meaning |
+| --- | --- |
+| `FROM` | Start from a Java runtime image |
+| `WORKDIR /app` | Use `/app` as the working directory |
+| `COPY` | Copy the JAR into `/app` |
+| `EXPOSE` | Document that the app uses port `8080` |
+| `CMD` | Start the Java application |
+
+## WORKDIR affects later instructions
+
+After this line:
+
+```dockerfile
+WORKDIR /app
+```
+
+These instructions use `/app` as the current directory:
+
+```dockerfile
+COPY . .
+RUN ls
+CMD ["node", "server.js"]
+```
+
+So `COPY . .` copies files into `/app`, `RUN ls` lists files inside `/app`, and `CMD` starts from `/app`.
+
+## Multiple WORKDIR instructions
+
+You can use `WORKDIR` more than once:
+
+```dockerfile
+WORKDIR /app
+WORKDIR logs
+```
+
+The second line is relative to the first, so the final working directory becomes:
+
+```text
+/app/logs
+```
+
+For beginner Dockerfiles, prefer one clear absolute `WORKDIR`, such as `/app`.
+
+## Good practice
+
+Use `WORKDIR` in almost every application Dockerfile.
+
+It makes paths easier to read and prevents confusion about where commands are running.
+
+<Callout type="info">
+Think of `WORKDIR` as the default folder inside the image. Copying files, running commands, and starting the app become easier once that folder is clear.
+</Callout>
+

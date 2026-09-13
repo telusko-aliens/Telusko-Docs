@@ -1,0 +1,92 @@
+---
+title: "Docker Basic Architecture"
+description: "Understand how the Docker client, Docker Engine, images, containers, and registries work together."
+---
+
+Docker becomes much easier when you understand its architecture.
+
+When you type a Docker command, you are not directly creating containers yourself. You are using the Docker CLI to send instructions to the Docker Engine. The Docker Engine then pulls images, builds images, starts containers, stops containers, creates networks, and manages storage.
+
+## The main parts
+
+Docker has a few important pieces:
+
+| Part | Meaning |
+| --- | --- |
+| Docker Client | The command-line tool you use, such as `docker run` |
+| Docker Engine | The service that manages images, containers, networks, and volumes |
+| Image | A read-only package used to create containers |
+| Container | A running instance of an image |
+| Registry | A place where images are stored, such as Docker Hub |
+
+The client is what you talk to. The engine is what does the work.
+
+## How a Docker command flows
+
+Suppose you run:
+
+```bash
+docker run nginx
+```
+
+Docker follows a simple flow:
+
+1. The Docker CLI sends the request to the Docker Engine
+2. The engine checks whether the `nginx` image exists locally
+3. If the image is missing, Docker pulls it from Docker Hub
+4. Docker creates a container from that image
+5. Docker starts the container
+
+This is why the first run can take longer. Docker may need to download the image first.
+
+## Image and container relationship
+
+An image is the package. A container is the running copy.
+
+```text
+nginx image
+-> nginx container
+```
+
+You can create many containers from the same image:
+
+```text
+nginx image
+-> web-server-1
+-> web-server-2
+-> web-server-3
+```
+
+Each container is isolated, but all of them can start from the same image.
+
+## Local machine and registry
+
+Docker keeps images on your local machine after downloading or building them.
+
+If the image is not available locally, Docker can pull it from a registry. Docker Hub is the default public registry.
+
+```text
+Docker Hub
+-> pull image
+-> local Docker machine
+-> run container
+```
+
+Later, when you build your own image, you can push it to Docker Hub or another registry so another machine can pull and run it.
+
+## Why architecture matters
+
+Knowing this flow helps you debug Docker problems.
+
+If a container does not start, ask:
+
+- Did Docker find the image?
+- Did the image download correctly?
+- Did the container start and then exit?
+- Is the application inside the container running?
+- Is the port mapped correctly?
+
+<Callout type="info">
+Most Docker commands are about one of three things: images, containers, or registries. Keep those separate in your mind and Docker becomes far less confusing.
+</Callout>
+

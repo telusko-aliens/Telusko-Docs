@@ -1,0 +1,120 @@
+---
+title: "Essential Docker Commands"
+description: "The everyday Docker commands for running, listing, stopping, removing, and inspecting containers and images."
+---
+
+Docker has many commands, but beginners should first become comfortable with the commands used every day.
+
+These commands help you run containers, check what is running, view images, inspect logs, stop containers, and clean up after practice.
+
+## Check Docker installation
+
+Start with:
+
+```bash
+docker version
+docker info
+```
+
+`docker version` shows the client and server versions. `docker info` shows details about the Docker Engine, storage driver, running containers, images, and system configuration.
+
+If these commands work, your terminal can talk to Docker.
+
+## Run a container
+
+Use `docker run` to create and start a container from an image.
+
+```bash
+docker run hello-world
+```
+
+If the image is not available locally, Docker downloads it first.
+
+To run an Nginx web server:
+
+```bash
+docker run nginx
+```
+
+This starts the container in the foreground, so logs appear directly in the terminal.
+
+## List running containers
+
+To see running containers:
+
+```bash
+docker ps
+```
+
+To see all containers, including stopped ones:
+
+```bash
+docker ps -a
+```
+
+This is one of the most useful Docker commands. Use it often.
+
+## List images
+
+To see images available on your machine:
+
+```bash
+docker images
+```
+
+Images stay on your system until you remove them. Running a container does not automatically delete the image.
+
+## Stop and remove containers
+
+Stop a running container:
+
+```bash
+docker stop container-id
+```
+
+Remove a stopped container:
+
+```bash
+docker rm container-id
+```
+
+You can use either the container ID or container name.
+
+## Remove images
+
+To remove an image:
+
+```bash
+docker rmi image-name
+```
+
+If a container is still using that image, Docker will not remove it. Remove the container first.
+
+## View container logs
+
+To see logs from a container:
+
+```bash
+docker logs container-id
+```
+
+This is useful when an application starts but does not behave as expected.
+
+## Command summary
+
+| Command | Purpose |
+| --- | --- |
+| `docker version` | Check Docker client and server version |
+| `docker run image` | Create and start a container |
+| `docker ps` | Show running containers |
+| `docker ps -a` | Show all containers |
+| `docker images` | Show local images |
+| `docker stop id` | Stop a running container |
+| `docker rm id` | Remove a stopped container |
+| `docker rmi image` | Remove an image |
+| `docker logs id` | Show container logs |
+
+<Callout type="info">
+Do not try to memorise every Docker command at once. Start with `run`, `ps`, `images`, `stop`, `rm`, and `logs`. These cover most beginner practice.
+</Callout>
+

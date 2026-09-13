@@ -1,0 +1,109 @@
+---
+title: "Dockerfile Basics With A Hands On Example"
+description: "Learn what a Dockerfile is, how images are built from instructions, and how to create a simple image."
+---
+
+A Dockerfile is a text file that contains instructions for building a Docker image.
+
+Instead of manually preparing a machine, you describe the setup once in a Dockerfile. Docker reads those instructions step by step and creates an image. That image can then be used to run containers.
+
+This is one of the most important Docker ideas: a Dockerfile turns setup steps into repeatable deployment instructions.
+
+## What a Dockerfile does
+
+A Dockerfile answers questions like:
+
+- Which base image should we start from?
+- Which folder should the app run inside?
+- Which files should be copied into the image?
+- Which commands should run while building the image?
+- Which port does the application use?
+- Which command should start the app?
+
+Without Docker, these steps may be written in a README and followed manually. With Docker, they become executable instructions.
+
+## A simple Dockerfile
+
+Create a folder with an `index.html` file:
+
+```html
+<h1>Hello from Docker</h1>
+```
+
+Now create a file named `Dockerfile` in the same folder:
+
+```dockerfile
+FROM nginx
+COPY index.html /usr/share/nginx/html/index.html
+```
+
+This Dockerfile starts from the official `nginx` image and replaces the default web page with your own `index.html`.
+
+## Build the image
+
+Run this command from the folder where the Dockerfile exists:
+
+```bash
+docker build -t my-nginx-page .
+```
+
+The `-t` option gives the image a name. The dot at the end means "use the current folder as the build context."
+
+Check the image:
+
+```bash
+docker images
+```
+
+You should see `my-nginx-page` in the image list.
+
+## Run the image as a container
+
+Start a container from the image:
+
+```bash
+docker run -d -p 8080:80 --name my-page my-nginx-page
+```
+
+Open this in your browser:
+
+```text
+http://localhost:8080
+```
+
+Docker sends traffic from host port `8080` to container port `80`, where Nginx is serving your page.
+
+## Dockerfile instructions are layered
+
+Each Dockerfile instruction creates a layer in the image.
+
+For example:
+
+```dockerfile
+FROM nginx
+COPY index.html /usr/share/nginx/html/index.html
+```
+
+Docker starts with the `nginx` image layer, then adds another layer for your copied file.
+
+This layer system is why Docker can cache builds. If an instruction has not changed, Docker can reuse the existing layer instead of rebuilding everything.
+
+## Clean up
+
+After testing, stop and remove the container:
+
+```bash
+docker stop my-page
+docker rm my-page
+```
+
+The image still remains. You can remove it separately:
+
+```bash
+docker rmi my-nginx-page
+```
+
+<Callout type="info">
+A Dockerfile is not the running application. It is the recipe used to build the image. The image is then used to create containers.
+</Callout>
+

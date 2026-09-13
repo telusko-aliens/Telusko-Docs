@@ -1,0 +1,108 @@
+---
+title: "Get Inside A Running Docker Container"
+description: "Use exec to open a shell inside a running container for inspection and debugging."
+---
+
+Sometimes you need to look inside a running container.
+
+Maybe you want to check files, inspect environment variables, confirm a process is running, or understand how the container filesystem looks. Docker lets you do this with `docker exec`.
+
+## Start a container
+
+Run an Nginx container in detached mode:
+
+```bash
+docker run -d --name web nginx
+```
+
+Check that it is running:
+
+```bash
+docker ps
+```
+
+Now you can enter it.
+
+## Use docker exec
+
+Use this command:
+
+```bash
+docker exec -it web bash
+```
+
+The options mean:
+
+| Option | Meaning |
+| --- | --- |
+| `-i` | Keep input open |
+| `-t` | Allocate a terminal |
+| `web` | Container name |
+| `bash` | Shell to open inside the container |
+
+If the image does not include `bash`, try:
+
+```bash
+docker exec -it web sh
+```
+
+Small images often include `sh` instead of `bash`.
+
+## Explore inside the container
+
+Once inside, try:
+
+```bash
+pwd
+ls
+whoami
+cat /etc/os-release
+```
+
+For Nginx, you can check the default web files:
+
+```bash
+cd /usr/share/nginx/html
+ls
+cat index.html
+```
+
+This helps you see that the container has its own filesystem.
+
+## Exit the container shell
+
+To leave the shell:
+
+```bash
+exit
+```
+
+The container keeps running because you only exited the extra shell process, not the main Nginx process.
+
+Check again:
+
+```bash
+docker ps
+```
+
+## Exec vs attach
+
+Beginners sometimes confuse `exec` and `attach`.
+
+| Command | Meaning |
+| --- | --- |
+| `docker exec` | Runs a new command inside a running container |
+| `docker attach` | Attaches your terminal to the main container process |
+
+For inspection and debugging, prefer `docker exec`.
+
+## Do not manually fix production containers
+
+Getting inside a container is useful for learning and debugging. But in real deployments, you should not manually edit containers and treat those edits as permanent.
+
+If a change is needed, update the Dockerfile or application code, build a new image, and run a new container.
+
+<Callout type="warn">
+Changes made inside a running container can disappear when the container is removed. Permanent changes belong in the image, not inside a manually edited container.
+</Callout>
+

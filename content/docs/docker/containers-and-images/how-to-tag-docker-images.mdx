@@ -1,0 +1,117 @@
+---
+title: "How To Tag Docker Images"
+description: "Use Docker image tags to name versions clearly and prepare images for sharing through a registry."
+---
+
+Docker image tags help identify versions of an image.
+
+When you build or pull an image, the tag tells Docker which version you mean. If you do not mention a tag, Docker usually assumes `latest`.
+
+Tags are simple, but they matter a lot in real projects.
+
+## Image name and tag
+
+An image reference usually looks like this:
+
+```text
+image-name:tag
+```
+
+For example:
+
+```text
+nginx:latest
+mysql:8
+my-app:1.0
+```
+
+The part before `:` is the image name. The part after `:` is the tag.
+
+## Pull an image with a tag
+
+You can pull a specific version:
+
+```bash
+docker pull nginx:latest
+docker pull mysql:8
+```
+
+If you run:
+
+```bash
+docker pull nginx
+```
+
+Docker treats it like:
+
+```bash
+docker pull nginx:latest
+```
+
+## Build an image with a tag
+
+When building your own image, use `-t`:
+
+```bash
+docker build -t my-app:1.0 .
+```
+
+This creates an image named `my-app` with the tag `1.0`.
+
+You can check it with:
+
+```bash
+docker images
+```
+
+## Tag an existing image
+
+You can add another tag to an existing image:
+
+```bash
+docker tag my-app:1.0 my-app:latest
+```
+
+This does not duplicate the full image. It adds another name pointing to the same image data.
+
+## Tags for Docker Hub
+
+To push an image to Docker Hub, the image name should include your Docker Hub username:
+
+```bash
+docker tag my-app:1.0 username/my-app:1.0
+docker push username/my-app:1.0
+```
+
+Replace `username` with your Docker Hub username.
+
+This naming tells Docker where the image belongs in the registry.
+
+## Why `latest` can be confusing
+
+The `latest` tag does not always mean the newest or safest version. It is just a tag name.
+
+Someone has to update it. In real projects, teams often use clear version tags:
+
+```text
+my-app:1.0
+my-app:1.1
+my-app:2026-09-06
+my-app:release-12
+```
+
+Specific tags make deployment easier to understand and rollback.
+
+## Good tagging habits
+
+Use meaningful tags:
+
+- Use `1.0`, `1.1`, or semantic versions for releases
+- Use `dev` for development images
+- Use `latest` only when you understand what it points to
+- Include your registry username before pushing to Docker Hub
+
+<Callout type="info">
+An image tag is a label for an image version. Good tags make Docker images easier to share, deploy, and debug.
+</Callout>
+

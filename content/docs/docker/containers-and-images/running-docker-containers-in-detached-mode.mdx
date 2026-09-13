@@ -1,0 +1,118 @@
+---
+title: "Running Docker Containers In Detached Mode"
+description: "Run containers in the background using detached mode and manage them with common Docker commands."
+---
+
+By default, many containers run in the foreground.
+
+That means the container logs stay attached to your terminal. If the application keeps running, your terminal stays busy until you stop the container or open another terminal.
+
+Detached mode solves this by running the container in the background.
+
+## Foreground mode
+
+Run Nginx normally:
+
+```bash
+docker run nginx
+```
+
+The container starts, and the terminal stays attached to it. You may see logs directly in the terminal.
+
+This is useful for learning and debugging, but it is not always convenient.
+
+## Detached mode
+
+Use `-d` to run a container in detached mode:
+
+```bash
+docker run -d nginx
+```
+
+Docker starts the container in the background and prints the container ID.
+
+Now your terminal is free for more commands.
+
+## Check the running container
+
+Use:
+
+```bash
+docker ps
+```
+
+You should see the container running.
+
+The output shows details such as:
+
+- Container ID
+- Image name
+- Command
+- Created time
+- Status
+- Ports
+- Container name
+
+## View logs from detached containers
+
+Detached does not mean invisible. You can still view logs:
+
+```bash
+docker logs container-id
+```
+
+To continuously follow logs:
+
+```bash
+docker logs -f container-id
+```
+
+Press `Ctrl + C` to stop following logs. This does not stop the container.
+
+## Stop a detached container
+
+To stop the container:
+
+```bash
+docker stop container-id
+```
+
+Then confirm:
+
+```bash
+docker ps
+docker ps -a
+```
+
+The first command shows running containers. The second shows stopped containers too.
+
+## Naming a container
+
+Container IDs are long, so names are easier during practice.
+
+```bash
+docker run -d --name my-nginx nginx
+```
+
+Now you can use the name:
+
+```bash
+docker logs my-nginx
+docker stop my-nginx
+docker rm my-nginx
+```
+
+## When to use detached mode
+
+Use detached mode when:
+
+- Running web servers
+- Running databases for local development
+- Running services that should continue in the background
+- Testing port mapping
+- Practicing real deployment style
+
+<Callout type="info">
+Foreground mode is good for seeing what happens immediately. Detached mode is closer to how long-running services are usually run.
+</Callout>
+
