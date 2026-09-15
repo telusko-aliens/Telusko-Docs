@@ -1,0 +1,10 @@
+{
+    "title": "Modern Github and AI Development",
+    "pages": [
+        "github-copilot.mdx",
+        "github-models.mdx",
+        "github-mcp-and-developer-agents.mdx",
+        "github-codespaces.mdx",
+        "github-cli.mdx"
+    ]
+}
