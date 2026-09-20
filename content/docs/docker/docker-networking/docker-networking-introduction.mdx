@@ -1,0 +1,79 @@
+---
+title: "Docker Networking Introduction"
+description: "Understand why Docker networking exists and how containers communicate with each other and the host."
+---
+
+Containers are isolated, but real applications still need to communicate.
+
+A web container may need to talk to a database container. Your browser may need to reach a containerized application. A container may need internet access to download packages or call an API.
+
+Docker networking is the system that makes those connections possible.
+
+## What networking solves
+
+Docker networking answers three common questions:
+
+- How does my browser reach a container?
+- How does one container talk to another container?
+- How does a container reach the internet?
+
+The answer depends on the network type and port mapping.
+
+## Container isolation
+
+Each container gets its own network view. It can have its own IP address, routes, and network interfaces.
+
+This isolation is useful because containers do not all fight over the same internal ports.
+
+For example, two containers can both listen on port `80` internally, as long as the host exposes them on different ports:
+
+```bash
+docker run -d -p 8081:80 nginx
+docker run -d -p 8082:80 nginx
+```
+
+## Port mapping
+
+Port mapping connects a host port to a container port:
+
+```bash
+docker run -p 8080:80 nginx
+```
+
+This means:
+
+```text
+host port 8080 -> container port 80
+```
+
+Without port mapping, your container may be running perfectly but still not reachable from your browser.
+
+## Container-to-container communication
+
+Containers can communicate through Docker networks.
+
+Custom bridge networks are especially useful because containers can find each other by name.
+
+```bash
+docker network create app-network
+docker run -d --name database --network app-network mysql
+docker run -d --name api --network app-network my-api
+```
+
+Inside `app-network`, the API can reach the database using the container name `database`.
+
+## What to focus on first
+
+Learn these ideas in order:
+
+| Topic | Why it matters |
+| --- | --- |
+| Port mapping | Browser to container access |
+| Default networks | What Docker creates automatically |
+| Bridge network | Normal single-host container networking |
+| Custom bridge | Cleaner container-to-container communication |
+
+<Callout type="info">
+Docker networking sounds difficult at first, but the beginner path is clear: map ports for browser access, use custom bridge networks for container-to-container access.
+</Callout>
+

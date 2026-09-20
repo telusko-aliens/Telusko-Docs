@@ -1,0 +1,88 @@
+---
+title: "Dockerizing A React Application Using Multi Stage Dockerfile"
+description: "Build a React app with Node and serve the production files with Nginx."
+---
+
+React applications are usually built into static files.
+
+During development, you use Node and a dev server. For production, you normally build optimized files and serve them using a web server such as Nginx.
+
+This makes React a great example for multi-stage Dockerfiles.
+
+## Multi-stage Dockerfile
+
+```dockerfile
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+For Create React App, the build folder may be `/app/build` instead of `/app/dist`.
+
+## Stage 1: build React
+
+The first stage uses Node:
+
+```dockerfile
+FROM node:20-alpine AS build
+```
+
+It installs dependencies and creates production files:
+
+```dockerfile
+RUN npm run build
+```
+
+## Stage 2: serve with Nginx
+
+The second stage uses Nginx:
+
+```dockerfile
+FROM nginx:alpine
+```
+
+Only the final static files are copied:
+
+```dockerfile
+COPY --from=build /app/dist /usr/share/nginx/html
+```
+
+The final image does not need Node, source files, or development dependencies.
+
+## Build and run
+
+```bash
+docker build -t react-app:1.0 .
+docker run -d -p 8080:80 --name react-web react-app:1.0
+```
+
+Open:
+
+```text
+http://localhost:8080
+```
+
+## Common folder difference
+
+Different React tools use different output folders.
+
+| Tool | Common build output |
+| --- | --- |
+| Vite | `dist` |
+| Create React App | `build` |
+| Next.js static export | `out` |
+
+Use the folder your project actually creates.
+
+<Callout type="info">
+The Node stage builds the React app. The Nginx stage serves the final files. That is the clean production pattern.
+</Callout>
+

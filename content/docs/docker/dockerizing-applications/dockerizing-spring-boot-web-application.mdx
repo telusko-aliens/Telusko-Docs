@@ -1,0 +1,75 @@
+---
+title: "Dockerizing Spring Boot Web Application"
+description: "Create a Docker image for a Spring Boot web app and run it with port mapping."
+---
+
+Spring Boot applications are a natural fit for Docker because they usually package into a single executable JAR.
+
+Once the JAR is built, the Docker image only needs Java, the JAR file, the exposed port, and the startup command.
+
+## Build the Spring Boot app
+
+Run:
+
+```bash
+mvn clean package
+```
+
+The JAR is usually created inside `target`.
+
+```text
+target/demo-0.0.1-SNAPSHOT.jar
+```
+
+## Dockerfile
+
+Create a `Dockerfile` in the project root:
+
+```dockerfile
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY target/demo-0.0.1-SNAPSHOT.jar app.jar
+EXPOSE 8080
+CMD ["java", "-jar", "app.jar"]
+```
+
+Change the JAR name to match your project.
+
+## Build the image
+
+```bash
+docker build -t spring-web-app:1.0 .
+```
+
+## Run the container
+
+```bash
+docker run -d -p 8080:8080 --name spring-web spring-web-app:1.0
+```
+
+Open:
+
+```text
+http://localhost:8080
+```
+
+## What to check if it fails
+
+Check logs:
+
+```bash
+docker logs spring-web
+```
+
+Common problems:
+
+- The JAR name in `COPY` is wrong
+- The app uses a different port
+- Maven build failed
+- The container started and exited because the app crashed
+- Environment variables are missing
+
+<Callout type="info">
+For Spring Boot, Docker usually runs the final JAR. First make the JAR work, then package it into an image.
+</Callout>
+

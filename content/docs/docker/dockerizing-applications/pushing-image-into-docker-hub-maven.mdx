@@ -1,0 +1,72 @@
+---
+title: "Pushing Image Into Docker Hub Maven"
+description: "Tag and push a Maven application image to Docker Hub."
+---
+
+After building a Docker image locally, you can push it to Docker Hub so another machine can pull and run it.
+
+This is how Docker images move from your laptop to a server, teammate, or deployment pipeline.
+
+## Log in to Docker Hub
+
+Use:
+
+```bash
+docker login
+```
+
+Enter your Docker Hub username and password or access token.
+
+## Build the image
+
+Build your Maven web application image:
+
+```bash
+docker build -t maven-web-app:1.0 .
+```
+
+Check it:
+
+```bash
+docker images
+```
+
+## Tag the image for Docker Hub
+
+Docker Hub images use this format:
+
+```text
+username/repository-name:tag
+```
+
+Tag your local image:
+
+```bash
+docker tag maven-web-app:1.0 username/maven-web-app:1.0
+```
+
+Replace `username` with your Docker Hub username.
+
+## Push the image
+
+Push it:
+
+```bash
+docker push username/maven-web-app:1.0
+```
+
+After the upload finishes, open Docker Hub and confirm the repository is visible.
+
+## Why tagging matters
+
+The tag tells Docker where to send the image.
+
+| Image name | Meaning |
+| --- | --- |
+| `maven-web-app:1.0` | Local image name |
+| `username/maven-web-app:1.0` | Docker Hub image name |
+
+<Callout type="info">
+Before pushing to Docker Hub, always tag the image with your Docker Hub username. Otherwise Docker does not know which repository should receive it.
+</Callout>
+

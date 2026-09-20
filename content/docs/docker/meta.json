@@ -9,7 +9,7 @@
         "docker-setup-and-practice",
         "containers-and-images",
         "dockerfile-fundamentals",
-        "disabled-dockerizing-applications",
-        "disabled-docker-networking"
+        "dockerizing-applications",
+        "docker-networking"
     ]
 }

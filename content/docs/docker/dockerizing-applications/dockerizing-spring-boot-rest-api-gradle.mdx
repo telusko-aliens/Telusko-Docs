@@ -1,0 +1,78 @@
+---
+title: "Dockerizing Spring Boot REST API Gradle"
+description: "Dockerize a Spring Boot REST API built with Gradle."
+---
+
+Gradle-based Spring Boot applications are dockerized in almost the same way as Maven projects.
+
+The main difference is the build command and output location. Gradle usually creates the JAR inside `build/libs`.
+
+## Build the project
+
+Run:
+
+```bash
+./gradlew clean build
+```
+
+On Windows, you may use:
+
+```bash
+gradlew.bat clean build
+```
+
+After the build, check:
+
+```text
+build/libs/
+```
+
+You should see the application JAR.
+
+## Dockerfile
+
+Create a Dockerfile:
+
+```dockerfile
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY build/libs/*.jar app.jar
+EXPOSE 8080
+CMD ["java", "-jar", "app.jar"]
+```
+
+Using `*.jar` is convenient for beginner projects, but in production you may prefer the exact JAR name.
+
+## Build the Docker image
+
+```bash
+docker build -t spring-gradle-api:1.0 .
+```
+
+## Run the API
+
+```bash
+docker run -d -p 8080:8080 --name gradle-api spring-gradle-api:1.0
+```
+
+Test an endpoint:
+
+```text
+http://localhost:8080/api
+```
+
+Use the actual endpoint from your application.
+
+## Debug if needed
+
+```bash
+docker logs gradle-api
+docker ps -a
+```
+
+If the container exits immediately, the Spring Boot app probably failed during startup.
+
+<Callout type="info">
+For Gradle projects, remember the output path: Maven usually uses `target`, while Gradle usually uses `build/libs`.
+</Callout>
+

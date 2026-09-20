@@ -1,0 +1,86 @@
+---
+title: "Docker Default Networks"
+description: "Explore the default Docker networks and understand when containers use them."
+---
+
+Docker creates default networks when it is installed.
+
+You can see them with:
+
+```bash
+docker network ls
+```
+
+Common default networks are:
+
+| Network | Meaning |
+| --- | --- |
+| `bridge` | Default network for normal containers |
+| `host` | Container shares the host network stack |
+| `none` | Container has no network access |
+
+Most beginner containers use the default `bridge` network.
+
+## Bridge network
+
+When you run a container without specifying a network, Docker usually connects it to the default bridge network.
+
+```bash
+docker run -d --name web nginx
+```
+
+You can inspect the network:
+
+```bash
+docker network inspect bridge
+```
+
+This shows connected containers and network details.
+
+## Host network
+
+The host network removes much of Docker's network isolation.
+
+```bash
+docker run --network host nginx
+```
+
+With host networking, the container uses the host's network directly.
+
+This can be useful in some Linux scenarios, but it is not the normal beginner choice and behaves differently on Docker Desktop.
+
+## None network
+
+The none network gives the container no network access:
+
+```bash
+docker run --network none ubuntu
+```
+
+This is useful for special isolation cases, but not for normal web apps.
+
+## Default bridge limitation
+
+The default bridge works, but it is not the best choice for multi-container applications.
+
+Custom bridge networks are better because containers can communicate by name more cleanly.
+
+```bash
+docker network create my-network
+```
+
+Then run containers on that network.
+
+## Useful commands
+
+```bash
+docker network ls
+docker network inspect bridge
+docker network create app-network
+docker network rm app-network
+```
+
+<Callout type="info">
+The default bridge network is fine for simple containers. For real multi-container practice, create a custom bridge network.
+</Callout>
+

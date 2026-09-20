@@ -1,0 +1,68 @@
+---
+title: "Single Stage Dockerfile With Maven Spring Boot"
+description: "Build and run a Spring Boot Maven application using a single-stage Dockerfile."
+---
+
+A single-stage Dockerfile uses one image for everything: building the application and running it.
+
+This is easy to understand, so it is a good first step before learning multi-stage Dockerfiles.
+
+## Single-stage example
+
+```dockerfile
+FROM maven:3.9-eclipse-temurin-17
+WORKDIR /app
+COPY . .
+RUN mvn clean package
+EXPOSE 8080
+CMD ["java", "-jar", "target/app.jar"]
+```
+
+This Dockerfile copies the source code, builds the project inside the image, and starts the generated JAR.
+
+## What happens during build
+
+When you run:
+
+```bash
+docker build -t spring-single-stage:1.0 .
+```
+
+Docker:
+
+1. Starts from a Maven image
+2. Copies the full project
+3. Runs Maven inside the image
+4. Stores the built JAR in the image
+5. Keeps Maven and build files in the final image
+
+## Why it is beginner friendly
+
+Single-stage Dockerfiles are simple because everything happens in one place.
+
+You do not need to install Maven locally. Docker uses the Maven base image to build the application.
+
+## The problem
+
+The final image includes more than it needs.
+
+It contains:
+
+- Maven
+- Source code
+- Build cache
+- Test files
+- The final JAR
+
+For running a Spring Boot app, you only need Java runtime and the JAR.
+
+## When to use it
+
+Use single-stage builds for learning, experiments, and quick demos.
+
+For production images, use multi-stage builds.
+
+<Callout type="info">
+Single-stage Dockerfiles are good for understanding the flow. Multi-stage Dockerfiles are better for clean production images.
+</Callout>
+

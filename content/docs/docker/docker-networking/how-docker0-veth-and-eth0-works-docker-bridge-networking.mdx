@@ -1,0 +1,72 @@
+---
+title: "How Docker0 Veth And Eth0 Works Docker Bridge Networking"
+description: "Understand the basic moving parts behind Docker bridge networking: docker0, veth pairs, and eth0 inside containers."
+---
+
+Docker bridge networking has a few names that look strange at first: `docker0`, `veth`, and `eth0`.
+
+You do not need to become a network engineer to use Docker, but knowing the basic idea helps you understand how containers connect to the host and each other.
+
+## The simple picture
+
+On a Linux host, Docker creates a bridge interface called `docker0`.
+
+Think of `docker0` as a small virtual switch on your machine. Containers can connect to this switch.
+
+```text
+container eth0
+-> veth pair
+-> docker0 bridge
+-> host network
+```
+
+## eth0 inside the container
+
+Inside a container, the network interface is usually named `eth0`.
+
+From the container's point of view, `eth0` is its network card.
+
+You can inspect it by entering a container and running network commands, depending on what tools are installed in the image.
+
+## veth pair
+
+A `veth` pair is like a virtual cable with two ends.
+
+One end appears inside the container as `eth0`. The other end stays on the host and connects to the Docker bridge.
+
+This is how traffic moves between the container and the host network.
+
+## docker0 bridge
+
+The `docker0` bridge connects containers on the default bridge network.
+
+It can forward traffic between containers and help route traffic out to the host network.
+
+When containers need internet access, Docker also uses NAT rules on the host to send traffic outward.
+
+## Port mapping in this picture
+
+When you run:
+
+```bash
+docker run -p 8080:80 nginx
+```
+
+Docker makes host port `8080` forward traffic to port `80` inside the container.
+
+The browser talks to the host. Docker forwards the traffic through the networking layer to the container.
+
+## Why this matters
+
+If networking fails, this model gives you places to check:
+
+- Is the container running?
+- Is the app listening on the expected container port?
+- Did you publish the port with `-p`?
+- Is the host firewall or AWS security group allowing the host port?
+- Are containers on the same Docker network?
+
+<Callout type="info">
+For daily Docker work, remember the simple version: `eth0` is inside the container, `veth` connects it to the host, and `docker0` acts like Docker's bridge.
+</Callout>
+
