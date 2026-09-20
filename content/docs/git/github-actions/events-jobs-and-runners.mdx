@@ -1,5 +1,5 @@
 ---
-title: Workflow Events, Jobs, Steps and Runners
+title: Events, Runners & Execution Context
 ---
 
 
@@ -360,6 +360,12 @@ Use `uses` to run a reusable action:
 - name: Checkout repository
   uses: actions/checkout@v4
 ```
+
+| Part    | Example    | Meaning                                   |
+| ------- | ---------- | ----------------------------------------- |
+| Owner   | `actions`  | User or organization that owns the action |
+| Action  | `checkout` | Name of the action                        |
+| Version | `@v4`      | Version, tag, branch, or commit           |
 
 You can also execute multiple commands:
 
