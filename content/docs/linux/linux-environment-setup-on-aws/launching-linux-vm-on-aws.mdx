@@ -1,0 +1,229 @@
+---
+title: Launching Linux VM on AWS
+---
+
+
+## What is an EC2 Instance?
+
+An **Amazon EC2 (Elastic Compute Cloud) instance** is a virtual server running in the AWS cloud.
+
+It provides computing resources such as CPU, memory, storage, and networking. You can use it to install software, execute Linux commands, host applications, and perform administrative tasks.
+
+Think of an EC2 instance as a Linux computer that you rent in the cloud and access remotely.
+
+
+----
+
+<Steps>
+
+## Launching a Linux EC2 Instance
+
+<Step>
+### Open the EC2 Dashboard
+
+1. Sign in to the AWS Management Console.
+2. Search for **EC2** in the console search bar.
+3. Open the EC2 Dashboard.
+
+</Step>
+
+<Step>
+### Launch an Instance
+
+1. Click **Launch instance**.
+2. The instance creation page will open.
+3. Configure the instance using the following settings.
+
+</Step>
+
+<Step>
+### Configure the Instance
+
+#### 1. Name
+
+Enter a meaningful name to identify your virtual machine.
+
+```text
+Linux_VM
+```
+
+This name helps you identify your instance in the EC2 dashboard.
+
+#### 2. Choose an Amazon Machine Image (AMI)
+
+An **Amazon Machine Image (AMI)** is a template used to launch an EC2 instance. It includes the operating system and may include additional preconfigured software.
+
+For this Linux lab, choose one of the following:
+
+| AMI          | Description                                                     |
+| ------------ | --------------------------------------------------------------- |
+| Ubuntu       | Beginner-friendly and widely used for development and learning. |
+| Amazon Linux | AWS-provided Linux distribution designed for AWS environments.  |
+
+Choose Ubuntu if you want to follow the Ubuntu-based examples in this course.
+
+#### 3. Select an Instance Type
+
+An instance type determines the computing resources available to your virtual machine, including CPU and memory.
+
+For a basic Linux lab, `t3.micro` is a small instance type with 2 vCPUs and 1 GiB of memory.
+
+| Setting       | Value      |
+| ------------- | ---------- |
+| Instance Type | `t3.micro` |
+| vCPUs         | 2          |
+| Memory        | 1 GiB      |
+
+**Billing note:** `t3.micro` is eligible for certain AWS Free Tier offers, but eligibility depends on your account's creation date, plan, region, and available credits. Verify the current offer in the console before launching. Do not assume that 750 free hours apply to every new account. 
+
+#### 4. Create a Key Pair (Important)
+
+A **key pair** is used to authenticate your SSH connection to the Linux instance.
+
+It consists of:
+
+* **Public key:** Stored on the EC2 instance.
+* **Private key:** Downloaded to your local machine and used to authenticate your connection.
+
+To create a key pair:
+
+1. Select **Create new key pair**.
+2. Enter a name, such as `Linux-shell`.
+3. Choose **RSA** as the key pair type.
+4. Select `.pem` as the private key file format.
+5. Click **Create key pair**.
+
+AWS will download the private key file to your computer.
+
+```text
+Linux-shell.pem
+```
+
+**Protect your private key:**
+
+* Store it in a secure location.
+* Never share it or upload it to GitHub.
+* Do not lose it; AWS does not retain a downloadable copy of the private key you created.
+
+You'll use this file when connecting to your instance through SSH.
+
+#### 5. Configure Network Settings
+
+A **security group** acts as a virtual firewall for your EC2 instance. It controls which inbound and outbound network traffic is allowed.
+
+For this lab, configure the following inbound rules:
+
+| Rule  | Port | Purpose                               |
+| ----- | ---: | ------------------------------------- |
+| SSH   |   22 | Connect to the Linux server remotely. |
+| HTTP  |   80 | Allow standard web traffic.           |
+| HTTPS |  443 | Allow secure web traffic.             |
+
+**Security recommendation:** For SSH, allow access only from your IP address whenever possible. Avoid opening port 22 to everyone (`0.0.0.0/0`). HTTP and HTTPS rules are only needed when you plan to host a web application or web server.
+
+For the initial Linux lab, SSH is the only inbound rule required.
+
+#### 6. Configure Storage
+
+Storage determines how much disk space is available to your instance.
+
+For basic Linux practice, you can start with:
+
+```text
+8 GiB
+```
+
+Choose an eligible EBS volume type, such as `gp3`, if available for your selected configuration.
+
+Review the storage pricing and Free Tier eligibility before launching. Storage can continue to incur charges even when the instance is stopped.
+
+</Step>
+
+<Step>
+### Launch the Instance
+
+Once you've reviewed the configuration:
+
+1. Click **Launch instance**.
+2. Wait for AWS to create the virtual machine.
+3. Open **Instances** from the EC2 navigation menu.
+4. Locate your instance named `Linux_VM`.
+
+Check the following details:
+
+| Property       | What to Verify                                                        |
+| -------------- | --------------------------------------------------------------------- |
+| Instance ID    | A unique identifier assigned by AWS.                                  |
+| Instance State | `Running`                                                             |
+| Status Checks  | The instance should pass its system status checks before you connect. |
+
+Your Linux virtual machine is now ready for the next step.
+
+</Step>
+
+</Steps>
+
+---
+
+
+## Managing an EC2 Instance
+
+AWS allows you to control the lifecycle of your virtual machine directly from the EC2 dashboard.
+
+| Action    | Description                                                       |
+| --------- | ----------------------------------------------------------------- |
+| Start     | Starts a stopped instance.                                        |
+| Stop      | Shuts down the instance while retaining its attached EBS storage. |
+| Reboot    | Restarts the instance without deleting it.                        |
+| Terminate | Permanently deletes the instance.                                 |
+
+### Stop vs Terminate
+
+This is an important distinction when working with cloud resources.
+
+* **Stop:** You can start the instance again later. EBS storage generally remains, and storage charges may continue.
+* **Terminate:** The instance is permanently deleted. Depending on the storage settings, attached volumes may also be deleted.
+
+For a learning lab, stop the instance when you're finished practising if you don't need it running continuously. However, stopping it does not guarantee that all AWS charges stop. Check for other billable resources, such as EBS volumes and public IPv4 addresses. 
+
+
+---
+
+
+## EC2 Instance Configuration Summary
+
+Here's a quick reference for the Linux VM we'll use throughout the lab.
+
+```text
+EC2 Linux VM
+│
+├── Name: Linux_VM
+├── AMI: Ubuntu
+├── Instance Type: t3.micro
+├── Key Pair: Linux-shell.pem
+│
+├── Security Group
+│   └── SSH (Port 22)
+│
+├── Storage: 8 GiB EBS
+│
+└── State: Running
+```
+
+*This is a learning configuration. Actual availability, pricing, and Free Tier eligibility depend on your AWS account and selected region.*
+
+
+## Summary
+
+* Amazon EC2 allows you to create and manage virtual servers in the AWS cloud.
+* An AMI provides the operating system template used to launch an instance.
+* The instance type determines the CPU and memory resources available.
+* A key pair is used to authenticate SSH connections. Keep the private key secure.
+* Security groups control network traffic to and from your instance.
+* Stopping an instance preserves its EBS storage, while terminating it deletes the instance.
+* Always review AWS Free Tier eligibility and monitor your usage to avoid unexpected costs.
+
+> **Remember:** Your EC2 instance is the Linux server you'll practise on. In the next lecture, we'll use Git Bash and the downloaded `.pem` private key to connect to it securely using SSH.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

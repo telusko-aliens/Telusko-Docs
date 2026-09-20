@@ -1,0 +1,8 @@
+{
+    "title": "Linux Environment Setup on AWS",
+    "pages": [
+        "aws-account-and-gitbash-setup.mdx",
+        "launching-linux-vm-on-aws.mdx",
+        "connecting-to-ec2-instance-using-gitbash.mdx"
+    ]
+}
