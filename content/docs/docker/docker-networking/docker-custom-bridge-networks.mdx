@@ -1,0 +1,100 @@
+---
+title: "Docker Custom Bridge Networks"
+description: "Create custom bridge networks so containers can communicate by name in a cleaner way."
+---
+
+Custom bridge networks are one of the most useful Docker networking features for beginners.
+
+They let related containers communicate with each other by container name. This makes multi-container setups cleaner than using the default bridge network.
+
+## Create a custom network
+
+```bash
+docker network create app-network
+```
+
+Check it:
+
+```bash
+docker network ls
+```
+
+## Run containers on the network
+
+Start a database container:
+
+```bash
+docker run -d --name database --network app-network mysql:8
+```
+
+Start an app container on the same network:
+
+```bash
+docker run -d --name api --network app-network my-api:1.0
+```
+
+Now `api` can reach the database using the hostname:
+
+```text
+database
+```
+
+Docker provides name resolution inside the custom network.
+
+## Why custom networks are better
+
+Custom bridge networks are better for app setups because:
+
+- Containers can find each other by name
+- Related containers are grouped together
+- Network setup is easier to inspect
+- You avoid hard-coding container IP addresses
+- It feels closer to Docker Compose and production-style setups
+
+## Inspect a network
+
+```bash
+docker network inspect app-network
+```
+
+This shows containers connected to the network and their assigned IP addresses.
+
+## Connect an existing container
+
+You can connect a running container to a network:
+
+```bash
+docker network connect app-network container-name
+```
+
+And disconnect it:
+
+```bash
+docker network disconnect app-network container-name
+```
+
+## Remove a network
+
+After removing containers, remove the network:
+
+```bash
+docker network rm app-network
+```
+
+Docker will not remove a network if containers are still attached.
+
+## Simple mental model
+
+Use a custom bridge network when containers belong to the same application.
+
+```text
+app-network
+-> api container
+-> database container
+-> cache container
+```
+
+<Callout type="info">
+For multi-container practice, create a custom bridge network and use container names instead of IP addresses.
+</Callout>
+

@@ -1,0 +1,83 @@
+---
+title: "Multi Stage Dockerfile Explained Using Spring Boot Application"
+description: "Use a multi-stage Dockerfile to build a Spring Boot app cleanly and run only the final JAR."
+---
+
+A multi-stage Dockerfile uses more than one `FROM` instruction.
+
+Each stage has a job. One stage can build the application, and another stage can run it. The final image only keeps what you copy into the final stage.
+
+This is the cleanest way to dockerize many production applications.
+
+## Multi-stage Spring Boot Dockerfile
+
+```dockerfile
+FROM maven:3.9-eclipse-temurin-17 AS build
+WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN mvn clean package -DskipTests
+
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
+EXPOSE 8080
+CMD ["java", "-jar", "app.jar"]
+```
+
+## Stage 1: build
+
+```dockerfile
+FROM maven:3.9-eclipse-temurin-17 AS build
+```
+
+This stage has Maven and Java. It is used to compile the application and create the JAR.
+
+```dockerfile
+RUN mvn clean package -DskipTests
+```
+
+After this, the JAR exists inside the build stage.
+
+## Stage 2: runtime
+
+```dockerfile
+FROM eclipse-temurin:17-jre
+```
+
+This stage is smaller because it only needs Java runtime.
+
+```dockerfile
+COPY --from=build /app/target/*.jar app.jar
+```
+
+This copies only the built JAR from the build stage into the final image.
+
+## Why this is better
+
+The final image does not contain Maven, source code, or build cache.
+
+| Single-stage | Multi-stage |
+| --- | --- |
+| Build and run in one image | Build and run in separate stages |
+| Larger final image | Smaller final image |
+| Includes build tools | Runtime only |
+| Easier for beginners | Better for production |
+
+## Build and run
+
+```bash
+docker build -t spring-multistage:1.0 .
+docker run -d -p 8080:8080 --name spring-app spring-multistage:1.0
+```
+
+Check logs:
+
+```bash
+docker logs spring-app
+```
+
+<Callout type="info">
+Multi-stage builds let Docker use heavy tools while building, then leave those tools behind in the final runtime image.
+</Callout>
+

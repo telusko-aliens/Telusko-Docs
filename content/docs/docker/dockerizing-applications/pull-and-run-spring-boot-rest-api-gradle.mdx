@@ -1,0 +1,73 @@
+---
+title: "Pull And Run Spring Boot REST API Gradle"
+description: "Pull a Gradle Spring Boot REST API image from Docker Hub and run it locally or on a server."
+---
+
+After pushing a Gradle Spring Boot REST API image to Docker Hub, you can run it from any Docker machine.
+
+This is useful when moving the API from development to another laptop, an EC2 instance, or a deployment server.
+
+## Pull the image
+
+```bash
+docker pull username/spring-gradle-api:1.0
+```
+
+Check:
+
+```bash
+docker images
+```
+
+## Run the container
+
+```bash
+docker run -d -p 8080:8080 --name gradle-api username/spring-gradle-api:1.0
+```
+
+Test the API:
+
+```text
+http://localhost:8080
+```
+
+On EC2, use:
+
+```text
+http://ec2-public-ip:8080
+```
+
+## Check logs
+
+```bash
+docker logs gradle-api
+```
+
+For Spring Boot, logs show whether the app started successfully and which port it is using.
+
+## Pass environment variables
+
+Some APIs need database URLs, usernames, passwords, or profiles.
+
+You can pass values using `-e`:
+
+```bash
+docker run -d -p 8080:8080 \
+  -e SPRING_PROFILES_ACTIVE=prod \
+  --name gradle-api \
+  username/spring-gradle-api:1.0
+```
+
+On Windows PowerShell, write the command on one line if line continuation becomes confusing.
+
+## Clean up
+
+```bash
+docker stop gradle-api
+docker rm gradle-api
+```
+
+<Callout type="info">
+Pulling and running from Docker Hub proves that your app is no longer tied to your local project folder. The image has become the deployment package.
+</Callout>
+

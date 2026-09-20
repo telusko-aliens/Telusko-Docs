@@ -1,0 +1,75 @@
+---
+title: "Dockerizing A Maven Web Application"
+description: "Package a Maven web application into a Docker image and run it as a container."
+---
+
+A Maven web application normally depends on Java, Maven, a servlet container, and the application files. Docker lets us package that setup so the application can run in a repeatable way.
+
+The basic idea is simple: build the Maven project, create a deployable artifact, copy it into an image, and run it inside a container.
+
+## Typical Maven web app output
+
+Many older Java web applications produce a `.war` file.
+
+```text
+target/my-web-app.war
+```
+
+A WAR file usually runs inside a servlet container such as Tomcat.
+
+## Dockerfile example
+
+For a simple Maven web app, you can use a Tomcat base image:
+
+```dockerfile
+FROM tomcat:10-jdk17
+COPY target/my-web-app.war /usr/local/tomcat/webapps/ROOT.war
+EXPOSE 8080
+CMD ["catalina.sh", "run"]
+```
+
+This image starts Tomcat and deploys the WAR file as the root application.
+
+## Build the Maven project
+
+First build the app locally:
+
+```bash
+mvn clean package
+```
+
+Then check the `target` folder and confirm the WAR file exists.
+
+## Build and run the Docker image
+
+Build the image:
+
+```bash
+docker build -t maven-web-app:1.0 .
+```
+
+Run it:
+
+```bash
+docker run -d -p 8080:8080 --name maven-web maven-web-app:1.0
+```
+
+Open:
+
+```text
+http://localhost:8080
+```
+
+## What Docker is doing
+
+| Step | Meaning |
+| --- | --- |
+| `FROM tomcat:10-jdk17` | Start with Tomcat and Java |
+| `COPY target/...war` | Add your built application |
+| `EXPOSE 8080` | Document Tomcat's port |
+| `CMD` | Start Tomcat |
+
+<Callout type="info">
+Docker does not replace Maven. Maven builds the Java artifact; Docker packages and runs that artifact.
+</Callout>
+

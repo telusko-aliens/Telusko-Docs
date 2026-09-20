@@ -1,0 +1,76 @@
+---
+title: "Push Spring Boot Image To Docker Hub"
+description: "Tag a Spring Boot Docker image and push it to Docker Hub."
+---
+
+After dockerizing a Spring Boot application, the next step is sharing the image.
+
+Docker Hub lets you upload the image so another machine can pull and run the same Spring Boot app.
+
+## Build the Spring Boot image
+
+```bash
+docker build -t spring-web-app:1.0 .
+```
+
+Check:
+
+```bash
+docker images
+```
+
+## Log in
+
+```bash
+docker login
+```
+
+## Tag for Docker Hub
+
+Use your Docker Hub username:
+
+```bash
+docker tag spring-web-app:1.0 username/spring-web-app:1.0
+```
+
+You can also tag a latest version:
+
+```bash
+docker tag spring-web-app:1.0 username/spring-web-app:latest
+```
+
+## Push the image
+
+```bash
+docker push username/spring-web-app:1.0
+```
+
+If you tagged `latest`, push that too:
+
+```bash
+docker push username/spring-web-app:latest
+```
+
+## Run from Docker Hub
+
+On another machine:
+
+```bash
+docker pull username/spring-web-app:1.0
+docker run -d -p 8080:8080 username/spring-web-app:1.0
+```
+
+## Tagging habit
+
+Use clear versions for real projects.
+
+```text
+spring-web-app:1.0
+spring-web-app:1.1
+spring-web-app:prod-2026-09-13
+```
+
+<Callout type="info">
+Pushing an image means the application package is now portable. The server does not need your source code; it only needs Docker and access to the image.
+</Callout>
+

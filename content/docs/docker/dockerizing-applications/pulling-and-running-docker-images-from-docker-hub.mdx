@@ -1,0 +1,74 @@
+---
+title: "Pulling And Running Docker Images From Docker Hub"
+description: "Download an image from Docker Hub and run it on another machine."
+---
+
+Once an image is pushed to Docker Hub, any machine with Docker can pull and run it.
+
+This is the real power of Docker: build once, share the image, and run the same packaged application somewhere else.
+
+## Pull an image
+
+Use:
+
+```bash
+docker pull username/maven-web-app:1.0
+```
+
+Docker downloads the image layers and stores them locally.
+
+Check:
+
+```bash
+docker images
+```
+
+## Run the pulled image
+
+Start a container:
+
+```bash
+docker run -d -p 8080:8080 --name pulled-app username/maven-web-app:1.0
+```
+
+Open:
+
+```text
+http://localhost:8080
+```
+
+If you are running this on AWS EC2, open:
+
+```text
+http://ec2-public-ip:8080
+```
+
+Make sure the EC2 security group allows port `8080`.
+
+## Pull is automatic with docker run
+
+If the image is not present locally, this command can pull it automatically:
+
+```bash
+docker run username/maven-web-app:1.0
+```
+
+Still, using `docker pull` first is useful while learning because it makes the steps clear.
+
+## Useful checks
+
+Use:
+
+```bash
+docker ps
+docker logs pulled-app
+docker stop pulled-app
+docker rm pulled-app
+```
+
+These commands help confirm the container is running and clean it up when done.
+
+<Callout type="info">
+Docker Hub is the handoff point. One machine pushes the image; another machine pulls and runs the exact same package.
+</Callout>
+

@@ -1,0 +1,70 @@
+---
+title: "Why Single Stage Dockerfiles Are Not Recommended"
+description: "Understand the drawbacks of single-stage Dockerfiles for production applications."
+---
+
+Single-stage Dockerfiles are easy, but they are usually not ideal for production.
+
+The main problem is that the same image is used for building and running. Build tools are useful during image creation, but they are not needed when the application is running.
+
+## Bigger images
+
+A Maven image is much larger than a Java runtime image.
+
+If your final image includes Maven, source code, and build dependencies, it becomes larger than necessary.
+
+Large images create problems:
+
+- Slower uploads
+- Slower downloads
+- More disk usage
+- Longer deployments
+- Larger attack surface
+
+## More files than needed
+
+A running Spring Boot application usually needs only:
+
+- Java runtime
+- Application JAR
+- Configuration passed at runtime
+
+It does not need:
+
+- Maven
+- Full source code
+- Build plugins
+- Test files
+- Local project files
+
+Keeping unnecessary files in the final image makes the image harder to trust and maintain.
+
+## Security concern
+
+Every extra tool inside an image is another thing that may have vulnerabilities.
+
+Production images should contain only what they need to run the application. This keeps the image smaller and reduces the surface area attackers can use.
+
+## Slower deployments
+
+Deployment systems pull images before running containers.
+
+If the image is unnecessarily large, every deployment takes longer. This matters more when you deploy often, scale containers, or run multiple services.
+
+## Better solution
+
+Use a multi-stage Dockerfile.
+
+The first stage builds the application with Maven. The second stage copies only the final JAR into a smaller Java runtime image.
+
+```text
+Stage 1: build with Maven
+Stage 2: run with Java runtime only
+```
+
+This keeps the final image clean.
+
+<Callout type="warn">
+Single-stage Dockerfiles are fine while learning, but production images should avoid carrying build tools and source files that are not needed at runtime.
+</Callout>
+
