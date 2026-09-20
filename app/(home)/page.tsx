@@ -30,7 +30,7 @@ export default function HomePage() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4, duration: 0.6 }}
         >
-          Friendly documentation for tech stacks - from backend frameworks to frontend libraries, cloud platforms, and beyond.
+          Friendly documentation for tech stacks - from backend frameworks to frontend libraries, AI, cloud platforms, and beyond.
         </motion.p>
 
 
