@@ -1,0 +1,301 @@
+---
+title: Value vs Pointer Receivers
+---
+
+```go
+func (u User) Update(name string)  { }     // value receiver
+func (u *User) Update(name string) { }     // pointer receiver
+```
+
+One character apart, and the choice affects correctness, performance, and which interfaces your type satisfies. It is the decision you make most often in Go and the one most likely to be made by copying whatever the surrounding code did.
+
+Here is the short version, followed by the reasoning: **use a pointer receiver unless you have a specific reason not to, and never mix the two on one type.**
+
+## The functional difference
+
+```go
+type Counter struct {
+    count int
+}
+
+func (c Counter) IncValue() {
+    c.count++                // increments a copy
+}
+
+func (c *Counter) IncPointer() {
+    c.count++                // increments the original
+}
+
+c := Counter{}
+
+c.IncValue()
+fmt.Println(c.count)     // 0
+
+c.IncPointer()
+fmt.Println(c.count)     // 1
+```
+
+A value receiver gets a copy of the whole struct. Any change it makes dies when the method returns. If a method needs to modify the receiver, it must take a pointer. There is no way around this.
+
+## The three reasons to use a pointer receiver
+
+### 1. The method modifies the receiver
+
+Non-negotiable. A value receiver silently does nothing, which is worse than failing.
+
+```go
+func (a *Account) Deposit(amount int64) {
+    a.balance += amount
+}
+```
+
+### 2. The struct is large
+
+Every value receiver call copies the entire struct. For a handful of fields that is nothing. For something with an embedded array or dozens of fields, it adds up in a hot path.
+
+```go
+type Snapshot struct {
+    Metrics [1000]float64
+    Label   string
+}
+
+func (s Snapshot) Mean() float64   // copies 8 KB per call
+func (s *Snapshot) Mean() float64  // copies 8 bytes
+```
+
+### 3. The type contains something that must not be copied
+
+This one is a correctness issue, not a performance one.
+
+```go
+type Registry struct {
+    mu    sync.Mutex
+    items map[string]string
+}
+
+func (r Registry) Add(k, v string) {     // copies the mutex, breaking it
+    r.mu.Lock()
+    defer r.mu.Unlock()
+    r.items[k] = v
+}
+```
+
+Copying a `sync.Mutex` produces a second, unrelated lock. Two goroutines each holding their own copy will happily enter the critical section together. The same applies to `sync.WaitGroup`, `sync.Once`, `strings.Builder`, and anything embedding them.
+
+<Callout type="warn">
+`go vet` catches this specific mistake with the message "passes lock by value". It runs automatically during `go test`, which is one more reason to have tests in place early. Take the warning seriously, because the bug it describes only appears under concurrency and is nearly impossible to reproduce on demand.
+</Callout>
+
+## The reasons to use a value receiver
+
+### The type is small and immutable in spirit
+
+```go
+type Point struct{ X, Y float64 }
+
+func (p Point) Distance(q Point) float64 {
+    return math.Hypot(q.X-p.X, q.Y-p.Y)
+}
+
+func (p Point) Add(q Point) Point {
+    return Point{p.X + q.X, p.Y + q.Y}
+}
+```
+
+Sixteen bytes, no mutation, and the value semantics communicate that a `Point` is a value like a number. Copying it is cheaper than dereferencing a pointer, and the compiler is more likely to keep it in registers.
+
+### The receiver is a basic type or a small named type
+
+```go
+type Celsius float64
+
+func (c Celsius) ToFahrenheit() Fahrenheit {
+    return Fahrenheit(c*9/5 + 32)
+}
+```
+
+A pointer here would be strictly worse: larger, slower, and inviting a nil check that makes no sense.
+
+### The method must work on the zero value without an address
+
+```go
+type Duration int64
+
+func (d Duration) String() string { ... }
+
+fmt.Println(Duration(500))     // works, no addressable variable needed
+```
+
+## The rule that matters most: do not mix
+
+If any method on a type needs a pointer receiver, give **all** of them pointer receivers.
+
+```go
+// Inconsistent, and it will cause trouble
+func (u *User) SetName(n string) { u.Name = n }
+func (u User) GetName() string   { return u.Name }
+
+// Consistent
+func (u *User) SetName(n string) { u.Name = n }
+func (u *User) GetName() string  { return u.Name }
+```
+
+The reason is not tidiness. It is that the method set of a type depends on the receiver, and mixing produces surprises at interface boundaries.
+
+## Method sets, and the interface trap
+
+This is the part that actually bites people.
+
+```text
+   Type T   has methods with value receivers only
+   Type *T  has methods with value receivers AND pointer receivers
+```
+
+A value does not automatically satisfy an interface whose implementation uses pointer receivers.
+
+```go
+type Speaker interface {
+    Speak() string
+}
+
+type Dog struct{ Name string }
+
+func (d *Dog) Speak() string {
+    return d.Name + " says woof"
+}
+
+var s Speaker = Dog{"Bruno"}      // compile error
+var s Speaker = &Dog{"Bruno"}     // works
+```
+
+```text
+cannot use Dog{} (value of type Dog) as Speaker value:
+    Dog does not implement Speaker (method Speak has pointer receiver)
+```
+
+The reason goes back to addressability. Go can automatically take the address when calling a method on an addressable variable, but an interface holds a copy of the value, and there is no guarantee that copy is addressable. So the language does not allow it.
+
+The reverse direction works fine:
+
+```go
+type Cat struct{ Name string }
+
+func (c Cat) Speak() string { return c.Name + " says meow" }
+
+var s Speaker = Cat{"Mittens"}    // works
+var s Speaker = &Cat{"Mittens"}   // also works
+```
+
+<Callout type="info">
+This is the single most common cause of "does not implement" errors in Go. When you see one, check whether the method uses a pointer receiver and whether you passed a value. The fix is almost always adding an `&`.
+</Callout>
+
+## A decision table
+
+| Situation | Receiver |
+| --- | --- |
+| The method changes the receiver | pointer |
+| The struct contains a mutex, WaitGroup, or Once | pointer |
+| The struct is large, roughly over 100 bytes | pointer |
+| Some other method on the type needs a pointer | pointer, for consistency |
+| The type will be stored in an interface and mutated | pointer |
+| Small immutable value type such as Point or Celsius | value |
+| The type is a basic type, slice, or map alias | value |
+| Implementing `String()` on a mostly-value type | value |
+| Genuinely unsure | pointer |
+
+That last row is real advice. Pointer receivers are the safer default because they always work, where value receivers fail silently when you later add a mutating method.
+
+## The nil receiver
+
+A pointer receiver can be nil, and the method still runs:
+
+```go
+type List struct {
+    Value int
+    Next  *List
+}
+
+func (l *List) Len() int {
+    if l == nil {
+        return 0
+    }
+    return 1 + l.Next.Len()
+}
+
+var empty *List
+fmt.Println(empty.Len())     // 0, no panic
+```
+
+Nothing was dereferenced before the nil check, so nothing panicked. This makes recursive structures much cleaner, and it is worth defending in code review when someone flags it as suspicious.
+
+```go
+type Config struct {
+    Timeout time.Duration
+}
+
+func (c *Config) TimeoutOrDefault() time.Duration {
+    if c == nil || c.Timeout == 0 {
+        return 30 * time.Second
+    }
+    return c.Timeout
+}
+```
+
+Now a caller with no configuration at all can pass nil and get sensible behaviour.
+
+## Does the copy actually cost anything?
+
+Benchmarks tell a more nuanced story than "pointers are faster".
+
+For small structs, value receivers are often **faster**, because the value stays in registers or on the stack while a pointer forces a heap allocation and a dereference. Go's escape analysis frequently keeps value receivers off the heap entirely.
+
+For large structs the copy dominates and pointers win clearly.
+
+The practical guidance:
+
+- Under about 64 bytes with no mutation, value receivers are fine and possibly faster
+- Over a few hundred bytes, use pointers
+- In between, correctness and consistency matter more than the difference
+- Measure before restructuring anything for this reason alone
+
+## Applying it to a real type
+
+```go
+type Order struct {
+    ID       string
+    Items    []Item
+    Total    int64
+    Status   OrderStatus
+    mu       sync.Mutex
+}
+
+// Pointer, because it mutates
+func (o *Order) AddItem(item Item) error {
+    o.mu.Lock()
+    defer o.mu.Unlock()
+
+    if o.Status != StatusDraft {
+        return fmt.Errorf("cannot modify order in status %s", o.Status)
+    }
+    o.Items = append(o.Items, item)
+    o.Total += item.Price * int64(item.Quantity)
+    return nil
+}
+
+// Pointer, for consistency and because of the mutex
+func (o *Order) ItemCount() int {
+    o.mu.Lock()
+    defer o.mu.Unlock()
+    return len(o.Items)
+}
+
+// Pointer, same reasons, even though it only reads
+func (o *Order) String() string {
+    return fmt.Sprintf("Order(%s, %d items, %s)", o.ID, len(o.Items), o.Status)
+}
+```
+
+Every method takes a pointer. The mutex forces it for two of them, and consistency carries the rest. A reader never has to wonder which form to use, and `&order` works everywhere.
+
+Next, let's look at embedding, which is how Go gets most of what inheritance offers without any of the hierarchy.

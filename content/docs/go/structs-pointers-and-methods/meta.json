@@ -1,0 +1,11 @@
+{
+    "title": "Structs, Pointers and Methods",
+    "pages": [
+        "defining-and-using-structs.mdx",
+        "pointers-explained.mdx",
+        "methods-and-receivers.mdx",
+        "value-vs-pointer-receivers.mdx",
+        "struct-embedding.mdx",
+        "constructors-and-struct-patterns.mdx"
+    ]
+}

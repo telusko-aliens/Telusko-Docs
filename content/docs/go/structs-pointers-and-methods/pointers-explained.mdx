@@ -1,0 +1,289 @@
+---
+title: Pointers Explained
+---
+
+Pointers have a reputation they do not deserve in Go. The fear comes from C, where pointers can be added to, cast between types, and left dangling after the memory is freed. Go removed all three of those. What is left is a small, safe idea: a pointer is a variable holding the address of another variable.
+
+```go
+x := 42
+p := &x            // p holds the address of x
+fmt.Println(*p)    // 42, read through the pointer
+*p = 100           // write through the pointer
+fmt.Println(x)     // 100
+```
+
+Two operators, and you now know the syntax. The rest of this page is about when to reach for them.
+
+## The two operators
+
+```text
+   &x    address of x        gives you a *T from a T
+   *p    value at p          gives you a T from a *T
+```
+
+They are exact opposites, and reading them aloud helps:
+
+```go
+x := 42
+p := &x            // "p is the address of x"
+v := *p            // "v is the value at p"
+```
+
+The `*` appears in two different roles, which is the main source of early confusion:
+
+```go
+var p *int         // in a type: "pointer to int"
+v := *p            // in an expression: "the value at p"
+```
+
+Type position or expression position. Once you notice which one you are looking at, the ambiguity disappears.
+
+## Why pointers exist
+
+Two reasons, and only two.
+
+### To let a function modify its caller's value
+
+```go
+func birthday(u User) {
+    u.Age++                    // modifies a copy
+}
+
+func birthdayPtr(u *User) {
+    u.Age++                    // modifies the original
+}
+
+u := User{Name: "Shiva", Age: 28}
+
+birthday(u)
+fmt.Println(u.Age)             // 28
+
+birthdayPtr(&u)
+fmt.Println(u.Age)             // 29
+```
+
+Since Go copies every argument, a pointer is the only way to reach back into the caller.
+
+### To avoid copying large values
+
+```go
+type Report struct {
+    Rows    [10000]Row
+    Summary string
+}
+
+func process(r Report)  { }    // copies about a megabyte on every call
+func process(r *Report) { }    // copies 8 bytes
+```
+
+For a struct with a few fields the copy is free and passing by value is often faster, because it avoids a pointer dereference and keeps the value on the stack. The crossover is usually somewhere around 64 to 128 bytes, and it is not worth agonising over.
+
+## nil and the panic
+
+The zero value of a pointer is `nil`, and dereferencing nil panics:
+
+```go
+var p *int
+fmt.Println(p)      // <nil>
+fmt.Println(*p)     // panic: runtime error: invalid memory address
+```
+
+```text
+panic: runtime error: invalid memory address or nil pointer dereference
+[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x...]
+```
+
+This is the most common runtime panic in Go, and it always means the same thing: something returned nil and the code used it without checking.
+
+```go
+u := findUser(id)         // returns nil when not found
+fmt.Println(u.Name)       // panic when u is nil
+
+if u == nil {             // the check that prevents it
+    return errors.New("user not found")
+}
+fmt.Println(u.Name)
+```
+
+The Go convention of returning `(value, error)` exists partly to make this harder to get wrong. When a function returns an error alongside the pointer, checking the error first also protects the pointer.
+
+<Callout type="info">
+Calling a method on a nil pointer does not automatically panic. It panics only if the method dereferences the receiver. A method that checks `if n == nil` first works perfectly on a nil receiver, which is how the recursive tree walk in the functions section handled empty branches for free.
+</Callout>
+
+## new and &T{}
+
+Two ways to allocate:
+
+```go
+p := new(int)              // pointer to a zero int
+*p = 42
+
+u := &User{Name: "Shiva"}  // pointer to an initialised User
+u2 := new(User)            // pointer to a zero User
+```
+
+`new(T)` allocates a zero value and returns its address. `&T{...}` does the same and lets you set fields. In practice `&T{}` is used almost exclusively for structs, and `new` shows up rarely, mostly for basic types where there is no literal to write.
+
+## Escape analysis, and why returning a pointer is safe
+
+In C this would be a serious bug:
+
+```go
+func newUser(name string) *User {
+    u := User{Name: name}
+    return &u              // returning the address of a local variable
+}
+```
+
+In Go it is completely fine. The compiler performs escape analysis: it notices that `u`'s address leaves the function, so it allocates `u` on the heap instead of the stack. The garbage collector keeps it alive as long as anything references it.
+
+You can watch the compiler decide:
+
+```bash
+go build -gcflags="-m" main.go
+```
+
+```text
+./main.go:5:2: moved to heap: u
+```
+
+This is worth knowing for two reasons. First, it means you never have to think about stack versus heap for correctness. Second, it explains why taking pointers unnecessarily has a cost: a value that escapes to the heap creates work for the garbage collector, where a stack value is free.
+
+## No pointer arithmetic
+
+```go
+p := &arr[0]
+p++            // compile error
+p + 1          // compile error
+```
+
+You cannot walk through memory with a pointer. This closes off buffer overruns entirely, which is a large fraction of the security vulnerabilities that plague C programs.
+
+The `unsafe` package can do it, and its name is the documentation. Outside of low level interop, you will never need it.
+
+## Pointers to pointers
+
+Legal, and almost always a design smell:
+
+```go
+x := 42
+p := &x
+pp := &p
+
+fmt.Println(**pp)     // 42
+```
+
+The one legitimate case is a function that needs to change which value a caller's pointer points at, which comes up in linked list and tree manipulation:
+
+```go
+func insert(node **Node, value int) {
+    if *node == nil {
+        *node = &Node{Value: value}
+        return
+    }
+    if value < (*node).Value {
+        insert(&(*node).Left, value)
+    } else {
+        insert(&(*node).Right, value)
+    }
+}
+```
+
+Even here, returning the new node is usually clearer.
+
+## What is already a pointer underneath
+
+Slices, maps, channels, and functions contain pointers internally. This is why they behave as they do:
+
+```go
+func modify(s []int, m map[string]int) {
+    s[0] = 99            // caller sees it, the slice header points at shared memory
+    m["key"] = 99        // caller sees it, the map header points at a shared table
+}
+```
+
+You almost never need `*[]int` or `*map[string]int`. The one situation where a pointer to a slice is justified is a function that must change the caller's slice header, and even then returning the new slice is idiomatic:
+
+```go
+func appendTo(s *[]int, v int) {     // works, unusual
+    *s = append(*s, v)
+}
+
+func appendTo(s []int, v int) []int { // idiomatic
+    return append(s, v)
+}
+```
+
+## When to use a pointer
+
+```text
+   The function must modify its argument      →  pointer
+   The struct is large and copied often       →  pointer
+   nil is a meaningful state (absent, unset)  →  pointer
+   The type has any pointer receiver methods  →  pointer, for consistency
+   The value must be shared, not copied       →  pointer
+
+   Small struct, read only                    →  value
+   The type should be immutable               →  value
+   Slice, map, channel, or function           →  value, they already share
+   A basic type like int or string            →  value, always
+```
+
+That fourth rule is worth expanding. Mixing value and pointer receivers on the same type causes confusion about which form to pass around, so most Go codebases pick one per type and stick with it. The receivers page covers this properly.
+
+## Optional fields
+
+Pointers are how Go expresses "this value may not have been provided", which matters for configuration and for JSON where zero and absent are different:
+
+```go
+type Settings struct {
+    Timeout  *int      `json:"timeout"`      // nil means "not specified"
+    Retries  *int      `json:"retries"`
+    Verbose  *bool     `json:"verbose"`
+}
+
+func (s Settings) TimeoutOrDefault() int {
+    if s.Timeout == nil {
+        return 30
+    }
+    return *s.Timeout
+}
+```
+
+Without the pointer, a JSON body of `{"timeout": 0}` and one omitting the field entirely both produce zero, and you cannot tell whether the user asked for no timeout or said nothing.
+
+<Callout type="warn">
+Do not reach for this pattern by default. It makes every read a nil check and clutters the code. Use it only where the distinction between zero and absent genuinely matters, which in practice means configuration, PATCH request bodies, and database columns that are nullable.
+</Callout>
+
+## A worked comparison
+
+```go
+type Inventory struct {
+    items map[string]int
+}
+
+// Value receiver: the copy shares the map, so this works but is misleading
+func (inv Inventory) AddConfusing(name string, qty int) {
+    inv.items[name] += qty       // works, because maps are shared
+}
+
+// Value receiver: this one silently does nothing
+func (inv Inventory) ResetConfusing() {
+    inv.items = make(map[string]int)   // reassigns the copy's field
+}
+
+// Pointer receiver: both work as written
+func (inv *Inventory) Add(name string, qty int) {
+    inv.items[name] += qty
+}
+
+func (inv *Inventory) Reset() {
+    inv.items = make(map[string]int)
+}
+```
+
+The first two methods illustrate exactly why mixing receiver types is confusing. One works by accident of how maps behave, the other silently fails. Using pointer receivers throughout removes the ambiguity.
+
+Next, let's attach behaviour to types properly and look at what a method actually is in Go.

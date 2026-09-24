@@ -1,0 +1,268 @@
+---
+title: Implementing and Designing Interfaces
+---
+
+The mechanics of implementing an interface take one line to explain: write the methods. The interesting question is which interfaces should exist at all, where they should live, and how big they should be. Go's answers to those questions are unusual and they are what separate a Go codebase that ages well from one that becomes a maze of abstractions.
+
+## Small is the whole strategy
+
+Look at the interface count in the standard library and you find something striking: the most used interfaces have one method.
+
+```go
+type Reader interface   { Read(p []byte) (int, error) }
+type Writer interface   { Write(p []byte) (int, error) }
+type Closer interface   { Close() error }
+type Stringer interface { String() string }
+type error interface    { Error() string }
+type Handler interface  { ServeHTTP(ResponseWriter, *Request) }
+```
+
+There is a proverb for this from Rob Pike:
+
+<Quote>
+The bigger the interface, the weaker the abstraction.
+</Quote>
+
+The logic is straightforward. An interface with one method can be satisfied by nearly anything, so it composes with nearly everything. An interface with eight methods can be satisfied by almost nothing, so implementing it becomes a chore and faking it in a test becomes a hundred lines of stubs.
+
+```go
+// Weak: every implementation must provide all of it, every fake must stub all of it
+type UserService interface {
+    Create(User) error
+    Update(User) error
+    Delete(string) error
+    FindByID(string) (User, error)
+    FindByEmail(string) (User, error)
+    List(int, int) ([]User, error)
+    Count() (int, error)
+    Activate(string) error
+}
+
+// Strong: each consumer asks only for what it uses
+type UserFinder interface {
+    FindByID(ctx context.Context, id string) (User, error)
+}
+
+type UserWriter interface {
+    Save(ctx context.Context, u User) error
+}
+```
+
+## Where to define them
+
+The rule that follows from implicit satisfaction: **the consumer defines the interface**.
+
+```text
+   Wrong                             Right
+   ─────                             ─────
+   package storage                   package storage
+     type Store interface {...}        type PostgresStore struct{...}
+     type PostgresStore struct{}       func (s *PostgresStore) Get(...)
+
+   package report                    package report
+     import storage                    type Getter interface {
+     func New(s storage.Store)             Get(ctx, id) ([]byte, error)
+                                       }
+                                       func New(g Getter)
+```
+
+On the left, `report` depends on `storage`'s abstraction, so changing the interface breaks both packages and `storage` has to guess what its consumers need.
+
+On the right, `report` declares the one method it uses. `storage` knows nothing about `report`. Tests in `report` need a fake with one method. Another package that needs a different subset declares its own interface, and `*PostgresStore` satisfies both without changing.
+
+<Callout type="info">
+The reflex to fight is defining an interface next to its only implementation because it feels like good design. In Go that is usually noise. Write the concrete type. When a second consumer or a test needs a substitute, define the interface at that call site, sized to that need.
+</Callout>
+
+## Accept interfaces, return structs
+
+The most quoted piece of Go API advice, and it holds up.
+
+```go
+func Process(r io.Reader) (*Result, error)
+```
+
+Taking an interface means callers can pass a file, an HTTP body, a string reader, or a test fixture. Returning a concrete type means callers get the full set of methods and fields, and can decide for themselves which interface to view it through.
+
+```go
+// Returning an interface hides what the caller actually got
+func NewClient() Doer
+
+// Returning the struct lets the caller decide
+func NewClient() *Client
+```
+
+The exception is when the concrete type genuinely varies, as in a factory:
+
+```go
+func NewStore(kind string) (Store, error) {
+    switch kind {
+    case "postgres":
+        return newPostgres()
+    case "memory":
+        return newMemory()
+    default:
+        return nil, fmt.Errorf("unknown store %q", kind)
+    }
+}
+```
+
+Here the interface is the point, because different calls return different types.
+
+## Compile-time verification
+
+Add a blank assignment near your type to lock in the relationship:
+
+```go
+type PostgresStore struct {
+    db *sql.DB
+}
+
+var _ Getter = (*PostgresStore)(nil)     // fails to build if a method is missing
+```
+
+The `(*PostgresStore)(nil)` is a typed nil pointer, which costs nothing at runtime because the variable is `_` and gets discarded. What it buys is an error at the type definition rather than at some distant call site.
+
+## Interfaces make code testable
+
+This is the practical payoff, and it is worth showing end to end.
+
+```go
+// payment.go
+type Charger interface {
+    Charge(ctx context.Context, amount int64, token string) (string, error)
+}
+
+type OrderService struct {
+    charger Charger
+    repo    *Repo
+}
+
+func (s *OrderService) Checkout(ctx context.Context, o Order, token string) error {
+    if err := o.Validate(); err != nil {
+        return fmt.Errorf("invalid order: %w", err)
+    }
+
+    txnID, err := s.charger.Charge(ctx, o.Total, token)
+    if err != nil {
+        return fmt.Errorf("payment failed: %w", err)
+    }
+
+    o.TransactionID = txnID
+    o.Status = StatusPaid
+    return s.repo.Save(ctx, o)
+}
+```
+
+```go
+// payment_test.go
+type fakeCharger struct {
+    called bool
+    err    error
+}
+
+func (f *fakeCharger) Charge(ctx context.Context, amount int64, token string) (string, error) {
+    f.called = true
+    if f.err != nil {
+        return "", f.err
+    }
+    return "txn_test_123", nil
+}
+
+func TestCheckoutHandlesPaymentFailure(t *testing.T) {
+    charger := &fakeCharger{err: errors.New("card declined")}
+    svc := &OrderService{charger: charger, repo: newTestRepo(t)}
+
+    err := svc.Checkout(context.Background(), validOrder(), "tok_123")
+
+    if err == nil {
+        t.Fatal("expected an error when the charge fails")
+    }
+    if !charger.called {
+        t.Error("expected the charger to be called")
+    }
+}
+```
+
+One method on the interface means eight lines of fake. If `Charger` had eight methods, the fake would be eighty lines of stubs that the test never touches.
+
+## Interface embedding for growth
+
+Build larger interfaces out of smaller ones rather than declaring them whole:
+
+```go
+type Reader interface { Read(p []byte) (int, error) }
+type Writer interface { Write(p []byte) (int, error) }
+type Closer interface { Close() error }
+
+type ReadWriter interface {
+    Reader
+    Writer
+}
+
+type ReadWriteCloser interface {
+    Reader
+    Writer
+    Closer
+}
+```
+
+A function taking a `ReadWriteCloser` can hand its argument to anything expecting a `Reader`, because the smaller interface is a subset. Declaring `ReadWriteCloser` with three method signatures written out would work identically but would not signal the relationship.
+
+## Optional behaviour through assertion
+
+A useful pattern: take a small interface, then check at runtime whether the value also supports something extra.
+
+```go
+func Save(w io.Writer, data []byte) error {
+    if _, err := w.Write(data); err != nil {
+        return err
+    }
+
+    // If this writer can flush, flush it.
+    if f, ok := w.(interface{ Flush() error }); ok {
+        return f.Flush()
+    }
+    return nil
+}
+```
+
+The standard library uses this heavily. `io.Copy` checks whether the source implements `WriterTo` or the destination implements `ReaderFrom`, and takes a fast path when either does, falling back to a buffer otherwise.
+
+Note the inline interface literal. You do not need a named type for a one-off check.
+
+## Common mistakes
+
+**Defining an interface with one implementation, in the same package.** Adds indirection, hides the concrete type, buys nothing until a second implementation exists.
+
+**Naming an interface after the implementation.** `UserServiceInterface` and `IUserService` are conventions from other languages. Go names interfaces after behaviour, usually with an `er` suffix: `Reader`, `Writer`, `Formatter`, `Validator`.
+
+**Putting the interface in the provider package.** Covered above, and it is the most consequential one.
+
+**Returning an interface from a constructor by default.** Callers lose access to everything the concrete type offers, and they cannot tell what they actually received.
+
+**Making the interface big because the implementation is big.** The interface should be as small as the consumer's need, not as large as the type's capability.
+
+## Naming
+
+| Methods | Convention | Examples |
+| --- | --- | --- |
+| One | verb plus `er` | `Reader`, `Writer`, `Closer`, `Stringer` |
+| Two or three related | describe the role | `ReadWriter`, `Handler`, `RoundTripper` |
+| Domain concept | name the concept | `Store`, `Repository`, `Clock` |
+
+`Clock` deserves a mention because it is one of the most useful small interfaces you can add to a codebase:
+
+```go
+type Clock interface {
+    Now() time.Time
+}
+
+type realClock struct{}
+
+func (realClock) Now() time.Time { return time.Now() }
+```
+
+Injecting a clock makes anything time dependent testable without sleeping, and it is one method.
+
+Next, let's look at how to get a concrete type back out of an interface when you need it.

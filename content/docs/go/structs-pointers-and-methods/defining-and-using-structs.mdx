@@ -1,0 +1,318 @@
+---
+title: Defining and Using Structs
+---
+
+A struct groups related fields into one type. That is the entire concept, and if you have written a class, a record, or an object literal you already understand it. What makes structs interesting in Go is what they do not do: no inheritance, no constructors, no methods inside the declaration, and no private keyword.
+
+What you get instead is a plain description of data, with behaviour attached separately.
+
+## Declaring one
+
+```go
+type User struct {
+    ID        int
+    Name      string
+    Email     string
+    Age       int
+    Active    bool
+    CreatedAt time.Time
+}
+```
+
+`type` introduces a new named type, `struct` says what shape it has. Field names follow the same visibility rule as everything else: capitalised fields are visible outside the package, lowercase ones are not.
+
+```go
+type Account struct {
+    ID      string      // exported, other packages can read and write it
+    balance int64       // unexported, only this package can touch it
+}
+```
+
+That distinction is how you protect invariants. A balance that can only be changed by methods in this package cannot be set to a nonsense value by a caller.
+
+## Creating values
+
+Four forms, and the difference between them matters.
+
+```go
+// 1. Zero value, every field at its own zero
+var u User
+
+// 2. Field names, which is what you should almost always write
+u := User{
+    Name:  "Shiva",
+    Email: "shiva@example.com",
+    Age:   28,
+}
+
+// 3. Positional, fragile
+u := User{1, "Shiva", "shiva@example.com", 28, true, time.Now()}
+
+// 4. Pointer to a new value
+u := &User{Name: "Shiva"}
+```
+
+The named form is not just a style preference. With positional initialisation, adding a field to the struct or reordering two fields of the same type breaks every construction site, sometimes silently. With named fields, it breaks nothing.
+
+Omitted fields take their zero value, so partial initialisation is normal and safe:
+
+```go
+u := User{Name: "Shiva"}
+fmt.Printf("%+v\n", u)
+// {ID:0 Name:Shiva Email: Age:0 Active:false CreatedAt:0001-01-01 00:00:00 +0000 UTC}
+```
+
+<Callout type="info">
+`go vet` flags positional composite literals for structs from other packages, precisely because they break when the other package adds a field. Within your own package it stays quiet, but the habit is worth keeping everywhere.
+</Callout>
+
+## Accessing fields
+
+```go
+u.Name = "Navin"
+fmt.Println(u.Email)
+```
+
+Through a pointer, the syntax does not change:
+
+```go
+p := &u
+p.Name = "Hyder"          // Go dereferences automatically
+fmt.Println(p.Age)
+
+(*p).Name = "Hyder"       // legal, and nobody writes this
+```
+
+This automatic dereference is one of Go's quiet conveniences. There is no `->` operator because there does not need to be one.
+
+## Structs are values
+
+The same rule as arrays, with the same consequences:
+
+```go
+a := User{Name: "Shiva"}
+b := a                   // full copy of every field
+
+b.Name = "Navin"
+fmt.Println(a.Name)      // Shiva, unchanged
+```
+
+Passing to a function copies too:
+
+```go
+func rename(u User) {
+    u.Name = "changed"   // modifies the copy
+}
+
+rename(a)
+fmt.Println(a.Name)      // Shiva
+```
+
+To modify the original, take a pointer:
+
+```go
+func rename(u *User) {
+    u.Name = "changed"
+}
+
+rename(&a)
+fmt.Println(a.Name)      // changed
+```
+
+The next page covers pointers properly. For now, the practical shorthand is that small structs you only read can be passed by value, and anything you need to modify takes a pointer.
+
+## Comparison
+
+Structs compare with `==` field by field, as long as every field is comparable:
+
+```go
+type Point struct{ X, Y int }
+
+fmt.Println(Point{1, 2} == Point{1, 2})     // true
+fmt.Println(Point{1, 2} == Point{1, 3})     // false
+```
+
+Add a slice, a map, or a function and the struct stops being comparable:
+
+```go
+type Config struct {
+    Name string
+    Tags []string        // Config can no longer use ==
+}
+```
+
+For those, compare explicitly or use a helper:
+
+```go
+reflect.DeepEqual(a, b)        // works, slow, fine in tests
+```
+
+Comparable structs can be map keys, which is often exactly what you want:
+
+```go
+type CacheKey struct {
+    Endpoint string
+    UserID   int
+}
+
+cache := map[CacheKey][]byte{}
+```
+
+## Nested structs
+
+Fields can be structs themselves:
+
+```go
+type Address struct {
+    Street string
+    City   string
+    Pin    string
+}
+
+type Customer struct {
+    Name    string
+    Billing Address
+    Shipping Address
+}
+
+c := Customer{
+    Name: "Shiva",
+    Billing: Address{
+        Street: "12 MG Road",
+        City:   "Bengaluru",
+        Pin:    "560001",
+    },
+}
+
+fmt.Println(c.Billing.City)
+c.Shipping.City = "Pune"
+```
+
+The nested struct is stored inline, not as a pointer, so a `Customer` contains two complete `Address` values in its own memory.
+
+When a nested value is optional, use a pointer so that nil means absent:
+
+```go
+type Customer struct {
+    Name     string
+    Shipping *Address        // nil means "same as billing"
+}
+
+if c.Shipping != nil {
+    ship(c.Shipping)
+}
+```
+
+## Anonymous structs
+
+For one-off shapes that do not deserve a name:
+
+```go
+config := struct {
+    Host string
+    Port int
+}{
+    Host: "localhost",
+    Port: 8080,
+}
+```
+
+Their natural home is table driven tests, where the shape exists only inside one function:
+
+```go
+tests := []struct {
+    name    string
+    input   string
+    want    int
+    wantErr bool
+}{
+    {"valid", "42", 42, false},
+    {"empty", "", 0, true},
+    {"letters", "abc", 0, true},
+}
+```
+
+Also useful for shaping a JSON response without polluting the package with a type:
+
+```go
+json.NewEncoder(w).Encode(struct {
+    Status string `json:"status"`
+    Count  int    `json:"count"`
+}{
+    Status: "ok",
+    Count:  len(items),
+})
+```
+
+## Struct tags
+
+A tag is a string literal after a field, and it carries metadata that libraries read via reflection.
+
+```go
+type User struct {
+    ID       int       `json:"id" db:"user_id"`
+    Name     string    `json:"name" validate:"required,min=2"`
+    Email    string    `json:"email" validate:"required,email"`
+    Password string    `json:"-"`
+    Bio      string    `json:"bio,omitempty"`
+}
+```
+
+The `encoding/json` package reads the `json` tag to decide field names and behaviour:
+
+- `json:"name"` renames the field in JSON
+- `json:"-"` excludes it entirely, which is how you keep a password hash out of an API response
+- `json:",omitempty"` drops the field when it holds its zero value
+
+Other libraries define their own keys. `db` for sqlx, `gorm` for GORM, `validate` for go-playground/validator, `yaml` for YAML parsers. The compiler does not check any of them, so a typo in a tag fails silently at runtime.
+
+<Callout type="warn">
+Tag syntax is unforgiving. The format is `key:"value"` with a space between pairs and no space around the colon. Writing `json: "name"` with a space compiles fine and is silently ignored, leaving you with a field named `Name` in your JSON. `go vet` catches malformed tags, which is one more reason to run it.
+</Callout>
+
+## Memory layout and field order
+
+Go aligns struct fields to their natural boundaries, which means the order you declare them affects the size of the struct.
+
+```go
+type Wasteful struct {
+    a bool      // 1 byte, then 7 bytes of padding
+    b int64     // 8 bytes
+    c bool      // 1 byte, then 7 bytes of padding
+}                // total: 24 bytes
+
+type Compact struct {
+    b int64     // 8 bytes
+    a bool      // 1 byte
+    c bool      // 1 byte, then 6 bytes of padding
+}                // total: 16 bytes
+```
+
+Same fields, a third less memory, purely from ordering largest to smallest.
+
+This matters when you have millions of these values, and it does not matter at all otherwise. Write the field order that reads best, and revisit it only if a profile or a memory budget says to. The `fieldalignment` analyzer in `go vet` will point out the opportunities when you want them.
+
+## The empty struct
+
+```go
+type Signal struct{}
+
+var s struct{}
+fmt.Println(unsafe.Sizeof(s))     // 0
+```
+
+An empty struct occupies no memory at all. Two uses follow from that:
+
+```go
+// A set, with zero overhead per entry
+seen := map[string]struct{}{}
+seen["item"] = struct{}{}
+
+// A channel that carries no data, only the fact that something happened
+done := make(chan struct{})
+close(done)
+```
+
+The channel form is idiomatic Go for signalling. `chan struct{}` says clearly that only the event matters, where `chan bool` invites the reader to wonder what true and false mean.
+
+Next, let's take on pointers properly, because everything from here on assumes you are comfortable with them.

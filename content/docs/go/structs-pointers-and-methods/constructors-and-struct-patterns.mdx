@@ -1,0 +1,329 @@
+---
+title: Constructors and Struct Patterns
+---
+
+Go has no constructors. There is no special method that runs when a value is created, no way to make a field mandatory, and no way to stop somebody writing `User{}` and getting a struct full of zeros.
+
+What Go has instead is a set of conventions that the whole ecosystem follows. Learn these five and you will be able to design types that are hard to misuse, which is what constructors were supposed to give you anyway.
+
+## The New function
+
+The convention is a function named `New` or `NewSomething` returning the type:
+
+```go
+type Server struct {
+    host    string
+    port    int
+    timeout time.Duration
+    mu      sync.Mutex
+    conns   map[string]*Conn
+}
+
+func NewServer(host string, port int) *Server {
+    return &Server{
+        host:    host,
+        port:    port,
+        timeout: 30 * time.Second,        // a default that is not the zero value
+        conns:   make(map[string]*Conn),  // a map that must exist
+    }
+}
+```
+
+Two things here justify the function's existence. The default timeout is not zero, and the map must be created or every write panics. Neither can be expressed in a struct declaration.
+
+Naming follows the package. In package `server`, the function is `New` so callers write `server.New(...)`. When a package builds several types, they get names: `NewClient`, `NewPool`, `NewLogger`.
+
+```go
+// package cache
+func New(size int) *Cache            // cache.New(100)
+
+// package http
+func NewRequest(...) (*Request, error)   // http.NewRequest(...)
+```
+
+## Returning an error
+
+When construction can fail, return an error rather than panicking:
+
+```go
+func NewClient(baseURL string, timeout time.Duration) (*Client, error) {
+    if baseURL == "" {
+        return nil, errors.New("baseURL is required")
+    }
+
+    u, err := url.Parse(baseURL)
+    if err != nil {
+        return nil, fmt.Errorf("invalid baseURL %q: %w", baseURL, err)
+    }
+    if u.Scheme != "http" && u.Scheme != "https" {
+        return nil, fmt.Errorf("baseURL must be http or https, got %q", u.Scheme)
+    }
+    if timeout <= 0 {
+        timeout = 30 * time.Second
+    }
+
+    return &Client{
+        baseURL: u,
+        http:    &http.Client{Timeout: timeout},
+    }, nil
+}
+```
+
+Validation belongs here, at the boundary. Once a `*Client` exists, every method on it can assume the URL is valid and skip the check.
+
+<Callout type="warn">
+Do not panic in a constructor unless the failure is a programming error that can never occur with correct input, such as a malformed regular expression written as a literal. The standard library reserves the `MustCompile` naming convention for exactly that case, and the `Must` prefix is the signal that it panics.
+</Callout>
+
+## Functional options
+
+When a type has many optional settings, a constructor with eight parameters becomes unusable. The options pattern solves it, and it is worth learning properly because you will meet it in most serious Go libraries.
+
+```go
+type Server struct {
+    host       string
+    port       int
+    timeout    time.Duration
+    maxConns   int
+    tlsConfig  *tls.Config
+    logger     *slog.Logger
+}
+
+type Option func(*Server)
+
+func WithPort(port int) Option {
+    return func(s *Server) { s.port = port }
+}
+
+func WithTimeout(d time.Duration) Option {
+    return func(s *Server) { s.timeout = d }
+}
+
+func WithTLS(cfg *tls.Config) Option {
+    return func(s *Server) { s.tlsConfig = cfg }
+}
+
+func WithLogger(l *slog.Logger) Option {
+    return func(s *Server) { s.logger = l }
+}
+
+func NewServer(host string, opts ...Option) *Server {
+    s := &Server{
+        host:     host,
+        port:     8080,
+        timeout:  30 * time.Second,
+        maxConns: 100,
+        logger:   slog.Default(),
+    }
+
+    for _, opt := range opts {
+        opt(s)
+    }
+
+    return s
+}
+```
+
+```go
+s1 := NewServer("localhost")
+s2 := NewServer("api.example.com",
+    WithPort(443),
+    WithTLS(tlsCfg),
+    WithTimeout(10*time.Second),
+)
+```
+
+Every option is named at the call site, order is irrelevant, defaults live in one place, and adding an option next year breaks nobody.
+
+Options that can fail return an error:
+
+```go
+type Option func(*Server) error
+
+func WithCertFile(path string) Option {
+    return func(s *Server) error {
+        cert, err := tls.LoadX509KeyPair(path+".crt", path+".key")
+        if err != nil {
+            return fmt.Errorf("loading certificate: %w", err)
+        }
+        s.tlsConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
+        return nil
+    }
+}
+
+func NewServer(host string, opts ...Option) (*Server, error) {
+    s := &Server{ /* defaults */ }
+    for _, opt := range opts {
+        if err := opt(s); err != nil {
+            return nil, err
+        }
+    }
+    return s, nil
+}
+```
+
+## The config struct
+
+A simpler alternative that suits internal code well:
+
+```go
+type Config struct {
+    Host     string
+    Port     int
+    Timeout  time.Duration
+    MaxConns int
+}
+
+func NewServer(cfg Config) *Server {
+    if cfg.Port == 0 {
+        cfg.Port = 8080
+    }
+    if cfg.Timeout == 0 {
+        cfg.Timeout = 30 * time.Second
+    }
+    if cfg.MaxConns == 0 {
+        cfg.MaxConns = 100
+    }
+
+    return &Server{ /* ... */ }
+}
+```
+
+```go
+s := NewServer(Config{
+    Host: "localhost",
+    Port: 9000,
+})
+```
+
+Less machinery than options, and the config struct can be loaded straight from JSON, YAML, or environment variables, which is a real advantage.
+
+The tradeoff is that zero and "not set" are the same thing, so you cannot distinguish `MaxConns: 0` meaning unlimited from `MaxConns` left out. Pointer fields solve that at the cost of readability.
+
+| | Options | Config struct |
+| --- | --- | --- |
+| Call site readability | very good | good |
+| Distinguishes zero from unset | yes | only with pointers |
+| Loadable from a file | no | yes |
+| Amount of code | more | less |
+| Best for | public libraries | internal services |
+
+## Making the zero value work
+
+The most elegant option, when it is available, is to need no constructor at all.
+
+```go
+type Buffer struct {
+    data []byte
+}
+
+func (b *Buffer) Write(p []byte) (int, error) {
+    b.data = append(b.data, p...)      // append handles a nil slice
+    return len(p), nil
+}
+
+var buf Buffer
+buf.Write([]byte("works immediately"))
+```
+
+The standard library does this wherever it can. `bytes.Buffer`, `sync.Mutex`, `sync.WaitGroup`, `strings.Builder`, and `http.Client` all work from their zero value.
+
+When a map is involved you can still get there with lazy initialisation:
+
+```go
+type Registry struct {
+    mu    sync.Mutex
+    items map[string]string
+}
+
+func (r *Registry) Set(k, v string) {
+    r.mu.Lock()
+    defer r.mu.Unlock()
+
+    if r.items == nil {
+        r.items = make(map[string]string)
+    }
+    r.items[k] = v
+}
+```
+
+One nil check per write, and the type needs no constructor.
+
+## Enforcing construction
+
+Sometimes you genuinely want to prevent `Server{}` from being written directly. Unexported fields are the mechanism:
+
+```go
+package db
+
+type Conn struct {
+    handle *sql.DB          // unexported
+    dsn    string           // unexported
+}
+
+func Open(dsn string) (*Conn, error) { ... }
+```
+
+From another package, `db.Conn{}` compiles but produces a value with a nil handle and no way to set it. Every method can safely assume construction went through `Open`.
+
+For a stronger signal, add an unexported marker field:
+
+```go
+type Token struct {
+    Value string
+    _     struct{}          // prevents positional literals from other packages
+}
+```
+
+Now `Token{"abc"}` fails outside the package, forcing `Token{Value: "abc"}`. This is a niche technique and it appears mainly in APIs where field order stability matters.
+
+## The builder, and why Go mostly skips it
+
+```go
+query := NewQueryBuilder().
+    Select("id", "name").
+    From("users").
+    Where("active = ?", true).
+    OrderBy("created_at DESC").
+    Limit(10).
+    Build()
+```
+
+Method chaining works in Go and reads well for genuinely fluent domains such as query construction. It is much rarer than in Java, for two reasons: struct literals with named fields already cover most of what builders were invented for, and chaining makes error handling awkward, since each step has nowhere to put a failure.
+
+The usual answer is to accumulate the error and report it at the end:
+
+```go
+type QueryBuilder struct {
+    parts []string
+    args  []any
+    err   error
+}
+
+func (b *QueryBuilder) Where(cond string, args ...any) *QueryBuilder {
+    if b.err != nil {
+        return b                       // short circuit after a failure
+    }
+    // ...
+    return b
+}
+
+func (b *QueryBuilder) Build() (string, []any, error) {
+    return strings.Join(b.parts, " "), b.args, b.err
+}
+```
+
+## Choosing between them
+
+```text
+   Zero value is already usable            →  no constructor
+   A map or channel must be created        →  New function
+   Construction can fail                   →  New returning (T, error)
+   Three or more optional settings         →  functional options
+   Settings come from a file or env vars   →  config struct
+   Fluent domain-specific API              →  builder, sparingly
+```
+
+Most types in a typical service need either nothing or a plain `New`. Options and builders are for libraries with wide audiences, and reaching for them in internal code usually adds ceremony without adding value.
+
+That completes types and their behaviour. Next, let's look at interfaces, which is how Go connects all of these types to each other without any of them knowing about the rest.

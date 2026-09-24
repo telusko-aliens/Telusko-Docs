@@ -1,0 +1,315 @@
+---
+title: Generics with Type Parameters
+---
+
+For ten years, writing a function that summed a slice of numbers meant writing it once per type.
+
+```go
+func SumInts(nums []int) int          { /* ... */ }
+func SumInt64s(nums []int64) int64    { /* ... */ }
+func SumFloats(nums []float64) float64 { /* ... */ }
+```
+
+Or writing it once with `any` and paying for it with type assertions, allocations, and runtime panics. Go 1.18 finally added type parameters, and this particular category of duplication disappeared.
+
+```go
+func Sum[T int | int64 | float64](nums []T) T {
+    var total T
+    for _, n := range nums {
+        total += n
+    }
+    return total
+}
+```
+
+## The syntax
+
+Type parameters go in square brackets before the ordinary parameters:
+
+```go
+func Name[T Constraint](args) Result
+```
+
+```go
+func First[T any](s []T) (T, bool) {
+    if len(s) == 0 {
+        var zero T
+        return zero, false
+    }
+    return s[0], true
+}
+```
+
+Two details worth noting. `var zero T` is how you produce the zero value of an unknown type, since you cannot write `0` or `""` or `nil` without knowing which it is. And the constraint `any` means the function works for every type but can only do things that work for every type, which is not much beyond moving values around.
+
+Calling it usually needs no annotation, because the compiler infers `T` from the argument:
+
+```go
+n, ok := First([]int{1, 2, 3})          // T inferred as int
+s, ok := First([]string{"a", "b"})      // T inferred as string
+
+n, ok := First[int](nil)                // explicit, when inference cannot help
+```
+
+## Constraints are interfaces
+
+A constraint is just an interface used in a type parameter position. The familiar method-based form works:
+
+```go
+type Stringer interface {
+    String() string
+}
+
+func JoinAll[T Stringer](items []T, sep string) string {
+    parts := make([]string, len(items))
+    for i, item := range items {
+        parts[i] = item.String()
+    }
+    return strings.Join(parts, sep)
+}
+```
+
+Go 1.18 also added type sets, which let an interface list permitted types rather than required methods:
+
+```go
+type Number interface {
+    ~int | ~int8 | ~int16 | ~int32 | ~int64 |
+    ~float32 | ~float64
+}
+
+func Sum[T Number](nums []T) T {
+    var total T
+    for _, n := range nums {
+        total += n
+    }
+    return total
+}
+```
+
+The `|` means "any of these". Inside the function, you can use any operation that all the listed types support, which is why `+=` compiles here.
+
+### The tilde
+
+`~int` means "any type whose underlying type is int", which includes named types you define:
+
+```go
+type Celsius float64
+type UserID int
+
+Sum([]Celsius{20.5, 22.0})     // works because of ~float64
+Sum([]UserID{1, 2, 3})         // works because of ~int
+```
+
+Without the tilde, only the exact predeclared types match, and your own named types are excluded. In practice you almost always want the tilde.
+
+## The constraints you get for free
+
+The `cmp` package and the `golang.org/x/exp/constraints` package cover the common cases so you rarely write your own:
+
+```go
+import "cmp"
+
+func Max[T cmp.Ordered](a, b T) T {
+    if a > b {
+        return a
+    }
+    return b
+}
+```
+
+`cmp.Ordered` covers every type that supports `<`, `<=`, `>`, and `>=`, which is all the numeric types plus `string`.
+
+The two built-in constraints:
+
+- `any` is `interface{}`, meaning no constraint at all
+- `comparable` means the type supports `==` and `!=`
+
+```go
+func Contains[T comparable](s []T, target T) bool {
+    for _, v := range s {
+        if v == target {
+            return true
+        }
+    }
+    return false
+}
+```
+
+`comparable` excludes slices, maps, and functions, which is exactly right since `==` does not work on them.
+
+## Multiple type parameters
+
+```go
+func Map[T, U any](s []T, f func(T) U) []U {
+    result := make([]U, len(s))
+    for i, v := range s {
+        result[i] = f(v)
+    }
+    return result
+}
+
+names := Map(users, func(u User) string { return u.Name })
+lengths := Map(names, func(s string) int { return len(s) })
+```
+
+```go
+func GroupBy[T any, K comparable](items []T, key func(T) K) map[K][]T {
+    groups := make(map[K][]T)
+    for _, item := range items {
+        k := key(item)
+        groups[k] = append(groups[k], item)
+    }
+    return groups
+}
+
+byRole := GroupBy(users, func(u User) string { return u.Role })
+byYear := GroupBy(orders, func(o Order) int { return o.Placed.Year() })
+```
+
+`K` is constrained to `comparable` because it becomes a map key. The compiler enforces that, so you cannot accidentally group by a slice.
+
+## Generic types
+
+Structs can take type parameters too:
+
+```go
+type Stack[T any] struct {
+    items []T
+}
+
+func (s *Stack[T]) Push(item T) {
+    s.items = append(s.items, item)
+}
+
+func (s *Stack[T]) Pop() (T, bool) {
+    if len(s.items) == 0 {
+        var zero T
+        return zero, false
+    }
+    last := len(s.items) - 1
+    item := s.items[last]
+    s.items = s.items[:last]
+    return item, true
+}
+
+func (s *Stack[T]) Len() int { return len(s.items) }
+```
+
+```go
+nums := &Stack[int]{}
+nums.Push(1)
+nums.Push(2)
+v, ok := nums.Pop()      // 2, true
+
+words := &Stack[string]{}
+words.Push("hello")
+```
+
+Note that the receiver repeats the type parameter as `Stack[T]`. Note also that **methods cannot introduce new type parameters**. This compiles nowhere:
+
+```go
+func (s *Stack[T]) Map[U any](f func(T) U) *Stack[U] {     // not allowed
+```
+
+The reason is that it would require generating method sets at runtime, which Go's implementation cannot do. The workaround is a plain function:
+
+```go
+func MapStack[T, U any](s *Stack[T], f func(T) U) *Stack[U] {
+    out := &Stack[U]{}
+    for _, item := range s.items {
+        out.Push(f(item))
+    }
+    return out
+}
+```
+
+This restriction is the single biggest limitation of Go generics in practice, and it is worth knowing before you design around it.
+
+## A generic cache, end to end
+
+```go
+type Cache[K comparable, V any] struct {
+    mu    sync.RWMutex
+    items map[K]entry[V]
+    ttl   time.Duration
+}
+
+type entry[V any] struct {
+    value   V
+    expires time.Time
+}
+
+func NewCache[K comparable, V any](ttl time.Duration) *Cache[K, V] {
+    return &Cache[K, V]{
+        items: make(map[K]entry[V]),
+        ttl:   ttl,
+    }
+}
+
+func (c *Cache[K, V]) Set(key K, value V) {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    c.items[key] = entry[V]{value: value, expires: time.Now().Add(c.ttl)}
+}
+
+func (c *Cache[K, V]) Get(key K) (V, bool) {
+    c.mu.RLock()
+    defer c.mu.RUnlock()
+
+    e, ok := c.items[key]
+    if !ok || time.Now().After(e.expires) {
+        var zero V
+        return zero, false
+    }
+    return e.value, true
+}
+```
+
+```go
+users := NewCache[string, User](5 * time.Minute)
+users.Set("u1", User{Name: "Shiva"})
+u, ok := users.Get("u1")            // u is a User, not an any
+
+counts := NewCache[int, int64](time.Minute)
+```
+
+Before generics this needed either code generation or `map[any]any` with assertions everywhere. Now it is type safe at compile time with no runtime cost for the safety.
+
+## How Go implements it
+
+Go uses a hybrid called GC shape stenciling. Types that share a memory layout share one compiled version of the function, with a dictionary passed in to supply the type-specific details. Pointer types all share one shape, so `Stack[*User]` and `Stack[*Order]` compile to the same code.
+
+The practical implications:
+
+- Generic code is roughly as fast as hand-written code for the same type
+- It does not box values into interfaces, so there is no allocation for the abstraction
+- Compile time increases a little
+- Binary size increases a little for value types that need distinct shapes
+
+You do not need to think about this. It matters only as reassurance that generics are not secretly `interface{}` underneath, which is what people coming from older Java assume.
+
+<Callout type="info">
+One thing generics do not give you: operator overloading, method-level type parameters, or specialisation. You cannot write a generic function that behaves differently for `int` than for `string` by defining two versions. Type switches inside the generic function are the workaround, and they are usually a sign the function is doing too much.
+</Callout>
+
+## What generics are not for
+
+Go's generics are deliberately narrow, and the community norm is to use them sparingly. Three signs you are reaching too far:
+
+**A single implementation.** If a function is only ever called with one type, write it for that type. Generics cost readability and buy nothing here.
+
+**An interface would do.** If the function only calls methods on its parameter, an interface is simpler and does not require the caller to think about type parameters.
+
+```go
+// Overwrought
+func Print[T fmt.Stringer](v T) { fmt.Println(v.String()) }
+
+// Fine
+func Print(v fmt.Stringer) { fmt.Println(v.String()) }
+```
+
+The generic version is only better if you need to return `T`, store it in a `[]T`, or otherwise preserve the concrete type.
+
+**Constraint gymnastics.** If the constraint takes ten lines and three helper interfaces, the design is fighting the language. Go's type system does not do higher-kinded types, and trying to simulate them produces code nobody will maintain.
+
+Next, let's look at constraints in more depth and work through where generics genuinely pay off in day to day code.
