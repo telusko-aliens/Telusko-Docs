@@ -1,0 +1,300 @@
+---
+title: Methods and Receivers
+---
+
+A method in Go is a function with an extra parameter written before the name. That is not a metaphor, it is literally how the language defines it.
+
+```go
+func (u User) FullName() string {
+    return u.FirstName + " " + u.LastName
+}
+```
+
+The `(u User)` is the receiver. Everything else is an ordinary function. Understanding methods as functions with a special first parameter explains almost every question people have about them.
+
+## Declaring and calling
+
+```go
+type Rectangle struct {
+    Width  float64
+    Height float64
+}
+
+func (r Rectangle) Area() float64 {
+    return r.Width * r.Height
+}
+
+func (r Rectangle) Perimeter() float64 {
+    return 2 * (r.Width + r.Height)
+}
+
+rect := Rectangle{Width: 10, Height: 5}
+fmt.Println(rect.Area())        // 50
+fmt.Println(rect.Perimeter())   // 30
+```
+
+Methods live outside the type declaration, which is different from most object oriented languages. The struct describes data, the methods describe behaviour, and they are written separately.
+
+That separation has a practical benefit: methods for one type can be spread across several files, grouped by concern rather than crammed into one declaration.
+
+## Methods on any named type, not just structs
+
+This is where Go differs from Java and C# in a way that opens up real design options.
+
+```go
+type Celsius float64
+
+func (c Celsius) ToFahrenheit() Fahrenheit {
+    return Fahrenheit(c*9/5 + 32)
+}
+
+func (c Celsius) String() string {
+    return fmt.Sprintf("%.1f°C", float64(c))
+}
+
+temp := Celsius(37.5)
+fmt.Println(temp)                  // 37.5°C
+fmt.Println(temp.ToFahrenheit())   // 99.5°F
+```
+
+Slices, maps, and function types can all have methods:
+
+```go
+type IntSlice []int
+
+func (s IntSlice) Sum() int {
+    total := 0
+    for _, v := range s {
+        total += v
+    }
+    return total
+}
+
+func (s IntSlice) Average() float64 {
+    if len(s) == 0 {
+        return 0
+    }
+    return float64(s.Sum()) / float64(len(s))
+}
+
+nums := IntSlice{1, 2, 3, 4, 5}
+fmt.Println(nums.Sum(), nums.Average())     // 15 3
+```
+
+```go
+type Handler func(string) error
+
+func (h Handler) WithLogging() Handler {
+    return func(s string) error {
+        log.Printf("handling %q", s)
+        return h(s)
+    }
+}
+```
+
+That last one is the technique behind `http.HandlerFunc`, and it is worth having in your toolkit.
+
+## The one restriction
+
+You can only define methods on types declared in your own package.
+
+```go
+func (s string) Reverse() string { }        // compile error
+func (t time.Time) IsMonday() bool { }      // compile error
+```
+
+Go will not let you bolt methods onto `string`, `int`, or anything from another package. This rules out the monkey patching that makes some codebases unpredictable, at the cost of some convenience.
+
+The workaround is a named type based on the one you want to extend:
+
+```go
+type Timestamp time.Time
+
+func (t Timestamp) IsWeekend() bool {
+    d := time.Time(t).Weekday()
+    return d == time.Saturday || d == time.Sunday
+}
+```
+
+Or, more commonly, a plain function:
+
+```go
+func IsWeekend(t time.Time) bool {
+    d := t.Weekday()
+    return d == time.Saturday || d == time.Sunday
+}
+```
+
+Go programmers reach for the function more often than the wrapper type, because a wrapper type means converting back and forth at every boundary.
+
+## Go calls methods on your behalf
+
+You can call a pointer method on a value and a value method on a pointer, and Go inserts the `&` or `*` for you.
+
+```go
+type Counter struct{ n int }
+
+func (c *Counter) Inc()      { c.n++ }
+func (c Counter) Value() int { return c.n }
+
+c := Counter{}
+c.Inc()              // Go rewrites this as (&c).Inc()
+fmt.Println(c.n)     // 1
+
+p := &Counter{}
+fmt.Println(p.Value())    // Go rewrites this as (*p).Value()
+```
+
+This works because `c` is addressable. It stops working when the value is not:
+
+```go
+Counter{}.Inc()                    // compile error, cannot take the address
+m := map[string]Counter{"a": {}}
+m["a"].Inc()                       // compile error, map values are not addressable
+```
+
+The map case is the one you will actually meet. Store pointers instead:
+
+```go
+m := map[string]*Counter{"a": {}}
+m["a"].Inc()                       // works
+```
+
+## Method values and method expressions
+
+A method can be pulled out and used as a function value. There are two forms and they differ in whether the receiver is bound.
+
+```go
+rect := Rectangle{10, 5}
+
+// Method value: receiver is bound now
+area := rect.Area
+fmt.Println(area())          // 50, always this rectangle
+
+// Method expression: receiver becomes the first parameter
+areaOf := Rectangle.Area
+fmt.Println(areaOf(rect))    // 50, pass any rectangle
+```
+
+Method values are the useful one, and they turn up whenever an API wants a function:
+
+```go
+defer file.Close()                          // a method value
+go worker.Run()                             // another
+http.HandleFunc("/health", srv.HealthCheck) // and another
+```
+
+<Callout type="warn">
+A method value captures the receiver at the moment you create it, by copying it for a value receiver. `f := counter.Value` then `counter.Inc()` gives you a function still reporting the old count. With a pointer receiver the pointer is copied, so it does see later changes.
+</Callout>
+
+## The String method
+
+Implementing `String() string` makes `fmt` use your formatting everywhere. It is the single highest value method you can add to a type.
+
+```go
+type Money struct {
+    Paise    int64
+    Currency string
+}
+
+func (m Money) String() string {
+    return fmt.Sprintf("%s %d.%02d", m.Currency, m.Paise/100, m.Paise%100)
+}
+
+fmt.Println(Money{249950, "INR"})       // INR 2499.50
+log.Printf("total: %v", total)          // uses String too
+```
+
+The interface it satisfies is `fmt.Stringer`, and you do not declare that anywhere. Go's interfaces are implicit, which the next section covers in detail.
+
+Two rules for `String` methods. Never call `fmt.Sprintf("%v", m)` on the same type inside it, since that recurses forever. And prefer a value receiver, so the method works on both values and pointers.
+
+## Methods and the zero value
+
+A method should behave sensibly on a zero value where possible. This is the design principle from the zero values page, applied to your own types:
+
+```go
+type Logger struct {
+    prefix string
+    out    io.Writer
+}
+
+func (l *Logger) Log(msg string) {
+    out := l.out
+    if out == nil {
+        out = os.Stdout        // sensible default rather than a nil panic
+    }
+    fmt.Fprintf(out, "%s%s\n", l.prefix, msg)
+}
+
+var l Logger
+l.Log("works without any setup")
+```
+
+The standard library does this constantly. `sync.Mutex`, `bytes.Buffer`, `strings.Builder`, and `http.Client` are all usable straight from their zero value.
+
+## Grouping methods on a type
+
+A common and readable layout for a type with several responsibilities:
+
+```go
+// user.go
+type User struct {
+    ID       int
+    Name     string
+    Email    string
+    Password string
+}
+
+// Validation
+func (u *User) Validate() error {
+    if u.Name == "" {
+        return errors.New("name is required")
+    }
+    if !strings.Contains(u.Email, "@") {
+        return fmt.Errorf("invalid email: %q", u.Email)
+    }
+    return nil
+}
+
+// Behaviour
+func (u *User) SetPassword(plain string) error {
+    hash, err := bcrypt.GenerateFromPassword([]byte(plain), bcrypt.DefaultCost)
+    if err != nil {
+        return fmt.Errorf("hashing password: %w", err)
+    }
+    u.Password = string(hash)
+    return nil
+}
+
+func (u *User) CheckPassword(plain string) bool {
+    return bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(plain)) == nil
+}
+
+// Presentation
+func (u User) String() string {
+    return fmt.Sprintf("User(%d, %s)", u.ID, u.Email)
+}
+```
+
+Notice that `String` uses a value receiver while the others use pointers. That is a deliberate exception and the next page explains when it is justified.
+
+## Methods versus functions
+
+Not everything needs to be a method. A useful test: does the operation belong to the type, or does it merely involve it?
+
+```go
+// A method, because area is a property of a rectangle
+func (r Rectangle) Area() float64
+
+// A function, because comparing two rectangles belongs to neither
+func Overlaps(a, b Rectangle) bool
+
+// A function, because this creates rather than operates
+func ParseRectangle(s string) (Rectangle, error)
+```
+
+Constructors are functions by necessity, since there is no value to attach them to yet. Operations over several values of the same type usually read better as functions. Everything else that acts on one value tends to be a method.
+
+Next, let's settle the value versus pointer receiver question, which is the decision you will make on every method you write.

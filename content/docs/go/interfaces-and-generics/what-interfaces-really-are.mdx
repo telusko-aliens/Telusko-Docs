@@ -1,0 +1,263 @@
+---
+title: What Interfaces Really Are
+---
+
+An interface in Go is a list of method signatures. A type satisfies it by having those methods. There is no declaration connecting the two, no `implements` keyword, and no requirement that either party knows the other exists.
+
+```go
+type Speaker interface {
+    Speak() string
+}
+
+type Dog struct{ Name string }
+
+func (d Dog) Speak() string {
+    return d.Name + " says woof"
+}
+
+var s Speaker = Dog{"Bruno"}     // Dog satisfies Speaker, nothing was declared
+```
+
+That one property, implicit satisfaction, is the difference between Go's interfaces and everyone else's, and it changes how you design software.
+
+## Why implicit satisfaction matters
+
+In Java, a class must declare `implements Comparable` at the moment it is written. That means the interface has to exist first, and the author of the class has to know about it. Interfaces are decided by the person defining the type.
+
+In Go, you can define an interface today that describes a type somebody else wrote three years ago:
+
+```go
+// In your package, describing what you need
+type Closer interface {
+    Close() error
+}
+
+// Every one of these satisfies it, and none of them knew about you
+var c Closer
+c = os.Stdout
+c = someDBConnection
+c = resp.Body
+c = myCustomThing
+```
+
+The consequence is a design rule you will hear repeated in every Go community:
+
+<Quote>
+Define interfaces where they are used, not where they are implemented.
+</Quote>
+
+The consumer of a dependency describes what it needs. The provider just provides. Neither imports the other's abstraction.
+
+```go
+// package report -- defines what it needs
+type UserFinder interface {
+    FindUser(ctx context.Context, id string) (User, error)
+}
+
+func Generate(ctx context.Context, f UserFinder, ids []string) (*Report, error) {
+    // ...
+}
+```
+
+```go
+// package postgres -- knows nothing about reports
+func (r *Repo) FindUser(ctx context.Context, id string) (User, error) {
+    // ...
+}
+```
+
+`report.Generate` accepts `*postgres.Repo` without either package importing the other's interface. A test can pass a fake with the same one method. That is the whole design, and it needs no framework.
+
+## What an interface value contains
+
+An interface value is two words: a pointer to type information, and a pointer to the data.
+
+```text
+   var s Speaker = Dog{"Bruno"}
+
+   ┌──────────────┬──────────────┐
+   │ type: Dog    │ value: ──────┼──►  Dog{Name: "Bruno"}
+   └──────────────┴──────────────┘
+```
+
+Knowing this explains three things that otherwise look strange.
+
+**Method calls go through a lookup.** The type pointer leads to a table of the type's methods, and calling `s.Speak()` finds the right implementation there. It costs a little more than a direct call and prevents inlining, which is why interfaces are not free.
+
+**Storing a value in an interface may copy it to the heap.** The interface holds a pointer, so the value has to live somewhere addressable. This is one of the more common sources of unexpected allocation in Go.
+
+**And the nil trap.** Which is important enough for its own section.
+
+## The nil interface trap
+
+```go
+type MyError struct{}
+
+func (e *MyError) Error() string { return "something failed" }
+
+func doWork() error {
+    var e *MyError = nil     // a nil pointer
+    return e                 // stored in an error interface
+}
+
+err := doWork()
+fmt.Println(err == nil)      // false
+```
+
+The interface is not nil, because its type word holds `*MyError`. Only the value word is nil. An interface is nil only when **both** words are nil.
+
+```text
+   nil interface           interface holding a nil pointer
+   ┌──────┬──────┐         ┌──────────────┬──────────────┐
+   │ nil  │ nil  │         │ type:*MyError│ value: nil   │
+   └──────┴──────┘         └──────────────┴──────────────┘
+   err == nil is true      err == nil is FALSE
+```
+
+<Callout type="warn">
+The rule that avoids this entirely: never declare a variable of a concrete error type and return it as an `error`. Return a literal `nil` on the success path.
+
+```go
+func doWork() error {
+    if failed {
+        return &MyError{}
+    }
+    return nil               // untyped nil, the interface really is nil
+}
+```
+</Callout>
+
+## The empty interface
+
+An interface with no methods is satisfied by everything:
+
+```go
+var anything any
+anything = 42
+anything = "hello"
+anything = []int{1, 2, 3}
+anything = User{}
+```
+
+`any` is an alias for `interface{}`, added in Go 1.18. They are identical, and `any` is what you should write.
+
+It is the right tool in a narrow set of places: `fmt.Println`, JSON decoding into unknown shapes, and generic containers before generics existed. Everywhere else it throws away the type checking that is the reason to use Go.
+
+```go
+// Loses all safety, forces every caller to assert
+func Process(data any) any
+
+// Says what it means
+func Process(data []Record) ([]Result, error)
+```
+
+Since Go 1.18, most of the cases that used to justify `any` are better served by generics, which the later pages in this section cover.
+
+## The interfaces you already use
+
+The standard library's small interfaces are the best examples of the style, and you will implement several of them yourself.
+
+```go
+type Stringer interface {              // fmt
+    String() string
+}
+
+type Error interface {                 // builtin
+    Error() string
+}
+
+type Reader interface {                // io
+    Read(p []byte) (n int, err error)
+}
+
+type Writer interface {                // io
+    Write(p []byte) (n int, err error)
+}
+
+type Closer interface {                // io
+    Close() error
+}
+```
+
+`io.Reader` and `io.Writer` are worth studying because of how much they unlock. Anything that produces bytes is a `Reader`: files, network connections, HTTP bodies, string buffers, gzip decompressors, encrypted streams. Anything that consumes bytes is a `Writer`.
+
+```go
+io.Copy(dst, src)             // works between any reader and any writer
+
+io.Copy(os.Stdout, resp.Body)              // print an HTTP response
+io.Copy(file, strings.NewReader(text))     // write a string to a file
+io.Copy(gzipWriter, file)                  // compress a file
+io.Copy(hasher, file)                      // hash a file
+```
+
+One function, one line, and it works across every combination because both sides are described by a single method.
+
+<Callout type="info">
+This is the payoff of small interfaces. `io.Reader` has one method, so almost anything can satisfy it, so almost everything composes. An interface with ten methods is satisfied by very little and composes with nothing.
+</Callout>
+
+## Interfaces are types, and they compose
+
+An interface can embed others:
+
+```go
+type ReadWriter interface {
+    Reader
+    Writer
+}
+
+type ReadWriteCloser interface {
+    Reader
+    Writer
+    Closer
+}
+```
+
+That is the actual definition from the `io` package. Three one-method interfaces combine into larger ones without any type declaring anything.
+
+## Interface satisfaction is checked at compile time
+
+Assigning to an interface variable is where the compiler verifies the methods:
+
+```go
+var _ Speaker = Dog{}          // compile-time assertion, costs nothing at runtime
+var _ Speaker = (*Cat)(nil)    // same, for a pointer receiver implementation
+```
+
+That `var _` line is a common idiom. Put it near a type to document and enforce that it satisfies an interface. If somebody later renames a method, the build fails at this line with a clear message instead of somewhere far away.
+
+## The receiver rule, restated
+
+The method set difference from the previous section is where interface errors usually come from:
+
+```go
+type Dog struct{ Name string }
+
+func (d *Dog) Speak() string { return "woof" }     // pointer receiver
+
+var s Speaker = Dog{"Bruno"}      // compile error
+var s Speaker = &Dog{"Bruno"}     // works
+```
+
+```text
+cannot use Dog{} as Speaker value: Dog does not implement Speaker
+    (method Speak has pointer receiver)
+```
+
+When you see that message, add an `&`.
+
+## What interfaces cost
+
+Two real costs, both modest and both worth knowing before you make everything an interface.
+
+**Dynamic dispatch.** A call through an interface is an indirect jump the compiler usually cannot inline. In tight loops this is measurable, typically in the low nanoseconds per call.
+
+**Allocation.** Storing a concrete value in an interface often moves it to the heap, because the interface needs a pointer to it. Passing a large struct through an interface parameter can allocate where a direct call would not.
+
+Neither justifies avoiding interfaces. They justify not adding one "in case we need to swap the implementation later", which is the most common reason interfaces appear in codebases that do not need them.
+
+<Callout type="warn">
+The anti-pattern to avoid: an interface with exactly one implementation, defined in the same package as that implementation, existing only because the author felt an abstraction was owed. It adds indirection, hides the concrete type from readers, and buys nothing. Add the interface when you have a second implementation or a test that needs a substitute.
+</Callout>
+
+Next, let's look at how to design interfaces that stay small and where exactly to put them.

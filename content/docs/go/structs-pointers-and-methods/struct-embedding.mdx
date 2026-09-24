@@ -1,0 +1,316 @@
+---
+title: Struct Embedding
+---
+
+Go has no inheritance. No `extends`, no base classes, no `super`. What it has is embedding, which looks superficially similar and works on a completely different principle: instead of a type *being* another type, it *contains* one and borrows its methods.
+
+The distinction matters, and this page is mostly about where the two diverge.
+
+## Embedding a struct
+
+Declare a field with a type and no name:
+
+```go
+type Animal struct {
+    Name string
+    Age  int
+}
+
+func (a Animal) Describe() string {
+    return fmt.Sprintf("%s is %d years old", a.Name, a.Age)
+}
+
+type Dog struct {
+    Animal          // embedded, no field name
+    Breed  string
+}
+```
+
+Now `Dog` has promoted fields and methods:
+
+```go
+d := Dog{
+    Animal: Animal{Name: "Bruno", Age: 3},
+    Breed:  "Labrador",
+}
+
+fmt.Println(d.Name)          // Bruno, promoted from Animal
+fmt.Println(d.Age)           // 3
+fmt.Println(d.Describe())    // Bruno is 3 years old
+fmt.Println(d.Breed)         // Labrador
+```
+
+The embedded value is still reachable by its type name, which is how you disambiguate when you need to:
+
+```go
+fmt.Println(d.Animal.Name)   // same thing, written explicitly
+```
+
+## What promotion actually is
+
+Promotion is a compiler convenience, not a relationship. `d.Name` is rewritten as `d.Animal.Name`, and `d.Describe()` as `d.Animal.Describe()`. Nothing more happens.
+
+That has one consequence which trips up everyone arriving from an object oriented background:
+
+```go
+func (a Animal) Speak() string {
+    return a.Name + " makes a sound"
+}
+
+func (a Animal) Introduce() string {
+    return "Hello, " + a.Speak()      // calls Animal.Speak, always
+}
+
+func (d Dog) Speak() string {
+    return d.Name + " barks"
+}
+
+d := Dog{Animal{"Bruno", 3}, "Labrador"}
+fmt.Println(d.Speak())        // Bruno barks
+fmt.Println(d.Introduce())    // Hello, Bruno makes a sound
+```
+
+`Introduce` is a method on `Animal`. Its receiver is an `Animal` and it knows nothing about `Dog`. There is no virtual dispatch, no method table lookup, and no way for the outer type to override what the inner type does internally.
+
+<Callout type="warn">
+This is the sharpest difference from inheritance. In Java, `Introduce` would call the subclass `Speak`. In Go it cannot, because `Animal` has no idea it is embedded in anything. If you need that behaviour, you want an interface, not embedding.
+</Callout>
+
+## Shadowing
+
+A field or method on the outer type takes precedence over a promoted one:
+
+```go
+type Base struct {
+    ID string
+}
+
+func (b Base) Describe() string { return "base " + b.ID }
+
+type Derived struct {
+    Base
+    ID string        // shadows Base.ID
+}
+
+func (d Derived) Describe() string {    // shadows Base.Describe
+    return "derived " + d.ID + " wrapping " + d.Base.Describe()
+}
+```
+
+The inner version is still there under its type name, which is how you get the wrapping behaviour above. This is the closest Go comes to calling `super`, and it is explicit rather than implicit.
+
+## Embedding interfaces
+
+An interface can be embedded in a struct, which is where embedding stops being a curiosity and becomes genuinely powerful.
+
+```go
+type Store interface {
+    Get(id string) ([]byte, error)
+    Put(id string, data []byte) error
+}
+
+type LoggingStore struct {
+    Store                    // embedded interface
+    logger *slog.Logger
+}
+
+func (s LoggingStore) Put(id string, data []byte) error {
+    s.logger.Info("storing", "id", id, "bytes", len(data))
+    return s.Store.Put(id, data)
+}
+```
+
+`LoggingStore` satisfies `Store` immediately, because the embedded interface provides every method. You only write the ones you want to change, and `Get` passes straight through to whatever was embedded.
+
+This is the decorator pattern with almost no code, and it is how middleware for non-HTTP interfaces is usually built in Go.
+
+<Callout type="info">
+The same trick makes test doubles trivial. Embed the interface, leave it nil, and implement only the two methods your test actually calls. Anything else panics, which is a useful signal that your test exercised more than you expected.
+</Callout>
+
+```go
+type fakeStore struct {
+    Store                              // nil, panics if anything else is called
+    getFunc func(string) ([]byte, error)
+}
+
+func (f fakeStore) Get(id string) ([]byte, error) {
+    return f.getFunc(id)
+}
+```
+
+## Embedding a pointer
+
+```go
+type Service struct {
+    *slog.Logger        // embedded pointer
+    db *sql.DB
+}
+
+s := Service{Logger: slog.Default(), db: conn}
+s.Info("started")       // promoted from *slog.Logger
+```
+
+Embedding a pointer means the outer struct does not own the inner value, and it can be nil. Calling a promoted method on a nil embedded pointer panics, so this form suits dependencies that are always supplied at construction time.
+
+## The mutex embedding pattern
+
+You will see this constantly in real Go code:
+
+```go
+type SafeCounter struct {
+    sync.Mutex                   // embedded, so Lock and Unlock are promoted
+    counts map[string]int
+}
+
+func (c *SafeCounter) Inc(key string) {
+    c.Lock()
+    defer c.Unlock()
+    c.counts[key]++
+}
+```
+
+It is compact and reads well. It also has a real drawback: `Lock` and `Unlock` become part of the type's exported API, so anyone outside the package can lock your counter and forget to release it.
+
+For anything exported, prefer a named field:
+
+```go
+type SafeCounter struct {
+    mu     sync.Mutex           // named, and unexported
+    counts map[string]int
+}
+```
+
+Embed the mutex for unexported types where the convenience wins, name it for anything you publish.
+
+## Ambiguity and how Go handles it
+
+Embed two types with the same method and the compiler does not guess:
+
+```go
+type A struct{}
+func (A) Hello() string { return "from A" }
+
+type B struct{}
+func (B) Hello() string { return "from B" }
+
+type C struct {
+    A
+    B
+}
+
+c := C{}
+c.Hello()          // compile error: ambiguous selector
+c.A.Hello()        // fine, explicit
+```
+
+The error appears only at the point of use, not at the declaration, so `C` itself is legal. Resolve it by qualifying the call, or by defining `Hello` on `C` to say which one wins:
+
+```go
+func (c C) Hello() string { return c.A.Hello() }
+```
+
+Depth breaks ties before ambiguity does. A method at the outer level always beats one promoted from deeper in, and shallower promotions beat deeper ones.
+
+## Embedding and JSON
+
+Embedded fields are flattened by `encoding/json`, which is often exactly what you want:
+
+```go
+type Base struct {
+    ID        string    `json:"id"`
+    CreatedAt time.Time `json:"created_at"`
+}
+
+type Article struct {
+    Base
+    Title string `json:"title"`
+}
+```
+
+```json
+{
+  "id": "a1",
+  "created_at": "2026-01-15T10:00:00Z",
+  "title": "Learning Go"
+}
+```
+
+No nesting, because promotion applies to the encoder too. Add a name to the field and you get nesting back:
+
+```go
+type Article struct {
+    Meta  Base   `json:"meta"`
+    Title string `json:"title"`
+}
+```
+
+## When embedding is the wrong tool
+
+Embedding is composition with automatic delegation. It is right when the outer type genuinely **is** an extended version of the inner one and wants its whole surface.
+
+It is wrong in two common situations.
+
+**When you only need one or two methods.** Embedding exposes everything, including methods you did not intend to publish. A named field and two forwarding methods is more code and a smaller API.
+
+```go
+// Exposes every method on Engine, whether you meant to or not
+type Car struct {
+    Engine
+}
+
+// Exposes exactly what you chose
+type Car struct {
+    engine Engine
+}
+
+func (c *Car) Start() error { return c.engine.Start() }
+```
+
+**When you want polymorphism.** If the goal is "several types that can be used interchangeably", that is an interface. Embedding gives you code reuse, interfaces give you substitutability, and they solve different problems.
+
+```go
+// Not this
+type Shape struct { }
+type Circle struct { Shape }
+
+// This
+type Shape interface {
+    Area() float64
+}
+
+type Circle struct { Radius float64 }
+func (c Circle) Area() float64 { return math.Pi * c.Radius * c.Radius }
+```
+
+## A realistic use
+
+```go
+type Model struct {
+    ID        uint      `json:"id" db:"id"`
+    CreatedAt time.Time `json:"created_at" db:"created_at"`
+    UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+}
+
+func (m *Model) Touch() {
+    m.UpdatedAt = time.Now()
+}
+
+type User struct {
+    Model
+    Email string `json:"email" db:"email"`
+    Name  string `json:"name" db:"name"`
+}
+
+type Article struct {
+    Model
+    Title  string `json:"title" db:"title"`
+    Body   string `json:"body" db:"body"`
+}
+```
+
+Two entities share their identity and timestamp fields plus the `Touch` method, without any hierarchy and without either type knowing the other exists. Adding a `DeletedAt` field to `Model` gives both of them soft deletes.
+
+That is embedding used well: shared mechanics, not shared identity.
+
+Next, let's look at how Go constructs these types in the absence of constructors, and the patterns that have grown up around that gap.

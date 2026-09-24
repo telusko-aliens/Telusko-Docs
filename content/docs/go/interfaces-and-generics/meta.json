@@ -1,0 +1,11 @@
+{
+    "title": "Interfaces and Generics",
+    "pages": [
+        "what-interfaces-really-are.mdx",
+        "implementing-and-designing-interfaces.mdx",
+        "type-assertions-and-type-switches.mdx",
+        "composition-over-inheritance.mdx",
+        "generics-with-type-parameters.mdx",
+        "type-constraints-in-practice.mdx"
+    ]
+}

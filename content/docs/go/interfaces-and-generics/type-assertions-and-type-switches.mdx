@@ -1,0 +1,292 @@
+---
+title: Type Assertions and Type Switches
+---
+
+Putting a value into an interface is easy. Getting it back out is where Go asks you to be careful, because the compiler no longer knows what is in there and you might be wrong.
+
+```go
+var v any = "hello"
+
+s := v.(string)         // assertion: give me the string
+fmt.Println(s)          // hello
+
+n := v.(int)            // panic: interface conversion, string is not int
+```
+
+Two forms, and choosing the right one is the entire skill.
+
+## The two forms of assertion
+
+```go
+// Single value: panics if the type does not match
+s := v.(string)
+
+// Comma ok: never panics, tells you whether it worked
+s, ok := v.(string)
+if !ok {
+    // v was not a string, s is the zero value ""
+}
+```
+
+The single value form belongs where the type is guaranteed by construction and a mismatch would be a programming error. Everywhere else, use the comma ok form.
+
+```go
+// Fine: this handler only ever stores *User in this context key
+user := ctx.Value(userKey).(*User)
+
+// Not fine: the input came from outside
+config := input.(map[string]any)     // panics on unexpected JSON
+```
+
+## Asserting to an interface
+
+Assertion is not limited to concrete types. You can ask whether a value satisfies another interface, which is how optional behaviour gets discovered at runtime.
+
+```go
+func describe(v any) {
+    if s, ok := v.(fmt.Stringer); ok {
+        fmt.Println("stringer:", s.String())
+    }
+    if e, ok := v.(error); ok {
+        fmt.Println("error:", e.Error())
+    }
+}
+```
+
+An inline interface literal works too, when the check is one-off:
+
+```go
+if f, ok := w.(interface{ Flush() error }); ok {
+    f.Flush()
+}
+```
+
+This is exactly how `http.ResponseWriter` exposes extras. The interface itself has three methods, but a real response writer often also supports flushing and hijacking:
+
+```go
+func stream(w http.ResponseWriter, r *http.Request) {
+    flusher, ok := w.(http.Flusher)
+    if !ok {
+        http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+        return
+    }
+
+    for event := range events {
+        fmt.Fprintf(w, "data: %s\n\n", event)
+        flusher.Flush()
+    }
+}
+```
+
+## The type switch
+
+When you need to branch across several possible types, a switch reads far better than a stack of assertions.
+
+```go
+func format(v any) string {
+    switch value := v.(type) {
+    case nil:
+        return "null"
+    case bool:
+        return strconv.FormatBool(value)
+    case int:
+        return strconv.Itoa(value)
+    case float64:
+        return strconv.FormatFloat(value, 'g', -1, 64)
+    case string:
+        return strconv.Quote(value)
+    case []any:
+        parts := make([]string, len(value))
+        for i, item := range value {
+            parts[i] = format(item)
+        }
+        return "[" + strings.Join(parts, ",") + "]"
+    case fmt.Stringer:
+        return value.String()
+    default:
+        return fmt.Sprintf("%v", value)
+    }
+}
+```
+
+Inside each case, `value` has that specific type, so `strconv.Itoa(value)` compiles in the `int` case and `value.String()` compiles in the `Stringer` case.
+
+### Order matters
+
+Interface cases match anything that satisfies them, so put concrete types first:
+
+```go
+switch e := err.(type) {
+case *json.SyntaxError:          // specific
+    return fmt.Sprintf("bad JSON at byte %d", e.Offset)
+case *os.PathError:              // also specific
+    return fmt.Sprintf("cannot access %s", e.Path)
+case error:                      // general, must come last
+    return e.Error()
+}
+```
+
+Reverse those and the `error` case swallows everything, and the compiler will not warn you.
+
+### Multiple types in one case
+
+```go
+switch v.(type) {
+case int, int8, int16, int32, int64:
+    fmt.Println("a signed integer")
+case float32, float64:
+    fmt.Println("a float")
+case string, []byte:
+    fmt.Println("text-ish")
+}
+```
+
+When a case lists several types, the bound variable would have no single type, so Go keeps it as the interface type. That is why this form usually omits the assignment.
+
+### The nil case
+
+`case nil` matches when the interface itself is nil. It does not match an interface holding a nil pointer, which is the same distinction from the earlier nil interface trap:
+
+```go
+var p *User = nil
+var v any = p
+
+switch v.(type) {
+case nil:
+    fmt.Println("nil interface")        // not reached
+case *User:
+    fmt.Println("a *User, possibly nil") // this one
+}
+```
+
+## Errors are where you will use this most
+
+Go 1.13 added `errors.Is` and `errors.As`, which are type assertions that also unwrap wrapped errors. Prefer them over a raw assertion when working with errors.
+
+```go
+// Raw assertion: fails if the error has been wrapped
+if pathErr, ok := err.(*os.PathError); ok {
+    fmt.Println(pathErr.Path)
+}
+
+// errors.As: walks the wrap chain
+var pathErr *os.PathError
+if errors.As(err, &pathErr) {
+    fmt.Println(pathErr.Path)
+}
+```
+
+Since almost every layer of a real application wraps errors with `fmt.Errorf` and `%w`, the raw assertion will usually fail. The error handling section covers this properly.
+
+## When you should not be doing this
+
+Type assertions are a signal. Used occasionally at a boundary, they are fine. Used throughout a codebase, they usually mean an interface is doing the wrong job.
+
+```go
+// A type switch pretending to be polymorphism
+func Area(shape any) float64 {
+    switch s := shape.(type) {
+    case Circle:
+        return math.Pi * s.Radius * s.Radius
+    case Rectangle:
+        return s.Width * s.Height
+    case Triangle:
+        return s.Base * s.Height / 2
+    }
+    return 0
+}
+```
+
+Every new shape means editing this function, and forgetting to means silently returning zero. The interface version pushes the behaviour into the types where it belongs:
+
+```go
+type Shape interface {
+    Area() float64
+}
+
+func (c Circle) Area() float64    { return math.Pi * c.Radius * c.Radius }
+func (r Rectangle) Area() float64 { return r.Width * r.Height }
+func (t Triangle) Area() float64  { return t.Base * t.Height / 2 }
+
+func Area(s Shape) float64 { return s.Area() }
+```
+
+Now adding a shape means adding a type, and nothing else changes.
+
+<Callout type="warn">
+The heuristic: if a type switch enumerates types you control, and each case does the same kind of work, you want a method on an interface instead. Type switches are for types you do not control, for decoded data of unknown shape, and for genuinely different handling per type.
+</Callout>
+
+## Where type switches are the right answer
+
+**Decoding unstructured JSON**, where the shape is only known at runtime:
+
+```go
+var data any
+json.Unmarshal(raw, &data)
+
+switch v := data.(type) {
+case map[string]any:
+    handleObject(v)
+case []any:
+    handleArray(v)
+}
+```
+
+**Error inspection**, when you need different responses per failure kind.
+
+**Implementing something like `fmt`**, where you genuinely must handle every builtin type.
+
+**Optional interface detection**, as with the flusher example above.
+
+## The performance question
+
+A type assertion is cheap. It compares a type pointer, which is a couple of instructions. A type switch is a sequence of those comparisons, so a switch with twenty cases is slower than one with three, but both are still in the low nanoseconds.
+
+What is not free is the boxing that put the value into the interface in the first place, which may have allocated. If a profile points at interface use, that allocation is usually the cost, not the assertion.
+
+## A realistic example
+
+Turning any error into an HTTP response, which is a place where type switching genuinely earns its keep:
+
+```go
+func writeError(w http.ResponseWriter, err error) {
+    var (
+        status = http.StatusInternalServerError
+        msg    = "internal server error"
+    )
+
+    var validationErr *ValidationError
+    var notFoundErr *NotFoundError
+
+    switch {
+    case errors.As(err, &validationErr):
+        status = http.StatusBadRequest
+        msg = validationErr.Error()
+
+    case errors.As(err, &notFoundErr):
+        status = http.StatusNotFound
+        msg = "resource not found"
+
+    case errors.Is(err, context.DeadlineExceeded):
+        status = http.StatusGatewayTimeout
+        msg = "request timed out"
+
+    case errors.Is(err, sql.ErrNoRows):
+        status = http.StatusNotFound
+        msg = "resource not found"
+    }
+
+    if status >= 500 {
+        slog.Error("request failed", "error", err)   // log the detail, do not leak it
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(status)
+    json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+```
+
+Note the expressionless `switch` combined with `errors.As` and `errors.Is`, rather than a type switch. That combination is the idiomatic way to handle errors in Go today, because it works through wrapping where a plain type switch does not.
+
+Next, let's look at how interfaces and embedding together replace what other languages get from inheritance.

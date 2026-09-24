@@ -1,0 +1,339 @@
+---
+title: Type Constraints in Practice
+---
+
+A constraint answers one question: what is this generic function allowed to do with a value of type `T`? Choose too loose a constraint and the function cannot do anything useful. Choose too tight and it works with fewer types than it should. This page is about getting that balance right, and then about where generics actually earn their place in day to day Go.
+
+## The four kinds of constraint
+
+```go
+// 1. No constraint. You can move values around and nothing else.
+func Reverse[T any](s []T) []T
+
+// 2. Comparable. Adds == and !=.
+func Contains[T comparable](s []T, target T) bool
+
+// 3. Ordered. Adds <, <=, >, >=.
+func Max[T cmp.Ordered](a, b T) T
+
+// 4. Method based. Adds whatever the interface declares.
+func Describe[T fmt.Stringer](items []T) string
+```
+
+Start from the top and move down only as far as the function needs. `any` is the strongest signal to a reader that the function does not care about the values at all, which is exactly what you want for something like `Reverse`.
+
+## Writing your own
+
+A constraint is an interface, so a custom one is written the same way:
+
+```go
+type Number interface {
+    ~int | ~int8 | ~int16 | ~int32 | ~int64 |
+    ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
+    ~float32 | ~float64
+}
+
+func Sum[T Number](values []T) T {
+    var total T
+    for _, v := range values {
+        total += v
+    }
+    return total
+}
+
+func Average[T Number](values []T) float64 {
+    if len(values) == 0 {
+        return 0
+    }
+    return float64(Sum(values)) / float64(len(values))
+}
+```
+
+Constraints can be composed by embedding:
+
+```go
+type Signed interface {
+    ~int | ~int8 | ~int16 | ~int32 | ~int64
+}
+
+type Unsigned interface {
+    ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64
+}
+
+type Integer interface {
+    Signed | Unsigned
+}
+
+type Float interface {
+    ~float32 | ~float64
+}
+
+type Number interface {
+    Integer | Float
+}
+```
+
+That is essentially how `golang.org/x/exp/constraints` is defined, and importing it is easier than writing your own.
+
+## Combining a type set with methods
+
+An interface can require both, which is occasionally exactly what you need:
+
+```go
+type Identifiable interface {
+    ~int | ~int64 | ~string
+    fmt.Stringer
+}
+```
+
+A type satisfies this only if its underlying type is one of the three **and** it has a `String()` method. Useful for ID types that are numeric or textual underneath but present themselves as text.
+
+<Callout type="warn">
+An interface containing a type set can only be used as a constraint. You cannot declare `var x Number` or use it as a parameter type in a normal function. Interfaces with only methods work in both positions, interfaces with type unions work only as constraints.
+</Callout>
+
+## Inference and when it fails
+
+The compiler infers type parameters from the arguments most of the time:
+
+```go
+Sum([]int{1, 2, 3})             // T = int, inferred
+Map(users, getName)             // T = User, U = string, inferred from both
+```
+
+It cannot infer from the return type alone:
+
+```go
+func Zero[T any]() T {
+    var z T
+    return z
+}
+
+x := Zero()          // compile error: cannot infer T
+x := Zero[int]()     // explicit
+```
+
+Nor from a nil argument:
+
+```go
+First(nil)           // cannot infer
+First[int](nil)      // explicit
+```
+
+Partial specification works, filling in the ones inference cannot reach:
+
+```go
+func Convert[T, U any](items []T, f func(T) U) []U
+
+Convert[string](names, parse)     // T given, U inferred from parse
+```
+
+## Where generics genuinely pay off
+
+The honest list is shorter than the excitement around Go 1.18 suggested. Four categories cover almost everything.
+
+### Slice and map utilities
+
+This is the largest category by far, and much of it is already in the standard library:
+
+```go
+import "slices"
+import "maps"
+
+slices.Contains(s, v)
+slices.Index(s, v)
+slices.Sort(s)
+slices.SortFunc(s, cmp)
+slices.Reverse(s)
+slices.Max(s)
+slices.Min(s)
+slices.Clone(s)
+slices.Equal(a, b)
+slices.Compact(s)
+
+maps.Keys(m)
+maps.Values(m)
+maps.Clone(m)
+maps.Equal(a, b)
+```
+
+Before writing your own generic helper, check whether `slices` or `maps` already has it. The ones people still write themselves:
+
+```go
+func Filter[T any](s []T, keep func(T) bool) []T {
+    out := make([]T, 0, len(s))
+    for _, v := range s {
+        if keep(v) {
+            out = append(out, v)
+        }
+    }
+    return out
+}
+
+func Map[T, U any](s []T, f func(T) U) []U {
+    out := make([]U, len(s))
+    for i, v := range s {
+        out[i] = f(v)
+    }
+    return out
+}
+
+func Reduce[T, U any](s []T, initial U, f func(U, T) U) U {
+    acc := initial
+    for _, v := range s {
+        acc = f(acc, v)
+    }
+    return acc
+}
+```
+
+<Callout type="info">
+Go deliberately did not add `Map`, `Filter`, and `Reduce` to the standard library. The reasoning was that a `for` loop is usually clearer and the functional versions encourage chains that are harder to debug. Plenty of teams add them anyway. Either choice is defensible, but be aware that a reviewer may reasonably ask why the loop was not enough.
+</Callout>
+
+### Type safe containers
+
+```go
+type Set[T comparable] map[T]struct{}
+
+func NewSet[T comparable](items ...T) Set[T] {
+    s := make(Set[T], len(items))
+    for _, item := range items {
+        s[item] = struct{}{}
+    }
+    return s
+}
+
+func (s Set[T]) Add(item T)           { s[item] = struct{}{} }
+func (s Set[T]) Has(item T) bool      { _, ok := s[item]; return ok }
+func (s Set[T]) Remove(item T)        { delete(s, item) }
+func (s Set[T]) Len() int             { return len(s) }
+
+func (s Set[T]) Union(other Set[T]) Set[T] {
+    out := make(Set[T], len(s)+len(other))
+    for item := range s {
+        out[item] = struct{}{}
+    }
+    for item := range other {
+        out[item] = struct{}{}
+    }
+    return out
+}
+```
+
+Go has no built-in set type, so this is one of the most common generic types people write.
+
+### Removing the interface plus assertion dance
+
+Anywhere you previously used `any` and then asserted, generics remove the risk:
+
+```go
+// Before
+func FirstOrDefault(s []any, def any) any {
+    if len(s) == 0 {
+        return def
+    }
+    return s[0]
+}
+v := FirstOrDefault(items, 0).(int)     // panics if you get it wrong
+
+// After
+func FirstOrDefault[T any](s []T, def T) T {
+    if len(s) == 0 {
+        return def
+    }
+    return s[0]
+}
+v := FirstOrDefault(items, 0)           // v is an int, checked at compile time
+```
+
+### Pointer helpers
+
+Small but genuinely useful, especially with APIs that use pointer fields for optional values:
+
+```go
+func Ptr[T any](v T) *T { return &v }
+
+func Deref[T any](p *T, def T) T {
+    if p == nil {
+        return def
+    }
+    return *p
+}
+```
+
+```go
+cfg := Settings{
+    Timeout: Ptr(30),
+    Verbose: Ptr(true),
+}
+
+timeout := Deref(cfg.Timeout, 60)
+```
+
+Without generics you would need `IntPtr`, `BoolPtr`, `StringPtr`, and so on. Many older AWS and Kubernetes libraries still carry exactly those functions.
+
+## Where generics do not help
+
+**Different behaviour per type.** There is no specialisation. A generic function does the same thing for every type it accepts.
+
+**Arithmetic on your own types.** No operator overloading, so a generic function cannot add two `Vector` values unless `Vector` is a numeric type underneath.
+
+**Method-level type parameters.** Covered in the previous page, and it rules out fluent generic APIs.
+
+**Anything an interface already does well.** If the function only calls methods, take an interface.
+
+```go
+// Unnecessary
+func Log[T fmt.Stringer](v T) { fmt.Println(v.String()) }
+
+// Simpler, same capability
+func Log(v fmt.Stringer) { fmt.Println(v.String()) }
+```
+
+The generic version is only warranted when you need to return `T`, build a `[]T`, or otherwise keep the concrete type visible to the caller.
+
+## A rule of thumb
+
+```text
+   Same logic, three or more types, currently duplicated   →  generics
+   Same logic, one type                                    →  write it concretely
+   Only calling methods on the value                       →  interface
+   Different logic per type                                →  interface with methods
+   Container that should hold any type safely              →  generics
+   Already exists in slices or maps                        →  use that
+```
+
+The community norm settled roughly where the Go team hoped: generics for containers and collection utilities, interfaces for behaviour, and concrete types for everything else. Code that reaches for type parameters as a default reads as unidiomatic, and code that refuses to use them for a set type reads as stubborn.
+
+## One worked example
+
+A paginated result type, which is the kind of thing every API service ends up needing:
+
+```go
+type Page[T any] struct {
+    Items      []T   `json:"items"`
+    Total      int   `json:"total"`
+    Offset     int   `json:"offset"`
+    Limit      int   `json:"limit"`
+}
+
+func (p Page[T]) HasMore() bool {
+    return p.Offset+len(p.Items) < p.Total
+}
+
+func NewPage[T any](items []T, total, offset, limit int) Page[T] {
+    return Page[T]{Items: items, Total: total, Offset: offset, Limit: limit}
+}
+```
+
+```go
+users := NewPage(userList, 250, 0, 20)     // Page[User]
+orders := NewPage(orderList, 43, 20, 20)   // Page[Order]
+
+json.NewEncoder(w).Encode(users)
+```
+
+One type, one `HasMore` method, correct JSON for every entity in the service, and the compiler knows `users.Items[0]` is a `User`. Before generics this was a code generation problem or a `[]any` with assertions at every use.
+
+That completes types and abstraction in Go. Next, let's deal with the thing that appears on more lines of Go code than anything else: errors.

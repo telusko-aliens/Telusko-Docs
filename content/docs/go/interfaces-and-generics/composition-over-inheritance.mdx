@@ -1,0 +1,341 @@
+---
+title: Composition over Inheritance
+---
+
+Every Go developer arriving from Java, C#, Python, or C++ asks the same question in their first week: how do I do inheritance? The honest answer is that you do not, and the more useful answer is that the things you were using inheritance for split into three separate tools in Go.
+
+This page maps each one.
+
+## What inheritance was doing
+
+Class inheritance bundles three unrelated jobs into one mechanism:
+
+```text
+   class Dog extends Animal
+         │
+         ├─ 1. code reuse        Dog gets Animal's implemented methods
+         ├─ 2. substitutability  a Dog can be used wherever an Animal is expected
+         └─ 3. shared state      Dog has Animal's fields
+```
+
+Go separates them:
+
+| Job | Go's tool |
+| --- | --- |
+| Code reuse | embedding, or plain functions |
+| Substitutability | interfaces |
+| Shared state | struct fields, embedded or named |
+
+Once you see that split, the design questions get easier, because you pick the tool that matches the job instead of getting all three whether you wanted them or not.
+
+## Substitutability is an interface
+
+The classic inheritance example translates directly:
+
+```go
+type Animal interface {
+    Speak() string
+    Name() string
+}
+
+type Dog struct{ name string }
+func (d Dog) Speak() string { return d.name + " says woof" }
+func (d Dog) Name() string  { return d.name }
+
+type Cat struct{ name string }
+func (c Cat) Speak() string { return c.name + " says meow" }
+func (c Cat) Name() string  { return c.name }
+
+func describe(animals []Animal) {
+    for _, a := range animals {
+        fmt.Println(a.Speak())
+    }
+}
+
+describe([]Animal{Dog{"Bruno"}, Cat{"Mittens"}})
+```
+
+There is no base class, no hierarchy, and `Dog` and `Cat` do not know `Animal` exists. Adding a `Bird` requires touching nothing that already works.
+
+## Code reuse is embedding or a function
+
+When several types need the same implemented behaviour:
+
+```go
+type Base struct {
+    ID        string
+    CreatedAt time.Time
+}
+
+func (b *Base) Age() time.Duration {
+    return time.Since(b.CreatedAt)
+}
+
+type Article struct {
+    Base
+    Title string
+}
+
+type Comment struct {
+    Base
+    Body string
+}
+```
+
+Both get `Age()` and both get the fields. What they do not get is any relationship to each other, which is usually correct: an `Article` is not a kind of `Comment`, they merely share some mechanics.
+
+Often a plain function is even better:
+
+```go
+func Age(createdAt time.Time) time.Duration {
+    return time.Since(createdAt)
+}
+```
+
+No embedding, no coupling, testable on its own. Reach for embedding when the behaviour genuinely belongs to the type, and a function when it merely operates on data the type holds.
+
+## The template method problem
+
+Here is where people get stuck. In Java you write a base class with an algorithm that calls abstract steps, and subclasses fill in the steps.
+
+```java
+abstract class Report {
+    final void generate() {
+        loadData();          // subclass provides
+        render();            // subclass provides
+        save();              // shared
+    }
+}
+```
+
+Embedding cannot do this, because a promoted method has no idea it was promoted:
+
+```go
+type Report struct{}
+
+func (r Report) Generate() {
+    r.LoadData()      // there is no r.LoadData, and even if there were,
+    r.Render()        // it would be Report's, not the outer type's
+}
+```
+
+Go's answer is to pass the varying steps in, either as an interface or as functions.
+
+```go
+type DataSource interface {
+    Load(ctx context.Context) ([]Row, error)
+}
+
+type Renderer interface {
+    Render(rows []Row) ([]byte, error)
+}
+
+type Report struct {
+    source   DataSource
+    renderer Renderer
+}
+
+func (r *Report) Generate(ctx context.Context) ([]byte, error) {
+    rows, err := r.source.Load(ctx)
+    if err != nil {
+        return nil, fmt.Errorf("loading data: %w", err)
+    }
+
+    out, err := r.renderer.Render(rows)
+    if err != nil {
+        return nil, fmt.Errorf("rendering: %w", err)
+    }
+
+    return out, nil
+}
+```
+
+The algorithm is fixed, the steps are injected, and each step can be tested and swapped independently. This is strictly more flexible than the inheritance version, because a data source and a renderer can be combined freely rather than being locked together by a class hierarchy.
+
+<Callout type="info">
+Notice what happened to testing. With the template method, testing the algorithm means subclassing. Here it means passing two fakes. That difference compounds across a codebase.
+</Callout>
+
+## Wrapping instead of overriding
+
+Where inheritance would override a method to add behaviour, Go wraps.
+
+```go
+type Store interface {
+    Get(ctx context.Context, key string) ([]byte, error)
+    Put(ctx context.Context, key string, value []byte) error
+}
+
+type cachingStore struct {
+    Store                          // embedded interface, Get and Put pass through
+    cache map[string][]byte
+    mu    sync.RWMutex
+}
+
+func (s *cachingStore) Get(ctx context.Context, key string) ([]byte, error) {
+    s.mu.RLock()
+    if v, ok := s.cache[key]; ok {
+        s.mu.RUnlock()
+        return v, nil
+    }
+    s.mu.RUnlock()
+
+    v, err := s.Store.Get(ctx, key)
+    if err != nil {
+        return nil, err
+    }
+
+    s.mu.Lock()
+    s.cache[key] = v
+    s.mu.Unlock()
+    return v, nil
+}
+
+func WithCache(s Store) Store {
+    return &cachingStore{Store: s, cache: make(map[string][]byte)}
+}
+```
+
+`Put` was not written, and it passes straight through to the embedded interface. Only `Get` is decorated.
+
+The real advantage shows when you stack these:
+
+```go
+store := WithCache(WithMetrics(WithRetry(postgresStore)))
+```
+
+Four behaviours, composed at runtime, in any order. An inheritance hierarchy would need a class for every combination.
+
+## The diamond problem does not arise
+
+Multiple inheritance in C++ produces the diamond problem, where a class inherits the same base twice and the language has to decide what that means. Go sidesteps it because embedding is containment, not identity.
+
+```go
+type A struct{}
+func (A) Hello() string { return "A" }
+
+type B struct{}
+func (B) Hello() string { return "B" }
+
+type C struct {
+    A
+    B
+}
+
+c := C{}
+c.Hello()        // compile error: ambiguous selector c.Hello
+c.A.Hello()      // fine
+```
+
+There is no ambiguity about which state exists, because `C` genuinely contains one `A` and one `B`. Only the method name collides, and the compiler makes you say which you meant.
+
+## A worked redesign
+
+Take a typical inheritance hierarchy and see what it becomes.
+
+```text
+   Object oriented                    Go
+   ───────────────                    ──
+   abstract class Notifier            type Notifier interface {
+     abstract send(msg)                   Send(ctx, Message) error
+     protected log(msg)               }
+                                      
+   class EmailNotifier extends        type EmailNotifier struct {
+     Notifier                             smtp *smtp.Client
+                                      }
+   class SMSNotifier extends          
+     Notifier                         type SMSNotifier struct {
+                                          client *twilio.Client
+   class RetryingEmailNotifier        }
+     extends EmailNotifier            
+                                      func WithRetry(n Notifier, attempts int) Notifier
+```
+
+```go
+type Notifier interface {
+    Send(ctx context.Context, msg Message) error
+}
+
+type EmailNotifier struct {
+    from   string
+    client *smtp.Client
+}
+
+func (e *EmailNotifier) Send(ctx context.Context, msg Message) error {
+    // ...
+}
+
+type SMSNotifier struct {
+    client *twilio.Client
+}
+
+func (s *SMSNotifier) Send(ctx context.Context, msg Message) error {
+    // ...
+}
+
+// Retry works with any notifier, not just email
+type retrying struct {
+    Notifier
+    attempts int
+    backoff  time.Duration
+}
+
+func (r *retrying) Send(ctx context.Context, msg Message) error {
+    var err error
+    delay := r.backoff
+
+    for i := 0; i < r.attempts; i++ {
+        if err = r.Notifier.Send(ctx, msg); err == nil {
+            return nil
+        }
+        select {
+        case <-time.After(delay):
+            delay *= 2
+        case <-ctx.Done():
+            return ctx.Err()
+        }
+    }
+    return fmt.Errorf("after %d attempts: %w", r.attempts, err)
+}
+
+func WithRetry(n Notifier, attempts int) Notifier {
+    return &retrying{Notifier: n, attempts: attempts, backoff: 100 * time.Millisecond}
+}
+```
+
+The retry logic is written once and applies to email, SMS, push, webhooks, and anything added later. In the hierarchy version, `RetryingEmailNotifier` and `RetryingSMSNotifier` would be separate classes with duplicated logic.
+
+You can also fan out, which no hierarchy handles well:
+
+```go
+type multi []Notifier
+
+func (m multi) Send(ctx context.Context, msg Message) error {
+    var errs []error
+    for _, n := range m {
+        if err := n.Send(ctx, msg); err != nil {
+            errs = append(errs, err)
+        }
+    }
+    return errors.Join(errs...)
+}
+
+all := multi{email, sms, WithRetry(push, 3)}
+```
+
+A slice with one method, satisfying the same interface as its elements.
+
+## The habits to build
+
+```text
+   "I need several types used interchangeably"     →  interface
+   "These types share some implementation"         →  embed, or a function
+   "I need to add behaviour around an existing type" →  wrap it
+   "I need a fixed algorithm with varying steps"   →  inject the steps
+   "I need to share fields"                        →  embed a struct
+   "Dog is a kind of Animal"                       →  stop and ask what you need
+```
+
+That last line is the important one. Inheritance encourages you to model taxonomies, and taxonomies are rarely what a program needs. Go pushes you toward asking what behaviour a piece of code requires, which usually produces a smaller and more flexible design.
+
+Next, let's look at generics, which handle the one problem interfaces genuinely could not solve.
