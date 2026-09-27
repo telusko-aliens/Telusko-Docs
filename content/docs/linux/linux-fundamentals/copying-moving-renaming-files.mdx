@@ -1,0 +1,189 @@
+---
+title: Copying, Moving and Renaming Files
+---
+
+
+So far, we've learned how to create, inspect, and remove files. The next step is learning how to **copy files, move them between directories, and rename them**.
+
+Linux provides simple commands for these operations: `cp` and `mv`. We'll also see how `cat` can combine multiple files and how `history` helps us review commands we've already executed.
+
+<Steps>
+
+<Step>
+## `mv` - Move or Rename
+
+The `mv` command is used for both **moving** and **renaming** files.
+
+### Rename a File
+
+When the destination is a new filename in the same directory, `mv` renames the file:
+
+```bash
+mv old_name.txt new_name.txt
+```
+
+The file is now called `new_name.txt`.
+
+No separate rename command is required in Linux.
+
+### Move a File
+
+You can also move a file into another directory:
+
+```bash
+mv notes.txt /home/ubuntu/documents/
+```
+
+The file is removed from its original location and placed inside the destination directory.
+
+### How Does `mv` Know the Difference?
+
+Linux determines the operation from the destination:
+
+```bash
+mv file.txt new_name.txt
+```
+
+Here, `new_name.txt` is treated as the new filename.
+
+```bash
+mv file.txt documents/
+```
+
+Here, `documents/` is an existing directory, so the file is moved into it.
+
+### Moving and Renaming at the Same Time
+
+You can do both operations with one command:
+
+```bash
+mv notes.txt documents/linux-notes.txt
+```
+
+This moves `notes.txt` into `documents/` and gives it the new name `linux-notes.txt`.
+
+</Step>
+
+---
+
+<Step>
+## `cp` - Copy a File
+
+The `cp` command creates a **copy** of a file.
+
+```bash
+cp aliens.txt jenkins.txt
+```
+
+This creates `jenkins.txt` as a copy of `aliens.txt`.
+
+If `jenkins.txt` doesn't exist, it is created.
+
+If it already exists, its contents are normally **overwritten** by the source file.
+
+> **Important:** `cp` copies; it does not move the original file.
+
+After:
+
+```bash
+cp aliens.txt jenkins.txt
+```
+
+both files exist independently.
+
+### Copy a File to Another Directory
+
+```bash
+cp notes.txt documents/
+```
+
+The original `notes.txt` remains in the current directory, while a copy is created inside `documents/`.
+
+</Step>
+
+---
+
+<Step>
+## Combining Files with `cat`
+
+The `cat` command can also combine the contents of multiple files into a new file.
+
+```bash
+cat ansible.txt telusko.txt > shell.txt
+```
+
+The contents are written in this order:
+
+```text
+ansible.txt
+     ↓
+telusko.txt
+     ↓
+shell.txt
+```
+
+So the content of `ansible.txt` appears first, followed by the content of `telusko.txt`.
+
+If `shell.txt` already exists, `>` replaces its existing content.
+
+To append the combined content instead:
+
+```bash
+cat ansible.txt telusko.txt >> shell.txt
+```
+
+This adds the output to the end of the existing file.
+
+</Step>
+
+---
+
+<Step>
+## `history` - Review Previous Commands
+
+The `history` command displays commands previously entered in the shell.
+
+```bash
+history
+```
+
+Example:
+
+```text
+  101  pwd
+  102  ls
+  103  cd projects
+  104  touch notes.txt
+  105  ls
+```
+
+This is useful when you want to:
+
+* Review commands you've already run.
+* Find a command you used earlier.
+* Troubleshoot what you did during a session.
+* Reuse a previous command.
+
+> **Note:** The exact history available depends on the shell and its configuration. Shell history can also be stored for use across sessions.
+
+</Step>
+
+</Steps>
+
+---
+
+
+## Quick Reference
+
+| Command                         | Purpose                                 |
+| ------------------------------- | --------------------------------------- |
+| `mv old.txt new.txt`            | Rename a file                           |
+| `mv file.txt directory/`        | Move a file                             |
+| `mv file.txt directory/new.txt` | Move and rename a file                  |
+| `cp source.txt copy.txt`        | Create a copy of a file                 |
+| `cp file.txt directory/`        | Copy a file to another directory        |
+| `cat file1 file2 > merged.txt`  | Combine files into a new file           |
+| `history`                       | View previously executed shell commands |
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

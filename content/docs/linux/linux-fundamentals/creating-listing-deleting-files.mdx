@@ -1,0 +1,317 @@
+---
+title: Creating, Listing and Deleting Files
+---
+
+
+In the previous lecture, we learned how to navigate the Linux filesystem and create basic files and directories.
+
+Now let's go a step further. We'll learn how to **inspect files in more detail and safely remove files and directories**.
+
+The `ls` command is especially useful here because its options allow us to view the same directory in different ways.
+
+## Listing Files with `ls`
+
+The `ls` command displays the contents of a directory.
+
+```bash
+ls
+```
+
+Example:
+
+```text
+config.yml  notes.txt  projects  script.sh
+```
+
+By itself, `ls` gives you a simple list. By adding **options (flags)**, you can get more useful information.
+
+### Common `ls` Options
+
+| Command   | Purpose                                                       |
+| --------- | ------------------------------------------------------------- |
+| `ls`      | List files and directories.                                   |
+| `ls -l`   | Display detailed information in long format.                  |
+| `ls -r`   | Reverse the listing order.                                    |
+| `ls -lh`  | Show detailed information with human-readable file sizes.     |
+| `ls -lt`  | Sort the detailed listing by modification time, newest first. |
+| `ls -ltr` | Sort by modification time, oldest first.                      |
+
+### `ls -l` - Long Format
+
+```bash
+ls -l
+```
+
+Example:
+
+```text
+-rw-r--r-- 1 ubuntu ubuntu  124 Sep 27 18:10 notes.txt
+drwxr-xr-x 2 ubuntu ubuntu 4096 Sep 27 18:05 projects
+```
+
+The long format provides information such as:
+
+* File type and permissions
+* Number of links
+* Owner
+* Group
+* Size
+* Last modification time
+* File or directory name
+
+We'll explore permissions and ownership in detail in a later lecture.
+
+### `ls -lh` - Human-Readable Sizes
+
+```bash
+ls -lh
+```
+
+The `h` option makes file sizes easier to read.
+
+Instead of seeing raw byte counts, you may see values such as:
+
+```text
+4.0K
+2.1M
+1.5G
+```
+
+This is particularly useful when working with large files.
+
+### `ls -lt` - Sort by Modification Time
+
+```bash
+ls -lt
+```
+
+This displays the newest modified items first.
+
+This can be useful when you're trying to identify recently changed files, such as application logs or configuration files.
+
+### `ls -ltr` - Oldest First
+
+```bash
+ls -ltr
+```
+
+This reverses the time-based listing, so older files appear first and newer files appear toward the bottom.
+
+### Combining Options
+
+Linux command options can often be combined.
+
+```bash
+ls -ltr
+```
+
+Here:
+
+* `l` → Long format
+* `t` → Sort by modification time
+* `r` → Reverse the order
+
+You can also write the same combination as:
+
+```bash
+ls -l -t -r
+```
+
+Both forms are commonly used.
+
+
+---
+
+
+## Deleting Files
+
+Once you understand how to inspect the filesystem, you also need to know how to remove things you no longer need.
+
+### `rm` - Remove a File
+
+The `rm` command removes files.
+
+```bash
+rm notes.txt
+```
+
+After running the command, the file is removed from the directory.
+
+> **Important:** Linux does not normally move files deleted with `rm` to a recycle bin. Make sure you are deleting the correct file before running the command.
+
+### Removing Multiple Files
+
+You can specify multiple files:
+
+```bash
+rm file1.txt file2.txt file3.txt
+```
+
+All three files will be removed.
+
+
+---
+
+
+## Deleting Directories
+
+Linux provides different commands depending on whether a directory is empty or contains files.
+
+### `rmdir` - Remove an Empty Directory
+
+The `rmdir` command removes a directory **only when it is empty**.
+
+```bash
+rmdir linux
+```
+
+If the directory contains files or subdirectories, the command will fail rather than deleting its contents.
+
+This makes `rmdir` useful when you specifically want to remove an empty directory.
+
+### `rm -r` - Remove a Directory Recursively
+
+To remove a directory along with its contents, use the recursive option:
+
+```bash
+rm -r telusko
+```
+
+The `-r` option means **recursive**. Linux will remove the directory and the files and subdirectories inside it.
+
+### `rm -rf` - Force Recursive Removal
+
+You may also encounter:
+
+```bash
+rm -rf telusko
+```
+
+Here:
+
+* `r` → Recursively remove contents.
+* `f` → Force removal without prompting for confirmation in situations where `rm` would otherwise prompt.
+
+> **Be extremely careful with `rm -rf`.** It can remove a large amount of data very quickly, and there is normally no recycle bin to recover it from.
+
+Always check your current directory with `pwd` and verify the target with `ls` before running destructive commands.
+
+
+---
+
+
+## Using Wildcards
+
+Wildcards allow a command to match multiple filenames based on a pattern.
+
+The `*` wildcard means **zero or more characters**.
+
+For example:
+
+```bash
+rm *.txt
+```
+
+This matches files ending in `.txt` in the current directory.
+
+Suppose the directory contains:
+
+```text
+notes.txt
+commands.txt
+config.yml
+main.tf
+```
+
+Running:
+
+```bash
+rm *.txt
+```
+
+will remove:
+
+```text
+notes.txt
+commands.txt
+```
+
+but leave:
+
+```text
+config.yml
+main.tf
+```
+
+### Matching a Specific Filename Pattern
+
+You can combine characters with `*`.
+
+```bash
+rm m*.tf
+```
+
+This matches `.tf` files whose names begin with `m`.
+
+For example:
+
+```text
+main.tf
+module.tf
+variables.tf
+```
+
+The command matches:
+
+```text
+main.tf
+module.tf
+```
+
+but not:
+
+```text
+variables.tf
+```
+
+> **Tip:** Before using a wildcard with `rm`, first run the same pattern with `ls`.
+
+For example:
+
+```bash
+ls *.txt
+```
+
+If the results are exactly what you intend to delete, then run:
+
+```bash
+rm *.txt
+```
+
+This simple habit can prevent accidental deletion.
+
+
+![Linux_Delete_Checklist](https://dyz1pdcuffwr5.cloudfront.net/Linux/linux_delete_checklist.png)
+
+
+---
+
+
+## Quick Reference
+
+| Command            | Purpose                                             |
+| ------------------ | --------------------------------------------------- |
+| `ls`               | List directory contents.                            |
+| `ls -l`            | Show detailed information.                          |
+| `ls -lh`           | Show detailed information with readable file sizes. |
+| `ls -lt`           | Sort by modification time, newest first.            |
+| `ls -ltr`          | Sort by modification time, oldest first.            |
+| `rm file.txt`      | Remove a file.                                      |
+| `rmdir directory`  | Remove an empty directory.                          |
+| `rm -r directory`  | Remove a directory and its contents recursively.    |
+| `rm -rf directory` | Forcefully remove a directory and its contents.     |
+| `rm *.txt`         | Remove matching `.txt` files.                       |
+| `rm m*.tf`         | Remove `.tf` files beginning with `m`.              |
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

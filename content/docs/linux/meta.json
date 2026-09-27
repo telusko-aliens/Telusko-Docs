@@ -3,6 +3,7 @@
     "pages":[
         "getting-started.mdx",
         "introduction.mdx",
-        "linux-environment-setup-on-aws"
+        "linux-environment-setup-on-aws",
+        "linux-fundamentals"
     ]
 }  
