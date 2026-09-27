@@ -1,0 +1,11 @@
+{
+    "title": "Linux Fundamentals",
+    "pages": [
+        "linux-navigation-and-basic-commands.mdx",
+        "creating-listing-deleting-files.mdx",
+        "viewing-file-contents.mdx",
+        "copying-moving-renaming-files.mdx",
+        "linux-file-system-structure.mdx",
+        "vi-editor-basics.mdx"
+    ]
+}
