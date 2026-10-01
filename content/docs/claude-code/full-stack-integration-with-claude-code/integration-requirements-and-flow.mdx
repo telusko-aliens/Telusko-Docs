@@ -46,6 +46,33 @@ For every branch the loop is the same:
 5. Test it
 6. Commit, merge into `main`, delete the branch
 
+## Git commands for every branch
+
+You will repeat this cycle five times, so it is worth knowing by heart:
+
+```bash
+git checkout -b feature/<name>    # 1. start the feature
+# ... work with Claude, review with /diff ...
+git add .                         # 2. stage
+git commit -m "feat: ..."         # 3. commit (or let Claude write the message)
+git checkout main                 # 4. go back to main
+git merge feature/<name>          # 5. bring the feature in
+git branch -d feature/<name>      # 6. delete the merged branch
+```
+
+Inside Claude Code you can run each line with the `!` prefix, for example `!git status`, so it does not go through the model.
+
+## Definition of done for each branch
+
+Before you merge a branch, every box should be ticked:
+
+- [ ] The prompt referenced the spec files instead of describing things from memory
+- [ ] You read the full `/diff`, not just Claude's summary
+- [ ] The code follows `CLAUDE.md`: service layer, schemas and models in their folders, snake_case, type hints
+- [ ] You ran it yourself (Swagger, curl or the browser), not only Claude's own checks
+- [ ] Nothing outside the feature changed (no surprise edits in `frontend/` or `specs/`)
+- [ ] The commit message explains **what** and **why**
+
 ## A note on uv
 
 While planning, we realised something was missing: we want **uv** as the Python package manager, not plain `pip`. uv is much faster, manages Python versions, and keeps dependencies locked in `pyproject.toml` and `uv.lock`.
@@ -82,3 +109,7 @@ When this works end to end, clicking **Move Forward** on a card updates the data
 - [Best practices for Claude Code](https://code.claude.com/docs/en/best-practices)
 - [uv documentation](https://docs.astral.sh/uv/)
 - [FastAPI documentation](https://fastapi.tiangolo.com/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

@@ -55,6 +55,8 @@ Each requirement prevents a specific failure:
 | `$PORT`, default 8080 | Cloud Run cannot reach the app. It sends traffic to the port in `$PORT`, 8080 by default |
 | Dependencies before code | Every code change reinstalls all packages, so builds are slow |
 
+<img src="/claude-code/docker-layer-caching.svg" alt="Docker layer caching order" width={960} height={470} />
+
 ## The Dockerfile Claude wrote
 
 ```dockerfile title="Dockerfile"
@@ -169,6 +171,34 @@ In the logs you see the migrations run, the seed script insert the demo data, an
 The local secret is deliberately weak and obvious. Never use it outside your own machine. For Cloud Run we generate a real one.
 </Callout>
 
+## Common problems
+
+| Error or symptom | Cause | Fix |
+| --- | --- | --- |
+| `Cannot connect to the Docker daemon` | Docker Desktop is not running | Start Docker Desktop and wait for "Engine running" |
+| `FileNotFoundError: ... seed-data.json` | `specs/` was not copied, or copied to the wrong place | `COPY specs/ ../specs/` with `WORKDIR /app/backend` |
+| `Directory '../frontend' does not exist` | `frontend/` was not copied one level up | `COPY frontend/ ../frontend/` |
+| Container starts but the browser shows nothing | Port not published, or uvicorn bound to `127.0.0.1` | Use `-p 8080:8080` and `--host 0.0.0.0` |
+| `port is already allocated` | Something else uses port 8080 | Stop it, or map another host port: `-p 9090:8080` |
+| Login fails with 500 | JWT environment variables missing | Pass all three `-e JWT_...` variables |
+
+## A `.dockerignore` file
+
+Without it, Docker sends everything in the folder to the build, including your virtual environment, the local database and your `.env`:
+
+```text title=".dockerignore"
+.git
+.venv
+**/__pycache__
+*.db
+*.db-*
+.env
+**/.env
+.claude/worktrees
+```
+
+This makes builds faster and keeps secrets out of the image.
+
 ## Stop the container
 
 Find the container ID and stop it:
@@ -186,3 +216,7 @@ The image is tested and ready to go to the cloud.
 - [uv: Using uv in Docker](https://docs.astral.sh/uv/guides/integration/docker/)
 - [Cloud Run: container runtime contract](https://cloud.google.com/run/docs/container-contract)
 - [Docker docs on this site](/docs/docker/getting-started)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

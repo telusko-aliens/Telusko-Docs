@@ -5,6 +5,18 @@ description: Create a Google Cloud project, install and initialise the Google Cl
 
 The image works locally. Now we prepare Google Cloud: a **project** to hold everything, and the **Google Cloud CLI** (`gcloud`) to control it from the terminal.
 
+## Google Cloud terms you will see
+
+| Term | Meaning |
+| --- | --- |
+| **Google account** | The login you use for the console and `gcloud` |
+| **Billing account** | Where charges go. Linked to one or more projects |
+| **Project** | A container for everything you create: services, images, settings, permissions |
+| **Project ID** | The unique, permanent identifier of a project. Commands use this, not the display name |
+| **Region** | The data centre location, for example `us-central1` or `asia-south1` (Mumbai) |
+| **API / service** | A Google Cloud product you switch on per project, such as Cloud Run or Cloud Build |
+| **IAM** | Identity and Access Management: who is allowed to do what in the project |
+
 ## Step 1: Create a project
 
 <Steps>
@@ -88,9 +100,33 @@ You should see your **account** and your **project** ID. If both are right, the 
 It can, and for repetitive commands that is useful. But login flows open a browser and need your decisions, so they are easier to run yourself with `!` or in a normal terminal. Commands that would put credentials or secrets in the conversation should always be run by you, outside Claude.
 </Callout>
 
+## Useful gcloud commands
+
+| Command | What it does |
+| --- | --- |
+| `gcloud --version` | Show the installed CLI version |
+| `gcloud auth list` | Show which accounts are logged in and which one is active |
+| `gcloud config list` | Show the active account, project and default region |
+| `gcloud projects list` | List the projects your account can access |
+| `gcloud config set project <PROJECT_ID>` | Switch the active project |
+| `gcloud config set run/region us-central1` | Set a default region for Cloud Run, so you can skip `--region` |
+
+## Troubleshooting
+
+| Problem | Fix |
+| --- | --- |
+| `gcloud` is not recognized | Restart all VS Code windows or your terminal. On Windows, check that the Cloud SDK `bin` folder is on your `PATH` |
+| New project does not appear in `gcloud init` | Choose "enter a project ID" and type it, or run `gcloud config set project <PROJECT_ID>` |
+| `PERMISSION_DENIED` or billing errors later | Make sure billing is linked to the project and that you are logged in with the account that owns it |
+| Wrong account is used | `gcloud auth list`, then `gcloud config set account <email>` |
+
 ## Official references
 
 - [Install the Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
 - [Initialize the gcloud CLI](https://cloud.google.com/sdk/docs/initializing)
 - [Creating and managing projects](https://cloud.google.com/resource-manager/docs/creating-managing-projects)
 - [Create a budget alert](https://cloud.google.com/billing/docs/how-to/budgets)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

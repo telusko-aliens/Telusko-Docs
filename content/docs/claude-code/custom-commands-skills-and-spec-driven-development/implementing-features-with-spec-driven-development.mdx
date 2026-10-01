@@ -179,6 +179,43 @@ Then review the diff yourself:
 
 You should see the new query parameters in `api/v1/tasks.py` and a filtered query in `task_service.py`, and nothing else.
 
+## Vibe prompt vs spec
+
+| | Vibe prompt | Spec |
+| --- | --- | --- |
+| Example | "add filtering to tasks" | `specs/features/task-filtering.md` |
+| Inputs and outputs | Claude guesses | Written down, with exact error bodies |
+| Done means | "looks like it works" | Every acceptance criterion passes |
+| Scope | Whatever Claude thinks is natural | Out-of-scope list is explicit |
+| Reusable | No, lost in chat history | Yes, committed to git and reviewed |
+| Testing | Ad hoc | Smoke tests are part of the spec |
+
+## A spec template you can copy
+
+```markdown title="specs/features/_template.md"
+# Feature: <short name>
+
+## What it does
+One or two sentences.
+
+## Why we need it
+The problem it solves.
+
+## Behaviour
+### <request or action>
+Exact inputs, outputs, status codes and error bodies.
+
+## Acceptance criteria
+- Testable statement 1
+- Testable statement 2
+
+## Out of scope
+- Thing we are deliberately not building (separate spec)
+
+## Smoke test (all must pass)
+curl ...
+```
+
 ## The workflow from now on
 
 For every new feature:
@@ -197,3 +234,7 @@ You write the *what*. Claude writes the *how*. You verify both. That is spec-dri
 - [Pass arguments to skills](https://code.claude.com/docs/en/skills#pass-arguments-to-skills)
 - [Best practices for Claude Code](https://code.claude.com/docs/en/best-practices)
 - [FastAPI: query parameters](https://fastapi.tiangolo.com/tutorial/query-params/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

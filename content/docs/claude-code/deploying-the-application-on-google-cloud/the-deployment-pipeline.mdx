@@ -36,6 +36,22 @@ Our frontend is just HTML, CSS and JavaScript. FastAPI can serve those files its
 
 A container packages the app with its exact Python version, dependencies and start command. If it runs in Docker on your laptop, it runs the same way on Cloud Run. Without a container, every difference between your machine and the server becomes a debugging session. (For a full introduction, see the [Docker docs on this site](/docs/docker/getting-started).)
 
+## Cloud Run in a nutshell
+
+<img src="/claude-code/cloud-run-concepts.svg" alt="Cloud Run service, revisions and instances" width={960} height={400} />
+
+| Concept | Meaning |
+| --- | --- |
+| **Service** | Your app on Cloud Run, with one stable HTTPS URL. Ours is `telusko-app` |
+| **Revision** | An immutable snapshot created by every deploy (image plus settings). You can send traffic back to an older revision to roll back |
+| **Instance** | A running copy of your container. Cloud Run adds instances when traffic grows |
+| **Scale to zero** | With no requests, Cloud Run can stop all instances, so an idle app costs very little |
+| **Container contract** | Your container must listen on the port in the `PORT` environment variable (8080 by default) |
+
+<Callout type="info" title="What it costs">
+Cloud Run bills for the resources used while handling requests, and there is a monthly free tier. Cloud Build and Artifact Registry also have free allowances. For a small learning project the cost is usually zero or close to it, but always check the [Cloud Run pricing page](https://cloud.google.com/run/pricing) and set a budget alert.
+</Callout>
+
 ## What you need
 
 - **Docker Desktop** (or Docker Engine) installed and running
@@ -52,3 +68,7 @@ Deployments often fail the first time: a missing permission, a wrong path, a typ
 - [Artifact Registry documentation](https://cloud.google.com/artifact-registry/docs)
 - [Cloud Build documentation](https://cloud.google.com/build/docs)
 - [Docker: Get started](https://docs.docker.com/get-started/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

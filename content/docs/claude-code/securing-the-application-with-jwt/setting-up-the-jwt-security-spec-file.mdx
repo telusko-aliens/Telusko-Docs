@@ -195,6 +195,38 @@ uploader DELETE 403, bad credentials 401. See the next lesson.)
 A spec this detailed takes time. You can describe your requirements in plain language and ask Claude to **draft** the spec. But then read every line. Did it add a library you do not need? Every extra dependency is a potential risk. Did it miss a role rule? The spec is your responsibility.
 </Callout>
 
+## Drafting a spec with Claude's help
+
+You do not have to write a spec like this from a blank page. A good approach is to let Claude draft it in **plan mode**, so no code is touched while you shape the requirements:
+
+```text title="Prompt: draft a security spec (in plan mode)"
+I want to add authentication and authorisation to this project.
+Requirements:
+- username + password login, bcrypt hashed passwords
+- JWT access tokens, 60 minutes, HS256
+- four roles: admin, content_team, video_editor, uploader
+- the advance rules from ROLE_CONFIG in frontend/app.js, enforced on the server
+- 401 for missing or invalid tokens, 403 for wrong roles
+- a login form in the frontend, token in localStorage, logout button
+
+Read CLAUDE.md, specs/api-contract.md and the existing backend code.
+Write a spec to specs/security/security-spec.md with: scope, files to create,
+files to modify, database changes, frontend changes, acceptance criteria,
+out of scope, and curl smoke tests. Do not write any code.
+```
+
+## Spec review checklist
+
+Before you implement, read the spec and check:
+
+- [ ] Every endpoint has an explicit auth rule, including the ones that stay public (like `/api/auth/login`)
+- [ ] 401 and 403 are used correctly and consistently
+- [ ] Role names match **exactly** what the code uses (`video_editor`, not "Editor" or "video editor")
+- [ ] The tricky security cases are acceptance criteria: expired token, tampered token, wrong role
+- [ ] No unnecessary libraries were added
+- [ ] Secrets come from environment variables, never from the spec or the code
+- [ ] Out of scope is written down, so nothing half-built sneaks in
+
 ## Secrets: you create them, not Claude
 
 The original spec also asked Claude to generate the `.env` file with the JWT secret. We removed that part on purpose.
@@ -254,3 +286,7 @@ Never commit `.env`. It is in `.gitignore`, and our `CLAUDE.md` says "NEVER comm
 - [Configure permissions: exclude sensitive files](https://code.claude.com/docs/en/permissions)
 - [Claude Code security](https://code.claude.com/docs/en/security)
 - [Python secrets module](https://docs.python.org/3/library/secrets.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

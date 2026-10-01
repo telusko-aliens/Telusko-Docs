@@ -35,6 +35,8 @@ Think of RAM on a laptop. A machine with 16 GB never gives you all 16 GB, becaus
 | Memory files | `CLAUDE.md` and auto memory |
 | Skills | Short descriptions of available skills |
 
+<img src="/claude-code/context-budget.svg" alt="Illustration of how the context window is used" width={960} height={340} />
+
 What remains is yours. Treat the context indicator like your phone's battery icon: you do not wait for the phone to die before charging it.
 
 ## Auto-compaction and why you should not rely on it
@@ -68,9 +70,26 @@ With Sonnet selected, a clean context and our specs in place, start each feature
 /rename backend-setup
 ```
 
+## Session hygiene checklist
+
+Use this at the start and end of every feature:
+
+| When | Do this |
+| --- | --- |
+| Starting a feature | New session (or `/clear`), `/rename <feature>`, check `/model` |
+| Before a big prompt | `/context` to see how much room you have |
+| Midway, same feature | `/compact <what to keep>` if the conversation has grown large |
+| Quick unrelated question | `/btw <question>` |
+| A decision that must survive | Write it into `CLAUDE.md` or the spec, not only the chat |
+| Feature merged | Close the session or `/clear` before the next one |
+
 ## Official references
 
 - [Explore the context window](https://code.claude.com/docs/en/context-window)
 - [How Claude Code works: when context fills up](https://code.claude.com/docs/en/how-claude-code-works#when-context-fills-up)
 - [Manage costs effectively](https://code.claude.com/docs/en/costs)
 - [Manage sessions](https://code.claude.com/docs/en/sessions)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

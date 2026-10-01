@@ -47,14 +47,30 @@ Even if it worked, this is the wrong shape of solution:
 
 What we want is a **standard** way for a service to say: "Here are the actions I offer, here is what each one does, and here is how to call them." Any AI tool that understands that standard could then use any service that speaks it.
 
+<img src="/claude-code/mcp-integration-problem.svg" alt="Without MCP every tool integrates with every service; with MCP each side implements one protocol" width={960} height={420} />
+
 That standard exists. It is called the **Model Context Protocol**, and it is the subject of the next lesson.
 
 <Callout type="info" title="What about the GitHub CLI?">
 If you already use `gh` and are logged in, Claude Code can use it through the Bash tool, and that works well for many tasks. MCP is the more general solution: the same mechanism connects Claude to GitHub, databases, browsers, Slack, Jira and hundreds of other services.
 </Callout>
 
+## Three ways Claude Code can work with GitHub
+
+| Approach | How it works | Good | Watch out |
+| --- | --- | --- | --- |
+| **Raw API calls** | Claude writes `curl` requests to the GitHub REST API | No setup beyond a token | The token ends up in commands or the environment, and Claude improvises every call |
+| **GitHub CLI (`gh`)** | Claude runs `gh issue create`, `gh pr create` through the Bash tool | Very capable if you already use `gh` | GitHub only, needs `gh` installed and logged in |
+| **GitHub MCP server** | Claude calls tools the server describes, like "create issue" | Standard, self-describing, permissions in one place | Needs a token with the right scopes, one-time setup |
+
+All three are valid. In this section we use MCP because the same skill transfers to every other service that offers an MCP server.
+
 ## Official references
 
 - [GitHub Docs: About issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/about-issues)
 - [GitHub Docs: About pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests)
 - [GitHub CLI](https://cli.github.com/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

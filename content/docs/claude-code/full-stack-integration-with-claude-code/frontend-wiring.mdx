@@ -106,6 +106,25 @@ It also fixed a related bug in the drag-and-drop handler. Now moves, creates and
 Claude can also test web UIs for you with a browser tool such as [Claude in Chrome](https://code.claude.com/docs/en/chrome), clicking through the app and reading console errors. For this small app, manual testing was enough.
 </Callout>
 
+## Debugging with browser DevTools
+
+When the UI misbehaves, open the browser's developer tools (`F12`) before asking Claude anything. Two tabs answer most questions:
+
+| Tab | What to look for |
+| --- | --- |
+| **Network** | Is the request sent at all? Which URL? What status code: 200, 404, 422, 500? What does the response body say? |
+| **Console** | JavaScript errors, and CORS errors (they appear here, not in the Network tab) |
+
+| You see | It usually means |
+| --- | --- |
+| No request in the Network tab | The frontend code never called the API, or crashed before it |
+| Request with status `(failed)` and a CORS message in the Console | The backend does not allow this origin. Check `allow_origins` |
+| `404` | Wrong URL or path |
+| `422` | The JSON body does not match the schema (wrong field name or value) |
+| `200` but the board does not change | The backend worked. The frontend does not re-render, which was exactly our bug |
+
+Paste the exact status code and error text into your prompt. "Delete fails with 404 on `/api/tasks/7`" gets a much faster fix than "delete is broken".
+
 ## Commit, merge, delete
 
 ```text
@@ -152,3 +171,7 @@ Five branches, five clean merges, and every step driven by specs and reviewed by
 - [Use Claude Code with Chrome](https://code.claude.com/docs/en/chrome)
 - [MDN: Using the Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
 - [MDN: CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

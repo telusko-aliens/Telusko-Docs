@@ -36,6 +36,55 @@ You have already used a few without thinking of them as "commands":
 | **Bundled skills** | Prompt-based workflows that ship with Claude Code | `/code-review`, `/simplify`, `/batch`, `/debug` |
 | **Your own skills** | Commands you create for your project or team | `/telusko-status`, `/scaffold-endpoint` (Section 9) |
 
+## What happens behind the scenes
+
+<img src="/claude-code/slash-command-lifecycle.svg" alt="How built-in commands and skills are handled" width={960} height={380} />
+
+When you press `Enter`, Claude Code first checks whether the text starts with a known command name.
+
+- **Built-in commands** like `/clear`, `/model` or `/compact` run fixed logic inside Claude Code. `/clear` does not ask the model anything. It simply starts a fresh conversation.
+- **Skills**, bundled or your own, are turned into instructions for Claude. `/review` loads a carefully written review prompt, and Claude then works through it with its normal agentic loop.
+
+This is why a skill can take a while and use tokens, while most built-in commands react instantly.
+
+## Anatomy of a command
+
+Many commands accept **arguments** after the name, separated by a space:
+
+| You type | Command | Argument | Effect |
+| --- | --- | --- | --- |
+| `/model sonnet` | `/model` | `sonnet` | Switch straight to Sonnet, without opening the picker |
+| `/compact keep the API decisions` | `/compact` | focus text | Summarise, but keep what you asked for |
+| `/rename backend-crud` | `/rename` | a name | Label the current session |
+| `/effort high` | `/effort` | a level | Change the effort level |
+| `/scaffold-endpoint GET /api/x` | your skill | verb and path | Passed to the skill as `$ARGUMENTS` (Section 9) |
+
+Run a command **without** arguments and it usually opens an interactive picker instead.
+
+## Finding the right command
+
+| Method | How |
+| --- | --- |
+| Type `/` | Shows the list and filters as you keep typing, for example `/co` shows `/compact`, `/config`, `/context` |
+| `/help` | Lists the commands available in your version |
+| `/skills` | Lists only skills, including your own |
+| The [commands reference](https://code.claude.com/docs/en/commands) | Full descriptions of every built-in command and bundled skill |
+
+## Commands, shell mode and shortcuts
+
+These look similar but do very different things:
+
+| Input | What it is | Example |
+| --- | --- | --- |
+| `/name` | A slash command or skill | `/context` |
+| `!command` | Shell mode: runs the command directly in your terminal, without the model | `!git status` |
+| `@path` | Attaches a file to your prompt | `Read @specs/api-contract.md` |
+| `Shift+Tab`, `Esc`, `Ctrl+O` | Keyboard shortcuts | Change permission mode, stop Claude, open transcript |
+
+<Callout type="info" title="MCP servers can add commands too">
+Some MCP servers (Section 11) expose ready-made prompts. They appear as commands with the server name in them, such as `/mcp__github__pr_review`.
+</Callout>
+
 ## You do not need to memorise them
 
 There are dozens of commands, and new ones arrive regularly. You will not use all of them. In daily work, most developers rely on a handful: `/clear`, `/compact`, `/context`, `/model`, `/resume` and a couple of custom skills.
@@ -50,3 +99,7 @@ Run `/help` at any time to see the commands available in your version. Since Cla
 
 - [Commands reference](https://code.claude.com/docs/en/commands)
 - [Interactive mode](https://code.claude.com/docs/en/interactive-mode)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

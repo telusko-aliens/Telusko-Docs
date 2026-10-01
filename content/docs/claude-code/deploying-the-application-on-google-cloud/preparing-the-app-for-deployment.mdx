@@ -108,6 +108,8 @@ app.mount("/", StaticFiles(directory="../frontend", html=True), name="static")
 | Routers first, then static mount | Matched by the tasks router. Works |
 | Static mount first | The `/` mount catches it first and looks for a file called `api/tasks`. The API breaks |
 
+<img src="/claude-code/static-mount-order.svg" alt="Route order: API routers before the static mount" width={960} height={400} />
+
 `html=True` makes the static mount serve `index.html` when someone opens `/`.
 
 ## Test locally
@@ -123,7 +125,40 @@ Open `http://localhost:8080`. The login page loads from FastAPI, and after loggi
 
 Commit the changes before moving on.
 
+## What a relative URL resolves to
+
+A relative URL takes its host from the page that is currently open. That is why the same `app.js` works everywhere without changes:
+
+| Page opened from | `fetch('/api/tasks')` goes to |
+| --- | --- |
+| `http://localhost:8080` (local test) | `http://localhost:8080/api/tasks` |
+| `http://localhost:8080` (Docker) | `http://localhost:8080/api/tasks` |
+| `https://telusko-app-xxxx.run.app` (Cloud Run) | `https://telusko-app-xxxx.run.app/api/tasks` |
+
+With the old hardcoded `http://localhost:8000`, the deployed site would try to call port 8000 **on the visitor's own computer**, and that request fails.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+| --- | --- | --- |
+| `/` returns `{"detail":"Not Found"}` | The static mount is missing or points to the wrong folder | Check `directory="../frontend"` and that you start uvicorn from `backend/` |
+| API calls return HTML instead of JSON | The static mount is registered **before** the routers | Move `app.mount(...)` below both `include_router` lines |
+| `RuntimeError: Directory '../frontend' does not exist` | uvicorn was started from the project root, not from `backend/` | `cd backend` first, exactly like the Docker `WORKDIR` |
+| Login works but the board is empty | An old `app.js` is cached in the browser | Hard refresh with `Ctrl+Shift+R` (`Cmd+Shift+R` on macOS) |
+
+## Checklist before you write the Dockerfile
+
+- [ ] No `localhost` left in `frontend/app.js` (search for it)
+- [ ] `app.mount("/", StaticFiles(...))` is the **last** route registration in `app/main.py`
+- [ ] The app works on a **single port** with `uv run uvicorn app.main:app --port 8080` from `backend/`
+- [ ] Login, moving a card and logout all work in the browser
+- [ ] Changes are committed
+
 ## Official references
 
 - [FastAPI: Static files](https://fastapi.tiangolo.com/tutorial/static-files/)
 - [MDN: Same-origin policy](https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

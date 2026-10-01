@@ -77,6 +77,19 @@ The resulting commit message follows the [Conventional Commits](https://www.conv
 docs(api-contract): document the three auth endpoints
 ```
 
+### Conventional commit types
+
+| Type | Use it for | Example |
+| --- | --- | --- |
+| `feat` | A new feature | `feat(tasks): add filtering by state` |
+| `fix` | A bug fix | `fix(frontend): refresh board after move` |
+| `docs` | Documentation only | `docs(api-contract): document auth endpoints` |
+| `refactor` | Code change without behaviour change | `refactor(service): extract role checks` |
+| `test` | Adding or fixing tests | `test(auth): cover expired tokens` |
+| `chore` | Tooling, config, housekeeping | `chore: add .dockerignore` |
+
+The part in brackets is the optional **scope**: which area of the project changed.
+
 ## Open a pull request
 
 ```text title="Prompt: open the PR"
@@ -124,9 +137,23 @@ The same pattern works with any MCP server:
 
 And if a system you use has no MCP server, you can build your own. The official [MCP documentation](https://modelcontextprotocol.io/) explains how.
 
+## Troubleshooting the GitHub MCP server
+
+| Problem | Likely cause | Fix |
+| --- | --- | --- |
+| `/mcp` shows the server as failed or needing auth | Token is wrong, expired or revoked | Create a new token and re-add the server |
+| `403` or "Resource not accessible" when creating an issue | The token has no **Issues: write** permission, or not for this repository | Edit the token's permissions on GitHub |
+| Claude uses `gh` or asks for a token instead of MCP | The server is not connected in this session | Start a new session and check `/mcp` |
+| The wrong repository is used | Several repositories are accessible to the token | Always name the owner and repo in your prompt |
+| Push fails | Pushing uses your **local git** credentials, not the MCP token | Check `git remote -v` and your git login |
+
 ## Official references
 
 - [Connect Claude Code to tools via MCP](https://code.claude.com/docs/en/mcp)
 - [GitHub MCP server](https://github.com/github/github-mcp-server)
 - [GitHub Docs: Linking a pull request to an issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue)
 - [Conventional Commits](https://www.conventionalcommits.org/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>
