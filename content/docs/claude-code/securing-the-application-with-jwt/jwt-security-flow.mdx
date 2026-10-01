@@ -91,6 +91,8 @@ For each request the server checks the signature and expiry, loads the user, the
 </Step>
 </Steps>
 
+<img src="/claude-code/jwt-structure.svg" alt="Anatomy of a JWT: header, payload and signature" width={960} height={440} />
+
 <Callout type="info" title="Why the signature matters">
 A JWT is not encrypted. Anyone can decode it and read `sub` and `role`. What they cannot do is **change** it: if someone edits the role from `uploader` to `admin`, the signature no longer matches and the server rejects it with 401. That is why the secret key must stay secret.
 </Callout>

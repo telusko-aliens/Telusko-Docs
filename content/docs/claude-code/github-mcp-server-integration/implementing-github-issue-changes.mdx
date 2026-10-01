@@ -147,6 +147,15 @@ And if a system you use has no MCP server, you can build your own. The official 
 | The wrong repository is used | Several repositories are accessible to the token | Always name the owner and repo in your prompt |
 | Push fails | Pushing uses your **local git** credentials, not the MCP token | Check `git remote -v` and your git login |
 
+## Try It Yourself
+
+Before moving to the next section, practise what you learned:
+
+1. Create a fine-grained token for one repository only, with exactly the permissions from the previous lesson (Contents, Issues, Pull requests) and a short expiry.
+2. Add the GitHub MCP server from a normal terminal and verify it with `/mcp`.
+3. Ask Claude to list your open issues, create one with a label, and open a small PR that closes it.
+4. Review the PR on GitHub yourself before you merge it.
+
 ## Official references
 
 - [Connect Claude Code to tools via MCP](https://code.claude.com/docs/en/mcp)

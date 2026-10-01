@@ -23,6 +23,10 @@ That is a pipeline with different people at different stages. You could track it
   - **Content team**, **video editor** and **uploader** can only move a card forward from the stages they own
 - Runs live on **Google Cloud Run**
 
+<img src="/claude-code/app-board-admin.webp" alt="Finished Content Tracker board logged in as Admin" width={1440} height={500} />
+
+*The finished app, logged in as Admin. Every column has a Move Forward button and cards can be deleted.*
+
 ### The tech stack
 
 | Layer | Technology |
@@ -101,6 +105,14 @@ The videos mention the **`before-auth-impl`** branch. It is a snapshot of the pr
 <Callout type="info" title="Prompts and specs">
 The repository includes a `prompts.txt` file with every major prompt used in the videos, plus the spec files under `specs/`. You can type your own prompts, but if you want to follow along exactly, copy them from there. Always read a prompt before you run it, so you know what you are asking Claude to do.
 </Callout>
+
+## Try It Yourself
+
+Before moving to the next section, practise what you learned:
+
+1. Open the [live demo](https://telusko-app-923380018328.us-central1.run.app/) and log in as `admin`, then as `editor`. Note which buttons change.
+2. In one sentence each, write down the difference between "done" and "verified" for a task in your own work.
+3. Fetch the original frontend with `git checkout deffa7c -- frontend` and keep it in a new practice folder.
 
 ## Official references
 

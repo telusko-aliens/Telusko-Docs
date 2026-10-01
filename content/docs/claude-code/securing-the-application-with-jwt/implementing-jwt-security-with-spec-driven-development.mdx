@@ -136,12 +136,20 @@ Claude ran the smoke tests, but some acceptance criteria can only be checked by 
 
 ### In the browser
 
+<img src="/claude-code/app-login.webp" alt="Content Tracker login form" width={600} height={380} />
+
+*The new login form that replaces the role dropdown.*
+
+<img src="/claude-code/app-board-editor.webp" alt="Board logged in as Video Editor, Move Forward only on Recorded and Editing" width={1440} height={500} />
+
+*Logged in as editor: Move Forward appears only on Recorded and Editing, and a delete attempt is refused ("Only Admin can delete tasks."). The server enforces the same rules, so the UI cannot be bypassed.*
+
 | Test | Expected |
 | --- | --- |
 | Open the app | Login form appears |
 | Log in as `admin` / `admin123` | Board loads, delete is available |
 | Wrong password | Error message, no access |
-| Log in as `editor` / `editor123` | Can move cards only from Recorded and Editing, no delete |
+| Log in as `editor` / `editor123` | Can move cards only from Recorded and Editing, delete is refused |
 | Log out | Token cleared, back to login form |
 
 ### From the terminal
@@ -179,6 +187,10 @@ You can also paste a token into [jwt.io](https://jwt.io) to see the `sub`, `role
 In the video, deleting a task was still broken at the end of this step. It was a leftover bug from earlier experiments, not part of the security feature. It is honest to show that: real projects always have a bug list. Write it down, open an issue, and fix it in its own small change. (In the next section we use the GitHub MCP server to manage issues just like this.)
 </Callout>
 
+<Callout type="warn" title="A finding from reviewing this code">
+`app/core/config.py` reads `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` from the environment, but the login route in `app/api/v1/auth.py` uses its own hardcoded `_TOKEN_EXPIRE_MINUTES = 60`. So changing the variable has no effect. Every smoke test still passes, because 60 minutes is also the spec's value. This is exactly the kind of gap that only a human review catches: the feature is **done**, but not fully **verified**. The fix is one line: use `settings.access_token_expire_minutes` in `auth.py`.
+</Callout>
+
 ## Security notes for real projects
 
 Our implementation is a solid learning baseline. Before production, consider:
@@ -189,6 +201,15 @@ Our implementation is a solid learning baseline. Before production, consider:
 - **Out-of-scope items.** Refresh tokens, account lockout and password reset are real requirements for most apps. They each deserve their own spec.
 
 When everything checks out, commit and merge the branch.
+
+## Try It Yourself
+
+Before moving to the next section, practise what you learned:
+
+1. Run all five curl smoke tests and confirm every expected status code.
+2. Paste a token into [jwt.io](https://jwt.io), change the role in the payload, send the edited token, and confirm you get 401.
+3. Log in as each of the five demo users and check which cards each one can move.
+4. Set `JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1`, log in, and wait two minutes. You stay logged in. Find out why (hint: compare `app/core/config.py` with `app/api/v1/auth.py`), fix it with a small prompt, and test again.
 
 ## Official references
 

@@ -124,6 +124,15 @@ Add `.claude/worktrees/` to your `.gitignore` so worktree folders never show up 
 
 They also combine: a sub-agent with `isolation: worktree` in its frontmatter runs inside its own temporary worktree.
 
+## Try It Yourself
+
+Before moving to the next section, practise what you learned:
+
+1. Create the two sub-agents from this section and run them together. Check that both spec files exist and make sense.
+2. Run `/context` after the sub-agents finish and compare it with doing the same work in the main session.
+3. Start two sessions with `claude -w <name>` in two terminals, make a different change in each, and look at `git worktree list`.
+4. Exit both sessions and remove the worktrees cleanly.
+
 ## Official references
 
 - [Run parallel sessions with worktrees](https://code.claude.com/docs/en/worktrees)

@@ -154,6 +154,15 @@ Before moving on, run two commands you already know:
 - `/model` to confirm which model you are on
 - `/usage` to see how much of your session the demos used
 
+## Try It Yourself
+
+Before moving to the next section, practise what you learned:
+
+1. Start a session in Manual mode and press `Shift+Tab` until you have seen every mode at least once.
+2. Ask Claude to create two small files, change one of them, then use `/rewind` to restore the code from before the change.
+3. Let Claude delete a file with a shell command, try to rewind it, and confirm for yourself why it does not come back.
+4. Add a `deny` rule for `Read(**/.env)` to `.claude/settings.json` and ask Claude to read a `.env` file. Watch it get blocked.
+
 ## Official references
 
 - [Choose a permission mode](https://code.claude.com/docs/en/permission-modes)

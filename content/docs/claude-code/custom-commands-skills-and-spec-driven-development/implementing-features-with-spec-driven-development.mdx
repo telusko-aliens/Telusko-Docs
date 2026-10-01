@@ -228,6 +228,15 @@ For every new feature:
 
 You write the *what*. Claude writes the *how*. You verify both. That is spec-driven development.
 
+## Try It Yourself
+
+Before moving to the next section, practise what you learned:
+
+1. Create the `/telusko-status` skill with the opening `---` on line 1, and fix any permission error with `allowed-tools`.
+2. Use `/scaffold-endpoint` to add `GET /api/tasks/by-role/{role}` and check that it follows the existing patterns.
+3. Write a small spec of your own (for example "sort tasks by created date") using the template, then run `/implement-spec` on it.
+4. Remove the Acceptance criteria section from your spec and confirm the skill refuses to implement it.
+
 ## Official references
 
 - [Extend Claude with skills](https://code.claude.com/docs/en/skills)

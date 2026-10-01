@@ -44,6 +44,8 @@ The same menu as pressing `Esc` twice. Restore code, the conversation, or both t
 
 Each conversation with Claude Code is a **session**, saved locally under `~/.claude/projects/`. You can name sessions, leave them and come back later.
 
+<img src="/claude-code/session-lifecycle.svg" alt="Lifecycle of a healthy Claude Code session" width={960} height={360} />
+
 ### `/rename`
 
 By default, a session is labelled with the start of your first message, which is not very helpful when the first message was "hi". Give it a proper name:
@@ -123,6 +125,15 @@ And three keyboard shortcuts you should know by heart:
 | `Shift+Tab` | Cycle permission modes |
 | `Esc` | Stop Claude. Press twice on an empty prompt to rewind |
 | `Ctrl+O` | Open the detailed transcript view |
+
+## Try It Yourself
+
+Before moving to the next section, practise what you learned:
+
+1. Run `/context` at the start of a session and again after a few prompts. Note which category grew.
+2. Use `/btw` for a side question and confirm with `/context` that the conversation did not grow.
+3. Name a session with `/rename`, exit, and come back to it with `claude --resume <name>`.
+4. Run `/compact` with your own focus text and read the summary it creates.
 
 ## Official references
 

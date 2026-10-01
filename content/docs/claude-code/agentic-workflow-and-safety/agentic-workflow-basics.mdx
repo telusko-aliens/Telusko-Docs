@@ -93,6 +93,10 @@ The **Telusko Workflow Engine** opens in the browser:
 
 Try clicking **Move Forward**. Nothing changes, and an error toast appears. That is expected. The frontend calls an `api` layer that uses a `mockFetch` function, and `mockFetch` deliberately always fails. There is no backend yet.
 
+<img src="/claude-code/app-starter-board-error.webp" alt="Starter Content Tracker board showing a backend connection error toast" width={1440} height={500} />
+
+*The starter board. Clicking Move Forward shows the "Cannot connect to backend" error, because no backend exists yet.*
+
 ```javascript title="frontend/app.js"
 function mockFetch(url, options = {}) {
   return new Promise((_, reject) => {

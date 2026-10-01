@@ -46,6 +46,8 @@ us-central1-docker.pkg.dev / telusko-content-tracker / telusko-repo / telusko-ap
 └──── region + registry ───┘ └──── project ID ──────┘ └── repo ───┘ └── image:tag ──┘
 ```
 
+<img src="/claude-code/artifact-image-path.svg" alt="Parts of an Artifact Registry image path" width={960} height={300} />
+
 Cloud Build uploads your project, runs the Dockerfile in Google Cloud, and pushes the finished image to the repository. You see the same steps as your local build in the logs.
 
 ## Step 4: Deploy to Cloud Run
@@ -110,7 +112,7 @@ Open the Service URL. Cloud Run gives you **HTTPS** automatically.
 | --- | --- |
 | Open the URL | Login page |
 | `admin` / `admin123` | Full board, delete available |
-| `editor` / `editor123` | Can move cards from Recorded and Editing only, cannot move back, no delete |
+| `editor` / `editor123` | Can move cards from Recorded and Editing only, cannot move back, deleting is refused |
 | Logout | Back to the login page |
 
 The Content Tracker is live. A deployed demo of the finished app is available at [telusko-app-923380018328.us-central1.run.app](https://telusko-app-923380018328.us-central1.run.app/).
@@ -149,6 +151,15 @@ Look back at the whole journey:
 | 12 | Docker and deployment to Google Cloud Run |
 
 Around 90% of the work was done by Claude Code. The other 10% was yours: the specs, the decisions, the reviews, the secrets and the final merges. That 10% is what makes the result trustworthy. Use AI to move fast, but keep the understanding and the control. That is what makes you a developer, not just a prompt writer.
+
+## Try It Yourself
+
+Before moving to the next section, practise what you learned:
+
+1. Deploy your own copy and open the Service URL on your phone to confirm HTTPS works.
+2. Deploy a small change and look at the new revision in the Cloud Run console.
+3. Restart the service (or deploy again), then check whether a task you created is still there. Explain the result.
+4. Delete the service when you are done, so it does not cost anything.
 
 ## Official references
 
