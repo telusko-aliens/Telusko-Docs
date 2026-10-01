@@ -15,15 +15,15 @@ This is also how most real work looks. You rarely start from an empty folder. Yo
 
 ## Step 1: Get the project
 
-Clone the repository and switch to the starter branch:
+Clone the repository and take the original frontend from its first commit:
 
 ```bash
 git clone https://github.com/navinreddy20/content-tracker.git
 cd content-tracker
-git switch before-auth-impl
+git checkout deffa7c -- frontend
 ```
 
-Take only the `frontend/` folder into your own project folder. Your starting structure should look like this:
+Copy only the `frontend/` folder into your own project folder. Your starting structure should look like this:
 
 ```text
 content-tracker/
@@ -77,7 +77,7 @@ Do you want to proceed?
 | **Yes, and don't ask again** | Save an allow rule so similar commands run without asking in this project |
 | **No** | Cancel, and tell Claude what to do instead |
 
-Choose **Yes** for now. We will cover what "don't ask again" saves, and where, in [Permissions and Checkpoints](/docs/claude-code/agentic-workflow-and-safety/permissions-and-checkpoints).
+Choose **Yes** for now. (The exact wording of the options can differ slightly between versions.) We will cover what "don't ask again" saves, and where, in [Permissions and Checkpoints](/docs/claude-code/agentic-workflow-and-safety/permissions-and-checkpoints).
 
 <Callout type="info" title="Claude Code is not only for chatting">
 The prompt box is not just a chat. Claude can execute real shell commands on your machine. That is what makes it powerful, and why the permission prompt exists. You can also run a shell command yourself by starting your input with `!`, for example `!git status`.
@@ -87,8 +87,8 @@ The prompt box is not just a chat. Claude can execute real shell commands on you
 
 The **Telusko Workflow Engine** opens in the browser:
 
-- Five columns: **Code Ready**, **Recorded**, **Editing**, **Uploaded** and **Published**
-- A role selector with **Admin**, **Content**, **Editor** and **Uploader**
+- Five columns: **Code & Examples Ready**, **Recorded**, **Editing in Progress**, **Uploaded (Pending Verify)** and **Verified & Published**
+- A role selector with **Admin**, **Content Team**, **Video Editor** and **Uploader**
 - Cards with a **Move Forward** button, plus drag-and-drop for Admin
 
 Try clicking **Move Forward**. Nothing changes, and an error toast appears. That is expected. The frontend calls an `api` layer that uses a `mockFetch` function, and `mockFetch` deliberately always fails. There is no backend yet.

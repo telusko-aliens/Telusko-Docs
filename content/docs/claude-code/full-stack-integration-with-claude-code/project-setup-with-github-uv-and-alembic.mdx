@@ -127,7 +127,7 @@ Watch what Claude does and approve each step:
 - Adds dependencies with uv
 - Creates the folder structure
 - Initialises **Alembic**, the migration tool for SQLAlchemy. Alembic reads your models and generates the SQL to create or change tables, so you never write `CREATE TABLE` by hand
-- Notices that the contract uses camelCase on the wire and that SQLAlchemy needs the async extras
+- Sets up the async database extras that SQLAlchemy needs for SQLite (`sqlalchemy[asyncio]`, `aiosqlite`)
 
 The result is a skeleton with empty files where the real code will go:
 

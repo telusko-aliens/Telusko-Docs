@@ -85,7 +85,7 @@ Markdown summary with:
 | `argument-hint` | `<verb> <path>` | Shown while typing the command, so you remember what to pass |
 | `disable-model-invocation` | `true` | Claude never runs this on its own. Scaffolding changes code, so only **you** trigger it |
 | `allowed-tools` | `Read Write Edit Grep Glob Bash(curl *) Bash(uv run *) Bash(git diff *)` | Exactly the tools the job needs, pre-approved while the skill runs |
-| `paths` | `backend/**` | Ties the skill to backend files (it affects automatic loading) |
+| `paths` | `backend/**` | Limits automatic loading to backend files. Because `disable-model-invocation` is `true`, Claude never auto-loads this skill anyway, so here it mainly documents intent. It matters for skills Claude is allowed to load on its own |
 
 And in the body:
 

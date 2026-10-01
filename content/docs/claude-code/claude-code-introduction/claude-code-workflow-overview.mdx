@@ -32,7 +32,7 @@ That is a pipeline with different people at different stages. You could track it
 | Database | SQLite through SQLAlchemy 2.0 (async) |
 | Migrations | Alembic |
 | Validation | Pydantic v2 |
-| Security | JWT (python-jose) and bcrypt password hashing (passlib) |
+| Security | JWT (python-jose) and bcrypt password hashing |
 | Package manager | uv |
 | Deployment | Docker, Google Artifact Registry, Google Cloud Run |
 
@@ -84,15 +84,19 @@ The final project lives in this repository:
   <Card title="navinreddy20/content-tracker" href="https://github.com/navinreddy20/content-tracker" description="Final source code, specs, skills, sub-agents and prompts" />
 </Cards>
 
-The `main` branch contains the finished application, including the updated login UI. To follow along from the beginning, start from the **`before-auth-impl`** branch and take only the `frontend/` folder. The backend is what we build together.
+The `main` branch contains the finished application, including the login UI. To build along from the very beginning, you only need the original `frontend/` folder. It is in the repository's **first commit**, where `mockFetch` still fails on purpose:
 
 ```bash
 git clone https://github.com/navinreddy20/content-tracker.git
 cd content-tracker
-git switch before-auth-impl
+git checkout deffa7c -- frontend
 ```
 
-Then copy the `frontend/` folder into your own fresh project folder and initialise a new git repository there.
+Copy that `frontend/` folder into your own fresh project folder and initialise a new git repository there. The backend is what we build together.
+
+<Callout type="info" title="About the before-auth-impl branch">
+The videos mention the **`before-auth-impl`** branch. It is a snapshot of the project just **before** the security section: the backend is built and the frontend is already connected to it. Use it if you want to jump straight to Section 10, or to compare your work with a reference. If you take the frontend from that branch, the "Frontend Wiring" step in Section 8 is already done.
+</Callout>
 
 <Callout type="info" title="Prompts and specs">
 The repository includes a `prompts.txt` file with every major prompt used in the videos, plus the spec files under `specs/`. You can type your own prompts, but if you want to follow along exactly, copy them from there. Always read a prompt before you run it, so you know what you are asking Claude to do.
