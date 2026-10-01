@@ -1,0 +1,8 @@
+{
+    "title": "Project Memory",
+    "pages": [
+        "project-memory-basics.mdx",
+        "working-with-claude-md.mdx",
+        "testing-project-memory.mdx"
+    ]
+}

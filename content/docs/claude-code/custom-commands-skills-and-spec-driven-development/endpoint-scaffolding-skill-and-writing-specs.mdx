@@ -1,0 +1,145 @@
+---
+title: Endpoint Scaffolding Skill and Writing Specs
+description: Build a /scaffold-endpoint skill with arguments, tool restrictions and hard rules, use it to add a new endpoint, and see why the next step is writing specs.
+---
+
+The status skill was a warm-up. Now let us build a skill that does real work: **scaffolding a new API endpoint** end to end, following every convention we have set so far.
+
+## Create the skill
+
+```text
+.claude/skills/scaffold-endpoint/SKILL.md
+```
+
+```markdown title=".claude/skills/scaffold-endpoint/SKILL.md"
+---
+description: Scaffold a new FastAPI endpoint end-to-end for the Telusko Workflow Engine. Reads the existing API contract, adds schemas, service method, route handler, and generates a curl smoke test. Use this whenever a new endpoint needs to be added to backend/app/api/v1/.
+argument-hint: <verb> <path>
+disable-model-invocation: true
+allowed-tools: Read Write Edit Grep Glob Bash(curl *) Bash(uv run *) Bash(git diff *)
+paths: backend/**
+---
+
+You are scaffolding a new endpoint for the Telusko Workflow Engine.
+
+## Input
+The user provided: $ARGUMENTS
+
+If $ARGUMENTS is empty, stop and ask for:
+- HTTP verb (GET / POST / PUT / DELETE)
+- Path (for example: /api/tasks/by-role/{role})
+
+## Current branch
+!`git branch --show-current`
+
+## Required reading before scaffolding
+1. specs/api-contract.md: contract style, status codes, error patterns
+2. backend/app/api/v1/tasks.py: existing endpoint patterns to match
+3. backend/app/services/task_service.py: service layer conventions
+4. backend/app/schemas/task.py: existing Pydantic v2 schemas
+5. CLAUDE.md: project-wide rules
+
+## Steps
+
+### 1. Confirm understanding
+Print one line:
+"Scaffolding $ARGUMENTS, adding [schema/service/route/smoke-test]."
+
+### 2. Add Pydantic schema (only if a new shape is needed)
+Use Pydantic v2 syntax. model_config, not class Config.
+
+### 3. Add service method
+In backend/app/services/task_service.py. Async SQLAlchemy 2.0: select(), not query().
+The service knows nothing about HTTP.
+
+### 4. Add route handler
+In backend/app/api/v1/tasks.py. Match the status code conventions:
+- GET: 200
+- POST: 201
+- PUT: 200
+- DELETE: 204 (no body)
+Use HTTPException with explicit messages.
+
+### 5. Generate smoke test
+Output a curl command that exercises the new endpoint.
+Show the expected response shape based on the schema.
+
+### 6. Report
+Markdown summary with:
+- Files modified (one-line description each)
+- The curl command
+- TODOs (e.g., "add this endpoint to specs/api-contract.md if it is permanent")
+
+## Hard rules
+- Do NOT modify frontend/. Backend only
+- Do NOT modify specs/. Those are immutable contracts
+- Do NOT run alembic. Schema changes are a separate task
+- If the request requires a model change, STOP and tell the user this is out of scope
+```
+
+## Every field explained
+
+| Field | Value | Why |
+| --- | --- | --- |
+| `description` | What it does and when to use it | Shown in the `/` menu and helps Claude understand the skill |
+| `argument-hint` | `<verb> <path>` | Shown while typing the command, so you remember what to pass |
+| `disable-model-invocation` | `true` | Claude never runs this on its own. Scaffolding changes code, so only **you** trigger it |
+| `allowed-tools` | `Read Write Edit Grep Glob Bash(curl *) Bash(uv run *) Bash(git diff *)` | Exactly the tools the job needs, pre-approved while the skill runs |
+| `paths` | `backend/**` | Ties the skill to backend files (it affects automatic loading) |
+
+And in the body:
+
+| Element | Purpose |
+| --- | --- |
+| `$ARGUMENTS` | Replaced with whatever you type after the command, for example `GET /api/tasks/by-role/{role}` |
+| `` !`git branch --show-current` `` | Injects the current branch, so Claude knows where it is working |
+| **Required reading** | Points Claude at the files that define our patterns, instead of letting it guess |
+| **Steps** | The same rules from our CRUD prompt, now written once and reused forever |
+| **Hard rules** | Clear boundaries: no frontend changes, no spec changes, no migrations |
+
+<Callout type="info" title="Writing skills is a skill">
+You do not have to write these from scratch. You can ask Claude to draft a skill for you. But always read every line before you use it. A skill is a set of instructions that will run again and again, so a mistake in it repeats every time.
+</Callout>
+
+## Use it
+
+Type `/scaffold` and the command autocompletes. Pass the verb and path:
+
+```text
+/scaffold-endpoint GET /api/tasks/by-role/{role}
+```
+
+Claude follows the steps exactly:
+
+1. Prints a one-line confirmation of what it is scaffolding
+2. Reads the contract and existing code
+3. Adds `get_tasks_by_role()` to the service
+4. Adds the route in `api/v1/tasks.py`, calling that service method
+5. Runs a `curl` smoke test, including an unknown role
+6. Reports the files changed and the test command
+
+<Callout type="warn" title="When the smoke test gets stuck">
+In the video the smoke test took a long time: the backend was started with auto-reload, an older server process was still holding the port, and Claude spent a while finding and restarting it. This is a good reason to have a skill (or a recorded `/run` recipe) that knows exactly how to start, stop and restart your servers. And always check `/context` before long tasks.
+</Callout>
+
+Check the result yourself: open `api/v1/tasks.py` and `task_service.py` and confirm the new endpoint follows the same pattern as the others.
+
+## The next step: specs instead of prompts
+
+Look at what we have been doing: for every feature we wrote a careful prompt with requirements, rules and restrictions. That is a specification, just hidden inside a chat message.
+
+What if we made it explicit?
+
+1. Write each feature as a proper **spec file** under `specs/features/`
+2. Create a skill whose only job is to **implement a spec**
+3. For every new feature: write the spec, run the skill, verify the result
+
+This is how serious software teams work: specification and design first, implementation second. With Claude Code, the implementation step becomes fast and repeatable, and the spec becomes the shared source of truth for Claude and for you.
+
+That is what we build in the next lesson.
+
+## Official references
+
+- [Pass arguments to skills](https://code.claude.com/docs/en/skills#pass-arguments-to-skills)
+- [Control who invokes a skill](https://code.claude.com/docs/en/skills#control-who-invokes-a-skill)
+- [Frontmatter reference](https://code.claude.com/docs/en/skills#frontmatter-reference)

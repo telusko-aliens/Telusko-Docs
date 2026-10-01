@@ -1,0 +1,9 @@
+{
+    "title": "GitHub MCP Server Integration",
+    "pages": [
+        "working-with-github-without-mcp.mdx",
+        "what-is-mcp-and-how-it-works.mdx",
+        "configuring-the-github-mcp-server.mdx",
+        "implementing-github-issue-changes.mdx"
+    ]
+}

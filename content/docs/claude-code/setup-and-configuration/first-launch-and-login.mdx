@@ -1,0 +1,116 @@
+---
+title: First Launch and Login
+description: Walk through the first-run setup, log in with a subscription or a Console account, and see how model choice affects what you spend.
+---
+
+The first time you run `claude`, it walks you through a short setup: pick a theme, log in, and trust the folder. Let us go through each step and also see, with real numbers, why your choice of login and model matters.
+
+## The first-run flow
+
+<Steps>
+<Step>
+### Choose a theme
+
+Pick the colour theme that is easiest to read in your terminal, such as dark or light mode. You can change it later with `/config` or `/theme`.
+</Step>
+<Step>
+### Choose how to log in
+
+Claude Code shows the available login methods:
+
+| Option | When to use it |
+| --- | --- |
+| **Claude account with subscription** | You have Pro, Max, Team or Enterprise |
+| **Anthropic Console account** | You want to pay per token using API credits |
+| **3rd-party platform** | Your company uses Amazon Bedrock, Google Cloud or Microsoft Foundry |
+</Step>
+<Step>
+### Authorize in the browser
+
+Claude Code opens a browser window. Sign in and click **Authorize**. The terminal then shows `Login successful`.
+
+If the browser does not open, press `c` to copy the login URL and paste it into a browser yourself. In WSL, SSH sessions or containers, the browser may show a code instead. Paste that code back into the terminal.
+</Step>
+<Step>
+### Trust the folder
+
+Confirm that you trust the current folder. Claude Code is now ready.
+</Step>
+</Steps>
+
+<Callout type="info">
+If the `ANTHROPIC_API_KEY` environment variable is set on your machine, Claude Code skips the login screen and asks whether you want to use that key instead. Keep this in mind if you have an old key in your environment and wonder why you are being billed through the API.
+</Callout>
+
+## Logging in with a Console account (API credits)
+
+If you choose the Console option, your usage is billed against the credit balance in your [Claude Console](https://platform.claude.com/). You need credits before anything works. Even a successful login fails on the first request if your balance is zero.
+
+Open the **Billing** page in the Console to add credits. For learning purposes, around $5 goes a long way, as long as you are careful with model choice.
+
+<Callout type="warn" title="Turn off auto-reload">
+The Console can automatically top up your balance when it runs low. While you are learning, keep **auto-reload disabled**. Otherwise a long-running session or a mistake in a script can keep charging your card without you noticing.
+</Callout>
+
+### A quick experiment: how fast does money go?
+
+In the video we logged in with a Console account and asked Claude Code to build an e-commerce project in Go, a language that was not even installed on the machine. Claude asked a few clarifying questions (API or HTML templates, in-memory storage or a database, which features), then started planning.
+
+Within a few moments, about **nine cents** had been spent. Nothing had been built yet. That is because the default model for API accounts at that time was **Opus**, the most capable and most expensive model.
+
+The lesson is not "the API is bad". The lesson is: **know which model you are running**.
+
+## Switching models to control cost
+
+Type `/model` at the prompt to open the model picker:
+
+```text
+/model
+```
+
+You will see options such as **Default**, **Opus**, **Sonnet** and **Haiku**. Use the arrow keys to select one. For many models you can also adjust the **effort level** with the left and right arrow keys (more on effort in the next lesson).
+
+You can also switch directly:
+
+```text
+/model sonnet
+```
+
+| Model | Strength | Cost |
+| --- | --- | --- |
+| Opus | Deep reasoning, planning, architecture | Highest |
+| Sonnet | Strong everyday coding | Medium |
+| Haiku | Fast answers, simple tasks | Lowest |
+
+<Callout type="info" title="Defaults change over time">
+In the videos, API accounts defaulted to Opus while the Pro subscription defaulted to Sonnet 4.6. Anthropic updates these defaults as new models ship, so what you see may differ. Run `/model` or `/status` to see exactly which model your session uses right now.
+</Callout>
+
+## Switching to the subscription
+
+To move from the Console account to your subscription:
+
+```text
+/logout
+```
+
+Then start Claude Code again with `claude`, pick **Claude account with subscription**, and authorize in the browser. Now your work counts against your plan's usage limit instead of your credit balance.
+
+You can also run `/login` while already logged in to switch accounts. Press `Esc` to cancel any command you opened by mistake.
+
+## Commands from this lesson
+
+| Command | What it does |
+| --- | --- |
+| `claude` | Start Claude Code in the current folder |
+| `/login` | Sign in or switch accounts |
+| `/logout` | Sign out (the next launch walks you through setup again) |
+| `/model` | Open the model picker, or pass a model name to switch directly |
+| `/status` | Show version, model, account and connectivity |
+| `Esc` | Cancel the current command or interrupt Claude |
+
+## Official references
+
+- [Authentication](https://code.claude.com/docs/en/authentication)
+- [Model configuration](https://code.claude.com/docs/en/model-config)
+- [Manage costs effectively](https://code.claude.com/docs/en/costs)

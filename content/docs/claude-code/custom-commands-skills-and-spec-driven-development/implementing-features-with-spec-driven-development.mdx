@@ -1,0 +1,199 @@
+---
+title: Implementing Features with Spec-Driven Development
+description: Write a feature spec with acceptance criteria and scope, build an /implement-spec skill that refuses specs without criteria, and implement task filtering from the spec.
+---
+
+We now combine everything: a **spec file** that describes a feature, and a **skill** that implements any spec it is given.
+
+<img src="/claude-code/spec-driven-flow.svg" alt="Spec-driven development loop" width={960} height={440} />
+
+## Part 1: Write the spec
+
+Create a folder for feature specs and a file for our first feature:
+
+```text
+specs/features/task-filtering.md
+```
+
+```markdown title="specs/features/task-filtering.md"
+# Feature: Task filtering on GET /api/tasks
+
+## What it does
+Adds query parameter support to GET /api/tasks so the frontend can
+request a filtered subset of tasks instead of always getting all of them.
+
+## Why we need it
+As the project grows, returning every task on every page load will
+become slow. Filtering by state and assigned_role lets the frontend
+fetch only what it needs for the current view.
+
+## Behaviour
+
+### GET /api/tasks (no params): unchanged
+Returns all tasks. Existing behaviour preserved exactly.
+
+### GET /api/tasks?state=editing
+Returns tasks where state == "editing".
+Invalid state values → 400 with body: {"detail": "invalid state: <value>"}
+
+### GET /api/tasks?assigned_role=Editor
+Returns tasks where assigned_role == "Editor".
+Invalid role values → 400 with body: {"detail": "invalid role: <value>"}
+
+### GET /api/tasks?state=editing&assigned_role=Editor
+Both filters applied (AND).
+
+## Acceptance criteria
+- Existing GET /api/tasks calls continue to return all tasks
+- Invalid state or role returns 400 with a clear error message
+- Valid filter returns 200 with the filtered list (empty array allowed)
+- Per-task response shape is unchanged, the frontend code does NOT change
+- The route remains in backend/app/api/v1/tasks.py
+
+## Out of scope
+- Pagination (separate spec)
+- Sorting (separate spec)
+- Date range filtering (separate spec)
+
+## Smoke test (all must pass)
+curl -s "http://localhost:8000/api/tasks?state=editing" | python -m json.tool
+curl -s "http://localhost:8000/api/tasks?state=invalid" -w "\nStatus: %{http_code}\n"
+curl -s "http://localhost:8000/api/tasks?assigned_role=Editor" | python -m json.tool
+curl -s "http://localhost:8000/api/tasks" | python -m json.tool   # must still return all
+```
+
+### Anatomy of a good spec
+
+| Section | Why it matters |
+| --- | --- |
+| **What it does** | One clear statement of the feature |
+| **Why we need it** | Context, so decisions in the code make sense |
+| **Behaviour** | Exact inputs, outputs and error responses, including status codes and error bodies |
+| **Acceptance criteria** | A checklist that defines "done". These become your tests |
+| **Out of scope** | What must **not** be built, even if it looks like a natural addition |
+| **Smoke test** | Concrete commands to verify the result |
+
+<Callout type="warn" title="A spec is only as good as its details">
+In the video, the spec used `video_editor` as the role value, but our model's roles are `Admin`, `Content`, `Editor` and `Uploader`. The implementation was correct, but the smoke test failed because the **spec** was wrong. Claude flagged it for human review. The version above uses the real value, `Editor`. Before you write a spec, check the actual enum values in your models.
+</Callout>
+
+## Part 2: Build the `/implement-spec` skill
+
+```text
+.claude/skills/implement-spec/SKILL.md
+```
+
+```markdown title=".claude/skills/implement-spec/SKILL.md"
+---
+description: Implement a feature described in a markdown spec file anywhere under specs. Reads the spec, builds the feature end-to-end across schemas, service, and routes, and runs the smoke tests from the spec. Use when the user provides a spec file path.
+argument-hint: <path-to-spec-file>
+disable-model-invocation: true
+allowed-tools: Read Write Edit Grep Glob Bash(curl *) Bash(uv run *) Bash(git diff *)
+---
+
+You are implementing a feature from a markdown specification.
+
+## Input
+The spec file path is in $ARGUMENTS.
+Example: /implement-spec specs/features/task-filtering.md
+
+## Required reading
+1. The spec file at $ARGUMENTS. This is your source of truth
+2. CLAUDE.md: project conventions
+3. backend/app/api/v1/tasks.py: existing endpoint patterns
+4. backend/app/services/task_service.py: service patterns
+5. backend/app/schemas/task.py: schema patterns
+6. specs/api-contract.md: the overall contract
+
+## Steps
+
+### 1. Restate the spec
+Print one line: "Implementing <feature-name>: <one-line behaviour>"
+This proves you read the spec, not guessed it.
+
+### 2. Extract acceptance criteria
+List them. These are your tests.
+If the spec has no acceptance criteria section, STOP. Tell the user
+the spec needs acceptance criteria before implementation.
+
+### 3. Extract out-of-scope items
+List them. These are NOT part of this work.
+Do not implement them even if they seem like natural additions.
+
+### 4. Implement
+Touch only the files needed. Match existing patterns in each file.
+Pydantic v2. Async SQLAlchemy. snake_case Python. CLAUDE.md conventions.
+
+### 5. Run smoke tests from the spec
+Skip this step by default. Only run if the user explicitly passes `--test` in the arguments.
+
+If `--test` is passed: execute every curl command in the spec's smoke test section,
+show actual output for each, and PASS or FAIL each against the spec's expectation.
+
+### 6. Report
+Output markdown with:
+- Spec implemented (path)
+- Files modified (one line each)
+- Smoke test results (pass/fail per test, with actual output)
+- Acceptance criteria items that could NOT be tested via curl, flagged for human review
+
+## Hard rules
+- The spec is the source of truth. Do not add behaviour the spec does not describe.
+- Do not modify the spec file itself.
+- Do not modify frontend/ unless the spec explicitly says so.
+- If the spec is ambiguous, STOP and ask the user to clarify and update the spec.
+```
+
+### The design choices that make this skill reliable
+
+| Rule | Effect |
+| --- | --- |
+| **Restate the spec in one line** | Proves Claude read the actual file instead of guessing from the name |
+| **No acceptance criteria, no implementation** | Forces you to define "done" before any code is written. This is what good engineers do |
+| **List out-of-scope items** | Stops scope creep: no surprise pagination or sorting |
+| **Smoke tests only with `--test`** | Lets you implement quickly, then test when the backend is running |
+| **Do not modify the spec** | The spec stays a stable contract. If it is wrong, **you** fix it |
+| **Stop when ambiguous** | Claude asks instead of inventing behaviour |
+
+## Part 3: Implement the feature
+
+Start a fresh session, switch to Sonnet, and run:
+
+```text
+/implement-spec specs/features/task-filtering.md --test
+```
+
+Claude:
+
+1. Prints a one-line restatement, something like `Implementing task filtering: optional state and assigned_role filters on GET /api/tasks`
+2. Lists the five acceptance criteria and the three out-of-scope items
+3. Adds optional `state` and `assigned_role` query parameters to the route, and the filtering logic to the service
+4. Starts the backend if it is not running, and runs each smoke test
+5. Reports the files changed, pass or fail for each test, and anything that needs a human
+
+Then review the diff yourself:
+
+```text
+/diff
+```
+
+You should see the new query parameters in `api/v1/tasks.py` and a filtered query in `task_service.py`, and nothing else.
+
+## The workflow from now on
+
+For every new feature:
+
+1. **Write the spec** in `specs/features/`, with acceptance criteria and out-of-scope items
+2. **Run** `/implement-spec <path> --test`
+3. **Review** the report and the diff
+4. If something is wrong in the spec, **fix the spec** and run it again
+5. Commit, merge, move on
+
+You write the *what*. Claude writes the *how*. You verify both. That is spec-driven development.
+
+## Official references
+
+- [Extend Claude with skills](https://code.claude.com/docs/en/skills)
+- [Pass arguments to skills](https://code.claude.com/docs/en/skills#pass-arguments-to-skills)
+- [Best practices for Claude Code](https://code.claude.com/docs/en/best-practices)
+- [FastAPI: query parameters](https://fastapi.tiangolo.com/tutorial/query-params/)

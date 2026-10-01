@@ -11,6 +11,7 @@
         "docker",
         "system-design",
         "git",
-        "linux"
+        "linux",
+        "claude-code"
     ]
 }

@@ -1,0 +1,96 @@
+---
+title: Google Cloud Project and SDK Setup
+description: Create a Google Cloud project, install and initialise the Google Cloud CLI, authenticate, and verify the configuration from VS Code.
+---
+
+The image works locally. Now we prepare Google Cloud: a **project** to hold everything, and the **Google Cloud CLI** (`gcloud`) to control it from the terminal.
+
+## Step 1: Create a project
+
+<Steps>
+<Step>
+### Open the console
+
+Go to the [Google Cloud console](https://console.cloud.google.com/) and sign in with your Google account.
+</Step>
+<Step>
+### Create a new project
+
+Click the project picker at the top, then **New project**. Enter a name, for example `telusko-content-tracker`. Leave **Organization** empty if you do not have one, and click **Create**.
+</Step>
+<Step>
+### Note the project ID
+
+Google shows a **project ID** below the name. It must be globally unique, so it may differ slightly from the name. Every `gcloud` command uses the **project ID**, not the name. Save it next to the image name from the previous lesson.
+</Step>
+</Steps>
+
+<Callout type="info" title="Billing">
+Cloud Run, Cloud Build and Artifact Registry need billing enabled on the project, even if your usage stays within the free tier. Check **Billing** in the console and set a **budget alert** so you are notified long before any surprise.
+</Callout>
+
+## Step 2: Install the Google Cloud CLI
+
+Download the installer for your OS from the [official install page](https://cloud.google.com/sdk/docs/install):
+
+| OS | How |
+| --- | --- |
+| Windows | Run the **Google Cloud CLI installer**. Keep the option to add `gcloud` to your `PATH` |
+| macOS | Download the archive and run the install script, or use Homebrew |
+| Linux | Use the package for your distribution, or the archive |
+
+At the end, the installer starts `gcloud init`. It asks you to log in with your Google account and pick a project. If your new project is not in the list, choose to **enter a project ID** and type it.
+
+## Step 3: Make `gcloud` available in VS Code
+
+The VS Code terminal may not see the new `PATH` yet. If `gcloud` is "not recognized":
+
+1. Close **all** VS Code windows (not just the terminal tab)
+2. Reopen VS Code and open a new terminal
+
+Then check:
+
+```bash
+gcloud --version
+```
+
+Restart Claude Code in that new terminal too, and switch back to Sonnet with `/model sonnet` if needed.
+
+## Step 4: Authenticate
+
+```bash
+gcloud auth login
+```
+
+A browser window opens. Pick your account and click **Allow**.
+
+Set the project for all following commands (use your own project ID):
+
+```bash
+gcloud config set project telusko-content-tracker
+```
+
+Also set **application default credentials**, which tools and libraries use to call Google APIs:
+
+```bash
+gcloud auth application-default login
+```
+
+## Step 5: Verify
+
+```bash
+gcloud config list
+```
+
+You should see your **account** and your **project** ID. If both are right, the setup is done.
+
+<Callout type="info" title="Should Claude Code run these commands?">
+It can, and for repetitive commands that is useful. But login flows open a browser and need your decisions, so they are easier to run yourself with `!` or in a normal terminal. Commands that would put credentials or secrets in the conversation should always be run by you, outside Claude.
+</Callout>
+
+## Official references
+
+- [Install the Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
+- [Initialize the gcloud CLI](https://cloud.google.com/sdk/docs/initializing)
+- [Creating and managing projects](https://cloud.google.com/resource-manager/docs/creating-managing-projects)
+- [Create a budget alert](https://cloud.google.com/billing/docs/how-to/budgets)

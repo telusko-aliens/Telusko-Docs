@@ -1,0 +1,8 @@
+{
+    "title": "Agentic Workflow and Safety",
+    "pages": [
+        "agentic-workflow-basics.mdx",
+        "agentic-loop-demo.mdx",
+        "permissions-and-checkpoints.mdx"
+    ]
+}

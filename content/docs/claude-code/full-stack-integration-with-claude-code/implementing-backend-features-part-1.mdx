@@ -1,0 +1,189 @@
+---
+title: Implementing Backend Features - Part 1
+description: Build the Task model, Pydantic v2 schemas and async database engine from the specs, configure Alembic for async SQLAlchemy, and run the first migration.
+---
+
+The skeleton is in place. Now we fill in the data layer: the database model, the request and response schemas, the async database engine and the first migration. All of it is driven by the two spec files.
+
+## Branch and session
+
+```text
+!git checkout -b feature/task-model
+/clear
+```
+
+<Callout type="info">
+In the video the `/clear` step was skipped here, and for two small features it was fine. As a habit, still start every feature with a clean context. It costs nothing and avoids surprises.
+</Callout>
+
+## Step 1: Model, schemas and database engine
+
+```text title="Prompt: task model"
+Read @specs/api-contract.md and @specs/seed-data.json.
+
+Create the SQLAlchemy 2.0 async Task model in backend/app/models/task.py.
+Field names must exactly match the snake_case keys in seed-data.json.
+State and assigned_role must be Python Enums.
+
+Create corresponding Pydantic v2 schemas in backend/app/schemas/task.py:
+  - TaskCreate (request body for POST)
+  - TaskUpdate (request body for PUT, all fields optional)
+  - TaskResponse (response body for all endpoints)
+
+Set up the async database engine using SQLite with aiosqlite.
+Include a get_db dependency for FastAPI.
+```
+
+Every line of this prompt removes a guess. "Field names must exactly match the snake_case keys" stops Claude from inventing its own names. "State and assigned_role must be Python Enums" means invalid values are rejected automatically.
+
+### What Claude built
+
+**The model** uses SQLAlchemy 2.0's typed `Mapped[...]` style, with enums that mirror the frontend's `STATES` and `ROLE_CONFIG`:
+
+```python title="backend/app/models/task.py (trimmed)"
+class AssignedRole(str, enum.Enum):
+    Admin = "Admin"
+    Content = "Content"
+    Editor = "Editor"
+    Uploader = "Uploader"
+
+
+class TaskState(str, enum.Enum):
+    code_ready = "code_ready"
+    recorded = "recorded"
+    editing = "editing"
+    uploaded = "uploaded"
+    published = "published"
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    assigned_role: Mapped[AssignedRole] = mapped_column(
+        SAEnum(AssignedRole, native_enum=False, length=32), nullable=False
+    )
+    state: Mapped[TaskState] = mapped_column(
+        SAEnum(TaskState, native_enum=False, length=32),
+        nullable=False,
+        default=TaskState.code_ready,
+    )
+    created_at: Mapped[date] = mapped_column(Date, nullable=False)
+```
+
+**The schemas** solve the camelCase problem the API contract warned us about. The backend uses `snake_case` internally, but the frontend reads `assignedRole` and `createdAt`. Pydantic's alias generator converts between the two:
+
+```python title="backend/app/schemas/task.py (trimmed)"
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
+
+
+class _CamelBase(BaseModel):
+    # snake_case in Python, camelCase on the wire
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
+class TaskCreate(_CamelBase):
+    title: str = Field(..., min_length=1)
+    description: str = Field(default="")
+    assigned_role: AssignedRole
+    state: TaskState = Field(default=TaskState.code_ready)
+
+
+class TaskUpdate(_CamelBase):
+    # every field optional, so the frontend can send only {"state": "editing"}
+    title: str | None = Field(default=None, min_length=1)
+    description: str | None = None
+    assigned_role: AssignedRole | None = None
+    state: TaskState | None = None
+
+
+class TaskResponse(_CamelBase):
+    model_config = ConfigDict(
+        alias_generator=to_camel, populate_by_name=True, from_attributes=True
+    )
+    id: int
+    title: str
+    description: str
+    assigned_role: AssignedRole
+    state: TaskState
+    created_at: date
+```
+
+**The database module** creates an async engine and a `get_db` dependency that FastAPI injects into each request:
+
+```python title="backend/app/core/database.py (trimmed)"
+engine = create_async_engine(settings.database_url, echo=True)
+AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with AsyncSessionLocal() as session:
+        yield session
+```
+
+Claude then ran a quick check that all three schemas accept valid data and reject malformed input, and committed.
+
+## Step 2: Alembic for async SQLAlchemy
+
+Alembic's generated `env.py` is written for synchronous SQLAlchemy. Ours is async, so we ask Claude to adapt it and create the first migration:
+
+```text title="Prompt: Alembic"
+Configure alembic/env.py to work with SQLAlchemy 2.0 async and our SQLite database.
+Then generate the first migration for the Task model and apply it.
+Use uv to run all alembic commands.
+```
+
+Claude rewrites `env.py` to reuse the app's async engine, and adds `render_as_batch=True`, which SQLite needs because it does not support most `ALTER TABLE` operations. Then it runs:
+
+```bash
+uv run alembic revision --autogenerate -m "create tasks table"
+uv run alembic upgrade head
+```
+
+| Command | What it does |
+| --- | --- |
+| `alembic revision --autogenerate` | Compares your models with the database and writes a migration script |
+| `alembic upgrade head` | Applies all pending migrations, creating the `tasks` table |
+
+<Callout type="info" title="Why migrations matter">
+Six months from now you will need a new column. Do not add it by hand in the database. Change the model, generate a migration, apply it. That is why our `CLAUDE.md` says "Always create a migration when changing models". Every schema change is recorded, reviewable and repeatable on every environment.
+</Callout>
+
+## Review before you merge
+
+Run `/diff` and actually read it. In our case, a careful review finds a few things worth knowing:
+
+| Finding | Why it matters |
+| --- | --- |
+| `config.py` uses an inner `class Config:` | That is Pydantic v1 style. With Pydantic v2 and `pydantic-settings`, prefer `model_config = SettingsConfigDict(env_file=".env")`. It still works, but our `CLAUDE.md` says Pydantic v2 |
+| `echo=True` on the engine | Logs every SQL statement. Great for learning, too noisy for production |
+| An extra `app/routes/tasks.py` with only comments | A leftover from the skeleton next to the real `app/api/v1/tasks.py`. Remove it so nobody edits the wrong file |
+| `backend/main.py` prints "Hello from backend!" | The `uv init` stub. The real app lives in `app/main.py` |
+
+None of these break anything today. But this is exactly the difference between **done** and **verified**. Ask Claude to fix them, or note them for later.
+
+## Commit, merge, delete
+
+```text
+Commit the Alembic configuration and the first migration.
+```
+
+```text
+!git checkout main
+!git merge feature/task-model
+!git branch -d feature/task-model
+```
+
+## Official references
+
+- [SQLAlchemy 2.0: ORM declarative mapping](https://docs.sqlalchemy.org/en/20/orm/declarative_tables.html)
+- [SQLAlchemy asyncio extension](https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html)
+- [Pydantic: alias generators](https://docs.pydantic.dev/latest/concepts/alias/)
+- [Alembic: autogenerate](https://alembic.sqlalchemy.org/en/latest/autogenerate.html)

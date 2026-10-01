@@ -1,0 +1,132 @@
+---
+title: Implementing GitHub Issue Changes
+description: Use the GitHub MCP server to list and create issues, fix the missing auth endpoints on a branch, open a pull request that closes the issue, and review and merge it yourself.
+---
+
+The GitHub MCP server is connected. Let us use it for a complete, real workflow: from an issue to a merged pull request, without leaving Claude Code except for the final human review.
+
+<img src="/claude-code/github-mcp-workflow.svg" alt="Issue to merged PR workflow using the GitHub MCP server" width={960} height={360} />
+
+## Explore what the server offers
+
+```text
+What tools does the GitHub MCP server expose? List all of them with a one-line explanation.
+```
+
+You get a long list: create or fork a repository, create and list branches, read file contents, list, read and create issues, create pull requests, search code, and more. Your token's permissions decide which of these actually work. We only granted contents, issues and pull requests.
+
+## Read issues
+
+On GitHub, create two quick test issues by hand, with different labels. Then ask Claude:
+
+```text
+Using the GitHub MCP server, list the open issues from the content-tracker repo and give me their descriptions.
+```
+
+<Callout type="info" title="Name the repository">
+If your token can access several repositories, always name the one you mean. It avoids Claude guessing, or reading from the wrong repository.
+</Callout>
+
+Claude calls the list-issues tool on your repository and shows each issue with its number, title, labels and description. You did not open the browser.
+
+## Create an issue from Claude Code
+
+Now the real task. In Section 10 we added three auth endpoints but never documented them in `specs/api-contract.md`. Let us record that properly:
+
+```text title="Prompt: create the issue"
+Create a new issue on the content-tracker repo using the GitHub MCP server.
+
+Title: Update specs/api-contract.md with the new auth endpoints
+
+Body: Explain that the three auth endpoints were added but never documented
+in the contract file. List them:
+  - POST /api/auth/login
+  - POST /api/auth/users (admin only)
+  - GET /api/auth/me
+
+Note that this should be done before adding more endpoints so the
+contract stays the source of truth.
+
+Apply the 'documentation' label.
+```
+
+Claude Code asks permission to call the MCP tool. This is the same permission system as for files and commands. Approve it, then check GitHub: the issue is there with the right title, body and label.
+
+## Fix it on a branch
+
+```text title="Prompt: fix on a branch"
+Create a new branch called fix/document-auth-endpoints from main.
+
+On that branch, update specs/api-contract.md to add documentation
+for the three auth endpoints: POST /api/auth/login, POST /api/auth/users
+(admin only), GET /api/auth/me. Match the existing format in the file.
+
+Commit with a conventional commits style message.
+Do NOT push. Do NOT open a PR. Stop after the commit.
+```
+
+"Stop after the commit" keeps you in control. Review the change with `/diff`, then push:
+
+```text
+Push this branch.
+```
+
+The resulting commit message follows the [Conventional Commits](https://www.conventionalcommits.org/) style, for example:
+
+```text
+docs(api-contract): document the three auth endpoints
+```
+
+## Open a pull request
+
+```text title="Prompt: open the PR"
+The branch fix/document-auth-endpoints is now pushed to GitHub.
+
+Using the GitHub MCP server, open a pull request from
+fix/document-auth-endpoints into main on the content-tracker repo.
+
+Write a PR description that:
+  - Explains what was changed and why
+  - References the issue you created earlier (closes it)
+  - Notes this completes the contract documentation gap
+
+Use a conventional commits style title.
+```
+
+Claude opens the PR. The description includes a line such as `Closes #4`, which links the PR to the issue.
+
+<Callout type="info" title="Why #4 and not #3?">
+On GitHub, issues and pull requests share the same number sequence. With two test issues and one PR or issue created earlier, the new issue ended up as #4. Always check the number Claude references.
+</Callout>
+
+## Review and merge: the human step
+
+You could ask Claude to merge the PR too. Do not. Reviewing and merging is **your** responsibility:
+
+1. Open the PR on GitHub
+2. Read the **Files changed** tab
+3. Check that the change matches the issue and the project's conventions
+4. Add comments if anything needs fixing
+5. Merge when you are satisfied
+
+When the PR is merged, GitHub automatically **closes the linked issue**. The PR list and the issue list are both clean again.
+
+## What this unlocks
+
+The same pattern works with any MCP server:
+
+| Server | Example workflow |
+| --- | --- |
+| Jira | "Implement the feature described in ticket ENG-4521 and open a PR" |
+| Slack | "Post a summary of today's merged PRs to #dev" |
+| Postgres | "Find tasks stuck in editing for more than a week" |
+| Playwright | "Open the app, log in as editor and check that delete is hidden" |
+
+And if a system you use has no MCP server, you can build your own. The official [MCP documentation](https://modelcontextprotocol.io/) explains how.
+
+## Official references
+
+- [Connect Claude Code to tools via MCP](https://code.claude.com/docs/en/mcp)
+- [GitHub MCP server](https://github.com/github/github-mcp-server)
+- [GitHub Docs: Linking a pull request to an issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue)
+- [Conventional Commits](https://www.conventionalcommits.org/)

@@ -1,0 +1,52 @@
+---
+title: Introduction to Slash Commands
+description: What slash commands are, why they exist, and the three kinds you will use in Claude Code.
+---
+
+When you work with any coding assistant, you talk to it through prompts, and better prompts give better results. Models keep improving, so even rough prompts often work. But some activities you repeat again and again: initialise a project, check usage, clear the context, switch models.
+
+Typing a fresh prompt for each of those is a waste of time. So Claude Code gives you **slash commands**: short, fixed commands that start with `/`. Some control Claude Code directly (like `/clear`), and others are packaged prompts that always do the same job well (like `/init`).
+
+## Seeing all the commands
+
+Type a single `/` in the prompt. A list of available commands appears, and it filters as you type.
+
+```text
+/
+```
+
+You have already used a few without thinking of them as "commands":
+
+| Command | What it did for us |
+| --- | --- |
+| `/init` | Analysed the project and created `CLAUDE.md` |
+| `/model` | Switched between Opus, Sonnet and Haiku |
+| `/usage` | Showed session and weekly usage |
+| `/login`, `/logout` | Switched accounts |
+| `/rewind` | Opened the checkpoint menu |
+| `/exit` | Closed the session |
+
+## Three kinds of slash commands
+
+<img src="/claude-code/slash-command-types.svg" alt="Built-in commands, bundled skills and your own skills" width={960} height={330} />
+
+| Kind | What it is | Examples |
+| --- | --- | --- |
+| **Built-in commands** | Control Claude Code itself: sessions, context, models, settings | `/clear`, `/compact`, `/context`, `/model`, `/status` |
+| **Bundled skills** | Prompt-based workflows that ship with Claude Code | `/code-review`, `/simplify`, `/batch`, `/debug` |
+| **Your own skills** | Commands you create for your project or team | `/telusko-status`, `/scaffold-endpoint` (Section 9) |
+
+## You do not need to memorise them
+
+There are dozens of commands, and new ones arrive regularly. You will not use all of them. In daily work, most developers rely on a handful: `/clear`, `/compact`, `/context`, `/model`, `/resume` and a couple of custom skills.
+
+In the next lesson we go through the essential ones in a logical order. Others, like `/agents` and `/mcp`, will appear when we need them.
+
+<Callout type="info">
+Run `/help` at any time to see the commands available in your version. Since Claude Code updates frequently, `/help` and the [commands reference](https://code.claude.com/docs/en/commands) are always more current than any tutorial.
+</Callout>
+
+## Official references
+
+- [Commands reference](https://code.claude.com/docs/en/commands)
+- [Interactive mode](https://code.claude.com/docs/en/interactive-mode)

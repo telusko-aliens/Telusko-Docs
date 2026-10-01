@@ -1,0 +1,10 @@
+{
+    "title": "Deploying the Application on Google Cloud",
+    "pages": [
+        "the-deployment-pipeline.mdx",
+        "preparing-the-app-for-deployment.mdx",
+        "dockerizing-and-testing-the-app-locally.mdx",
+        "google-cloud-project-and-sdk-setup.mdx",
+        "artifact-registry-cloud-run-and-testing.mdx"
+    ]
+}
