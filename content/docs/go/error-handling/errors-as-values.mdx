@@ -1,0 +1,245 @@
+---
+title: Errors as Values
+---
+
+Go has no exceptions. There is no `try`, no `catch`, no `throws` clause, and no invisible path that jumps from line 40 to a handler two functions up the stack. When something fails, a function returns an error, and the caller decides what to do about it.
+
+```go
+f, err := os.Open("config.yaml")
+if err != nil {
+    return err
+}
+```
+
+You will write that pattern more than any other thing in Go. Whether it feels like clarity or noise depends largely on whether you understand why it is there, so this page makes the case before the next four make it practical.
+
+## An error is just a value
+
+`error` is an interface with one method:
+
+```go
+type error interface {
+    Error() string
+}
+```
+
+That is the entire definition, built into the language. Anything with an `Error() string` method is an error.
+
+Because errors are values, they follow the rules every other value follows. You can store them in variables, compare them, put them in a slice, pass them as arguments, and return them. There is no separate mechanism to learn and no second control flow to keep in your head.
+
+```go
+var errs []error
+for _, task := range tasks {
+    if err := task.Run(); err != nil {
+        errs = append(errs, err)      // errors in a slice, nothing unusual
+    }
+}
+return errors.Join(errs...)
+```
+
+## What the design buys
+
+### Every failure is visible in the signature
+
+```go
+func Save(u User) error
+func Find(id string) (User, error)
+func Sum(a, b int) int              // this one cannot fail
+```
+
+Reading a function signature tells you whether it can fail. In a language with unchecked exceptions, any call might throw, and knowing which requires reading the implementation and everything it calls.
+
+### The failure path is on the page
+
+```go
+func handleOrder(id string) error {
+    order, err := repo.Find(id)
+    if err != nil {
+        return fmt.Errorf("finding order %s: %w", id, err)
+    }
+
+    if err := order.Validate(); err != nil {
+        return fmt.Errorf("validating order %s: %w", id, err)
+    }
+
+    if err := payments.Charge(order); err != nil {
+        return fmt.Errorf("charging order %s: %w", id, err)
+    }
+
+    return repo.Save(order)
+}
+```
+
+Every place this function can fail is a line you can point at. Nothing is skipped invisibly, and nothing unwinds past code you expected to run.
+
+### Errors carry data
+
+An error is a value, so it can hold whatever you need:
+
+```go
+type ValidationError struct {
+    Field   string
+    Value   any
+    Message string
+}
+
+func (e *ValidationError) Error() string {
+    return fmt.Sprintf("field %s: %s", e.Field, e.Message)
+}
+```
+
+The custom error types page builds on this.
+
+## The honest costs
+
+It would be dishonest to present only the upside.
+
+**It is repetitive.** In a function with six fallible calls you write six identical checks. Roughly one line in three of some Go code is `if err != nil`.
+
+**It is easy to ignore.** Nothing forces you to check. `f, _ := os.Open(path)` compiles and runs, and the bug appears later somewhere confusing.
+
+**Context is lost unless you add it.** A bare `return err` from four layers down gives you `permission denied` with no idea which file or which operation. Wrapping fixes this and wrapping is manual.
+
+The Go team has looked at alternatives repeatedly. A `try` proposal was rejected in 2019, and the error handling discussion has stayed open for years without producing a change. The current position is that the explicitness is worth the verbosity, and the tooling should make wrapping easier rather than hiding the checks.
+
+<Callout type="info">
+If the repetition bothers you, notice what it is buying: you never have to ask "can this line fail". In a large codebase maintained by many people over years, that property is worth a surprising amount.
+</Callout>
+
+## The four things to do with an error
+
+Every error you receive gets one of these four treatments. Being deliberate about which is most of what good error handling means.
+
+### 1. Return it, with context
+
+The default. You could not handle it, so the caller gets it, plus information about where it came from.
+
+```go
+data, err := os.ReadFile(path)
+if err != nil {
+    return nil, fmt.Errorf("reading config %s: %w", path, err)
+}
+```
+
+### 2. Handle it
+
+You know what to do, so do it and do not propagate.
+
+```go
+cfg, err := loadConfig(path)
+if err != nil {
+    slog.Warn("using defaults, config unavailable", "error", err)
+    cfg = defaultConfig()
+}
+```
+
+### 3. Log it and continue
+
+For failures that should be visible but must not stop the work.
+
+```go
+for _, item := range batch {
+    if err := process(item); err != nil {
+        slog.Error("item failed, continuing", "id", item.ID, "error", err)
+        failed++
+        continue
+    }
+    succeeded++
+}
+```
+
+### 4. Ignore it deliberately
+
+Rare, and it should look deliberate.
+
+```go
+// Best effort cleanup, a failure here changes nothing.
+_ = os.Remove(tmpPath)
+```
+
+Writing `_ =` rather than dropping the value silently tells reviewers and linters that you thought about it.
+
+<Callout type="warn">
+What is not on this list: logging an error and then also returning it. That produces the same failure reported three times as it travels up the stack, and it makes logs much harder to read. Log at the top, where you decide what happens, or return, but not both.
+</Callout>
+
+## Where to check
+
+Immediately. Not at the end of the function, not after a few more calls.
+
+```go
+// Wrong: uses f before knowing whether Open succeeded
+f, err := os.Open(path)
+defer f.Close()
+if err != nil {
+    return err
+}
+```
+
+That `defer f.Close()` runs on a nil file when the open failed, and panics. The order matters:
+
+```go
+f, err := os.Open(path)
+if err != nil {
+    return err
+}
+defer f.Close()
+```
+
+The wider rule is the guard clause style from the control flow section: check, return early, and keep the successful path at the base indentation.
+
+## The if with initialiser
+
+When you only need the error, scope it to the check:
+
+```go
+if err := db.Ping(); err != nil {
+    return fmt.Errorf("database unreachable: %w", err)
+}
+
+if err := os.MkdirAll(dir, 0o755); err != nil {
+    return fmt.Errorf("creating %s: %w", dir, err)
+}
+```
+
+`err` does not leak into the rest of the function, which means the next call can use `:=` again without shadowing confusion.
+
+## Errors are not exceptional
+
+A useful mental shift: in Go, an error is an ordinary outcome, not an emergency. A file that does not exist, a network that times out, and input that fails validation are all things that happen in normal operation. They are results, and results get returned.
+
+`panic` exists for the genuinely exceptional, meaning a bug in the program rather than a condition in the world. That distinction gets its own page at the end of this section, and getting it right is what keeps Go services from crashing on a bad request.
+
+## What good error handling looks like
+
+```go
+func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*User, error) {
+    if err := req.Validate(); err != nil {
+        return nil, fmt.Errorf("invalid request: %w", err)
+    }
+
+    existing, err := s.repo.FindByEmail(ctx, req.Email)
+    if err != nil && !errors.Is(err, ErrNotFound) {
+        return nil, fmt.Errorf("checking for existing user: %w", err)
+    }
+    if existing != nil {
+        return nil, ErrEmailTaken
+    }
+
+    hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+    if err != nil {
+        return nil, fmt.Errorf("hashing password: %w", err)
+    }
+
+    u := &User{Email: req.Email, PasswordHash: string(hash)}
+    if err := s.repo.Save(ctx, u); err != nil {
+        return nil, fmt.Errorf("saving user: %w", err)
+    }
+
+    return u, nil
+}
+```
+
+Four checks, each adding context, one of them distinguishing an expected condition from a real failure, and one returning a sentinel the caller can test for. Every line of the successful path sits at one indent level.
+
+That is what the rest of this section teaches you to write. Next, let's look at how to create errors and how wrapping preserves the chain.

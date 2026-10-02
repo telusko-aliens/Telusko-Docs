@@ -1,0 +1,300 @@
+---
+title: Packages and Imports
+---
+
+Every Go file begins with a package declaration, and the rule connecting files to packages is stricter than in most languages: **one folder is one package**. Every `.go` file in a folder must declare the same package name, and no subfolder is part of it.
+
+```text
+   myapp/
+   ├── main.go           package main
+   ├── config.go         package main       ← same folder, same package
+   └── storage/
+       ├── store.go      package storage    ← different folder, different package
+       └── query.go      package storage
+```
+
+That constraint does more work than it appears to. It means the import path of a package is always derivable from its location, and it means you can see a package's entire contents by listing one directory.
+
+## Files in a package share everything
+
+There is no file-level privacy. A lowercase name in `config.go` is visible from `main.go` without any import, because they are the same package.
+
+```go
+// config.go
+package main
+
+var defaultPort = 8080
+
+func loadConfig() Config { /* ... */ }
+```
+
+```go
+// main.go
+package main
+
+func main() {
+    cfg := loadConfig()          // no import, same package
+    fmt.Println(defaultPort)
+}
+```
+
+Splitting a package into several files is purely organisational. Do it when a file gets long or when a group of functions has a clear theme, not because you want to hide something.
+
+## Importing
+
+```go
+import "fmt"
+
+import (
+    "fmt"
+    "net/http"
+    "os"
+)
+```
+
+The string is the **import path**, which for standard library packages is just the package name or a path within it. The identifier you use in code is the **package name**, declared in the imported files.
+
+Usually these match, and occasionally they do not:
+
+```go
+import "math/rand"        // path is math/rand, package name is rand
+rand.Intn(100)
+
+import "gopkg.in/yaml.v3" // path ends in yaml.v3, package name is yaml
+yaml.Unmarshal(data, &cfg)
+```
+
+When they differ, your editor will tell you, and `goimports` will get it right automatically.
+
+## Import grouping
+
+`gofmt` sorts imports within a group but does not create groups. The universal convention is two groups, standard library first:
+
+```go
+import (
+    "context"
+    "fmt"
+    "net/http"
+    "time"
+
+    "github.com/google/uuid"
+    "github.com/jackc/pgx/v5"
+
+    "github.com/yourorg/yourapp/internal/config"
+    "github.com/yourorg/yourapp/internal/storage"
+)
+```
+
+Three groups, separated by blank lines: standard library, third party, then your own module. `goimports` maintains this if you configure it with `-local github.com/yourorg`, and most editors do it for you.
+
+## Import aliases
+
+Rename an import when there is a collision or when the name is unhelpful:
+
+```go
+import (
+    "math/rand"
+    crand "crypto/rand"          // both would be "rand"
+)
+```
+
+```go
+import (
+    pb "github.com/yourorg/proto/gen/orders/v1"     // generated names are often long
+)
+```
+
+Two special forms exist and both should be used sparingly.
+
+### The blank import
+
+```go
+import _ "github.com/lib/pq"
+```
+
+Imports a package purely for its `init` side effects, without using any of its names. Database drivers are the canonical case: importing `lib/pq` registers a driver called `postgres` with `database/sql`, and your code then refers to it by string.
+
+```go
+import (
+    "database/sql"
+    _ "github.com/lib/pq"
+)
+
+db, err := sql.Open("postgres", dsn)    // the driver registered itself
+```
+
+Always add a comment explaining why, since a bare underscore import looks like a mistake:
+
+```go
+_ "github.com/lib/pq"     // registers the postgres driver
+```
+
+### The dot import
+
+```go
+import . "fmt"
+
+Println("no prefix needed")
+```
+
+This dumps every exported name into your file's scope. It makes code unreadable, because a reader cannot tell where `Println` came from, and it breaks the moment two dot-imported packages share a name.
+
+The only accepted use is inside test files for BDD-style assertion libraries. Avoid it everywhere else.
+
+## Unused imports are errors
+
+```go
+import (
+    "fmt"
+    "os"        // not used anywhere
+)
+```
+
+```text
+./main.go:5:2: "os" imported and not used
+```
+
+Not a warning. The build fails. This keeps import blocks honest, and it is one more reason to let `goimports` manage them: it adds what you use and removes what you stopped using, on save.
+
+## init functions
+
+A package can have `init` functions that run before `main`, after all package level variables are initialised.
+
+```go
+package config
+
+var settings map[string]string
+
+func init() {
+    settings = make(map[string]string)
+    settings["env"] = os.Getenv("APP_ENV")
+}
+```
+
+The rules:
+
+- A file can have several `init` functions, and a package can have many across its files
+- They take no arguments and return nothing
+- They run in file name order within a package, which is fragile enough that you should never depend on it
+- All of a package's dependencies are fully initialised before its own `init` runs
+
+```text
+   import dependencies initialised
+        ↓
+   package level vars initialised
+        ↓
+   init() functions run
+        ↓
+   main() runs
+```
+
+<Callout type="warn">
+`init` is easy to overuse. Code that runs implicitly is hard to test, impossible to run twice with different settings, and produces startup failures with no obvious cause. Prefer an explicit `New` or `Setup` function that `main` calls. Reserve `init` for genuine registration, like the database drivers above.
+</Callout>
+
+## No circular imports
+
+Go forbids import cycles outright.
+
+```text
+   package a imports package b
+   package b imports package a
+   → build error: import cycle not allowed
+```
+
+There is no workaround, no forward declaration, and no lazy import. This is a deliberate constraint that keeps the dependency graph acyclic, which is why Go builds are fast and why the compiler can be sure of initialisation order.
+
+When you hit a cycle, one of three things is true.
+
+**The two packages are really one package.** Merge them.
+
+**A shared type belongs in a third package.** Extract it.
+
+```text
+   Before                       After
+   ──────                       ─────
+   user ⇄ order                 user  → model
+                                order → model
+```
+
+**The dependency should be inverted with an interface.** This is the most common fix and it follows the design rule from the interfaces section: the consumer declares what it needs.
+
+```go
+// package notify -- does not import user
+type UserLookup interface {
+    FindEmail(ctx context.Context, id string) (string, error)
+}
+
+func Send(ctx context.Context, l UserLookup, id string, msg Message) error {
+    email, err := l.FindEmail(ctx, id)
+    // ...
+}
+```
+
+```go
+// package user -- does not import notify
+func (s *Service) FindEmail(ctx context.Context, id string) (string, error) { /* ... */ }
+```
+
+Neither package imports the other. `main` wires them together.
+
+## Package naming
+
+The name is what callers type at every use, so it matters more than most identifiers.
+
+| Do | Avoid |
+| --- | --- |
+| short, lowercase, one word | `myUtilPackage`, `user_service` |
+| a noun describing what it provides | verbs, or vague words |
+| `http`, `json`, `user`, `storage` | `utils`, `helpers`, `common`, `base` |
+| singular | plural, usually |
+
+The name combines with what it exports, so avoid stuttering:
+
+```go
+// Stutters
+http.HTTPServer
+user.UserService
+config.ConfigLoad
+
+// Reads well
+http.Server
+user.Service
+config.Load
+```
+
+<Callout type="info">
+`utils`, `helpers`, and `common` are the packages that eventually contain everything and depend on everything. They have no coherent purpose, so nothing can be excluded from them. Name packages after what they do, and if a function has no obvious home, that is usually a sign the design has a gap rather than that you need a junk drawer.
+</Callout>
+
+## Documenting a package
+
+A comment block immediately before the package declaration, in any one file, is the package documentation. By convention it lives in a file called `doc.go` when it is long.
+
+```go
+// Package storage provides persistence for orders and customers.
+//
+// The package assumes a PostgreSQL database and expects the schema in
+// migrations/ to be applied before use. All functions take a context
+// and respect its cancellation.
+//
+// Basic usage:
+//
+//	store, err := storage.Open(ctx, dsn)
+//	if err != nil {
+//	    return err
+//	}
+//	defer store.Close()
+package storage
+```
+
+Check what it looks like:
+
+```bash
+go doc ./internal/storage
+go doc ./internal/storage.Open
+```
+
+Indented lines in a doc comment render as code blocks, which is how examples get formatted on pkg.go.dev.
+
+Next, let's look at the capitalisation rule that decides what any of this is actually visible to.

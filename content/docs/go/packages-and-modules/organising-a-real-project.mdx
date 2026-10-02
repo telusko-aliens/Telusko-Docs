@@ -1,0 +1,288 @@
+---
+title: Organising a Real Project
+---
+
+Go has no official project layout. The often-cited `golang-standards/project-layout` repository is not maintained by the Go team and is widely considered too heavy for most projects. What exists instead is a set of conventions that real Go codebases converge on, and a strong cultural preference for starting simple.
+
+So this page goes in the order a project actually grows.
+
+## Day one: one file
+
+```text
+   tool/
+   ├── go.mod
+   └── main.go
+```
+
+This is a complete, legitimate Go project. For a command line utility of two hundred lines, it is the correct structure and adding folders would make it worse.
+
+Resist the urge to create `cmd/`, `internal/`, and `pkg/` before there is anything to put in them. A project with six folders and one file in each is harder to navigate than a flat one.
+
+## When one file gets long: split by concern
+
+```text
+   tool/
+   ├── go.mod
+   ├── main.go        wiring and flags
+   ├── config.go      settings
+   ├── fetch.go       the HTTP work
+   └── report.go      output formatting
+```
+
+Still one package. All four files see each other's unexported names, so nothing needs exporting yet. This stage handles a surprising amount of program, often up to a couple of thousand lines.
+
+Split when a file passes roughly 300 to 500 lines or when a group of functions has an obvious shared theme, not on a schedule.
+
+## When there is a real boundary: packages
+
+The signal to create a package is not size, it is **a boundary you can name**. Storage, HTTP handling, business rules, external clients.
+
+```text
+   orders-api/
+   ├── go.mod
+   ├── go.sum
+   ├── main.go
+   └── internal/
+       ├── config/
+       ├── handler/
+       ├── service/
+       ├── storage/
+       └── model/
+```
+
+Everything under `internal` because nothing here is meant for other modules to import. That decision is free to make now and painful to make later.
+
+## The layered layout, in full
+
+For a service that has grown past a few thousand lines, this is where most Go teams land:
+
+```text
+   orders-api/
+   ├── go.mod
+   ├── go.sum
+   ├── Makefile
+   ├── Dockerfile
+   ├── README.md
+   ├── .golangci.yml
+   │
+   ├── cmd/
+   │   ├── api/
+   │   │   └── main.go            the HTTP service
+   │   └── migrate/
+   │       └── main.go            a migration runner
+   │
+   ├── internal/
+   │   ├── config/
+   │   │   └── config.go          environment and flags
+   │   ├── handler/
+   │   │   ├── order.go           HTTP: decode, call, respond
+   │   │   ├── health.go
+   │   │   └── middleware.go
+   │   ├── service/
+   │   │   └── order.go           business rules, no HTTP, no SQL
+   │   ├── storage/
+   │   │   ├── postgres.go        connection and setup
+   │   │   └── order.go           queries
+   │   ├── model/
+   │   │   └── order.go           shared domain types
+   │   └── payment/
+   │       └── stripe.go          an external client, wrapped
+   │
+   ├── migrations/
+   │   ├── 001_create_orders.up.sql
+   │   └── 001_create_orders.down.sql
+   │
+   └── api/
+       └── openapi.yaml
+```
+
+### What each layer is allowed to know
+
+```text
+   handler   →  service   →  storage
+      │           │            │
+      └───────────┴────────────┴──►  model
+
+   handler knows HTTP. It never writes SQL.
+   service knows business rules. It never writes HTTP or SQL.
+   storage knows SQL. It never writes HTTP or business rules.
+   model knows nothing about anything.
+```
+
+Dependencies point in one direction. That is what makes each layer testable on its own and what stops a change to the database schema rippling into your HTTP handlers.
+
+### Dependencies flow inward via interfaces
+
+The service does not import the storage package. It declares what it needs:
+
+```go
+// internal/service/order.go
+package service
+
+type OrderRepository interface {
+    Create(ctx context.Context, o *model.Order) error
+    FindByID(ctx context.Context, id string) (*model.Order, error)
+}
+
+type PaymentGateway interface {
+    Charge(ctx context.Context, amount int64, token string) (string, error)
+}
+
+type OrderService struct {
+    repo    OrderRepository
+    payment PaymentGateway
+    log     *slog.Logger
+}
+
+func NewOrderService(r OrderRepository, p PaymentGateway, l *slog.Logger) *OrderService {
+    return &OrderService{repo: r, payment: p, log: l}
+}
+```
+
+`*storage.OrderStore` satisfies `OrderRepository` without either package importing the other's abstraction. Tests pass a ten line fake.
+
+## main.go does nothing but wire
+
+The single most useful discipline in this layout: `main` reads configuration, constructs everything, and starts the server. No business logic, no queries, no request handling.
+
+```go title="cmd/api/main.go"
+package main
+
+func main() {
+    if err := run(); err != nil {
+        slog.Error("fatal", "error", err)
+        os.Exit(1)
+    }
+}
+
+func run() error {
+    cfg, err := config.Load()
+    if err != nil {
+        return fmt.Errorf("loading config: %w", err)
+    }
+
+    logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+    db, err := storage.Open(cfg.DatabaseURL)
+    if err != nil {
+        return fmt.Errorf("connecting to database: %w", err)
+    }
+    defer db.Close()
+
+    orderStore := storage.NewOrderStore(db)
+    gateway := payment.NewStripe(cfg.StripeKey)
+    orderSvc := service.NewOrderService(orderStore, gateway, logger)
+    h := handler.New(orderSvc, logger)
+
+    srv := &http.Server{
+        Addr:              cfg.Addr,
+        Handler:           h.Routes(),
+        ReadHeaderTimeout: 5 * time.Second,
+    }
+
+    return runWithGracefulShutdown(srv, logger)
+}
+```
+
+<Callout type="info">
+The `main` calling `run() error` pattern is worth adopting everywhere. `main` cannot return an error and `os.Exit` skips deferred calls, so putting the real work in a function that returns an error means your `defer db.Close()` actually runs.
+</Callout>
+
+## The three conventional directories
+
+**`cmd/`** holds one folder per binary, each with a `main.go`. Use it when the project produces more than one executable. For a single binary, `main.go` at the root is fine and simpler.
+
+**`internal/`** is enforced by the compiler. Nothing outside your module can import it. Default to putting everything here.
+
+**`pkg/`** is a plain convention meaning "this is meant to be imported by others". It has no compiler behaviour. Many Go developers consider it unnecessary, since anything not in `internal` is already importable. Use it only if the distinction genuinely helps readers of your repository.
+
+## Splitting by layer or by feature
+
+Two organising principles, and both are defensible.
+
+```text
+   By layer                    By feature
+   ────────                    ──────────
+   internal/                   internal/
+   ├── handler/                ├── order/
+   │   ├── order.go            │   ├── handler.go
+   │   └── user.go             │   ├── service.go
+   ├── service/                │   ├── storage.go
+   │   ├── order.go            │   └── model.go
+   │   └── user.go             └── user/
+   └── storage/                    ├── handler.go
+       ├── order.go                ├── service.go
+       └── user.go                 └── storage.go
+```
+
+Layer-first is the more common Go convention and works well up to a moderate size. Feature-first keeps everything about one concept together, which scales better in large codebases and makes it obvious when a feature has grown too entangled.
+
+The failure mode of layer-first is that changing one feature means touching four folders. The failure mode of feature-first is duplicated infrastructure and cross-feature imports that recreate the coupling you were avoiding.
+
+Pick one and apply it consistently. Mixing them is worse than either.
+
+## Where tests go
+
+Next to the code they test, always:
+
+```text
+   internal/service/
+   ├── order.go
+   └── order_test.go
+```
+
+Two package options:
+
+```go
+package service          // internal test, can reach unexported names
+package service_test     // external test, sees only the public API
+```
+
+Both can live in the same folder. Use `service` for testing internal logic, `service_test` when you want the test to exercise the package the way a caller would, which is a useful design check.
+
+## Supporting files
+
+```text
+   Makefile              build, test, lint, run
+   Dockerfile            container build
+   docker-compose.yml    local dependencies such as postgres
+   .golangci.yml         linter configuration
+   .env.example          documented environment variables, no secrets
+   migrations/           SQL migrations
+   scripts/              anything you run occasionally
+   testdata/             fixtures, ignored by the go tool
+```
+
+`testdata` is the one with special behaviour: the Go toolchain ignores any directory with that name, so fixtures never get compiled or scanned.
+
+A Makefile is not required but it documents the project's commands in a place people look:
+
+```makefile
+.PHONY: run test lint build
+
+run:
+	go run ./cmd/api
+
+test:
+	go test -race -cover ./...
+
+lint:
+	golangci-lint run
+
+build:
+	CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/api ./cmd/api
+```
+
+## The rules that matter
+
+Structure is less important than most people assume, but a few things genuinely help.
+
+1. **Start flat.** Add structure when the lack of it hurts, not before.
+2. **Everything in `internal` by default.** Exporting later is easy, unexporting is not.
+3. **Dependencies point one way.** No import cycles, and no lower layer knowing about a higher one.
+4. **Consumers define interfaces.** The service declares what it needs from storage.
+5. **`main` only wires.** Every piece of logic lives somewhere testable.
+6. **Name packages after what they provide.** Never `utils`, `helpers`, or `common`.
+7. **One folder, one package, matching names.** Every tool and every reader assumes it.
+
+That completes the foundations. Next, let's get to the part of Go that changes how you design programs rather than just how you write them: concurrency.

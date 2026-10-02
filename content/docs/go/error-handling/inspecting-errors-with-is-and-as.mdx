@@ -1,0 +1,293 @@
+---
+title: Inspecting Errors with Is and As
+---
+
+Once errors are wrapped, the error you receive is rarely the error that happened. It is a chain, and the interesting part is usually buried three layers down.
+
+```text
+   fmt.Errorf("starting service: %w", ...)
+        └── fmt.Errorf("loading config: %w", ...)
+                └── &os.PathError{Op: "open", Path: "app.yaml", Err: ...}
+                        └── syscall.ENOENT
+```
+
+`errors.Is` and `errors.As` walk that chain for you. Between them they cover every question you will need to ask an error.
+
+## errors.Is asks "is this in the chain"
+
+Use it to compare against a sentinel value.
+
+```go
+data, err := os.ReadFile(path)
+if errors.Is(err, os.ErrNotExist) {
+    return defaultConfig(), nil          // missing file is fine, use defaults
+}
+if err != nil {
+    return nil, fmt.Errorf("reading %s: %w", path, err)
+}
+```
+
+It walks the chain calling `Unwrap` and compares each link with `==`, so it finds the target no matter how many layers wrapped it.
+
+```go
+base := sql.ErrNoRows
+wrapped := fmt.Errorf("querying user: %w", base)
+deeper := fmt.Errorf("loading profile: %w", wrapped)
+
+deeper == sql.ErrNoRows              // false
+errors.Is(deeper, sql.ErrNoRows)     // true
+```
+
+<Callout type="warn">
+Never compare errors with `==` in application code. It works right up until somebody adds a `fmt.Errorf` wrap somewhere in between, at which point the comparison silently starts returning false and your special case stops firing. `errors.Is` costs nothing extra and does not break.
+</Callout>
+
+### The sentinels worth knowing
+
+```go
+errors.Is(err, io.EOF)                    // the reader is finished
+errors.Is(err, sql.ErrNoRows)             // query matched nothing
+errors.Is(err, os.ErrNotExist)            // file or directory is missing
+errors.Is(err, os.ErrPermission)          // permission denied
+errors.Is(err, context.Canceled)          // caller gave up
+errors.Is(err, context.DeadlineExceeded)  // timed out
+errors.Is(err, http.ErrServerClosed)      // graceful shutdown, not a failure
+```
+
+That last one matters more than it looks. `http.ListenAndServe` returns `ErrServerClosed` when you shut it down deliberately, so treating every non-nil return as a failure means logging an error on every clean exit:
+
+```go
+if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+    log.Fatalf("server failed: %v", err)
+}
+```
+
+## errors.As asks "give me the typed one"
+
+Use it to pull a concrete error type out of the chain so you can read its fields.
+
+```go
+var pathErr *os.PathError
+if errors.As(err, &pathErr) {
+    fmt.Println("operation:", pathErr.Op)     // "open"
+    fmt.Println("path:", pathErr.Path)        // "app.yaml"
+}
+```
+
+Three things about the signature catch people out.
+
+**The second argument must be a pointer to the type you want.** `errors.As(err, pathErr)` does not compile, and `errors.As(err, &err)` is not what you meant.
+
+**Declare the variable first.** It gets assigned only if a match is found.
+
+**It returns a bool, and the variable is only valid when that is true.**
+
+```go
+// Wrong
+if errors.As(err, &os.PathError{}) { }         // not a pointer to a variable
+
+// Right
+var pathErr *os.PathError
+if errors.As(err, &pathErr) {
+    use(pathErr)
+}
+```
+
+### A worked example
+
+```go
+func classify(err error) string {
+    var (
+        syntaxErr *json.SyntaxError
+        typeErr   *json.UnmarshalTypeError
+        netErr    *net.OpError
+        apiErr    *APIError
+    )
+
+    switch {
+    case errors.As(err, &syntaxErr):
+        return fmt.Sprintf("malformed JSON at byte %d", syntaxErr.Offset)
+
+    case errors.As(err, &typeErr):
+        return fmt.Sprintf("field %q expected %s, got %s",
+            typeErr.Field, typeErr.Type, typeErr.Value)
+
+    case errors.As(err, &netErr):
+        return fmt.Sprintf("network error during %s", netErr.Op)
+
+    case errors.As(err, &apiErr):
+        return fmt.Sprintf("api returned %d", apiErr.StatusCode)
+
+    case errors.Is(err, context.DeadlineExceeded):
+        return "request timed out"
+
+    default:
+        return "unexpected error"
+    }
+}
+```
+
+An expressionless `switch` mixing `errors.As` and `errors.Is` is the standard shape for this. It reads top to bottom, specific cases first.
+
+## Choosing between them
+
+```text
+   Is this a specific known error?          →  errors.Is(err, ErrSomething)
+   Is this a specific kind of error, and
+   I need its fields?                       →  errors.As(err, &target)
+```
+
+If the sentinel is a value, use `Is`. If you need to read something off the error, use `As`.
+
+## Extracting behaviour instead of a type
+
+`errors.As` works with interfaces too, which lets you ask what an error *can do* rather than what it *is*:
+
+```go
+type retryable interface {
+    Retryable() bool
+}
+
+func shouldRetry(err error) bool {
+    var r retryable
+    return errors.As(err, &r) && r.Retryable()
+}
+```
+
+Any error from any package that happens to have a `Retryable() bool` method now matches, with no import relationship between the two. This is the loosest and often the most useful form of error inspection.
+
+## Errors and context cancellation
+
+Two cases that come up in every service with timeouts, and they are worth distinguishing:
+
+```go
+if errors.Is(err, context.Canceled) {
+    // The caller went away. Not a server failure.
+    // Usually: log at debug level, do not alert.
+    return
+}
+
+if errors.Is(err, context.DeadlineExceeded) {
+    // We were too slow. This is a real problem.
+    slog.Warn("operation exceeded deadline", "error", err)
+    respond(w, http.StatusGatewayTimeout, "request timed out")
+    return
+}
+```
+
+Treating a client disconnect as a 500 pollutes your error rate metrics with things that were never your fault, and it is one of the most common causes of misleading dashboards in Go services.
+
+## Joined errors
+
+`errors.Join` produces an error containing several, and both functions handle it:
+
+```go
+err := errors.Join(ErrNotFound, ErrPermission)
+
+errors.Is(err, ErrNotFound)      // true
+errors.Is(err, ErrPermission)    // true, both are in there
+```
+
+`errors.As` finds the first matching type in the tree, walking breadth first.
+
+```go
+func validate(u User) error {
+    var errs []error
+    if u.Name == "" {
+        errs = append(errs, &ValidationError{Field: "name"})
+    }
+    if u.Email == "" {
+        errs = append(errs, &ValidationError{Field: "email"})
+    }
+    return errors.Join(errs...)
+}
+
+// Finds the first one, but not all of them
+var vErr *ValidationError
+errors.As(err, &vErr)
+```
+
+When you need every error rather than the first, unwrap the slice yourself:
+
+```go
+func allValidationErrors(err error) []*ValidationError {
+    var out []*ValidationError
+
+    var multi interface{ Unwrap() []error }
+    if errors.As(err, &multi) {
+        for _, e := range multi.Unwrap() {
+            var v *ValidationError
+            if errors.As(e, &v) {
+                out = append(out, v)
+            }
+        }
+        return out
+    }
+
+    var v *ValidationError
+    if errors.As(err, &v) {
+        out = append(out, v)
+    }
+    return out
+}
+```
+
+## The error handling boundary
+
+Most services do their error inspection in exactly one place: where an internal error becomes a response. Everything below that layer wraps and returns.
+
+```go
+func (h *Handler) mapError(w http.ResponseWriter, r *http.Request, err error) {
+    var (
+        status = http.StatusInternalServerError
+        code   = "internal_error"
+        msg    = "something went wrong"
+    )
+
+    var validation *ValidationError
+    var conflict *ConflictError
+
+    switch {
+    case errors.Is(err, ErrNotFound):
+        status, code, msg = http.StatusNotFound, "not_found", "resource not found"
+
+    case errors.Is(err, ErrUnauthorized):
+        status, code, msg = http.StatusUnauthorized, "unauthorized", "authentication required"
+
+    case errors.As(err, &validation):
+        status, code = http.StatusUnprocessableEntity, "validation_failed"
+        msg = validation.Error()
+
+    case errors.As(err, &conflict):
+        status, code = http.StatusConflict, "conflict"
+        msg = conflict.Error()
+
+    case errors.Is(err, context.Canceled):
+        return                        // client hung up, nothing to send
+
+    case errors.Is(err, context.DeadlineExceeded):
+        status, code, msg = http.StatusGatewayTimeout, "timeout", "request timed out"
+    }
+
+    // Log the full chain internally, send the sanitised version outward.
+    if status >= 500 {
+        slog.ErrorContext(r.Context(), "request failed",
+            "error", err,
+            "path", r.URL.Path,
+            "method", r.Method,
+        )
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(status)
+    json.NewEncoder(w).Encode(map[string]string{"code": code, "message": msg})
+}
+```
+
+Notice the split between what gets logged and what gets sent. The log has the whole wrapped chain including file paths and query text. The client gets a code and a short message. Leaking internal errors to clients is both a security problem and a support problem.
+
+<Callout type="info">
+Concentrating error inspection at one boundary is what makes wrapping worth the effort. Every layer below adds context and returns. One layer at the top asks the questions and decides. Spread the inspection across every layer and you get inconsistent responses and duplicated logic.
+</Callout>
+
+Next, let's cover the two features this section has deliberately avoided so far, and the narrow circumstances where they belong.

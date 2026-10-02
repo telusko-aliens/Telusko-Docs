@@ -1,0 +1,10 @@
+{
+    "title": "Packages and Modules",
+    "pages": [
+        "packages-and-imports.mdx",
+        "exported-and-unexported-names.mdx",
+        "working-with-go-modules.mdx",
+        "using-third-party-packages.mdx",
+        "organising-a-real-project.mdx"
+    ]
+}

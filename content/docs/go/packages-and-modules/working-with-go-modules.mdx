@@ -1,0 +1,285 @@
+---
+title: Working with Go Modules
+---
+
+Before 2018, Go had no dependency versioning. Your code lived in `GOPATH`, `go get` fetched whatever was on the default branch, and two projects needing different versions of the same library was a problem you solved by not having it.
+
+Modules fixed that, and they did it with a design that is unusual enough to be worth understanding rather than just memorising commands.
+
+## The two files
+
+```go title="go.mod"
+module github.com/yourorg/orders-api
+
+go 1.24
+
+require (
+    github.com/go-chi/chi/v5 v5.1.0
+    github.com/jackc/pgx/v5 v5.7.1
+)
+
+require (
+    github.com/jackc/puddle/v2 v2.2.2 // indirect
+    golang.org/x/sync v0.8.0 // indirect
+)
+```
+
+`go.mod` declares the module path, the language version, and the dependencies. The second `require` block holds indirect dependencies, meaning things your dependencies need that you do not import directly.
+
+```text title="go.sum"
+github.com/go-chi/chi/v5 v5.1.0 h1:acVI1TYaD+hhedDJ3r54HyA6sExp3HfXq7QWEEY/xMw=
+github.com/go-chi/chi/v5 v5.1.0/go.mod h1:DslCQbL2OYiznFReuXYUmQ2hGd1aDpCnlMNITLSKoi8=
+```
+
+`go.sum` holds cryptographic hashes of every module version in the graph. It is not a lock file, it is a verification file: it does not decide which versions you get, it proves the ones you got are the ones everyone else got.
+
+Both files are committed. Neither is edited by hand.
+
+## Minimal version selection
+
+This is the design decision that makes Go modules different from npm, pip, and Maven.
+
+When two dependencies need different versions of a library, most package managers pick the newest that satisfies all constraints. Go picks the **oldest version that satisfies everyone**.
+
+```text
+   your module    requires  lib v1.2.0
+   dependency A   requires  lib v1.4.0
+   dependency B   requires  lib v1.3.0
+
+   → Go selects v1.4.0, the highest of the minimums.
+     Not v1.9.0, even though it exists.
+```
+
+Nothing upgrades unless you ask. A build today produces the same versions as a build next year, without a lock file, because the answer is a pure function of the `go.mod` files involved.
+
+<Callout type="info">
+The practical effect is that Go builds are reproducible by default and dependency upgrades are always deliberate. The cost is that you do not automatically get bug fixes, so `go get -u` needs to be a scheduled habit rather than something that happens by accident.
+</Callout>
+
+## Semantic import versioning
+
+The second unusual rule: **a major version bump changes the import path**.
+
+```go
+import "github.com/go-chi/chi"        // v1
+import "github.com/go-chi/chi/v5"     // v5, a different path
+```
+
+Versions v0 and v1 use the bare path. From v2 onward, the major version becomes part of it.
+
+This has an immediate consequence that other ecosystems cannot offer: two major versions of the same library can coexist in one build, because as far as the compiler is concerned they are unrelated packages.
+
+```go
+import (
+    v1 "github.com/some/lib"
+    v2 "github.com/some/lib/v2"
+)
+```
+
+Migrating from v1 to v2 can then happen file by file rather than all at once.
+
+## The commands
+
+### Starting
+
+```bash
+go mod init github.com/yourorg/projectname
+```
+
+### Adding and removing
+
+Write the import first, then let the tool catch up:
+
+```bash
+go mod tidy
+```
+
+`go mod tidy` is the workhorse. It scans every `.go` file, adds any requirement you import, removes any you do not, and updates `go.sum`. Run it after any change to your imports and your `go.mod` will always describe reality.
+
+To add a specific version directly:
+
+```bash
+go get github.com/google/uuid@v1.6.0
+go get github.com/google/uuid@latest
+go get github.com/google/uuid@master           # a branch
+go get github.com/google/uuid@e91e2c2          # a commit
+```
+
+To remove one, delete the import and run `go mod tidy`.
+
+### Upgrading
+
+```bash
+go get -u ./...                # everything, minor and patch
+go get -u=patch ./...          # patch releases only, safer
+go get -u github.com/x/y       # one dependency
+go mod tidy                    # always follow with tidy
+```
+
+Check what is available before upgrading:
+
+```bash
+go list -m -u all              # shows current and latest for everything
+```
+
+```text
+github.com/go-chi/chi/v5 v5.1.0 [v5.2.1]
+github.com/google/uuid v1.6.0
+```
+
+The bracketed version is what you would get with `-u`.
+
+### Inspecting
+
+```bash
+go list -m all                        # every module in the build
+go list -m -json all                  # same, machine readable
+go mod graph                          # the full dependency graph
+go mod why github.com/some/lib        # why is this here at all
+```
+
+`go mod why` is the one to remember. When `go.sum` gains a module you have never heard of, it tells you which of your dependencies dragged it in:
+
+```bash
+go mod why golang.org/x/sys
+```
+
+```text
+# golang.org/x/sys
+github.com/yourorg/app
+github.com/jackc/pgx/v5
+golang.org/x/sys/unix
+```
+
+### Verifying
+
+```bash
+go mod verify                  # do cached modules match go.sum
+go mod download                # fetch everything without building
+```
+
+## Downgrading and pinning
+
+```bash
+go get github.com/some/lib@v1.2.0     # go back to a specific version
+```
+
+When a dependency has a bad release, pin it explicitly. The `require` line in `go.mod` sets a minimum, and minimal version selection means nothing will raise it unless another dependency demands more.
+
+To force a version even when something else wants a different one, use `replace`:
+
+```go title="go.mod"
+replace github.com/broken/lib => github.com/broken/lib v1.2.3
+```
+
+## replace, for local development
+
+The most common use of `replace` is pointing at a checkout on your own disk:
+
+```go title="go.mod"
+replace github.com/yourorg/shared => ../shared
+```
+
+Now edits to `../shared` show up immediately, with no publishing step. This is how you develop two modules together.
+
+```bash
+go mod edit -replace github.com/yourorg/shared=../shared
+go mod edit -dropreplace github.com/yourorg/shared
+```
+
+<Callout type="warn">
+Never commit a `replace` pointing at a local path. It builds on your machine and fails on everyone else's, including CI. Use a workspace instead, which does the same job without touching `go.mod`.
+</Callout>
+
+## Workspaces
+
+Go 1.18 added workspaces for exactly the multi-module case, and they keep the local paths out of version control:
+
+```bash
+mkdir workspace && cd workspace
+git clone github.com/yourorg/api
+git clone github.com/yourorg/shared
+
+go work init ./api ./shared
+```
+
+```text title="go.work"
+go 1.24
+
+use (
+    ./api
+    ./shared
+)
+```
+
+Every module in the `use` list resolves to the local copy. Add `go.work` and `go.work.sum` to `.gitignore`, since they describe one developer's layout rather than the project.
+
+## Private modules
+
+For repositories that require authentication:
+
+```bash
+go env -w GOPRIVATE=github.com/yourorg/*
+```
+
+`GOPRIVATE` tells Go to skip the public proxy and checksum database for matching paths, and to fetch directly with your git credentials instead.
+
+```bash
+git config --global url."git@github.com:".insteadOf "https://github.com/"
+```
+
+That line makes Go use SSH for GitHub, which is usually the easiest way to authenticate.
+
+## The proxy and the checksum database
+
+By default, Go fetches modules through `proxy.golang.org` and verifies them against `sum.golang.org`.
+
+```bash
+go env GOPROXY      # https://proxy.golang.org,direct
+go env GOSUMDB      # sum.golang.org
+```
+
+The proxy caches every published module version permanently, which means a dependency cannot disappear because somebody deleted their repository. The checksum database is an append-only transparency log that makes it detectable if a published version is ever changed after the fact.
+
+Both can be disabled, and you generally should not:
+
+```bash
+GOFLAGS=-mod=mod GOPROXY=direct go build      # skip the proxy
+GONOSUMDB=* go build                          # skip verification
+```
+
+## Vendoring
+
+`go mod vendor` copies every dependency into a `vendor/` folder in your repository:
+
+```bash
+go mod vendor
+go build -mod=vendor ./...       # implied automatically when vendor/ exists
+```
+
+Builds then use `vendor/` and never touch the network. Some organisations require this for auditability or for air-gapped builds.
+
+The tradeoffs are real. Your repository grows substantially, diffs include dependency changes, and `go mod tidy` needs a `go mod vendor` after it. Most projects do not vendor, and rely on the proxy for availability instead.
+
+## The commands in one place
+
+```bash
+go mod init <path>          # start a module
+go mod tidy                 # sync go.mod with the imports in your code
+go mod download             # fetch dependencies into the cache
+go mod verify               # check cached modules against go.sum
+go mod why <path>           # explain why a dependency is present
+go mod graph                # print the dependency graph
+go mod vendor               # copy dependencies into vendor/
+go mod edit -replace a=b    # edit go.mod programmatically
+
+go get <path>@<version>     # add or change a dependency
+go get -u ./...             # upgrade minor and patch versions
+go list -m all              # list the selected versions
+go list -m -u all           # list them with available upgrades
+
+go work init ./a ./b        # create a workspace
+go work use ./c             # add a module to it
+```
+
+Next, let's look at how to choose and evaluate the third party packages you will be adding with these commands.

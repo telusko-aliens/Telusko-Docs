@@ -1,0 +1,313 @@
+---
+title: Panic and Recover
+---
+
+Go does have a mechanism that unwinds the stack looking for a handler. It is called `panic` and `recover`, it looks a lot like exceptions, and using it like exceptions is the fastest way to write Go that other Go programmers will not want to maintain.
+
+The rule is short: **a panic means the program has a bug. An error means the world did something you planned for.**
+
+## What a panic does
+
+```go
+func main() {
+    fmt.Println("before")
+    panic("something is badly wrong")
+    fmt.Println("after")        // never runs
+}
+```
+
+```text
+before
+panic: something is badly wrong
+
+goroutine 1 [running]:
+main.main()
+	/tmp/main.go:6 +0x65
+exit status 2
+```
+
+When `panic` fires, the current function stops immediately. Its deferred calls run, then it returns to its caller, whose deferred calls run, and so on up the stack. If nothing recovers, the program prints the message and a stack trace and exits with status 2.
+
+Deferred calls still running is the important part. Cleanup registered with `defer` is not skipped by a panic, which is what makes `defer` reliable for closing files and releasing locks.
+
+## The panics you will meet
+
+Most panics are not written by you. They come from the runtime:
+
+```go
+var p *User
+fmt.Println(p.Name)              // nil pointer dereference
+
+s := []int{1, 2, 3}
+fmt.Println(s[10])               // index out of range [10] with length 3
+
+var m map[string]int
+m["key"] = 1                     // assignment to entry in nil map
+
+a, b := 10, 0
+fmt.Println(a / b)               // integer divide by zero
+
+var i any = "hello"
+n := i.(int)                     // interface conversion: string is not int
+```
+
+Every one of these is a bug in the code, not a condition in the environment. That is exactly why they panic rather than returning an error: there is no sensible way for the caller to continue.
+
+## When you should panic
+
+Three situations, and they are narrower than people expect.
+
+### Impossible states during initialisation
+
+If a program cannot start correctly, failing loudly at startup is better than running in a broken state.
+
+```go
+var validEmail = regexp.MustCompile(`^[^@]+@[^@]+\.[^@]+$`)
+```
+
+`MustCompile` panics on a bad pattern. That is correct here, because the pattern is a literal in the source, so a failure means the developer made a typo and the program should never have shipped.
+
+The `Must` prefix is Go's convention for exactly this: a function that panics instead of returning an error, intended for initialisation.
+
+```go
+func MustLoadTemplate(name string) *template.Template {
+    t, err := template.ParseFiles(name)
+    if err != nil {
+        panic(fmt.Sprintf("parsing template %s: %v", name, err))
+    }
+    return t
+}
+
+var indexTmpl = MustLoadTemplate("index.html")
+```
+
+### Violated invariants inside your own package
+
+```go
+func (t *Tree) rotate(n *node) {
+    if n.parent == nil {
+        panic("rotate called on the root node")     // caller made a mistake
+    }
+    // ...
+}
+```
+
+This says: if you reach here, my own code has a bug. It is a stronger form of assertion, and it belongs on unexported functions where the caller is you.
+
+### Genuinely unreachable code
+
+```go
+switch status {
+case Active, Inactive, Pending:
+    return handle(status)
+default:
+    panic(fmt.Sprintf("unhandled status %v", status))
+}
+```
+
+Better than silently returning a zero value when somebody adds a fourth status and forgets this switch.
+
+<Callout type="warn">
+What is not on the list: file not found, network timeout, invalid user input, a missing database row, a failed API call. All of these are ordinary conditions in a running system and every one of them should be an error return. A library that panics on bad input forces every caller into a `recover`, and that is a design failure.
+</Callout>
+
+## recover
+
+`recover` stops a panic, and it only works inside a deferred function:
+
+```go
+func safe() {
+    defer func() {
+        if r := recover(); r != nil {
+            fmt.Println("recovered:", r)
+        }
+    }()
+
+    panic("boom")
+}
+
+func main() {
+    safe()
+    fmt.Println("still running")     // this prints
+}
+```
+
+Outside a deferred function, `recover` returns nil and does nothing:
+
+```go
+func broken() {
+    if r := recover(); r != nil {    // always nil here, never fires
+        // ...
+    }
+    panic("boom")                    // crashes as normal
+}
+```
+
+## Converting a panic to an error
+
+The most legitimate use of `recover` in application code. Combined with a named return, it turns a crash into an ordinary failure:
+
+```go
+func Parse(input string) (result *AST, err error) {
+    defer func() {
+        if r := recover(); r != nil {
+            err = fmt.Errorf("parsing failed: %v", r)
+        }
+    }()
+
+    return parseInternal(input), nil
+}
+```
+
+This is how recursive descent parsers and some template engines are written. Internally they panic to abandon a deep recursion quickly, and at the public boundary they convert that into an error. The panic never escapes the package, which is the crucial part.
+
+Capture the stack trace while you are there, because `%v` on a recovered value gives you the message and nothing about where it came from:
+
+```go
+defer func() {
+    if r := recover(); r != nil {
+        err = fmt.Errorf("panic: %v\n%s", r, debug.Stack())
+    }
+}()
+```
+
+## Recovering in an HTTP server
+
+One panicking handler should not take down a server that is serving thousands of other requests. This middleware is close to mandatory in production:
+
+```go
+func Recovery(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        defer func() {
+            if rec := recover(); rec != nil {
+                slog.Error("panic in handler",
+                    "panic", rec,
+                    "method", r.Method,
+                    "path", r.URL.Path,
+                    "stack", string(debug.Stack()),
+                )
+                http.Error(w, "internal server error", http.StatusInternalServerError)
+            }
+        }()
+
+        next.ServeHTTP(w, r)
+    })
+}
+```
+
+Note what it does: logs the panic with the full stack, returns a 500, and lets the server keep running. It does not swallow the problem silently, and it does not pretend the request succeeded.
+
+<Callout type="info">
+Go's own `net/http` server already recovers panics per connection so one bad handler cannot kill the process. What it does not do is log usefully or send a proper response. Adding your own recovery middleware gives you both.
+</Callout>
+
+## Panics in goroutines cannot be recovered from outside
+
+This is the one that surprises people, and it crashes production services.
+
+```go
+func main() {
+    defer func() {
+        recover()               // does NOT catch the goroutine's panic
+    }()
+
+    go func() {
+        panic("in a goroutine")
+    }()
+
+    time.Sleep(time.Second)
+}
+```
+
+```text
+panic: in a goroutine
+exit status 2
+```
+
+Each goroutine has its own stack. A panic unwinds only that stack, and if it reaches the top with nothing recovering, the whole process dies. There is no way to catch it from the goroutine that started it.
+
+Every goroutine that runs code which might panic needs its own recovery:
+
+```go
+func safeGo(fn func()) {
+    go func() {
+        defer func() {
+            if r := recover(); r != nil {
+                slog.Error("goroutine panicked",
+                    "panic", r,
+                    "stack", string(debug.Stack()),
+                )
+            }
+        }()
+        fn()
+    }()
+}
+```
+
+<Callout type="warn">
+This is one of the most common causes of unexplained crashes in Go services. A background worker panics on malformed data at 3 a.m. and the entire process exits, taking every in-flight request with it. Any goroutine processing external input needs a recovery wrapper.
+</Callout>
+
+## Panicking with a value
+
+`panic` accepts any value, and using an error type makes recovery cleaner:
+
+```go
+type parseError struct {
+    Line int
+    Msg  string
+}
+
+func (e parseError) Error() string {
+    return fmt.Sprintf("line %d: %s", e.Line, e.Msg)
+}
+
+func parse(lines []string) (err error) {
+    defer func() {
+        if r := recover(); r != nil {
+            if pe, ok := r.(parseError); ok {
+                err = pe                    // our own panic, convert it
+                return
+            }
+            panic(r)                        // somebody else's, re-panic
+        }
+    }()
+
+    // ... panics with parseError deep in the recursion
+    return nil
+}
+```
+
+That re-panic is important. Recovering an unexpected panic and turning it into an error hides genuine bugs. Recover only what you deliberately threw, and let everything else through.
+
+## Panics you cannot recover from
+
+Some failures bypass the mechanism entirely:
+
+```text
+   concurrent map writes           fatal error, not recoverable
+   stack overflow                  fatal error, not recoverable
+   out of memory                   fatal error, not recoverable
+   all goroutines are asleep       fatal error, deadlock detected
+```
+
+These print `fatal error` rather than `panic` and no amount of `recover` will help. The runtime treats them as conditions where continuing would be unsafe.
+
+## The decision, in one place
+
+```text
+   Bad user input                        →  return an error
+   File missing, network down            →  return an error
+   Database row not found                →  return an error
+   Config invalid at startup             →  return an error, or panic in main
+   Regexp literal fails to compile       →  panic (MustCompile)
+   Your own precondition violated        →  panic in unexported code
+   Unreachable switch default            →  panic
+   A library needs input validated       →  return an error, never panic
+
+   Handling a panic in a request handler →  recover in middleware
+   Handling a panic in a goroutine       →  recover inside that goroutine
+   Handling a panic in normal logic      →  do not, fix the bug instead
+```
+
+That completes error handling. Next, let's look at how Go organises code into packages and modules, and how to lay out a project that stays navigable as it grows.

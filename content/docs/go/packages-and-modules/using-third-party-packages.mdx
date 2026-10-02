@@ -1,0 +1,225 @@
+---
+title: Using Third Party Packages
+---
+
+Go's culture around dependencies is noticeably more conservative than most of the ecosystems you may have come from. A typical Node project has hundreds of packages in `node_modules`. A typical Go service has ten to twenty in `go.mod`, and half of those are transitive.
+
+That difference is not accident or ideology. It comes from the standard library being unusually complete, and from a community proverb that gets quoted whenever someone reaches for a dependency too quickly:
+
+<Quote>
+A little copying is better than a little dependency.
+</Quote>
+
+## Check the standard library first
+
+Before adding anything, it is worth knowing what you already have.
+
+| Need | Standard library |
+| --- | --- |
+| HTTP server and client | `net/http` |
+| JSON encoding | `encoding/json` |
+| SQL database access | `database/sql` |
+| Structured logging | `log/slog` |
+| Testing and benchmarks | `testing` |
+| Templating | `html/template`, `text/template` |
+| Command line flags | `flag` |
+| Cryptography and hashing | `crypto/*` |
+| Compression | `compress/*` |
+| Time and durations | `time` |
+| Concurrency primitives | `sync`, `context` |
+| Regular expressions | `regexp` |
+| File and path handling | `os`, `io`, `path/filepath` |
+| Sorting and searching | `sort`, `slices` |
+
+A production HTTP API with a PostgreSQL database, JSON, logging, and tests needs exactly one third party package: the database driver. Everything else is already there.
+
+That is unusual. In most ecosystems, the equivalent stack is a framework, a logger, a JSON library, a test runner, an assertion library, and a router.
+
+## When a dependency is worth it
+
+Adding one is not a failure. The question is whether the problem is genuinely hard or merely tedious.
+
+**Worth it:**
+
+- Database drivers, because you are not writing the PostgreSQL wire protocol
+- Cryptography beyond what `crypto/*` covers, because rolling your own is dangerous
+- Cloud SDKs, because the APIs are enormous and change
+- Protocol implementations such as gRPC, AMQP, or Kafka clients
+- Anything with a specification you would have to implement correctly
+
+**Usually not worth it:**
+
+- A helper for something the standard library does in four lines
+- A router, unless you actually need what it adds over `net/http`
+- An assertion library, unless the team specifically wants one
+- Utility collections that duplicate `slices` and `maps`
+- A framework, before you know what you need from one
+
+<Callout type="info">
+Since Go 1.22, `net/http` supports method and wildcard patterns in routes: `mux.HandleFunc("GET /users/{id}", handler)`. That removed the main reason most projects reached for a router. Try the standard mux first and add `chi` or `gorilla/mux` only when you hit something it cannot do.
+</Callout>
+
+## Evaluating a package
+
+Before `go get`, spend five minutes on these.
+
+<Steps>
+<Step>
+### Check its own dependency list
+
+Open the repository's `go.mod`. A library with two dependencies is a very different proposition from one with forty. Every transitive dependency is code you now ship and are responsible for.
+</Step>
+<Step>
+### Look at the last commit and the open issues
+
+Not stars. Stars measure a moment of popularity years ago. Recent commits, responded-to issues, and merged pull requests measure whether anyone will fix a bug you find.
+</Step>
+<Step>
+### Check the version and the API stability
+
+A library at v0.x is telling you the API may change. That is fine for something you can replace easily and risky for something that will be threaded through your codebase.
+</Step>
+<Step>
+### Read some of the source
+
+Go libraries are usually small enough to skim. Fifteen minutes reading the main file tells you more about quality than any badge.
+</Step>
+<Step>
+### Confirm the licence
+
+MIT, BSD, and Apache 2.0 are the norm and are unproblematic. GPL and AGPL have obligations that may not suit a commercial product. Check before, not after.
+</Step>
+</Steps>
+
+## The packages you will actually meet
+
+These have earned broad adoption, and knowing the shortlist saves a lot of searching.
+
+**Databases**
+
+```bash
+go get github.com/jackc/pgx/v5              # PostgreSQL, the current standard
+go get github.com/go-sql-driver/mysql       # MySQL
+go get modernc.org/sqlite                   # SQLite, pure Go, no cgo
+go get github.com/jmoiron/sqlx              # thin helpers over database/sql
+```
+
+**Web**
+
+```bash
+go get github.com/go-chi/chi/v5             # router, stays close to net/http
+go get github.com/gorilla/mux               # router, long established
+go get github.com/gin-gonic/gin             # full framework, its own idioms
+```
+
+**Testing**
+
+```bash
+go get github.com/stretchr/testify          # assertions and mocks
+go get github.com/google/go-cmp             # structural comparison for tests
+```
+
+**Utility**
+
+```bash
+go get github.com/google/uuid               # UUID generation
+go get golang.org/x/sync/errgroup           # goroutine groups with error handling
+go get github.com/spf13/cobra               # CLI framework
+go get github.com/joho/godotenv             # .env file loading
+```
+
+The `golang.org/x/*` packages deserve a note. They are maintained by the Go team but live outside the standard library, either because they are still evolving or because they are too specialised to be included. `golang.org/x/sync/errgroup` in particular is close to essential for concurrent code and you will meet it in the concurrency section.
+
+## Isolating a dependency
+
+The habit that saves you later: wrap third party libraries behind your own small interface rather than letting them spread.
+
+```go
+// Not this: the library's types appear throughout your codebase
+func (s *Service) Charge(o Order) error {
+    return stripe.NewCharge(&stripe.ChargeParams{ /* ... */ })
+}
+```
+
+```go
+// This: one adapter, everything else sees your interface
+type PaymentGateway interface {
+    Charge(ctx context.Context, amount int64, token string) (string, error)
+}
+
+type stripeGateway struct {
+    client *stripe.Client
+}
+
+func (g *stripeGateway) Charge(ctx context.Context, amount int64, token string) (string, error) {
+    ch, err := g.client.Charges.New(&stripe.ChargeParams{ /* ... */ })
+    if err != nil {
+        return "", fmt.Errorf("stripe charge: %w", err)
+    }
+    return ch.ID, nil
+}
+```
+
+The rest of the application depends on `PaymentGateway`. Swapping providers, or faking one in a test, touches one file.
+
+This is worth doing for payment providers, cloud SDKs, message brokers, and anything else you might realistically replace. It is not worth doing for a UUID generator.
+
+## Keeping dependencies healthy
+
+```bash
+# What is out of date
+go list -m -u all
+
+# Known vulnerabilities, from the official Go database
+go install golang.org/x/vuln/cmd/govulncheck@latest
+govulncheck ./...
+
+# Upgrade patches only, the safe cadence
+go get -u=patch ./...
+go mod tidy
+go test ./...
+```
+
+`govulncheck` is worth wiring into CI. Unlike a generic dependency scanner it does reachability analysis: it reports a vulnerability only if your code actually calls the affected function, which cuts the noise dramatically.
+
+```text
+Vulnerability #1: GO-2024-2687
+    HTTP/2 CONTINUATION flood in net/http
+  More info: https://pkg.go.dev/vuln/GO-2024-2687
+  Standard library
+    Found in: net/http@go1.21.0
+    Fixed in: net/http@go1.21.9
+```
+
+## Reading documentation
+
+Every published module gets a page on pkg.go.dev automatically, generated from the doc comments:
+
+```text
+https://pkg.go.dev/github.com/go-chi/chi/v5
+```
+
+The same content is available offline:
+
+```bash
+go doc github.com/go-chi/chi/v5
+go doc github.com/go-chi/chi/v5.NewRouter
+go doc -all github.com/go-chi/chi/v5      # everything, including examples
+```
+
+Go doc has one feature worth knowing about: functions named `Example`, `ExampleFunctionName` in a `_test.go` file appear as runnable examples in the documentation and are executed by `go test`. Documentation that cannot go stale is a rare and valuable thing.
+
+## The dependency mindset
+
+```text
+   Can the standard library do it?              →  use that
+   Is it under twenty lines to write?           →  write it
+   Is it a hard problem with a spec?            →  use a library
+   Will I plausibly replace it later?           →  wrap it behind an interface
+   Does it pull in thirty transitive deps?      →  look for a smaller option
+   Is it at v0.x and central to my design?      →  think twice
+```
+
+The goal is not zero dependencies. It is being able to explain why each one is there, and being confident you could remove any of them in an afternoon.
+
+Next, let's put all of this together into a project layout that survives growth.
