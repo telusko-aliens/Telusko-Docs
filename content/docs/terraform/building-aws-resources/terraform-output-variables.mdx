@@ -1,0 +1,201 @@
+---
+title: Terraform Output Variables
+description: Add an output.tf that prints the public IP of the new EC2 instance after apply, and learn how to read, format and protect output values.
+---
+
+After `terraform apply` creates an EC2 instance, what is the first thing you need? Usually its public IP, so you can SSH in or open it in a browser. So far we have been opening the AWS console to find it. That defeats the point of automation.
+
+Terraform can print that information for you. Values that go **into** a configuration are input variables, which we used in the [previous lesson](/docs/terraform/building-aws-resources/using-variables-in-terraform). Values that come **out** after apply are **output values**, often called output variables.
+
+<img src="/terraform/tf-inputs-outputs.svg" alt="Input variables flow into main.tf and output values are printed after terraform apply" width={960} height={400} />
+
+## What outputs are for
+
+Anything Terraform knows about a resource after creating it can be an output:
+
+| Resource | Typical outputs |
+| --- | --- |
+| EC2 instance | Public IP, private IP, instance ID, public DNS name |
+| S3 bucket | Bucket name, ARN, regional domain name |
+| RDS database | Endpoint and port to put in your application config |
+| IAM user | User name and ARN |
+
+Outputs are also how modules pass data to each other, which we use in the [module project](/docs/terraform/taint-and-modules/terraform-module-project-implementation).
+
+## Step 1: Prepare the folder
+
+The lecture continues in the `03-tf-ec2vars` folder from the variables lesson. It deletes `terraform.tfstate` and `terraform.tfstate.backup` there so it can create a fresh instance.
+
+<Callout type="warn" title="Destroy, do not delete the state">
+As you saw in [Terraform Statefile](/docs/terraform/terraform-workflow-and-state/terraform-statefile), deleting the state while the instance from the last lesson is still running leaves that instance orphaned: it keeps running and Terraform forgets about it. Run `terraform destroy` first if anything is still up. You do not need to delete any files after that, because a destroyed configuration simply creates new resources on the next apply.
+</Callout>
+
+```bash
+cd 03-tf-ec2vars
+terraform destroy -auto-approve   # only if the previous instance still exists
+ls
+# main.tf  provider.tf  vars.tf  terraform.tfstate  terraform.tfstate.backup
+```
+
+## Step 2: Write output.tf
+
+```bash
+vi output.tf
+```
+
+```hcl title="output.tf"
+output "ec2_vm_public_ip" {
+  value = aws_instance.linux-VM.public_ip
+}
+```
+
+| Part | Meaning |
+| --- | --- |
+| `output` | Keyword for an output value |
+| `"ec2_vm_public_ip"` | Name you choose. It is printed next to the value |
+| `value` | What to print. Here a reference to an attribute of a resource |
+
+The reference has three parts: `<resource type>.<local name>.<attribute>`.
+
+- `aws_instance` is the resource type
+- `linux-VM` is the local name we gave the resource in `main.tf`
+- `public_ip` is one of the attributes the provider exposes for `aws_instance`
+
+Where do attribute names come from? The **Attribute Reference** section of each resource's page in the provider documentation. For `aws_instance` that includes `id`, `arn`, `public_ip`, `private_ip`, `public_dns` and `instance_state`, among others.
+
+You can define as many outputs as you like. A more complete `output.tf`:
+
+```hcl title="output.tf"
+output "ec2_vm_public_ip" {
+  description = "Public IP of the Linux VM"
+  value       = aws_instance.linux-VM.public_ip
+}
+
+output "ec2_vm_private_ip" {
+  description = "Private IP inside the VPC"
+  value       = aws_instance.linux-VM.private_ip
+}
+
+output "ec2_vm_id" {
+  description = "Instance ID"
+  value       = aws_instance.linux-VM.id
+}
+
+output "ssh_command" {
+  description = "Ready to paste SSH command"
+  value       = "ssh -i terraform_keypair.pem ec2-user@${aws_instance.linux-VM.public_ip}"
+}
+```
+
+The last one shows where the `"${...}"` string syntax is genuinely useful: building a longer string around a value.
+
+## Step 3: Apply
+
+The folder now has four files:
+
+| File | Role |
+| --- | --- |
+| `provider.tf` | Which cloud and region |
+| `vars.tf` | Input variables |
+| `main.tf` | The resources |
+| `output.tf` | What to print afterwards |
+
+Reconnected to the VM? Export your AWS credentials again first. Then:
+
+```bash
+terraform init
+terraform fmt
+terraform validate
+terraform plan
+```
+
+The plan now has an extra section:
+
+```text
+Plan: 1 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + ec2_vm_public_ip = (known after apply)
+```
+
+`(known after apply)` is honest: AWS assigns the public IP only when the instance launches, so Terraform cannot know it during planning.
+
+```bash
+terraform apply -auto-approve
+```
+
+```text
+aws_instance.linux-VM: Creation complete after 22s [id=i-0abc1234def567890]
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+ec2_vm_public_ip = "203.0.113.25"
+```
+
+Open the instance in the EC2 console and compare. The public IPv4 address is the same one Terraform printed.
+
+## Reading outputs later
+
+Outputs are saved in the state file, so you can read them any time without applying again:
+
+```bash
+terraform output                         # all outputs
+terraform output ec2_vm_public_ip        # one output, with quotes
+terraform output -raw ec2_vm_public_ip   # just the value, ideal for scripts
+terraform output -json                   # everything as JSON
+```
+
+`-raw` is the one you will use in shell scripts:
+
+```bash
+ssh -i terraform_keypair.pem ec2-user@$(terraform output -raw ec2_vm_public_ip)
+```
+
+## Sensitive outputs
+
+Some outputs should not appear on screen, such as a generated database password:
+
+```hcl
+output "db_password" {
+  value     = random_password.db.result
+  sensitive = true
+}
+```
+
+Terraform then prints `db_password = <sensitive>` after apply. `terraform output db_password` still shows the value when you ask for it directly, and the value is stored in plain text in the state file, which is another reason to protect state.
+
+## Common errors
+
+| Error | Cause |
+| --- | --- |
+| `Reference to undeclared resource` | The local name in the output does not match `main.tf`, for example `linux_vm` instead of `linux-VM` |
+| `Unsupported attribute` | The attribute does not exist, for example `public-ip` instead of `public_ip`. Check the provider docs |
+| Output is empty `""` | The instance has no public IP, for example in a subnet without auto assign public IP |
+
+## Clean up
+
+```bash
+terraform destroy -auto-approve
+```
+
+The destroy plan shows the outputs being removed too: `- ec2_vm_public_ip = "203.0.113.25" -> null`.
+
+## Try It Yourself
+
+1. Add `output.tf` with `ec2_vm_public_ip` and apply. Compare the printed IP with the console.
+2. Add outputs for `private_ip`, `id` and `instance_state`, then run `terraform apply` again. Notice that only outputs change, no resources.
+3. Run `terraform output -raw ec2_vm_public_ip` and use it inside an `ssh` command.
+4. Add the `ssh_command` output and copy-paste it to log in.
+5. Destroy everything and run `terraform output` again. What does it print now?
+
+## Official references
+
+- [Output values](https://developer.hashicorp.com/terraform/language/values/outputs)
+- [terraform output command](https://developer.hashicorp.com/terraform/cli/commands/output)
+- [aws_instance attribute reference](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

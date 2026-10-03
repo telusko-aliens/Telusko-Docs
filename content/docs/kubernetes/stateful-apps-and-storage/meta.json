@@ -1,0 +1,11 @@
+{
+  "title": "Stateful Apps & Storage",
+  "pages": [
+    "stateful-applications-and-statefulsets-explained.mdx",
+    "kubernetes-storage-fundamentals-pv-and-pvc.mdx",
+    "preparing-aws-ebs-storage-for-kubernetes-eks.mdx",
+    "persistent-volumes-pv-and-persistent-volume-claims-pvc-hands-on.mdx",
+    "behind-the-scenes-of-kubernetes-statefulsets.mdx",
+    "creating-statefulsets-with-persistent-storage-on-amazon-eks.mdx"
+  ]
+}

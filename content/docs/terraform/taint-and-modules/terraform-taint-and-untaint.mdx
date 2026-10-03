@@ -1,0 +1,175 @@
+---
+title: Terraform Taint and Untaint
+description: Force Terraform to destroy and recreate a resource without changing code, using terraform taint and untaint, and the modern replacement terraform apply -replace.
+---
+
+Here is a situation you will meet in real work. Terraform created an EC2 instance last week. Today the instance is misbehaving: someone changed a config file by hand, a disk filled up, the application on it is broken. Your Terraform code is fine and has not changed. You simply want a **fresh** instance built from the same code.
+
+What happens if you run `terraform apply`?
+
+```bash
+terraform apply -auto-approve
+```
+
+```text
+No changes. Your infrastructure matches the configuration.
+
+Apply complete! Resources: 0 added, 0 changed, 0 destroyed.
+```
+
+Nothing. As we learned in [Terraform Statefile](/docs/terraform/terraform-workflow-and-state/terraform-statefile), Terraform compares code, state and reality. The instance exists and matches the code, so as far as Terraform is concerned, there is nothing to do. It cannot see that the software inside the machine is broken.
+
+## The long way round
+
+Without any special command, you could:
+
+1. `terraform destroy` (deletes **everything** in the configuration, not just the broken instance)
+2. `terraform apply` again
+
+Or, as the lecture mentions, delete the state file and re-initialise, which as you know creates orphans and is never a good idea. Both are heavy handed. What you want is: "replace this one resource, leave the rest alone".
+
+<img src="/terraform/tf-taint-replace.svg" alt="Taint and apply -replace both lead to a plan that destroys and recreates one resource" width={960} height={480} />
+
+## terraform taint
+
+**Tainting** a resource marks it in the state file as "damaged, must be replaced". The next apply destroys and recreates it.
+
+The lecture uses the `03-tf-ec2vars` project from the variables and outputs lessons, where the instance was created as `aws_instance.linux-VM`.
+
+The command takes the **resource address**: `<type>.<local name>`.
+
+```bash
+terraform taint aws_instance.linux-VM
+```
+
+```text
+Resource instance aws_instance.linux-VM has been marked as tainted.
+```
+
+On the first try in the lecture, the name was typed slightly wrong and Terraform replied:
+
+```text
+No such resource instance
+```
+
+The address must match exactly what is in `main.tf`, including case and hyphens: `linux-VM` is not `linux_vm` or `Linux-VM`. When in doubt, list the addresses Terraform knows:
+
+```bash
+terraform state list
+```
+
+```text
+aws_instance.linux-VM
+```
+
+Now apply, without changing any code:
+
+```bash
+terraform apply -auto-approve
+```
+
+```text
+  # aws_instance.linux-VM is tainted, so must be replaced
+-/+ resource "aws_instance" "linux-VM" {
+      ~ id         = "i-0abc1234def567890" -> (known after apply)
+      ~ public_ip  = "203.0.113.25" -> (known after apply)
+        ...
+    }
+
+Plan: 1 to add, 0 to change, 1 to destroy.
+
+Changes to Outputs:
+  ~ ec2_vm_public_ip = "203.0.113.25" -> (known after apply)
+
+aws_instance.linux-VM: Destroying... [id=i-0abc1234def567890]
+aws_instance.linux-VM: Destruction complete after 40s
+aws_instance.linux-VM: Creating...
+aws_instance.linux-VM: Creation complete after 13s [id=i-0def9876abc543210]
+
+Apply complete! Resources: 1 added, 0 changed, 1 destroyed.
+```
+
+Read the symbol `-/+`: destroy, then create. The old instance is terminated, a new one is launched with a new instance ID and a new public IP, which our output prints for us.
+
+## terraform untaint
+
+Marked a resource by mistake? Remove the mark before you apply:
+
+```bash
+terraform taint aws_instance.linux-VM
+terraform untaint aws_instance.linux-VM
+```
+
+```text
+Resource instance aws_instance.linux-VM has been successfully untainted.
+```
+
+The next apply goes back to normal:
+
+```text
+No changes. Your infrastructure matches the configuration.
+```
+
+Untaint is also useful in one more case. If a resource fails halfway through creation (for example a provisioner script fails), Terraform marks it as tainted automatically. If you know the resource is actually fine, `untaint` stops Terraform from replacing it.
+
+## The modern way: apply -replace
+
+`terraform taint` still works, but HashiCorp has **deprecated** it. The official docs say: "This command is deprecated. Instead, add the `-replace` option to your `terraform apply` command." The `-replace` option exists since Terraform v0.15.2.
+
+```bash
+terraform apply -replace="aws_instance.linux-VM"
+```
+
+Same result, but better:
+
+| | `terraform taint` + `apply` | `terraform apply -replace` |
+| --- | --- | --- |
+| Steps | Two commands | One command |
+| When the state changes | Immediately, when you run `taint` | Only when you approve the apply |
+| Preview | You see the effect only in the next plan | The plan shows the replacement before you type `yes` |
+| Teams | A colleague running `apply` in between replaces your resource without expecting it | Nothing is changed for anyone until you approve |
+| Status | Deprecated | Recommended |
+
+You can preview first with `plan` too:
+
+```bash
+terraform plan -replace="aws_instance.linux-VM"
+```
+
+And replace several resources at once by repeating the flag:
+
+```bash
+terraform apply -replace="aws_instance.web" -replace="aws_instance.worker"
+```
+
+<Callout type="info" title="Learn both">
+You will still find `terraform taint` in older scripts, tutorials and interview questions, so know what it does. For your own work, use `-replace`.
+</Callout>
+
+<Callout type="warn" title="Replacing deletes data">
+Replacing an instance destroys its root disk. Anything stored only on that machine is gone. For servers built with user data or configuration tools this is fine, because the new machine rebuilds itself. For a database, think very carefully before replacing.
+</Callout>
+
+## When to use it
+
+- An instance's software is broken and rebuilding is faster than repairing
+- You changed a user data script and want the new script to run (alternatively use `user_data_replace_on_change`, see [the user data lesson](/docs/terraform/building-aws-resources/creating-ec2-vm-with-user-data-using-terraform))
+- You want to test that your configuration really can rebuild a resource from scratch
+
+## Try It Yourself
+
+1. Apply the `03-tf-ec2vars` project, then run `terraform apply` again and confirm `No changes`.
+2. Run `terraform taint` with a wrong address and read the error. Use `terraform state list` to find the right one.
+3. Taint the instance, apply, and compare the old and new public IP in the outputs.
+4. Taint it again, then untaint it, and confirm that `terraform plan` shows no changes.
+5. Use `terraform plan -replace="aws_instance.linux-VM"` and then `terraform apply -replace=...`. Finish with `terraform destroy`.
+
+## Official references
+
+- [terraform taint (deprecated)](https://developer.hashicorp.com/terraform/cli/commands/taint)
+- [terraform untaint](https://developer.hashicorp.com/terraform/cli/commands/untaint)
+- [terraform plan: replace option](https://developer.hashicorp.com/terraform/cli/commands/plan)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

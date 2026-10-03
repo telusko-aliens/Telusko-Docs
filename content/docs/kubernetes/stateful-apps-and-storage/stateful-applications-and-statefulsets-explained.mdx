@@ -1,0 +1,113 @@
+---
+title: Stateful Applications & StatefulSets Explained
+description: Understand the difference between stateless and stateful applications, see why a Deployment is the wrong tool for a database, and learn what a StatefulSet adds.
+---
+
+Pods, ReplicaSets, Deployments and DaemonSets have carried us a long way. Every one of them works on the same idea: pods are cattle, not pets. If one dies, a fresh one with a new name takes its place and nobody notices.
+
+That idea is perfect for a web application. It is a problem for a database. To see why, we first need two words: **stateless** and **stateful**.
+
+## A quick experiment with a stateless app
+
+Start the `telusko-deploy` Deployment and the LoadBalancer Service from [Rolling Updates & Rollbacks](/docs/kubernetes/namespaces-labels-and-deployments/rolling-updates-and-rollbacks-in-kubernetes-deployments). Both files are already on the EKS home server:
+
+```bash
+kubectl apply -f k8s-deploy.yml
+kubectl apply -f k8s-lbr-svc.yml
+kubectl get pods
+kubectl get svc
+```
+
+Open the `EXTERNAL-IP` hostname of `webapp-lbr-svc` in the browser. The Spring Boot app loads. Now delete one of the three pods:
+
+```bash
+kubectl get pods
+kubectl delete pod telusko-deploy-6c8d9b7f4-x2k9p     # use one of your pod names
+kubectl get pods
+```
+
+```text
+NAME                             READY   STATUS              RESTARTS   AGE
+telusko-deploy-6c8d9b7f4-7qmzt   1/1     Running             0          4m
+telusko-deploy-6c8d9b7f4-h5lwd   1/1     Running             0          4m
+telusko-deploy-6c8d9b7f4-p2c8r   0/1     ContainerCreating   0          3s
+```
+
+Two things happened:
+
+1. The ReplicaSet behind the Deployment noticed only two pods and created a third one. That is the self-healing you already know.
+2. The new pod has a **different name**. Its identity changed.
+
+Refresh the browser. The site still works. The load balancer sent your request to one of the healthy pods, and the application did not care which one.
+
+That is a **stateless application**: any pod can serve any request, nothing important lives inside a pod, and a replacement pod with a new name and a new IP is just as good as the old one. React and Angular front ends, Node.js services and Spring Boot REST APIs are usually stateless (they keep their data in a database outside the pod).
+
+## Now imagine the database
+
+The same Spring Boot app needs MySQL. Suppose you run MySQL with a Deployment too. The MySQL pod crashes, the Deployment creates a new one, and:
+
+- The new pod has a **new name and a new IP**. Anything that was talking to the old pod by name loses it.
+- The data that MySQL wrote **inside the container is gone**, because a container's filesystem is thrown away with the pod.
+- With three MySQL replicas, the Deployment starts all three **at the same time**, in no particular order. A primary and its replicas need a clear order: the primary first, then replicas that copy from it.
+
+The "state" in **stateful application** is exactly this: information the application must remember between restarts (its data, and often who it is in a cluster). Databases, message brokers and distributed stores are stateful: MySQL, PostgreSQL, MongoDB, Kafka, Cassandra, Elasticsearch, ZooKeeper.
+
+<img src="/kubernetes/k8s2-stateless-vs-stateful.svg" alt="Left: three Spring Boot pods with random names behind a load balancer, one crashed and replaced with a new name. Right: three MySQL pods named mysql-0, mysql-1 and mysql-2, each with its own disk" width={960} height={470} />
+
+## What a StatefulSet gives you
+
+A **StatefulSet** is the workload resource made for stateful applications. Like a Deployment, it keeps a fixed number of pods running from a template. What it adds:
+
+| Guarantee | What it means |
+| --- | --- |
+| **Stable, predictable names** | Pods are named `<statefulset-name>-<ordinal>`: `mysql-0`, `mysql-1`, `mysql-2`. If `mysql-1` dies, the replacement is called `mysql-1` again |
+| **Stable network identity** | With a headless Service, each pod gets its own DNS name, for example `mysql-0.mysql.default.svc.cluster.local`, which does not change when the pod is recreated |
+| **Ordered creation** | `mysql-0` is created first. `mysql-1` starts only when `mysql-0` is Running and Ready, and so on |
+| **Ordered deletion** | When scaling down, the highest ordinal goes first: `mysql-2`, then `mysql-1`, then `mysql-0` |
+| **Stable storage per pod** | Each pod gets its own PersistentVolumeClaim, and a recreated pod is reattached to the **same** volume |
+
+That predictability is the whole point. You always know which pod is the first one, which name to connect to, and which disk belongs to which pod. The ordered start and stop is the default behaviour, called `podManagementPolicy: OrderedReady`. You will see all of this on a real cluster in [Creating StatefulSets with Persistent Storage on Amazon EKS](/docs/kubernetes/stateful-apps-and-storage/creating-statefulsets-with-persistent-storage-on-amazon-eks).
+
+<Callout type="info" title="Where does the data actually live?">
+A stable name is only half the story. If the data still lives inside the container, a restarted `mysql-0` comes back empty. The data has to sit on storage outside the pod. Kubernetes models that with PersistentVolumes and PersistentVolumeClaims, which are the topic of the [next lesson](/docs/kubernetes/stateful-apps-and-storage/kubernetes-storage-fundamentals-pv-and-pvc).
+</Callout>
+
+## Deployment vs StatefulSet
+
+| | Deployment | StatefulSet |
+| --- | --- | --- |
+| Best for | Stateless applications | Stateful applications |
+| Pod names | Random: `telusko-deploy-6c8d9b7f4-x2k9p` | Stable: `mysql-0`, `mysql-1` |
+| Creation order | All pods in parallel | One by one, in order (by default) |
+| Deletion order | Any order | Reverse order, highest ordinal first |
+| Storage | Usually none, or one shared volume | One PVC per pod, kept across restarts |
+| Network identity | One Service IP, load balanced | Headless Service, one DNS name per pod |
+| Typical use | Web apps, REST APIs, front ends | Databases, Kafka, ZooKeeper, Elasticsearch |
+
+<Callout type="warn" title="A StatefulSet does not make a database highly available">
+A StatefulSet gives each pod a stable name, order and disk. It does **not** set up MySQL replication, elect a primary or take backups. That logic still has to come from the database itself, a Helm chart or an operator. For production databases on AWS, many teams use a managed service such as Amazon RDS and keep only stateless apps in the cluster. Run databases in Kubernetes when you have a good reason and a backup plan.
+</Callout>
+
+## Clean up
+
+```bash
+kubectl delete -f k8s-lbr-svc.yml     # removes the AWS load balancer
+kubectl delete -f k8s-deploy.yml
+```
+
+## Try It Yourself
+
+1. Deploy `telusko-deploy` with 3 replicas. Delete one pod and note the old and new pod names. Which part of the name stayed the same and which changed?
+2. Run `kubectl get pods -o wide` before and after deleting a pod. Did the IP address change too?
+3. Make a list of five applications your team uses. Mark each as stateless or stateful, and write one sentence on what "state" each stateful one keeps.
+4. Read the "Limitations" section of the official StatefulSet page and note which object you must create yourself for a StatefulSet to work.
+
+## Official references
+
+- [Kubernetes: StatefulSets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)
+- [Kubernetes: Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
+- [Kubernetes: StatefulSet Basics (tutorial)](https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

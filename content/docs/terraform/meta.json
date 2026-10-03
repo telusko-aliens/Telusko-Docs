@@ -1,0 +1,12 @@
+{
+  "title": "Terraform",
+  "icon": "Layers",
+  "pages": [
+    "getting-started.mdx",
+    "introduction.mdx",
+    "getting-started-with-terraform",
+    "terraform-workflow-and-state",
+    "building-aws-resources",
+    "taint-and-modules"
+  ]
+}

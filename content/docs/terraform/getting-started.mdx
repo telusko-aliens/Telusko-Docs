@@ -1,0 +1,88 @@
+---
+title: Getting Started
+description: A practical roadmap for learning Terraform, from installation and credentials to state, variables, outputs, S3 buckets, taint and reusable modules on AWS.
+icon: Sparkles
+---
+
+Every server, bucket and network you created by clicking in the AWS console has the same weakness: nobody can repeat it exactly. Terraform fixes that. You describe your infrastructure in code, review it like code, keep it in Git, and let Terraform create, change and delete the real resources for you.
+
+This course takes you from "what is infrastructure as code" to a small but realistic project with modules. Every lesson is hands-on on a real AWS account, and every resource we create, we also destroy, so your bill stays at zero.
+
+By the end you will be able to:
+
+- Explain why teams use infrastructure as code instead of the console, and where Terraform fits next to CloudFormation and Ansible
+- Install Terraform on an Amazon Linux VM and on Windows, and set up VS Code for HCL
+- Give Terraform AWS access safely, without ever putting keys in your code
+- Use the core workflow: `init`, `fmt`, `validate`, `plan`, `apply` and `destroy`
+- Read and protect the state file, and know why remote state with locking matters
+- Launch an EC2 web server with user data and a proper security group
+- Make configurations flexible with input variables and useful with outputs
+- Create S3 buckets the current way, with versioning as a separate resource
+- Force a resource to be rebuilt with `terraform apply -replace` (and know the older `taint`)
+- Organise a project into a root module and reusable child modules
+
+## Who this is for
+
+Anyone learning DevOps or cloud who already knows the basics of AWS (what an EC2 instance and an S3 bucket are) and is comfortable with a terminal. You do not need any programming background. HCL is a configuration language, much closer to filling in a well structured form than to writing a program.
+
+If AWS is new to you, do the first sections of the [AWS course](/docs/aws/getting-started) first. If Linux commands like `cd`, `ls` and `vi` are unfamiliar, the [Linux course](/docs/linux/getting-started) will make this one much smoother.
+
+## How the course is organised
+
+| Stage | Section | What it covers |
+| --- | --- | --- |
+| Setup | 01 Getting Started with Terraform | Why IaC, what Terraform is, installation on Linux and Windows, AWS credentials |
+| Core workflow | 02 Terraform Workflow & State | Architecture, the six everyday commands, your first EC2 instance, the state file |
+| Real resources | 03 Building AWS Resources | EC2 with user data, input variables, outputs, S3 buckets |
+| Going further | 04 Taint & Modules | Recreating resources, module theory, a modular EC2 and S3 project |
+
+## 01 - Getting Started with Terraform
+
+Why creating infrastructure by hand does not scale, why cloud specific tools like CloudFormation only solve half the problem, and what Terraform is. You then install Terraform on an Amazon Linux EC2 instance or on your Windows laptop (your choice), and give it access to AWS using an IAM user, environment variables or a profile, never keys in code.
+
+## 02 - Terraform Workflow & State
+
+How Terraform core, providers, the state file and cloud APIs fit together, and the commands you will type every day. You write your first configuration, create an EC2 instance, fix a real validation error, and destroy it again. Then you look inside `terraform.tfstate`, see what happens when it is lost, and learn how teams store state remotely in S3.
+
+## 03 - Building AWS Resources with Terraform
+
+From one hardcoded instance to cleaner, more useful configurations. You build an Apache web server with user data, split your project into `provider.tf`, `vars.tf` and `main.tf` with input variables, print the public IP with outputs, and create an S3 bucket while learning to deal with deprecated arguments that AI tools and old tutorials still suggest.
+
+## 04 - Taint & Modules
+
+How to force Terraform to rebuild a broken resource without touching code, first with `taint` and then with the recommended `apply -replace`. Finally, you organise everything into a root module that calls EC2 and S3 child modules, passes inputs down and reads outputs back up.
+
+## How to actually learn this
+
+<Steps>
+<Step>
+### Type every file yourself
+
+Copying and pasting HCL hides the details that matter: `=` versus no `=`, quotes, braces, resource names. Typing it is how you learn to read Terraform errors later.
+</Step>
+<Step>
+### Read every plan before you apply
+
+The plan is Terraform telling you exactly what it is about to do. Make it a habit to find the `Plan: X to add, Y to change, Z to destroy` line and check it matches what you expect.
+</Step>
+<Step>
+### Break things on purpose
+
+Misspell an attribute, remove an `=`, pass a wrong variable, delete a state file in a throwaway folder. Each error you have seen once is an error you will fix in seconds at work.
+</Step>
+<Step>
+### Destroy at the end of every session
+
+Finish each practice session with `terraform destroy` and a quick look at the EC2 and S3 consoles. It costs nothing to recreate tomorrow, because that is the whole point of infrastructure as code.
+</Step>
+</Steps>
+
+<Callout type="warn" title="Protect your AWS account">
+Use an IAM user, not the root user, for Terraform. Never paste access keys into `.tf` files, screenshots or Git. Set up an AWS budget alert before you start.
+</Callout>
+
+Head to the [Introduction](/docs/terraform/introduction) for the big picture, then begin with [Why Terraform and What is Terraform](/docs/terraform/getting-started-with-terraform/why-terraform-and-what-is-terraform).
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

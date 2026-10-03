@@ -1,0 +1,9 @@
+{
+  "title": "Configuration & Autoscaling",
+  "pages": [
+    "environment-variables-configmaps-and-secrets-in-kubernetes.mdx",
+    "kubernetes-autoscaling-introduction.mdx",
+    "auto-scaling-in-kubernetes-with-horizontal-pod-autoscaler-hpa.mdx",
+    "kubernetes-resourcequota.mdx"
+  ]
+}

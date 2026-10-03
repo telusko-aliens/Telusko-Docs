@@ -1,0 +1,59 @@
+---
+title: Introduction
+description: What this hands-on Kubernetes course covers, why we run every demo on Amazon EKS, and what you should have ready before creating your first cluster.
+---
+
+Most teams that ship software today run at least part of it on Kubernetes. It has become the standard way to run containers in production because it gives you a few things that are very hard to build yourself: scaling up and down on demand, automated deployments, self-healing when something crashes, high availability across machines, and sensible use of CPU and memory.
+
+The difficulty is the vocabulary. Within the first week you meet Pods, Deployments, Services, ReplicaSets, DaemonSets, PersistentVolumes, ConfigMaps, Secrets, Helm charts, Argo CD and Ingress controllers. Read about them all at once and it feels like a wall. Build them one at a time on a real cluster and each one makes sense, because each one solves a problem you just ran into.
+
+That is how this course works.
+
+## Why Amazon EKS
+
+You can run Kubernetes in many ways: minikube or kind on your laptop, kubeadm on your own servers, or a managed service from a cloud provider. We use **Amazon EKS** (Elastic Kubernetes Service) for every demo. AWS runs the control plane for you, the worker nodes are normal EC2 instances, and the load balancers and disks you create from Kubernetes are real AWS resources. What you practise here is what you will see in most company setups.
+
+| Option | Where it runs | Good for |
+| --- | --- | --- |
+| minikube, kind | Your laptop, one node | Quick local experiments |
+| kubeadm | Servers you manage | Learning the internals, on-premises clusters |
+| **Amazon EKS** | AWS, control plane managed by AWS | **This course**, and real production workloads |
+| AKS, GKE, OKE | Azure, Google Cloud, Oracle Cloud | Same idea on other clouds |
+
+The Kubernetes YAML you write here works on any of these. Only the cluster setup and a few cloud integrations (load balancers, storage) are EKS specific.
+
+## How to follow this course
+
+This is a hands-on course. Watching someone else type `kubectl` commands teaches very little. Create the cluster exactly as shown in [Creating Your First EKS Cluster](/docs/kubernetes/eks-cluster-setup/creating-your-first-eks-cluster), then repeat every demo yourself, break it on purpose, and fix it.
+
+What you need before you start:
+
+- An AWS account. If you do not have one, see [Creating an AWS Account](/docs/aws/cloud-and-aws-fundamentals/creating-an-aws-account)
+- Comfort with Docker images and containers. Kubernetes manages containers, it does not replace the need to understand them. The [Docker](/docs/docker/getting-started) course covers this
+- Basic Linux: SSH, `vi` or `nano`, file permissions. The [Linux](/docs/linux/getting-started) course covers this
+
+<Callout type="warn" title="EKS is not free">
+An EKS control plane costs $0.10 per hour (about $73 a month) on standard support, and the worker nodes are billed as normal EC2 instances. Free tier does not cover EKS. Create the cluster when you sit down to practise and delete it with `eksctl delete cluster` when you finish. Every hands-on lesson reminds you of this.
+</Callout>
+
+## What you will be able to do by the end
+
+- Explain what the control plane and worker nodes do, and what happens when you run `kubectl apply`
+- Create and delete an EKS cluster with `eksctl`
+- Write manifests for Pods, Services, ReplicaSets, Deployments and DaemonSets
+- Expose applications with ClusterIP, NodePort and LoadBalancer Services
+- Roll out a new version with zero downtime and roll it back
+- Run stateful workloads with persistent EBS storage, configure apps with ConfigMaps and Secrets, and autoscale them
+- Package apps with Helm, deploy them with Argo CD, and monitor the cluster with Prometheus and Grafana
+
+The next lesson starts with the basic question: [what is Kubernetes and why do we need it](/docs/kubernetes/kubernetes-foundations/what-is-kubernetes-why-do-we-need-it).
+
+## Official references
+
+- [Kubernetes documentation: Overview](https://kubernetes.io/docs/concepts/overview/)
+- [Amazon EKS User Guide: What is Amazon EKS?](https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html)
+- [Amazon EKS pricing](https://aws.amazon.com/eks/pricing/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

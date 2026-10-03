@@ -1,0 +1,9 @@
+{
+    "title": "DevOps",
+    "icon": "Infinity",
+    "pages": [
+        "getting-started.mdx",
+        "introduction.mdx",
+        "computer-and-programming-essentials"
+    ]
+}

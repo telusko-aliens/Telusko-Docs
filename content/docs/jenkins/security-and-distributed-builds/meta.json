@@ -1,0 +1,8 @@
+{
+  "title": "Security & Distributed Builds",
+  "pages": [
+    "jenkins-users-authentication-and-authorization.mdx",
+    "jenkins-master-agent-architecture-introduction.mdx",
+    "configure-a-jenkins-agent-using-ssh-and-run-jobs-on-an-agent.mdx"
+  ]
+}

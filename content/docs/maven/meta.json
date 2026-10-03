@@ -1,0 +1,13 @@
+{
+  "title": "Maven",
+  "icon": "Hammer",
+  "pages": [
+    "getting-started.mdx",
+    "introduction.mdx",
+    "build-tool-fundamentals",
+    "maven-installation",
+    "maven-projects-and-goals",
+    "dependencies-pom-and-ides",
+    "lifecycle-testing-and-spring-boot"
+  ]
+}

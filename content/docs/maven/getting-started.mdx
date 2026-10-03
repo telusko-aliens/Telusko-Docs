@@ -1,0 +1,93 @@
+---
+title: Getting Started
+description: A practical roadmap for learning Apache Maven, from why build tools exist to projects, goals, dependencies, repositories, the POM, IDEs, the build lifecycle, unit testing and Spring Boot.
+icon: Sparkles
+---
+
+Every Java application has to be compiled, tested and packaged before it can run on a server, and nearly every Java team uses Maven to do it. When a Jenkins pipeline goes red with a Maven error, or a Dockerfile runs `mvn package`, the person who understands Maven fixes it in minutes. This course makes you that person.
+
+You start from the problem a build tool solves, install Maven on Windows or on a Linux VM in AWS, and create projects from the command line. Then you run the everyday goals, add libraries, look inside the local repository, read every part of `pom.xml`, and use Maven inside IntelliJ IDEA and Eclipse. The course ends with the full build lifecycle, real unit tests, and a Spring Boot web application.
+
+By the end you will be able to:
+
+- Explain what a build tool does and why manual builds and manual JAR downloads do not scale
+- Install a JDK and Maven, set `JAVA_HOME` and `PATH`, and verify the setup with `mvn -v`
+- Generate standalone (JAR) and web (WAR) projects with `mvn archetype:generate`
+- Explain groupId, artifactId, version and packaging, and recognise GAV coordinates anywhere
+- Run `clean`, `compile`, `test`, `package`, `verify`, `install` and `deploy`, and know what each produces
+- Add dependencies, understand scopes and transitive dependencies, and read `mvn dependency:tree`
+- Explain local, central and remote repositories and find artifacts in `~/.m2`
+- Read and edit `pom.xml`, use properties, and inspect the effective POM
+- Work with Maven projects in IntelliJ IDEA and Eclipse
+- Write JUnit tests that Maven runs, and build a Spring Boot app with the Maven Wrapper
+
+## Who this is for
+
+This course is for anyone in the DevOps Bootcamp, and for Java beginners who want to understand how their projects are built. There are no prerequisites. You will read a little Java, but you do not need to be a Java developer: the focus is on Maven, its commands and its output.
+
+## How the course is organised
+
+| Stage | Section | What it covers |
+| --- | --- | --- |
+| Foundations | 01 | Why build tools exist and what Maven can do |
+| Setup | 02 | Installing Java and Maven on Windows or on an AWS Linux VM |
+| Daily Maven | 03 | Generating projects, Maven vocabulary, goals, and web apps |
+| Project model | 04 | Dependencies, repositories, the POM, IntelliJ, effective POM, Eclipse |
+| Real projects | 05 | The build lifecycle, unit testing, Spring Boot, and the wrap-up |
+
+## 01 - Build Tool Fundamentals
+
+What happens between writing Java code and running it: compile, test, package. Why doing that by hand breaks down, why downloading library JARs manually is painful, and how Maven automates both. You also get a clear picture of Maven's four jobs: structure, dependencies, testing and packaging.
+
+## 02 - Installing Maven
+
+Two equal paths. Install a JDK and Maven on Windows with the right environment variables, or launch an Amazon Linux VM on EC2 and install Maven with one `dnf` command. Both end with a working `mvn -v`, and both include the errors beginners usually hit.
+
+## 03 - Maven Projects & Goals
+
+Generate a project with the quickstart archetype on Windows and Linux, read its standard directory layout, and learn the core vocabulary. Then run `clean`, `compile`, `test` and `package` and watch the `target` folder change. Finally build a web application and produce a WAR file.
+
+## 04 - Dependencies, POM & IDEs
+
+Add Spring to a project and watch Maven download it, explore the local repository in `~/.m2`, and understand how companies use Nexus or Artifactory. Read `pom.xml` element by element, see the effective POM Maven really uses, and repeat everything in IntelliJ IDEA and Eclipse.
+
+## 05 - Lifecycle, Testing & Spring Boot
+
+The three built-in lifecycles and every key phase from `validate` to `deploy`. Writing a JUnit 5 test and reading a failing build. Generating a Spring Boot project from Spring Initializr, adding a controller and a JSP page, and running it on embedded Tomcat. The wrap-up gives you a one page cheat sheet.
+
+## How to actually learn this
+
+Maven becomes easy once its output stops looking like noise. The fastest way there is to run builds often and read what Maven prints.
+
+<Steps>
+<Step>
+### Type every command yourself
+
+`-DgroupId` with a typo, a missing `$` in a property, a dependency pasted outside `<dependencies>`: small slips cause most Maven failures. Typing commands and XML yourself trains your eye for them.
+</Step>
+<Step>
+### Read the output from the top
+
+When a build fails, scroll up to the first `[ERROR]` line and to the plugin that was running (`--- maven-surefire-plugin:...`). That tells you which phase failed and why.
+</Step>
+<Step>
+### Break things on purpose
+
+Remove the Java version, fail a test, delete a library from `~/.m2`, run Maven in the wrong folder. Seeing each error once in a safe project makes it familiar when it appears in a real pipeline.
+</Step>
+<Step>
+### Use the terminal before the IDE
+
+IntelliJ and Eclipse run the same Maven. If you know the commands, the IDE buttons make sense, and you can debug CI builds that have no IDE at all.
+</Step>
+</Steps>
+
+<Callout type="info">
+All you need to begin is a computer that can run Java. An AWS account is optional, and is only used for the Linux VM setup.
+</Callout>
+
+Head to the [Introduction](/docs/maven/introduction) for the big picture, then start with [Introduction to Maven](/docs/maven/build-tool-fundamentals/introduction-to-maven).
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

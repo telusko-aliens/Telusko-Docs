@@ -1,0 +1,11 @@
+{
+  "title": "Jenkins Pipelines",
+  "pages": [
+    "introduction-to-jenkins-pipeline.mdx",
+    "building-a-java-application-using-jenkins-pipeline.mdx",
+    "jenkins-pipelines-parallel-stages.mdx",
+    "shared-libraries-in-jenkins-reusing-pipeline-code.mdx",
+    "building-pipelines-with-groovy-scripted-pipeline.mdx",
+    "configuring-email-notifications-in-jenkins.mdx"
+  ]
+}

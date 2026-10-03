@@ -1,0 +1,9 @@
+{
+  "title": "Getting Started with Terraform",
+  "pages": [
+    "why-terraform-and-what-is-terraform.mdx",
+    "terraform-installation-on-linux-vm-on-aws.mdx",
+    "terraform-installation-locally-on-windows.mdx",
+    "terraform-security-credentials.mdx"
+  ]
+}

@@ -1,0 +1,159 @@
+---
+title: Ansible Git Installation Playbook
+description: Install Git on every managed node with a playbook, understand become for root privileges, choose between yum, dnf, apt and package, and verify the result from the control node.
+---
+
+Installing software is the most common job you will give Ansible. Every build agent needs Git, every Java server needs a JDK, every web server needs a web server. This lesson installs the Git client on all managed nodes with one short playbook, and introduces the one keyword you need for almost every installation: `become`.
+
+## The playbook
+
+On the control node, as the `ansible` user:
+
+```bash
+sudo su - ansible
+vi git-install.yml
+```
+
+```yaml title="git-install.yml"
+---
+- hosts: all
+  become: true
+  tasks:
+    - name: git installation
+      yum:
+        name: git
+        state: latest
+...
+```
+
+| Line | Meaning |
+| --- | --- |
+| `hosts: all` | Install on every managed node |
+| `become: true` | Run the tasks with root privileges (through `sudo`) on the managed nodes |
+| `yum:` | The package module for Red Hat family systems such as Amazon Linux |
+| `name: git` | The package to install |
+| `state: latest` | Install Git, and upgrade it if a newer version is available |
+
+## Why `become: true` is needed
+
+Ansible logs in to the managed nodes as the `ansible` user. A normal user cannot install packages: only root can write to `/usr/bin` and the package database. Without `become`, the task fails with an error like:
+
+```text
+fatal: [172.31.9.250]: FAILED! => {"changed": false, "msg": "This command has to be run under the root user.", ...}
+```
+
+`become: true` tells Ansible to run the module through `sudo`. It works without a password because, in [Ansible Config](/docs/ansible/ansible-fundamentals/ansible-config), we added `ansible ALL=(ALL) NOPASSWD: ALL` to the sudoers file on every node.
+
+| Keyword | Meaning | Default |
+| --- | --- | --- |
+| `become` | Turn privilege escalation on or off | `false` |
+| `become_user` | Which user to become | `root` |
+| `become_method` | How to become that user | `sudo` |
+
+You can put `become: true` on the play (all tasks run as root, as in this playbook) or on a single task (only that task runs as root). Use the smallest scope that works: tasks that do not need root should not run as root. On the command line, `-b` (or `--become`) does the same for ad hoc commands and playbooks.
+
+## Run it
+
+```bash
+ansible-playbook git-install.yml --syntax-check
+ansible-playbook git-install.yml
+```
+
+```text
+TASK [git installation] ********************************************************
+changed: [172.31.12.18]
+changed: [172.31.9.250]
+
+PLAY RECAP *********************************************************************
+172.31.12.18   : ok=2    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+172.31.9.250   : ok=2    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+```
+
+`changed` on both: Git was installed on both machines. Run the playbook a second time. Now the task says `ok` and `changed=0`, because Git is already at the latest version. That is idempotence in action: the package module checks first and acts only when needed.
+
+## Verify
+
+The lecture logs in to each managed node and runs `git -v`. That works, but with many servers it is quicker to ask all of them at once with an ad hoc command from the control node:
+
+```bash
+ansible all -a "git --version"
+```
+
+```text
+172.31.9.250 | CHANGED | rc=0 >>
+git version 2.x.y
+172.31.12.18 | CHANGED | rc=0 >>
+git version 2.x.y
+```
+
+(Your version number depends on the current Amazon Linux repositories.)
+
+## yum, dnf, apt or package?
+
+Each Linux family has its own package manager, and Ansible has a module for each:
+
+| Module | Package manager | Typical systems |
+| --- | --- | --- |
+| `ansible.builtin.dnf` | dnf | Amazon Linux 2023, RHEL 8+, Fedora, Rocky, Alma |
+| `ansible.builtin.yum` | yum | Older systems. In current ansible-core this name is only a **redirect to** `ansible.builtin.dnf` |
+| `ansible.builtin.apt` | apt | Ubuntu, Debian |
+| `ansible.builtin.package` | Whatever the host uses | Mixed fleets, when the package name is the same everywhere |
+
+On Amazon Linux 2023 the real package manager is dnf (`yum` is just a compatibility command). The lecture's `yum:` works, because ansible-core keeps `yum` as an alias. For new playbooks, write the module that matches the system, or `package` if you want one playbook for both Amazon Linux and Ubuntu:
+
+```yaml title="git-install.yml"
+---
+- name: Install Git on all managed nodes
+  hosts: all
+  become: true
+  tasks:
+    - name: git installation
+      ansible.builtin.package:
+        name: git
+        state: present
+```
+
+On Ubuntu with the `apt` module, add `update_cache: true` so the package lists are refreshed before installing, the same as running `apt update` first.
+
+## present or latest?
+
+| `state` | Behaviour | When to use |
+| --- | --- | --- |
+| `present` (default) | Install if missing, never upgrade | Most of the time. Your servers stay predictable |
+| `latest` | Install if missing, upgrade if a newer version exists | When you deliberately want upgrades on every run |
+| `absent` | Remove the package | Cleanup |
+
+`latest` means two runs a month apart can install different versions, and an upgrade can arrive at a moment you did not plan. Many teams use `present`, and upgrade on purpose with a separate playbook.
+
+## What Git on the servers gives you
+
+With Git installed, Ansible can clone repositories onto the managed nodes with the `ansible.builtin.git` module, which needs the `git` command on the target host:
+
+```yaml
+- name: Clone the application source
+  ansible.builtin.git:
+    repo: https://github.com/ansible/ansible-examples.git
+    dest: /home/ansible/ansible-examples
+    version: master
+```
+
+Avoid putting usernames or tokens inside the `repo` URL. For private repositories use SSH keys or [Ansible Vault](/docs/ansible/variables-vault-and-tags/ansible-vault).
+
+## Try It Yourself
+
+1. Remove `become: true`, run the playbook, read the error, then put it back.
+2. Change `state: latest` to `state: present` and run twice. What does each run report?
+3. Write `tools-install.yml` that installs `git`, `tree` and `wget` in one task by giving `name` a YAML list.
+4. Uninstall `tree` from the `dbservers` group only with `state: absent`.
+
+## Official references
+
+- [ansible.builtin.dnf module](https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/dnf_module.html)
+- [ansible.builtin.package module](https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/package_module.html)
+- [ansible.builtin.apt module](https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/apt_module.html)
+- [Understanding privilege escalation: become](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_privilege_escalation.html)
+- [ansible.builtin.git module](https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/git_module.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

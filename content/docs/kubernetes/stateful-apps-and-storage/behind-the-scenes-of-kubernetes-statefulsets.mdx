@@ -1,0 +1,122 @@
+---
+title: Behind the Scenes of Kubernetes StatefulSets
+description: See how a StatefulSet combines a headless Service, ordered pods and volumeClaimTemplates so that every pod gets a stable name, a stable DNS address and its own persistent volume.
+---
+
+We now have two separate ideas. From [the first lesson of this section](/docs/kubernetes/stateful-apps-and-storage/stateful-applications-and-statefulsets-explained): a StatefulSet gives pods stable names and an ordered life cycle. From [the PV and PVC hands-on](/docs/kubernetes/stateful-apps-and-storage/persistent-volumes-pv-and-persistent-volume-claims-pvc-hands-on): data survives a pod restart when it lives on a PersistentVolume.
+
+A StatefulSet puts these two ideas together, and it removes the manual work we did last time. Before we build one, let us look at the architecture.
+
+## What we did by hand last time
+
+In the hands-on lesson we:
+
+1. Created an EBS volume in the console
+2. Wrote a PV with its volume ID
+3. Wrote a PVC that claimed that PV
+4. Mounted the PVC into a Deployment
+
+One PVC, shared by whatever pods the Deployment creates. That is fine for one replica. But a database with three replicas needs **three separate disks**, one per pod. `mysql-0` must never write into `mysql-1`'s data directory. Doing that by hand means three volumes, three PVs, three PVCs and three Deployments. Nobody wants that.
+
+## One PVC per pod, created for you
+
+A StatefulSet has a field that a Deployment does not: **`volumeClaimTemplates`**. It is a PVC template. For every pod the StatefulSet creates, it stamps out a PVC from this template, with a predictable name:
+
+```text
+<template-name>-<statefulset-name>-<ordinal>
+
+mysql-storage-mysql-0
+mysql-storage-mysql-1
+mysql-storage-mysql-2
+```
+
+Each of those PVCs uses a **StorageClass**, and the StorageClass asks the EBS CSI driver to create a fresh EBS volume and a PV for it. This is **dynamic provisioning**: no console clicks, no copied volume IDs.
+
+The binding is sticky. If `mysql-1` is deleted, the replacement pod is again called `mysql-1`, and it mounts the same PVC `mysql-storage-mysql-1`, which still points at the same EBS volume. So the new pod finds the old pod's data.
+
+| | Deployment + PVC (last lesson) | StatefulSet + volumeClaimTemplates |
+| --- | --- | --- |
+| Who creates the PVC | You, by hand | The StatefulSet, one per pod |
+| Who creates the PV and disk | You (static) | The StorageClass and CSI driver (dynamic) |
+| Pods sharing a disk | All replicas would share one PVC | Each pod has its own |
+| After a pod is recreated | New random pod name, same shared PVC | Same pod name, same own PVC |
+
+## The headless Service
+
+A normal ClusterIP Service gives a group of pods **one** virtual IP and load balances across them. That is what you want for a web app. For a database cluster it is the wrong thing: a replica must connect to the **primary**, not to "any MySQL pod".
+
+A **headless Service** is a Service with `clusterIP: None`. It has no virtual IP and does no load balancing. Instead, cluster DNS creates a record for each pod behind it:
+
+```text
+<pod-name>.<service-name>.<namespace>.svc.cluster.local
+
+mysql-0.mysql.default.svc.cluster.local
+mysql-1.mysql.default.svc.cluster.local
+```
+
+These names stay the same when pods are recreated (the IP behind the name may change, the name does not). So an application, or another MySQL pod, can always reach `mysql-0` directly. The StatefulSet's `serviceName` field points at this Service, and you must create the Service yourself.
+
+<img src="/kubernetes/k8s2-statefulset-identity.svg" alt="A client talks to a headless Service named mysql, which gives each of the pods mysql-0, mysql-1 and mysql-2 its own DNS name; each pod has its own PVC, PV and EBS volume, and pods are created in order 0, 1, 2" width={960} height={520} />
+
+## Ordered, predictable behaviour
+
+With the default `podManagementPolicy: OrderedReady`:
+
+- **Scale up / create**: `mysql-0` first. `mysql-1` is created only when `mysql-0` is Running and Ready. Then `mysql-2`.
+- **Scale down**: the highest ordinal goes first. `mysql-2` must be fully terminated before `mysql-1` is touched.
+- **Rolling update** (when you change the pod template): pods are replaced in reverse order, `mysql-2`, then `mysql-1`, then `mysql-0`, one at a time.
+
+If your application does not need the ordering, `podManagementPolicy: Parallel` starts and stops all pods at once, while still keeping the stable names and volumes.
+
+## What happens to the volumes later
+
+This surprises many people: **deleting or scaling down a StatefulSet does not delete its PVCs**. Kubernetes keeps the data on purpose, because data loss is worse than a forgotten disk. If you scale from 3 to 2 and back to 3, `mysql-2` comes back with its old data.
+
+Since Kubernetes 1.32 you can change this with `persistentVolumeClaimRetentionPolicy`:
+
+```yaml
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain   # or Delete: remove PVCs when the StatefulSet is deleted
+    whenScaled: Retain    # or Delete: remove PVCs of pods removed by scale-down
+```
+
+The default for both is `Retain`. On AWS, every retained PVC is an EBS volume you are paying for, so clean up deliberately.
+
+## Where StatefulSets are used
+
+Anything that needs a stable identity, stable storage and an ordered start:
+
+- Relational databases: MySQL, PostgreSQL
+- NoSQL and search: MongoDB, Cassandra, Elasticsearch
+- Messaging and coordination: Apache Kafka, ZooKeeper, RabbitMQ, etcd
+
+In practice these are usually installed with a Helm chart or an operator that builds on a StatefulSet and adds the replication logic. You will meet Helm later in [Helm: Kubernetes Package Manager](/docs/kubernetes/jobs-helm-and-argo-cd/helm-kubernetes-package-manager).
+
+## The pieces we will create
+
+In the [next lesson](/docs/kubernetes/stateful-apps-and-storage/creating-statefulsets-with-persistent-storage-on-amazon-eks) we build exactly this on EKS:
+
+| Object | Name | Purpose |
+| --- | --- | --- |
+| Headless Service | `mysql` | `clusterIP: None`, port 3306, DNS name per pod |
+| StatefulSet | `mysql` | 2 replicas of `mysql:8.0`, `serviceName: mysql` |
+| volumeClaimTemplate | `mysql-storage` | 10Gi, `ReadWriteOnce`, mounted at `/var/lib/mysql` |
+| StorageClass | an EBS class | Lets the CSI driver create the EBS volumes |
+
+## Try It Yourself
+
+1. Without a cluster, write down the PVC names a StatefulSet called `kafka` with 3 replicas and a claim template called `data` would create.
+2. Write the full DNS name of the second pod of that StatefulSet if its headless Service is `kafka-hs` in namespace `streaming`.
+3. A StatefulSet with 3 replicas is scaled to 1. Which pods are removed, in what order, and how many PVCs remain?
+4. Read the "Deployment and Scaling Guarantees" section of the StatefulSet docs and list the conditions that must be true before pod N+1 is created.
+
+## Official references
+
+- [Kubernetes: StatefulSets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)
+- [Kubernetes: Headless Services](https://kubernetes.io/docs/concepts/services-networking/service/#headless-services)
+- [Kubernetes: DNS for Services and Pods](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

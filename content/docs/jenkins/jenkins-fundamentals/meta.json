@@ -1,0 +1,8 @@
+{
+  "title": "Jenkins Fundamentals",
+  "pages": [
+    "welcome-to-the-jenkins.mdx",
+    "understanding-build-and-deployment.mdx",
+    "what-is-jenkins-a-beginners-guide.mdx"
+  ]
+}

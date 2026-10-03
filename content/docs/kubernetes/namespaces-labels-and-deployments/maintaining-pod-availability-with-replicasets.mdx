@@ -1,0 +1,213 @@
+---
+title: Maintaining Pod Availability with ReplicaSets
+description: See why a bare pod gives no self-healing, write a ReplicaSet manifest with replicas, selector and template, and watch Kubernetes recreate a deleted pod automatically.
+---
+
+Everything we have run so far was a bare pod. That works until the pod disappears. Delete it by mistake, let its node crash, or have it evicted, and the application is simply gone until a human notices and recreates it. For a real application that is not acceptable.
+
+Kubernetes has a controller whose whole job is to stop that from happening: the **ReplicaSet**.
+
+## The problem, demonstrated
+
+Apply the pod and LoadBalancer Service from [Creating Pod and Service in One Manifest File](/docs/kubernetes/pods-and-services/creating-pod-and-service-in-one-manifest-file):
+
+```bash
+kubectl apply -f k8s-webapp.yml
+kubectl get pods
+kubectl get svc
+```
+
+Open the load balancer URL and the app loads. Now simulate an accident:
+
+```bash
+kubectl delete pod web-app-pod
+kubectl get pods
+```
+
+```text
+No resources found in default namespace.
+```
+
+Refresh the browser: the page no longer loads. Nothing brings the pod back, because a bare pod has no controller watching it. No self-healing.
+
+Clean up before moving on (the Service created an AWS load balancer):
+
+```bash
+kubectl delete -f k8s-webapp.yml --ignore-not-found
+```
+
+## What a ReplicaSet does
+
+A **ReplicaSet** makes sure that a specified number of identical pods (**replicas**) are running at all times.
+
+- You declare the **desired state**: "3 pods with this template"
+- The ReplicaSet controller (part of the controller manager) continuously compares it with the **current state**: how many matching pods actually exist
+- Too few? It creates pods from the template. Too many? It deletes the extras
+
+It does not matter **why** a pod disappeared: deleted by a person, crashed node, eviction. The ReplicaSet notices and replaces it. This is Kubernetes **self-healing** in practice.
+
+## Step 1: Write the ReplicaSet
+
+```bash
+vi k8s-rs.yml
+```
+
+```yaml title="k8s-rs.yml"
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: telusko-rs
+  labels:
+    app: telusko-rs-webapp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: telusko-rs-webapp
+  template:
+    metadata:
+      labels:
+        app: telusko-rs-webapp
+    spec:
+      containers:
+        - name: webapp-container
+          image: <your-dockerhub-username>/springboot-app:latest
+          ports:
+            - containerPort: 8080
+```
+
+This is the first manifest with a pod **inside** another object, so read it in two halves.
+
+**The ReplicaSet itself**
+
+| Field | Meaning |
+| --- | --- |
+| `apiVersion: apps/v1` | ReplicaSets live in the `apps` API group, not the core `v1` group |
+| `kind: ReplicaSet` | Capital R, capital S |
+| `metadata.name: telusko-rs` | Name of the ReplicaSet. Pods it creates are named `telusko-rs-<random>` |
+| `metadata.labels` | Labels on the ReplicaSet object itself. Optional, useful for searching |
+| `spec.replicas: 3` | Desired number of pods |
+| `spec.selector.matchLabels` | Which pods this ReplicaSet counts as its own |
+
+**The pod template** (`spec.template`)
+
+| Field | Meaning |
+| --- | --- |
+| `template.metadata.labels` | Labels stamped on every pod the ReplicaSet creates |
+| `template.spec.containers` | Exactly what you wrote in `spec` of the Pod manifests before |
+
+The template is a pod manifest without `apiVersion` and `kind`. Every time the ReplicaSet needs a new pod, it stamps one out from this template.
+
+<Callout type="warn" title="The selector must match the template labels">
+`spec.selector.matchLabels` and `spec.template.metadata.labels` must agree. If they do not, the API server rejects the object with `selector does not match template labels`. Otherwise the ReplicaSet would create pods it does not recognise as its own, and keep creating them forever.
+</Callout>
+
+## Step 2: Apply it, and fix the indentation error
+
+```bash
+kubectl apply -f k8s-rs.yml
+```
+
+The first attempt in the lecture failed with a `BadRequest ... cannot be handled as a ReplicaSet` error. Two indentation mistakes were the cause:
+
+1. The `app:` line under `template.metadata` was written directly under `metadata`, without the `labels:` level in between. A pod template needs `metadata` then `labels` then `app`, exactly like a normal pod.
+2. `spec:` under `template` was not indented to the same level as `template.metadata`. The template's `spec` belongs **inside** `template`, not at the ReplicaSet level.
+
+Compare your file carefully with the one above. Template indentation is the most common ReplicaSet and Deployment mistake.
+
+After fixing:
+
+```text
+replicaset.apps/telusko-rs created
+```
+
+## Step 3: Check the pods and the ReplicaSet
+
+```bash
+kubectl get pods
+```
+
+```text
+NAME               READY   STATUS    RESTARTS   AGE
+telusko-rs-nlwl9   1/1     Running   0          40s
+telusko-rs-s7mr5   1/1     Running   0          40s
+telusko-rs-z4kg4   1/1     Running   0          40s
+```
+
+```bash
+kubectl get rs        # rs is the short name for replicaset
+```
+
+```text
+NAME         DESIRED   CURRENT   READY   AGE
+telusko-rs   3         3         3       57s
+```
+
+| Column | Meaning |
+| --- | --- |
+| `DESIRED` | `spec.replicas`, what you asked for |
+| `CURRENT` | Pods that exist right now |
+| `READY` | Pods that are ready to serve traffic |
+
+`kubectl get pods -o wide` shows the scheduler has spread the three pods across both worker nodes, so losing one node does not take the whole application down.
+
+## Step 4: Watch self-healing
+
+Open a second SSH session to the EKS home server and watch the pods live:
+
+```bash
+kubectl get pods --watch
+```
+
+In the first session, delete one pod:
+
+```bash
+kubectl delete pod telusko-rs-nlwl9
+```
+
+In the watch window you see the deleted pod go to `Terminating`, and almost immediately a new pod (with a new random suffix) appear as `Pending`, `ContainerCreating`, then `Running`.
+
+```bash
+kubectl get rs
+```
+
+```text
+NAME         DESIRED   CURRENT   READY   AGE
+telusko-rs   3         3         3       3m
+```
+
+Desired and current are equal again. Nobody ran a command to create the new pod; the ReplicaSet did it.
+
+`kubectl describe rs telusko-rs` shows it in the Events section: `SuccessfulCreate ... Created pod: telusko-rs-xxxxx`.
+
+## How the ReplicaSet "owns" pods
+
+The ReplicaSet does not track pods by name. It counts every pod in its namespace that matches its selector. Two consequences are worth knowing:
+
+- If you create a bare pod by hand with the label `app: telusko-rs-webapp`, the ReplicaSet adopts it and then deletes one pod to stay at 3.
+- If you remove the label from one of its pods (`kubectl label pod <name> app-`), the ReplicaSet no longer counts it and creates a replacement. The relabelled pod keeps running on its own, which is a handy debugging trick.
+
+Every pod created by a ReplicaSet also has an `ownerReferences` entry pointing to it. See it with `kubectl get pod <name> -o yaml | grep -A5 ownerReferences`.
+
+<Callout type="info" title="You will rarely create ReplicaSets directly">
+ReplicaSets are the engine of self-healing, but in real projects you create a **Deployment**, which creates and manages ReplicaSets for you and adds rolling updates and rollbacks. We get there in [Kubernetes Deployments](/docs/kubernetes/namespaces-labels-and-deployments/kubernetes-deployments-replicasets-scaling-and-self-healing). Understanding ReplicaSets first makes Deployments easy.
+</Callout>
+
+## Try It Yourself
+
+1. Create `telusko-rs` with 3 replicas and confirm with `kubectl get rs` and `kubectl get pods -o wide` which node each pod runs on.
+2. Delete two pods at once (`kubectl delete pod <a> <b>`) while watching with `--watch`. How quickly are they replaced?
+3. Create a bare pod with the label `app: telusko-rs-webapp` and watch what the ReplicaSet does.
+4. Change `matchLabels` to a different value than the template labels and apply. Read the error.
+
+Keep the ReplicaSet running if you go straight to the next lesson. Otherwise `kubectl delete -f k8s-rs.yml`, and delete the cluster if you are done for the day.
+
+## Official references
+
+- [Kubernetes: ReplicaSet](https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/)
+- [Kubernetes: Controllers](https://kubernetes.io/docs/concepts/architecture/controller/)
+- [Kubernetes: Owners and Dependents](https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

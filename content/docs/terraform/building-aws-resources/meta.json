@@ -1,0 +1,9 @@
+{
+  "title": "Building AWS Resources with Terraform",
+  "pages": [
+    "creating-ec2-vm-with-user-data-using-terraform.mdx",
+    "using-variables-in-terraform.mdx",
+    "terraform-output-variables.mdx",
+    "terraform-to-create-s3-bucket-on-aws.mdx"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "title": "Taint & Modules",
+  "pages": [
+    "terraform-taint-and-untaint.mdx",
+    "terraform-modules-theory.mdx",
+    "terraform-module-project-implementation.mdx"
+  ]
+}

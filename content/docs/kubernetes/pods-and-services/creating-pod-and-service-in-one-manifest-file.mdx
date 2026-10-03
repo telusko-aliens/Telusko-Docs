@@ -1,0 +1,162 @@
+---
+title: Creating Pod and Service in One Manifest File
+description: Put a Pod and its LoadBalancer Service into one YAML file separated by three dashes, apply and delete them together, and learn the safe ways to remove resources.
+---
+
+So far every object had its own file: `k8s-pod.yml` for the pod, `clusterIp-svc.yml`, `nodePort-service.yml` and `k8s-lbr-svc.yml` for the Services. That is fine for learning, but real applications need several objects at once (a Deployment, a Service, a ConfigMap, a Secret), and they belong together. Kubernetes lets you put all of them in **one manifest file**.
+
+## The separator: three dashes
+
+YAML supports several **documents** in one file. Each document is separated by a line containing only `---`. kubectl treats each document as a separate object and applies them in order.
+
+```yaml
+# document 1
+apiVersion: v1
+kind: Pod
+...
+---
+# document 2
+apiVersion: v1
+kind: Service
+...
+```
+
+## Step 1: Write the combined file
+
+```bash
+vi k8s-webapp.yml
+```
+
+```yaml title="k8s-webapp.yml"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-app-pod
+  labels:
+    app: telusko-webapp
+spec:
+  containers:
+    - name: web-app-container
+      image: <your-dockerhub-username>/springboot-app:latest
+      ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-app-svc
+spec:
+  type: LoadBalancer
+  selector:
+    app: telusko-webapp
+  ports:
+    - port: 80
+      targetPort: 8080
+```
+
+Nothing here is new. It is the pod from [First Pod Creation](/docs/kubernetes/pods-and-services/first-pod-creation-in-kubernetes) and the Service from [LoadBalancer Service Explained](/docs/kubernetes/pods-and-services/loadbalancer-service-explained), joined by `---`. The link between them is still the label `app: telusko-webapp` on the pod and the same value in the Service selector.
+
+## Step 2: Apply it
+
+Check that the namespace is clean first:
+
+```bash
+kubectl get all
+```
+
+Then apply the file:
+
+```bash
+kubectl apply -f k8s-webapp.yml
+```
+
+In the lecture the first attempt produced this:
+
+```text
+service/web-app-svc created
+Error from server (BadRequest): error when creating "k8s-webapp.yml": Pod in version "v1" cannot be
+handled as a Pod: strict decoding error: unknown field "spec.conatainers"
+```
+
+Two lessons hide in that output:
+
+1. **A typo in a field name** (`conatainers` instead of `containers`) gives `unknown field`. Fix the spelling and apply again.
+2. **kubectl applies each document on its own.** The Service was created even though the Pod failed. A multi-document file is not a transaction; one bad object does not roll back the others. Because `apply` is idempotent, simply fixing the file and running `kubectl apply -f` again is safe: the Service shows `unchanged` and the Pod is created.
+
+```text
+pod/web-app-pod created
+service/web-app-svc unchanged
+```
+
+<Callout type="info" title="Catch errors before anything is created">
+Run `kubectl apply -f k8s-webapp.yml --dry-run=server` first. The API server validates every document and reports errors like `unknown field` without creating anything.
+</Callout>
+
+## Step 3: Check and open the app
+
+```bash
+kubectl get pods
+kubectl get svc
+kubectl get all
+```
+
+Copy the `EXTERNAL-IP` of `web-app-svc` (the `...elb.amazonaws.com` name), wait two to three minutes for the load balancer to become healthy, and open it in the browser. You should see the same Telusko Learning page as before.
+
+## Why one file per application is a good idea
+
+| Separate files | One file per application |
+| --- | --- |
+| Easy to read one object at a time | Everything the app needs is in one place |
+| You must remember to apply and delete several files | One `apply`, one `delete` |
+| Good while learning | Common in real projects, often with one folder per app |
+
+You can also point kubectl at a **folder**: `kubectl apply -f ./webapp/` applies every YAML file in it. Later in the course, Helm charts take this further by templating many related files.
+
+## Step 4: Deleting resources the right way
+
+There are several ways to delete what you created. From most to least precise:
+
+```bash
+# 1. One object by type and name
+kubectl delete pod web-app-pod
+kubectl delete svc web-app-svc
+
+# 2. Everything defined in a file (all documents in it)
+kubectl delete -f k8s-webapp.yml
+
+# 3. Everything of the common workload types in the current namespace
+kubectl delete all --all
+```
+
+| Command | Deletes | Risk |
+| --- | --- | --- |
+| `kubectl delete <type> <name>` | Exactly one object | Lowest |
+| `kubectl delete -f <file>` | Every object defined in that file | Low. Objects already gone give a harmless `NotFound` error |
+| `kubectl delete all --all` | Pods, Services, Deployments, ReplicaSets, StatefulSets, DaemonSets, Jobs, CronJobs in the **current namespace** | High. Never on a shared or production cluster |
+
+<Callout type="warn" title="What delete all --all does not delete">
+The lecture says `kubectl delete all --all` deletes every namespace too. It does not. The `all` category covers the common workload types and Services only, in the current namespace. Namespaces, ConfigMaps, Secrets, PersistentVolumeClaims, Ingresses and many others are left in place. The command is still dangerous because of what it does delete, but do not rely on it to "clean everything".
+</Callout>
+
+If you run `kubectl delete -f` on a file whose objects were already deleted, you get messages like `Error from server (NotFound): services "webapp-svc" not found`. That just means there was nothing left to delete. Add `--ignore-not-found` to silence it.
+
+<Callout type="error" title="Delete the LoadBalancer Service before the cluster">
+`web-app-svc` created an AWS load balancer that is billed per hour. `kubectl delete -f k8s-webapp.yml` removes it. Check **EC2, Load Balancers** is empty before running `eksctl delete cluster --name telusko-learning --region ap-south-1 --wait`.
+</Callout>
+
+## Try It Yourself
+
+1. Create `k8s-webapp.yml` with the Pod and the LoadBalancer Service, apply it, and open the app in the browser.
+2. Add a third document to the file: a ClusterIP Service named `web-app-internal` with the same selector. Apply again and notice which objects are `created` and which are `unchanged`.
+3. Misspell a field in the Pod, delete everything, and apply. Confirm the Services are still created while the Pod fails.
+4. Delete everything with `kubectl delete -f k8s-webapp.yml` and confirm the AWS load balancer is gone.
+
+## Official references
+
+- [Kubernetes: Managing Resources (multiple resources in one file)](https://kubernetes.io/docs/concepts/cluster-administration/manage-deployment/)
+- [kubectl reference: delete](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/)
+- [Kubernetes: Configuration best practices](https://kubernetes.io/docs/concepts/configuration/overview/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,204 @@
+---
+title: ClusterIP Service Explained
+description: Create a ClusterIP Service for the webapp pod, connect it with labels and selectors, map port to targetPort, and prove it works from inside the cluster.
+---
+
+Most Services in a real cluster are never seen by users. The orders service calls the payments service. The Spring Boot app calls MySQL. The frontend calls an internal API. All of that traffic stays inside the cluster, and the Service type built for it is **ClusterIP**.
+
+## What ClusterIP gives you
+
+- **It is the default.** If you create a Service and leave out `type`, you get a ClusterIP Service.
+- **A stable virtual IP** from the cluster's service range (on EKS, usually `10.100.0.0/16`) plus a DNS name. Pods come and go, the Service address stays.
+- **Internal only.** Pods and nodes in the cluster can reach it. The internet cannot.
+- **Load balancing** across every ready pod that matches its selector.
+
+```text
+other pod  ->  webapp-svc (10.100.113.192:80)  ->  webapp pod (192.168.x.x:8080)
+```
+
+## How the Service finds its pods: labels and selectors
+
+A Service does not list pod names or pod IPs. It uses a **selector**. Any pod whose labels match the selector becomes a backend of the Service, now or in the future.
+
+Our pod manifest already has a label:
+
+```yaml title="k8s-pod.yml (excerpt)"
+metadata:
+  name: webapp
+  labels:
+    app: telusko-webapp
+```
+
+The Service will select `app: telusko-webapp`. If these two strings differ by even one character, the Service ends up with no endpoints and every request fails. We look at labels in depth in [Labels and Selectors](/docs/kubernetes/namespaces-labels-and-deployments/labels-and-selectors-in-kubernetes).
+
+## Step 1: Write the Service manifest
+
+Make sure the `webapp` pod is running (`kubectl apply -f k8s-pod.yml`), then:
+
+```bash
+vi clusterIp-svc.yml
+```
+
+```yaml title="clusterIp-svc.yml"
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-svc
+spec:
+  selector:
+    app: telusko-webapp
+  ports:
+    - port: 80
+      targetPort: 8080
+```
+
+| Field | Meaning |
+| --- | --- |
+| `apiVersion: v1`, `kind: Service` | Services are in the core API group, like Pods |
+| `metadata.name: webapp-svc` | The Service name. It also becomes its DNS name |
+| `spec.selector` | Send traffic to pods with label `app=telusko-webapp` |
+| `ports[].port: 80` | The port the **Service** listens on. Clients call `webapp-svc:80` |
+| `ports[].targetPort: 8080` | The port on the **pod** to forward to. Must match the port the app listens on |
+| `type` | Not set, so it defaults to `ClusterIP` |
+
+`port` and `targetPort` do not have to be equal. Here, callers use the familiar port 80 while the Spring Boot app keeps its default 8080. If you leave `targetPort` out, it defaults to the same value as `port`.
+
+Before applying, double-check the label and selector match:
+
+```bash
+cat k8s-pod.yml clusterIp-svc.yml | grep telusko-webapp
+```
+
+## Step 2: Create and inspect it
+
+```bash
+kubectl apply -f clusterIp-svc.yml
+```
+
+```text
+service/webapp-svc created
+```
+
+```bash
+kubectl get svc
+```
+
+```text
+NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+kubernetes   ClusterIP   10.100.0.1       <none>        443/TCP   74m
+webapp-svc   ClusterIP   10.100.113.192   <none>        80/TCP    6s
+```
+
+`EXTERNAL-IP` is `<none>`: there is no way in from outside. Now look closer:
+
+```bash
+kubectl describe svc webapp-svc
+```
+
+```text
+Name:                     webapp-svc
+Namespace:                default
+Labels:                   <none>
+Annotations:              <none>
+Selector:                 app=telusko-webapp
+Type:                     ClusterIP
+IP Family Policy:         SingleStack
+IP Families:              IPv4
+IP:                       10.100.113.192
+IPs:                      10.100.113.192
+Port:                     <unset>  80/TCP
+TargetPort:               8080/TCP
+Endpoints:                192.168.5.59:8080
+Session Affinity:         None
+Internal Traffic Policy:  Cluster
+Events:                   <none>
+```
+
+The most important line is **Endpoints**. It is the list of pod IP and port pairs the Service is currently forwarding to. `192.168.5.59` is our pod's IP. If Endpoints is empty, the selector matches no ready pod, and that is the first thing to check whenever a Service "does not work".
+
+`Labels: <none>` refers to labels **on the Service itself**, which we did not set. The `Selector` is what matters for routing.
+
+Endpoints are stored as **EndpointSlice** objects in current Kubernetes. You can see them directly:
+
+```bash
+kubectl get endpointslices -l kubernetes.io/service-name=webapp-svc
+```
+
+`kubectl get all` shows the pod and both Services together:
+
+```bash
+kubectl get all
+```
+
+## Step 3: Prove it works from inside the cluster
+
+From the EKS home server you cannot open `10.100.113.192`, because that address only exists inside the cluster network. So start a throwaway pod inside the cluster and call the Service from there:
+
+```bash
+kubectl run curl-test --rm -it --image=curlimages/curl --restart=Never -- curl -s http://webapp-svc
+```
+
+| Part | Meaning |
+| --- | --- |
+| `kubectl run curl-test` | Create a pod named `curl-test` |
+| `--image=curlimages/curl` | A tiny image that contains curl |
+| `--rm -it` | Attach to it, and delete the pod when the command finishes |
+| `--restart=Never` | Create a plain pod, not something that restarts |
+| `-- curl -s http://webapp-svc` | The command to run inside the pod |
+
+You should see the HTML of the Spring Boot application. Notice we used the **name** `webapp-svc`, not the IP. The cluster DNS service (CoreDNS) resolves it. The full DNS name is:
+
+```text
+webapp-svc.default.svc.cluster.local
+<service>.<namespace>.svc.cluster.local
+```
+
+From a pod in the same namespace, the short name `webapp-svc` is enough. From another namespace use `webapp-svc.default`.
+
+This is exactly how your applications should call each other: by Service name, never by pod IP.
+
+## When the Service has several pods
+
+Right now there is one pod behind the Service. Once we run several copies with a ReplicaSet or Deployment, each new pod with the label `app: telusko-webapp` is added to Endpoints automatically, and kube-proxy spreads connections across all of them. Pods that are not ready are left out, so traffic only goes to healthy pods.
+
+## Common mistakes
+
+<Accordions>
+<Accordion title="Endpoints: <none>">
+The selector does not match any running, ready pod. Compare `kubectl get pods --show-labels` with the selector in `kubectl describe svc`. A typo such as `telusko-web-app` vs `telusko-webapp` is the usual cause.
+</Accordion>
+<Accordion title="Connection refused through the Service">
+The Service has endpoints but `targetPort` does not match the port the app listens on. Check the port in the app's logs (`kubectl logs webapp`) and fix `targetPort`.
+</Accordion>
+<Accordion title="Could not resolve host">
+You are calling the Service from outside the cluster, or from a different namespace using only the short name. Use the full name, or run the test from a pod as shown above.
+</Accordion>
+</Accordions>
+
+## Clean up
+
+Keep the pod and Service if you continue straight to the NodePort lesson. Otherwise:
+
+```bash
+kubectl delete -f clusterIp-svc.yml
+kubectl delete -f k8s-pod.yml
+```
+
+If you are stopping for the day, delete the cluster too: `eksctl delete cluster --name telusko-learning --region ap-south-1 --wait`.
+
+## Try It Yourself
+
+1. Create the pod and the `webapp-svc` Service, and confirm `Endpoints` shows the pod IP.
+2. Change the selector to `app: wrong-label`, apply, and check Endpoints again. Then call the Service with the curl pod and read the error. Fix it.
+3. Delete the pod and recreate it. Compare the pod IP before and after, and confirm the Service ClusterIP did not change.
+4. Call the Service using its full DNS name `webapp-svc.default.svc.cluster.local`.
+
+## Official references
+
+- [Kubernetes: Service](https://kubernetes.io/docs/concepts/services-networking/service/)
+- [Kubernetes: EndpointSlices](https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/)
+- [Kubernetes: DNS for Services and Pods](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

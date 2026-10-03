@@ -1,0 +1,155 @@
+---
+title: Maven POM.xml file
+description: Read a pom.xml from top to bottom, understand the project root, coordinates, dependencies, build plugins and properties, and use ${property} placeholders to avoid repeating values.
+---
+
+Everything you want Maven to do for you, you tell it through one file: `pom.xml`. POM stands for **Project Object Model**. It is an XML file that describes the project (its name, version and packaging), what it depends on, and how it should be built. If you understand the POM, you understand Maven.
+
+<img src="/maven/pom-anatomy.svg" alt="The main blocks of a pom.xml inside the project element: coordinates, properties, dependencies, and build with plugins" width={960} height={500} />
+
+## The full example
+
+Here is the `telusko-app` POM as it looks after the previous lessons, with one Spring dependency and the compiler plugin configured through properties:
+
+```xml title="pom.xml"
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- Who am I -->
+  <groupId>com.telusko</groupId>
+  <artifactId>telusko-app</artifactId>
+  <packaging>jar</packaging>
+  <version>1.0-SNAPSHOT</version>
+  <name>telusko-app</name>
+
+  <!-- Reusable values -->
+  <properties>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <!-- What my code needs -->
+  <dependencies>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>3.8.1</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-core</artifactId>
+      <version>6.2.8</version>
+    </dependency>
+  </dependencies>
+
+  <!-- How to build me -->
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.11.0</version>
+        <configuration>
+          <source>${maven.compiler.source}</source>
+          <target>${maven.compiler.target}</target>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+```
+
+Now let us walk through it.
+
+## The project root
+
+Everything sits inside `<project>`, the root element. The `xmlns` and `xsi:schemaLocation` attributes point to the POM's XML schema, which lets your IDE validate the file and autocomplete tags. You rarely touch them.
+
+## modelVersion
+
+`<modelVersion>4.0.0</modelVersion>` is the version of the POM format itself. For Maven 2 and 3 it is always `4.0.0`. It is mandatory, and you never change it.
+
+## Coordinates: who this project is
+
+| Element | Value | Meaning |
+| --- | --- | --- |
+| `groupId` | `com.telusko` | Organisation, reverse domain name. Also the usual root package, for example `com.telusko.webproject` |
+| `artifactId` | `telusko-app` | Project name, used for the output file name |
+| `packaging` | `jar` | Output format. `jar` is the default, `war` for web apps, `pom` for parent projects |
+| `version` | `1.0-SNAPSHOT` | Still in development. Change to a release like `1.0.0` when it is final |
+| `name` | `telusko-app` | A human friendly display name. Optional. The archetype copies the artifactId into it |
+
+`groupId`, `artifactId` and `version` together are the coordinates (GAV). Together with `modelVersion`, they are the only elements a POM must have.
+
+## dependencies: what the code needs
+
+Each `<dependency>` inside `<dependencies>` is one library Maven should fetch from the repository and put on the classpath, as you did in [Maven Dependencies](/docs/maven/dependencies-pom-and-ides/maven-dependencies). Spring Boot, JUnit, Kafka clients: whatever your code imports from outside the JDK goes here. The optional `<scope>` says where the library is needed (`test` for JUnit).
+
+## build and plugins: how to build
+
+`<build>` controls how the project is built. Inside it, `<plugins>` lists plugins and their configuration. Plugins do the real work in Maven: the compiler plugin compiles, the Surefire plugin runs tests, the JAR plugin packages. Maven already includes these with default settings (you will see where in [Effective POM](/docs/maven/dependencies-pom-and-ides/effective-pom)), so you only list a plugin when you want to change its version or configuration. Here we configure the compiler plugin to compile for Java 17.
+
+The structure is always `<build>` then `<plugins>` then one `<plugin>` per plugin.
+
+## properties: define once, reuse everywhere
+
+Hard coding `17` in the plugin works, but then every Java upgrade means hunting through the POM. `<properties>` lets you define a value once and refer to it anywhere with `${name}`:
+
+```xml
+<properties>
+  <maven.compiler.source>17</maven.compiler.source>
+</properties>
+...
+<source>${maven.compiler.source}</source>
+```
+
+Change the property to `21` and every place that uses it follows.
+
+<Callout type="error" title="Do not forget the dollar sign">
+In the video the placeholders are typed as `{maven.compiler.source}` without the `$`. Maven then passes the literal text `{maven.compiler.source}` to the compiler and the build fails with an "invalid source release" style error. The correct syntax is always `${maven.compiler.source}`.
+</Callout>
+
+Two more things about these particular properties:
+
+- `maven.compiler.source` and `maven.compiler.target` are the **user properties** the compiler plugin reads by default. Defining them in `<properties>` is enough: you can delete the whole `<configuration>` block and the plugin still picks them up.
+- On JDK 9 and newer, the single property `maven.compiler.release` is the modern choice. It replaces both and also stops you from accidentally using APIs newer than the target Java version:
+
+```xml
+<properties>
+  <maven.compiler.release>17</maven.compiler.release>
+</properties>
+```
+
+You can define your own properties too, for example `<spring.version>6.2.8</spring.version>`, and use `${spring.version}` in several Spring dependencies so they always stay in step.
+
+## Other elements you will meet
+
+| Element | Purpose | Where in this course |
+| --- | --- | --- |
+| `<parent>` | Inherit configuration from another POM | Spring Boot projects use `spring-boot-starter-parent` |
+| `<dependencyManagement>` | Fix versions centrally without adding the dependency | Spring Boot and JUnit BOMs |
+| `<build><finalName>` | Change the output file name | The webapp project |
+| `<modules>` | List sub-projects in a multi-module build | Beyond this course |
+| `<repositories>` | Extra repositories for this project | Usually set in `settings.xml` instead |
+
+## Try It Yourself
+
+1. Open your `telusko-app/pom.xml` and label each block with one of: coordinates, properties, dependencies, build.
+2. Move the Java version into `<properties>` and reference it with `${...}`. Build with `mvn clean compile` to confirm it works.
+3. Remove the `$` from one placeholder on purpose, build, and read the error. Fix it.
+4. Replace `source` and `target` with a single `maven.compiler.release` property, remove the `<configuration>` block, and build again.
+5. Add a `<spring.version>` property and use it for the spring-core version.
+
+## Official references
+
+- [Apache Maven: Introduction to the POM](https://maven.apache.org/guides/introduction/introduction-to-the-pom.html)
+- [Apache Maven: POM Reference](https://maven.apache.org/pom.html)
+- [Apache Maven: Compiler Plugin, setting the release](https://maven.apache.org/plugins/maven-compiler-plugin/examples/set-compiler-release.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

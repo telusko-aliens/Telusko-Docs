@@ -1,0 +1,8 @@
+{
+  "title": "Kubernetes Foundations",
+  "pages": [
+    "introduction-to-kubernetes.mdx",
+    "what-is-kubernetes-why-do-we-need-it.mdx",
+    "kubernetes-architecture-explained.mdx"
+  ]
+}

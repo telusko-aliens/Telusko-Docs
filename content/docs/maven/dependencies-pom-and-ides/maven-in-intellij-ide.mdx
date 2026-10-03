@@ -1,0 +1,121 @@
+---
+title: Maven in IntelliJ IDE
+description: Create a Maven project in IntelliJ IDEA, find the same standard structure you built from the terminal, and run clean, compile, test and package from the Maven tool window.
+---
+
+Everything we did in the terminal also works from an IDE, and in day to day development that is how most people use Maven. The important thing to understand is that the IDE does not replace Maven. It runs the same Maven, reads the same `pom.xml`, and produces the same `target` folder. The project structure is identical whichever IDE you use.
+
+## Create the project
+
+<Steps>
+<Step>
+### Open the New Project dialog
+
+In IntelliJ IDEA choose **File > New > Project** (or **New Project** on the welcome screen).
+</Step>
+<Step>
+### Fill in the basics
+
+| Field | Value in the demo | Notes |
+| --- | --- | --- |
+| Name | `MavenDemoApp` | Becomes the folder name and the default artifactId |
+| Location | `D:\Maven Projects` | Any folder you like |
+| Build system | **Maven** | The choice that matters. IntelliJ and Gradle are the other options |
+| JDK | 21 | Any JDK 17 or newer |
+| Add sample code | ticked | Creates a `Main` class |
+
+Expand **Advanced Settings** to set the **GroupId** (for example `com.telusko`) and **ArtifactId**. If you leave GroupId alone, IntelliJ uses `org.example`, which is why the video's project ends up with an `org.example` package.
+
+<img src="/maven/screens/intellij-new-maven-project.webp" alt="IntelliJ IDEA New Project dialog with name MavenDemoApp, location D:\Maven Projects, build system Maven selected and JDK 21" width={1440} height={810} />
+
+*The New Project dialog with Maven selected as the build system.*
+</Step>
+<Step>
+### Create
+
+Click **Create** and choose to open it in the current window or a new one. IntelliJ generates the project and imports it as a Maven project.
+</Step>
+</Steps>
+
+## The same structure as before
+
+The project tool window on the left shows a familiar layout:
+
+```text
+MavenDemoApp/
+├── pom.xml
+└── src/
+    ├── main/
+    │   ├── java/org/example/Main.java
+    │   └── resources/
+    └── test/
+        └── java/
+```
+
+Open `pom.xml`. IntelliJ already set the Java version through properties, the same technique you learned in [Maven POM.xml file](/docs/maven/dependencies-pom-and-ides/maven-pom-xml-file):
+
+```xml
+<properties>
+  <maven.compiler.source>21</maven.compiler.source>
+  <maven.compiler.target>21</maven.compiler.target>
+  <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+</properties>
+```
+
+## The Maven tool window
+
+Click the **m** icon on the right edge (or **View > Tool Windows > Maven**). It has three useful nodes:
+
+| Node | What it shows |
+| --- | --- |
+| **Lifecycle** | The common phases: `clean`, `validate`, `compile`, `test`, `package`, `verify`, `install`, `site`, `deploy` |
+| **Plugins** | Every plugin the project uses (clean, compiler, surefire, jar, install, deploy and so on) with its version, and each plugin's individual goals such as `compiler:compile` |
+| **Repositories** | The **local** repository (`~/.m2/repository`) and **central** (`https://repo.maven.apache.org/maven2`) you learned about in [Maven Repositories](/docs/maven/dependencies-pom-and-ides/maven-repositories) |
+
+<img src="/maven/screens/intellij-maven-tool-window.webp" alt="IntelliJ IDEA Maven tool window showing the Lifecycle phases, the Plugins list with versions, and the local and central Repositories" width={1440} height={810} />
+
+*The Maven tool window: lifecycle phases at the top, plugins with their versions, then the local and central repositories.*
+
+Notice that the Plugins node lists plugins you never added to `pom.xml`. They come from Maven's built-in defaults, which is exactly what the next lesson, [Effective POM](/docs/maven/dependencies-pom-and-ides/effective-pom), explains.
+
+## Run goals from the IDE
+
+Double click a phase under **Lifecycle** to run it (or right click it and choose **Run**). The **Run** panel at the bottom shows the same output you saw in the terminal.
+
+| Double click | Same as | Result |
+| --- | --- | --- |
+| `clean` | `mvn clean` | `target/` deleted |
+| `compile` | `mvn compile` | `target/classes` created |
+| `test` | `mvn test` | Tests compiled and run |
+| `package` | `mvn package` | `target/MavenDemoApp-1.0-SNAPSHOT.jar` created. The Run panel prints the full path |
+
+You can select several phases with Ctrl+click and run them together, for example `clean` and `package`. `install` and `deploy` work too, and we cover what they do in the [lifecycle lesson](/docs/maven/lifecycle-testing-and-spring-boot/maven-build-lifecycle-summary). `deploy` needs extra configuration (where to deploy), so it will fail on this demo project, which is expected.
+
+You can still open the **Terminal** tab inside IntelliJ and type `mvn clean package` yourself. Both ways give the same result.
+
+## Two IntelliJ habits worth learning
+
+<Accordions>
+<Accordion title="Reload after editing pom.xml">
+When you change `pom.xml` (for example add a dependency), IntelliJ shows a small floating **Load Maven Changes** button, and the Maven tool window has a **Reload All Maven Projects** button. Click it so the IDE downloads the new library and the editor stops underlining your imports in red. The shortcut is Ctrl+Shift+O on Windows and Linux.
+</Accordion>
+<Accordion title="Which Maven does IntelliJ use?">
+By default IntelliJ runs its own **bundled** Maven, which may be a different version from the one you installed. You can change it under **Settings > Build, Execution, Deployment > Build Tools > Maven > Maven home path**. If the project has a Maven Wrapper (`mvnw`), choose **Use Maven wrapper** there so the IDE, the terminal and CI all use the same version.
+</Accordion>
+</Accordions>
+
+## Try It Yourself
+
+1. Create `MavenDemoApp` in IntelliJ with GroupId `com.telusko` and run `package` from the Maven tool window.
+2. In the Plugins node, find the version of `maven-surefire-plugin` your project uses.
+3. Add the spring-core dependency to the POM, reload the project, and confirm it appears under **External Libraries**.
+4. Run `mvn clean package` from IntelliJ's Terminal tab and compare the output with the tool window run.
+
+## Official references
+
+- [IntelliJ IDEA: Maven support](https://www.jetbrains.com/help/idea/maven-support.html)
+- [IntelliJ IDEA: Run Maven goals](https://www.jetbrains.com/help/idea/work-with-maven-goals.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

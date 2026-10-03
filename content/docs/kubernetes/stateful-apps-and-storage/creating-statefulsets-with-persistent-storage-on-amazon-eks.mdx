@@ -1,0 +1,327 @@
+---
+title: Creating StatefulSets with Persistent Storage on Amazon EKS
+description: Run MySQL as a StatefulSet on EKS with a headless Service and volumeClaimTemplates, watch EBS volumes get created dynamically, and prove that pods keep their name and data.
+---
+
+Time to build what we drew in the [previous lesson](/docs/kubernetes/stateful-apps-and-storage/behind-the-scenes-of-kubernetes-statefulsets): a two-replica MySQL StatefulSet where every pod gets its own EBS-backed volume, with no manual PV or PVC at all.
+
+We also hit a real error on the way, the same one you will probably hit, and fix it.
+
+## Step 1: The headless Service
+
+```bash
+vi headless-service.yml
+```
+
+```yaml title="headless-service.yml"
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  clusterIP: None
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306
+```
+
+| Field | Meaning |
+| --- | --- |
+| `clusterIP: None` | This one line makes it **headless**: no virtual IP, no load balancing. DNS returns a record per pod instead. Leave it out and you get a normal ClusterIP Service |
+| `selector: app: mysql` | Pods with this label are part of the Service. Must match the StatefulSet's pod labels |
+| `port: 3306`, `targetPort: 3306` | MySQL's default port |
+
+Create it **before** the StatefulSet:
+
+```bash
+kubectl apply -f headless-service.yml
+kubectl get svc
+```
+
+```text
+NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)    AGE
+kubernetes   ClusterIP   10.100.0.1   <none>        443/TCP    3d
+mysql        ClusterIP   None         <none>        3306/TCP   5s
+```
+
+`CLUSTER-IP` is `None`. That is a headless Service.
+
+## Step 2: A StorageClass for EBS
+
+A `volumeClaimTemplate` only describes a PVC. Something has to turn that PVC into a real disk, and that is the job of a **StorageClass**. Check what your cluster has:
+
+```bash
+kubectl get storageclass
+```
+
+```text
+NAME   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+gp2    kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   false                  3d
+```
+
+EKS creates a `gp2` class, but on clusters running Kubernetes 1.30 or later it is **not marked as default**. That matters, as you will see in Step 4.
+
+The lecture uses this `gp2` class. It works because EKS redirects the old `kubernetes.io/aws-ebs` provisioner to the EBS CSI driver. The better choice today is your own class that uses the CSI driver directly and creates **gp3** volumes, which are cheaper and faster than gp2:
+
+```yaml title="ebs-sc.yml"
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ebs-sc
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+parameters:
+  type: gp3
+  encrypted: "true"
+```
+
+| Field | Meaning |
+| --- | --- |
+| `provisioner: ebs.csi.aws.com` | The EBS CSI driver you installed in [Preparing AWS EBS Storage](/docs/kubernetes/stateful-apps-and-storage/preparing-aws-ebs-storage-for-kubernetes-eks) |
+| `volumeBindingMode: WaitForFirstConsumer` | Do not create the disk until a pod using the PVC is scheduled. The disk is then created in **that node's zone**, so it can always attach. `Immediate` would pick a zone first and might strand the pod |
+| `reclaimPolicy: Delete` | When the PVC is deleted, delete the PV and the EBS volume too. Use `Retain` for data you cannot lose |
+| `allowVolumeExpansion: true` | Lets you grow a volume later by editing the PVC's storage request |
+| `parameters.type: gp3` | EBS volume type. gp3 is the driver's default |
+| `parameters.encrypted: "true"` | Encrypt with the default `aws/ebs` KMS key |
+
+```bash
+kubectl apply -f ebs-sc.yml
+```
+
+If you want PVCs without a `storageClassName` to use it, mark it default by adding `storageclass.kubernetes.io/is-default-class: "true"` under `metadata.annotations`. Another option: the EBS CSI add-on (version 1.31.0 and later) can install a recommended default class for you when you set its configuration value `defaultStorageClass.enabled: true`.
+
+<img src="/kubernetes/k8s2-dynamic-provisioning.svg" alt="Five steps of dynamic provisioning: PVC from volumeClaimTemplates, StorageClass ebs-sc, pod scheduled with WaitForFirstConsumer, CSI driver creates the EBS volume in that zone, PV created and bound; compared with static provisioning" width={960} height={430} />
+
+## Step 3: The StatefulSet
+
+```bash
+vi statefulset.yml
+```
+
+```yaml title="statefulset.yml"
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+spec:
+  serviceName: mysql
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: password123
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: mysql-storage
+              mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-storage
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: ebs-sc      # the lecture uses gp2
+        resources:
+          requests:
+            storage: 10Gi
+```
+
+| Field | Meaning |
+| --- | --- |
+| `kind: StatefulSet`, `apiVersion: apps/v1` | Same API group as Deployment |
+| `serviceName: mysql` | The headless Service that gives pods their DNS names. Must exist |
+| `replicas: 2` | Creates `mysql-0` then `mysql-1` |
+| `selector` / `template.metadata.labels` | Same rule as a Deployment: they must match |
+| `image: mysql:8.0` | Official MySQL image |
+| `env: MYSQL_ROOT_PASSWORD` | The MySQL image refuses to start without a root password (or an explicit "allow empty" setting) |
+| `volumeMounts: mysql-storage` at `/var/lib/mysql` | MySQL's data directory. Mounting the volume here means the database files go to EBS, not into the container |
+| `volumeClaimTemplates` | The PVC template. Its `metadata.name` must match the `volumeMounts` name. One PVC per pod is created from it |
+| `storageClassName` | Which StorageClass creates the disks |
+| `storage: 10Gi` | Each pod gets its own 10 GiB volume |
+
+<Callout type="warn" title="Never put a real password in YAML">
+`value: password123` in plain text is only acceptable in a throwaway lab. Anyone who can read the file or run `kubectl get sts mysql -o yaml` sees it. The proper way, a Secret referenced with `valueFrom.secretKeyRef`, is covered in [Environment Variables, ConfigMaps & Secrets](/docs/kubernetes/configuration-and-autoscaling/environment-variables-configmaps-and-secrets-in-kubernetes).
+</Callout>
+
+## Step 4: Apply, and the first error
+
+In the lecture, the first version of `statefulset.yml` had **no** `storageClassName`. Here is what happens then:
+
+```bash
+kubectl apply -f statefulset.yml
+kubectl get sts
+kubectl get pods
+```
+
+```text
+NAME      READY   STATUS    RESTARTS   AGE
+mysql-0   0/1     Pending   0          40s
+```
+
+Two things to notice already. The pod is called `mysql-0`, not `mysql-7f9c...`. And there is no `mysql-1` yet, because `mysql-1` waits until `mysql-0` is Ready. But why `Pending`?
+
+```bash
+kubectl describe pod mysql-0
+```
+
+```text
+Warning  FailedScheduling  ...  0/2 nodes are available: pod has unbound immediate PersistentVolumeClaims.
+```
+
+```bash
+kubectl get pvc
+kubectl describe pvc mysql-storage-mysql-0
+```
+
+```text
+Normal  FailedBinding  ...  persistentvolume-controller  no persistent volumes available for this claim and no storage class is set
+```
+
+The PVC has no StorageClass, the cluster has no default class, and there is no pre-made PV. Nobody is going to create a disk. The fix is to set `storageClassName` in the template.
+
+You cannot change `volumeClaimTemplates` on an existing StatefulSet, so delete and recreate. The PVC that was already created must be deleted too, otherwise the new pod reuses the old, broken claim:
+
+```bash
+kubectl delete -f statefulset.yml
+kubectl delete pvc mysql-storage-mysql-0
+# add storageClassName to statefulset.yml, then
+kubectl apply -f statefulset.yml
+```
+
+<Callout type="info" title="Still Pending? Check the driver">
+In the lecture the PVC stayed `Pending` even with `storageClassName: gp2`, and `describe pvc` showed it waiting for the external provisioner. The cluster had been recreated since the storage lesson, so the **EBS CSI driver add-on was missing**. A recreated cluster does not remember add-ons you installed by hand. Run `eksctl get addon --cluster telusko-learning --region ap-south-1`, and if `aws-ebs-csi-driver` is not listed, repeat Steps 3 and 4 of [Preparing AWS EBS Storage](/docs/kubernetes/stateful-apps-and-storage/preparing-aws-ebs-storage-for-kubernetes-eks). The PVCs bind within a minute after the driver is back.
+</Callout>
+
+## Step 5: Watch it work
+
+```bash
+kubectl get pvc
+kubectl get sts
+kubectl get pods
+```
+
+```text
+NAME                    STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+mysql-storage-mysql-0   Bound    pvc-a35faf6e-310e-4337-a1de-1a687c4bf152   10Gi       RWO            ebs-sc         2m
+
+NAME    READY   AGE
+mysql   1/2     23s
+
+NAME      READY   STATUS              RESTARTS   AGE
+mysql-0   1/1     Running             0          36s
+mysql-1   0/1     ContainerCreating   0          14s
+```
+
+`mysql-0` is Running, and only now is `mysql-1` being created. That is ordered creation. A few seconds later:
+
+```bash
+kubectl get pods
+kubectl get pvc
+kubectl get pv
+```
+
+You see two pods, two PVCs (`mysql-storage-mysql-0`, `mysql-storage-mysql-1`) and two PVs with generated names like `pvc-a35faf6e-...`. You wrote none of them.
+
+`kubectl get sts` and `kubectl get statefulset` are the same command. `sts` is the short name.
+
+Now open **EC2, Elastic Block Store, Volumes** in the console:
+
+<img src="/kubernetes/screens/k8s2-dynamic-ebs-volumes.webp" alt="EC2 Volumes list with two new 10 GiB volumes named telusko-learning-dynamic-pvc, next to the node root volumes and the manually created Pods Vol" width={1280} height={210} />
+
+*Two new 10 GiB volumes named `telusko-learning-dynamic-pvc-...` appeared on their own, one per pod, each in the zone of the node its pod runs on. (These are gp2 because the lecture used the gp2 class. With `ebs-sc` they are gp3.)*
+
+## Step 6: Delete a pod, keep its name and data
+
+```bash
+kubectl delete pod mysql-1
+kubectl get pods
+```
+
+```text
+NAME      READY   STATUS    RESTARTS   AGE
+mysql-0   1/1     Running   0          7m
+mysql-1   1/1     Running   0          52s
+```
+
+The replacement is called `mysql-1` again. Compare that with the random names a Deployment gives. And:
+
+```bash
+kubectl get pvc
+```
+
+The PVC ages are still 6 or 7 minutes. No new PVC was created. The new `mysql-1` mounted the same `mysql-storage-mysql-1` claim, so the same EBS volume, so the same database files.
+
+To prove the data survives, create a database before deleting the pod:
+
+```bash
+kubectl exec -it mysql-0 -- mysql -uroot -ppassword123 -e "CREATE DATABASE telusko;"
+kubectl delete pod mysql-0
+kubectl get pods -w                       # wait for mysql-0 to be Running, then Ctrl+C
+kubectl exec -it mysql-0 -- mysql -uroot -ppassword123 -e "SHOW DATABASES;"
+```
+
+`telusko` is still in the list.
+
+You can also check the stable DNS names from a temporary pod:
+
+```bash
+kubectl run dns-test --rm -it --image=busybox --restart=Never -- nslookup mysql-0.mysql
+```
+
+<Callout type="info" title="Two MySQL pods are not a MySQL cluster">
+`mysql-0` and `mysql-1` are two **independent** MySQL servers, each with its own empty database. The StatefulSet gave them stable names and disks, but it did not set up replication between them. Real MySQL replication needs extra configuration, usually from a Helm chart or an operator.
+</Callout>
+
+## Clean up (important for your AWS bill)
+
+The lecture finishes with `kubectl delete all --all`. Be careful: `all` covers pods, Services, Deployments, StatefulSets and a few other types, but **not PVCs, PVs or StorageClasses**. After that command, your EBS volumes are still there and still billed.
+
+Clean up explicitly:
+
+```bash
+kubectl delete -f statefulset.yml
+kubectl delete -f headless-service.yml
+kubectl get pvc                               # the PVCs are still there
+kubectl delete pvc mysql-storage-mysql-0 mysql-storage-mysql-1
+kubectl get pv                                # should be empty after a few seconds
+```
+
+Because the StorageClass has `reclaimPolicy: Delete`, deleting the PVCs deletes the PVs and the EBS volumes. Confirm in **EC2, Volumes** that no `dynamic-pvc` volumes remain.
+
+<Callout type="warn" title="Delete PVCs before deleting the cluster">
+`eksctl delete cluster` does not delete EBS volumes created by PVCs. If you delete the cluster first, those volumes stay in your account, unattached and billed every month. Delete PVCs first, or remove leftover volumes by hand in the console afterwards.
+</Callout>
+
+## Try It Yourself
+
+1. Scale the StatefulSet to 3 with `kubectl scale sts mysql --replicas=3` and watch `kubectl get pods -w`. In what order do pods appear? How many EBS volumes exist now?
+2. Scale back to 1. Which pods go away, in what order, and how many PVCs remain?
+3. Add `podManagementPolicy: Parallel` to a fresh StatefulSet and compare how the pods start.
+4. Increase the claim size of `mysql-storage-mysql-0` to 15Gi with `kubectl edit pvc` (this needs `allowVolumeExpansion: true`). Check the new size in the EC2 console.
+5. Run the `nslookup` test above for both `mysql-0.mysql` and `mysql`. What is the difference in the answers?
+
+## Official references
+
+- [Kubernetes: StatefulSet Basics (tutorial)](https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/)
+- [Kubernetes: Storage Classes](https://kubernetes.io/docs/concepts/storage/storage-classes/)
+- [Kubernetes: Dynamic Volume Provisioning](https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/)
+- [Amazon EKS: Use Kubernetes volume storage with Amazon EBS](https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

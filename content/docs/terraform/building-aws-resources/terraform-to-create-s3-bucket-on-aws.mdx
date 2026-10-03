@@ -1,0 +1,206 @@
+---
+title: Terraform to create s3 bucket on aws
+description: Create an S3 bucket with Terraform, understand why the acl argument now shows a deprecation warning, and add versioning and public access blocking the current way.
+---
+
+So far every resource we created was an EC2 instance. Terraform is not limited to servers, of course. The same workflow creates S3 buckets, RDS databases, IAM users, VPCs and hundreds of other resource types. In this lesson we create an S3 bucket, and along the way we meet two very practical topics: using AI tools to draft Terraform code, and dealing with deprecated arguments.
+
+If S3 itself is new, the AWS course covers it in the [storage section](/docs/aws/storage-and-static-hosting/s3-introduction).
+
+## Step 1: A new folder
+
+```bash
+mkdir 04-tf-s3bucket
+cd 04-tf-s3bucket
+```
+
+Using variables and outputs is optional here. The lecture keeps it simple with two files, `provider.tf` and `main.tf`.
+
+## Step 2: Drafting the code with an AI tool
+
+The lecture asks ChatGPT for "a Terraform script to create an S3 bucket on AWS", then refines the request: first with versioning, then without, then "with ACL". This is a perfectly reasonable way to work once you understand HCL, because you can read what the tool gives you and judge it.
+
+The important word is **judge**. AI tools are trained on years of public Terraform code, much of it written for older provider versions. The code you get often works but uses outdated patterns, and that is exactly what happens in this lecture. Always:
+
+1. Read every line and make sure you know what it does
+2. Run `terraform validate` and read the warnings, not only the errors
+3. Check the resource page in the provider documentation when something looks unfamiliar
+
+## Step 3: The code from the lecture
+
+```hcl title="provider.tf"
+provider "aws" {
+  region = "ap-south-1"
+}
+```
+
+The AI suggested `us-east-1`; change it to the region you use.
+
+```hcl title="main.tf (as in the lecture)"
+resource "aws_s3_bucket" "my_bucket" {
+  bucket = "telusko4545b" # Replace with a globally unique name
+
+  # ACL options: private, public-read, public-read-write, authenticated-read, etc.
+  acl = "private"
+}
+```
+
+| Part | Meaning |
+| --- | --- |
+| `aws_s3_bucket` | Resource type for an S3 bucket |
+| `my_bucket` | Local name, used to refer to it inside Terraform |
+| `bucket` | The real bucket name in AWS |
+| `acl` | Access control list. `private` means only the owner has access |
+
+### Bucket names must be globally unique
+
+S3 bucket names are shared across **all AWS accounts in the world**, not just yours. If someone anywhere already owns `telusko4545b`, your apply fails with `BucketAlreadyExists`. Rules:
+
+- 3 to 63 characters
+- Lowercase letters, numbers, dots and hyphens only
+- Must start and end with a letter or number
+
+A safe pattern is project name plus your initials plus a random number, for example `telusko-tf-demo-sm-48213`.
+
+## Step 4: init, fmt, validate, and a warning
+
+```bash
+terraform init
+terraform fmt
+terraform validate
+```
+
+```text
+Warning: Argument is deprecated
+
+  with aws_s3_bucket.my_bucket,
+  on main.tf line 5, in resource "aws_s3_bucket" "my_bucket":
+   5:   acl = "private"
+
+acl is deprecated. Use the aws_s3_bucket_acl resource instead.
+
+Success! The configuration is valid, but there were some validation warnings as shown above.
+```
+
+The lecture treats this as "just a warning" and moves on, and the bucket is created successfully. That is true today, but a deprecation warning is the provider telling you that this argument will be removed in a future major version. When that happens, your code stops working. It is worth understanding why it changed.
+
+## Why the warning: the S3 resource was split
+
+Since version 4 of the AWS provider (2022), almost every bucket setting moved out of `aws_s3_bucket` into its own resource:
+
+<img src="/terraform/tf-s3-split-resources.svg" alt="aws_s3_bucket with separate resources for versioning, public access block, encryption and ACL" width={960} height={450} />
+
+| Old argument inside `aws_s3_bucket` | Separate resource now |
+| --- | --- |
+| `acl` | `aws_s3_bucket_acl` |
+| `versioning { }` | `aws_s3_bucket_versioning` |
+| `server_side_encryption_configuration { }` | `aws_s3_bucket_server_side_encryption_configuration` |
+| `lifecycle_rule { }` | `aws_s3_bucket_lifecycle_configuration` |
+| `website { }` | `aws_s3_bucket_website_configuration` |
+| `policy` | `aws_s3_bucket_policy` |
+
+There is a second reason the `acl = "private"` line is unnecessary. Since April 2023, every new S3 bucket is created with **ACLs disabled** (Object Ownership set to "bucket owner enforced") and with **Block Public Access** turned on. A new bucket is already private. AWS itself now recommends controlling access with bucket policies and IAM rather than ACLs.
+
+## The current way to write it
+
+Here is the same bucket written for the current provider, with the versioning the lecture first asked the AI tool for:
+
+```hcl title="provider.tf"
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = "ap-south-1"
+}
+```
+
+```hcl title="main.tf"
+resource "aws_s3_bucket" "my_bucket" {
+  bucket        = "telusko-tf-demo-sm-48213" # must be globally unique
+  force_destroy = true                       # practice only: lets destroy delete a non-empty bucket
+
+  tags = {
+    Project = "terraform-course"
+  }
+}
+
+resource "aws_s3_bucket_versioning" "my_bucket" {
+  bucket = aws_s3_bucket.my_bucket.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "my_bucket" {
+  bucket = aws_s3_bucket.my_bucket.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+```
+
+What changed:
+
+| Code | Why |
+| --- | --- |
+| No `acl` | The bucket is private by default, and ACLs are disabled on new buckets |
+| `aws_s3_bucket_versioning` | Turns on versioning. `bucket = aws_s3_bucket.my_bucket.id` links it to our bucket and makes Terraform create the bucket first |
+| `aws_s3_bucket_public_access_block` | Makes the "no public access" setting explicit in code, so nobody can quietly turn it off in the console without Terraform noticing |
+| `force_destroy = true` | Without it, `terraform destroy` fails with `BucketNotEmpty` if the bucket holds any objects or old versions. Handy for practice; think twice before using it on real data |
+| `tags` | Optional, but tagging everything you create with Terraform makes billing and cleanup much easier |
+
+<Callout type="info" title="Same local name, different types">
+All three resources use the local name `my_bucket`. That is allowed, because the full address includes the type: `aws_s3_bucket.my_bucket` and `aws_s3_bucket_versioning.my_bucket` are different addresses. Many teams use this pattern to show which resources belong together.
+</Callout>
+
+## Step 5: plan, apply and check
+
+```bash
+terraform validate   # no warnings now
+terraform plan
+terraform apply -auto-approve
+```
+
+With the lecture's version, the plan says `1 to add`. With the current version it says `3 to add`. Open the **S3** console and you will find the bucket. Open it and check:
+
+- **Properties > Bucket Versioning**: Enabled
+- **Permissions > Block public access**: On
+- **Permissions > Object Ownership**: Bucket owner enforced (ACLs disabled)
+
+Try uploading a file, upload a changed copy with the same name, and turn on **Show versions** to see both.
+
+## Step 6: Destroy
+
+```bash
+terraform destroy -auto-approve
+```
+
+S3 storage is cheap but not free beyond the free tier, so delete practice buckets when you are done. If you did not set `force_destroy` and uploaded files, empty the bucket first (including all versions) or the destroy fails with `BucketNotEmpty`.
+
+## Try It Yourself
+
+1. Create the lecture version with `acl = "private"`, run `terraform validate`, and read the deprecation warning yourself.
+2. Rewrite it in the current style with versioning and the public access block, and confirm `validate` shows no warnings.
+3. Add a `bucket_name` input variable and an output that prints `aws_s3_bucket.my_bucket.arn`.
+4. Ask an AI tool for "Terraform code for an S3 bucket with encryption". Check whether it uses the deprecated inline block or `aws_s3_bucket_server_side_encryption_configuration`, and fix it if needed.
+5. Upload a file, then run `terraform destroy` with and without `force_destroy` and compare the results.
+
+## Official references
+
+- [aws_s3_bucket](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket)
+- [aws_s3_bucket_versioning](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_versioning)
+- [Controlling ownership of objects and disabling ACLs](https://docs.aws.amazon.com/AmazonS3/latest/userguide/about-object-ownership.html)
+- [Bucket naming rules](https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

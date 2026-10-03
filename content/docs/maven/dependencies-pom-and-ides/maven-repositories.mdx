@@ -1,0 +1,151 @@
+---
+title: Maven Repositories
+description: Understand the local, central and remote Maven repositories, prove that Maven downloads a library only once by watching the build output, and explore the .m2 folder on your machine.
+---
+
+When you add a dependency to `pom.xml`, the JAR has to come from somewhere, and it has to be stored somewhere. Those places are **repositories**: storage locations for artifacts (JARs, WARs, POMs and plugins), organised by their coordinates. Maven works with three kinds.
+
+| Repository | Where it lives | Who maintains it | What it holds |
+| --- | --- | --- | --- |
+| **Local** | A folder on your machine: `~/.m2/repository` | Maven, automatically | A cache of everything you downloaded, plus what you `install` yourself |
+| **Central** | `https://repo.maven.apache.org/maven2` | The Maven community (hosted by Sonatype) | Millions of open source libraries and plugins |
+| **Remote (private)** | A server inside your company, for example Nexus or JFrog Artifactory | Your company | Internal libraries, plus a cached copy of Central |
+
+Officially, Maven calls every repository that is not on your machine "remote", so Central is technically a remote repository too. In everyday talk, as in this course, "remote" usually means a company's private repository.
+
+## How Maven finds a dependency
+
+<img src="/maven/dependency-resolution.svg" alt="Maven looks for a dependency in the local repository first, then downloads it from Maven Central or a private remote repository, caches it locally and adds it to the classpath" width={960} height={440} />
+
+1. You declare, for example, `spring-core` in `pom.xml`.
+2. Maven checks the **local repository** first.
+3. If it is not there, Maven downloads it from **Central** (or from your company's repository if one is configured) into the local repository.
+4. From the local repository it goes onto your project's classpath.
+5. Next time, Maven finds it locally and does not download it again.
+
+The local repository is per user, not per project. Once spring-core 6.2.8 is in `~/.m2`, every project on your machine reuses that one copy.
+
+## Seeing it happen
+
+On the Linux VM, the demo project already has the compiler plugin and spring-core in its POM. Watch the output carefully on each run.
+
+**First build after adding a dependency:**
+
+```bash
+mvn package
+```
+
+The output is full of download lines:
+
+```text
+Downloading from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-compiler-api/2.13.0/...
+Downloaded from central: https://repo.maven.apache.org/maven2/...
+...
+[INFO] BUILD SUCCESS
+```
+
+**Second build, nothing changed in the POM:**
+
+```bash
+mvn clean
+mvn package
+```
+
+`BUILD SUCCESS` again, but **no** `Downloading from central` lines this time. Everything came from the local repository.
+
+**Add a new dependency** (the demo adds `spring-security-web` 6.5.0 with `vi pom.xml`) and build again:
+
+```bash
+mvn clean package
+```
+
+The download lines come back, but only for the new library and its transitive dependencies. Run it once more and they disappear again. That is the local repository cache at work.
+
+## Inside the local repository
+
+The local repository is a hidden folder in your home directory.
+
+<Tabs items={["Linux / macOS", "Windows"]}>
+<Tab value="Linux / macOS">
+
+```bash
+cd ~
+ls -la            # .m2 is hidden, -a shows it
+cd ~/.m2/repository
+ls -la
+```
+
+</Tab>
+<Tab value="Windows">
+
+```bash
+cd %USERPROFILE%\.m2\repository
+dir
+```
+
+The folder is `C:\Users\<your-name>\.m2\repository`.
+
+</Tab>
+</Tabs>
+
+<img src="/maven/screens/local-repository-m2.webp" alt="Listing of ~/.m2/repository on the Linux VM showing folders such as com, commons-io, junit, org and the archetype catalog file" width={1440} height={810} />
+
+*The local repository on the VM. Each top level folder is the first part of a groupId.*
+
+Artifacts are stored by their coordinates, with the dots of the groupId turned into folders:
+
+```text
+~/.m2/repository/org/springframework/spring-core/6.2.8/
+├── spring-core-6.2.8.jar
+├── spring-core-6.2.8.pom
+└── ... checksum and metadata files
+```
+
+That is the same layout as on `repo.maven.apache.org`, which is why Maven can treat both the same way.
+
+<Callout type="info" title="Deleting .m2 is safe">
+Everything in `~/.m2/repository` that came from Central can be downloaded again. If you suspect a corrupted download (strange `invalid LOC header` or `zip file is empty` errors), delete that artifact's folder, or the whole `repository` folder, and build again. Only things you installed yourself with `mvn install` would need to be rebuilt.
+</Callout>
+
+## Remote repositories in companies
+
+Large companies do not want every developer and every CI server downloading straight from the internet. They run a **repository manager** such as Sonatype Nexus or JFrog Artifactory, which:
+
+- Hosts the company's own private libraries (shared code that must not be public)
+- Proxies and caches Maven Central, so builds are faster and still work if the internet is slow
+- Lets security teams block libraries with known vulnerabilities
+
+To make Maven use it, you configure a **mirror** in `~/.m2/settings.xml` (not in the project's POM), so every project on that machine uses it:
+
+```xml title="~/.m2/settings.xml"
+<settings>
+  <mirrors>
+    <mirror>
+      <id>company-nexus</id>
+      <name>Company Nexus</name>
+      <url>https://nexus.example.com/repository/maven-public/</url>
+      <mirrorOf>central</mirrorOf>
+    </mirror>
+  </mirrors>
+</settings>
+```
+
+`mirrorOf=central` means "whenever you would go to Central, go here instead". Credentials for the server go in a `<servers>` section of the same file, never in `pom.xml`, because the POM is committed to Git. You publish your own artifacts to such a repository with `mvn deploy`, covered in the [lifecycle lesson](/docs/maven/lifecycle-testing-and-spring-boot/maven-build-lifecycle-summary).
+
+## Try It Yourself
+
+1. Run `mvn clean package` twice in `telusko-app` and compare the output. Point out which lines disappeared.
+2. Find spring-core in your local repository and list the files in its version folder.
+3. Add a new dependency (for example `com.google.guava:guava`), build, and find its folder in `~/.m2/repository/com/google/guava`.
+4. Delete the `~/.m2/repository/org/springframework/spring-core` folder and build again. Watch Maven download it again.
+5. Run `mvn -o package` (offline mode) after a successful build and confirm it still works without contacting Central.
+
+## Official references
+
+- [Apache Maven: Introduction to Repositories](https://maven.apache.org/guides/introduction/introduction-to-repositories.html)
+- [Apache Maven: Settings reference (localRepository, mirrors, servers)](https://maven.apache.org/settings.html)
+- [Apache Maven: Using Mirrors for Repositories](https://maven.apache.org/guides/mini/guide-mirror-settings.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>
