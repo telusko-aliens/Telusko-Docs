@@ -1,0 +1,173 @@
+---
+title: Ansible First Playbook
+description: Write and run your first Ansible playbook that pings every managed node, understand the hosts, variables and tasks sections, check syntax and read the PLAY RECAP.
+---
+
+In the ad hoc lesson you pinged every managed node with one command: `ansible all -m ping`. Now we do exactly the same thing with a playbook. The result is identical, but the work is now written in a file you can save, reuse, review and grow.
+
+## The three sections of a playbook
+
+A playbook is a YAML file that contains one or more **plays**. Each play has three parts:
+
+<img src="/ansible/ansible-playbook-anatomy.svg" alt="Playbook anatomy: a playbook contains plays, each play has hosts, optional vars and tasks, and each task calls a module" width={960} height={460} />
+
+| Section | Keyword | What it holds | Required? |
+| --- | --- | --- | --- |
+| Hosts | `hosts:` | Which managed nodes (from the inventory) this play targets. Ten web servers and twenty DB servers? You choose which ones | Yes |
+| Variables | `vars:` | Values you want to reuse in the tasks | No. We use it in the [variables lesson](/docs/ansible/variables-vault-and-tags/ansible-variables-runtime-and-playbook-variables) |
+| Tasks | `tasks:` | The list of things to do, in order. Each task calls one module | Yes, for anything useful |
+
+## Write the playbook
+
+Log in to the control node and switch to the `ansible` user. Its home directory, `/home/ansible`, is where we keep our playbooks:
+
+```bash
+sudo su - ansible
+pwd
+```
+
+```text
+/home/ansible
+```
+
+Create the file:
+
+```bash
+vi first-playbook.yml
+```
+
+Press `i` and type:
+
+```yaml title="first-playbook.yml"
+---
+- hosts: all
+  tasks:
+    - name: ping to all managed nodes
+      ping:
+      remote_user: ansible
+...
+```
+
+Save with `Esc`, `:wq`. Here is what each line does:
+
+| Line | Meaning |
+| --- | --- |
+| `---` / `...` | Start and end of the YAML document |
+| `- hosts: all` | A play that targets every host in the inventory |
+| `tasks:` | The list of tasks for this play |
+| `- name: ping to all managed nodes` | A human readable label, printed when the task runs |
+| `ping:` | The module this task runs. It takes no arguments, so the value is empty |
+| `remote_user: ansible` | Log in to the managed nodes as the `ansible` user for this task |
+
+<Callout type="info" title="The same playbook, in the style used from now on">
+The lecture's version is correct and runs fine. In real projects you will usually see a `name` on the play, `remote_user` set once at play level (or in `ansible.cfg`), and the module written with its full name:
+
+```yaml title="first-playbook.yml"
+---
+- name: Check connectivity to all managed nodes
+  hosts: all
+  remote_user: ansible
+  tasks:
+    - name: ping to all managed nodes
+      ansible.builtin.ping:
+```
+
+`ping` and `ansible.builtin.ping` are the same module. The full name (FQCN) is what the official documentation recommends, and it prevents mix-ups when other collections are installed.
+</Callout>
+
+## Check the syntax first
+
+Before running a playbook, let Ansible parse it:
+
+```bash
+ansible-playbook first-playbook.yml --syntax-check
+```
+
+```text
+playbook: first-playbook.yml
+```
+
+If the YAML or the playbook structure is wrong, you get an error with the line number instead. No error means the syntax is valid. It does **not** mean the tasks will succeed: a wrong package name, for example, only shows up at run time.
+
+## Run it
+
+```bash
+ansible-playbook first-playbook.yml
+```
+
+```text
+PLAY [all] *********************************************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [172.31.12.18]
+ok: [172.31.9.250]
+
+TASK [ping to all managed nodes] ***********************************************
+ok: [172.31.9.250]
+ok: [172.31.12.18]
+
+PLAY RECAP *********************************************************************
+172.31.12.18   : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+172.31.9.250   : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+```
+
+Both managed nodes answered. The ad hoc command and the playbook did the same work.
+
+## Reading the output
+
+**PLAY [all]** is printed when a play starts, with its name (or its hosts, if it has no name).
+
+**TASK [Gathering Facts]** is a task you did not write. Before running your tasks, Ansible runs the `setup` module on every host to collect **facts**: OS, IP addresses, memory, and so on. That is why each host shows `ok=2` and not `ok=1`. If a play does not need facts, you can skip this step and save time:
+
+```yaml
+- hosts: all
+  gather_facts: false
+```
+
+**TASK [ping to all managed nodes]** is your task, labelled with the `name` you gave it. Good task names make the output readable, so always name your tasks.
+
+**PLAY RECAP** is the summary per host:
+
+| Counter | Meaning |
+| --- | --- |
+| `ok` | Tasks that ran successfully, including the ones that changed something |
+| `changed` | Tasks that actually modified the managed node |
+| `unreachable` | Ansible could not connect to the host |
+| `failed` | Tasks that returned an error. The host stops running further tasks |
+| `skipped` | Tasks skipped because a condition was false |
+| `rescued`, `ignored` | Errors that were handled by `rescue` blocks or `ignore_errors` |
+
+## ok vs changed: your first look at idempotence
+
+`ping` only checks a connection, so it never changes anything: `changed=0`. Most modules work differently. A module that installs a package first checks whether the package is already there, and only acts if it is missing. Run it twice and the second run reports `ok` instead of `changed`.
+
+That property is called **idempotence**: running the same playbook again does not do the work again or break anything. It only fixes what is different from the desired state. You will see it in action in the very next lesson.
+
+## Useful flags for ansible-playbook
+
+| Flag | What it does |
+| --- | --- |
+| `--syntax-check` | Parse the playbook and stop |
+| `--list-hosts` | Show which hosts the playbook would run on |
+| `--list-tasks` | Show the tasks without running them |
+| `-C` / `--check` | Dry run: report what would change without changing it |
+| `-v` to `-vvvv` | More detail, from task results up to full SSH debugging |
+| `-i <inventory>` | Use a different inventory file |
+| `-l <pattern>` / `--limit` | Run only on some of the play's hosts, for example `-l webservers` |
+
+## Try It Yourself
+
+1. Change `hosts: all` to `hosts: webservers` and run the playbook again. How many hosts appear in the recap?
+2. Add `gather_facts: false` to the play and compare the output and the `ok` count.
+3. Add a second task that uses `ansible.builtin.debug` with `msg: "Hello from {{ inventory_hostname }}"`. Run it and find the message in the output.
+4. Break the indentation of `tasks:` on purpose and run `--syntax-check`. Read the error and fix it.
+
+## Official references
+
+- [Ansible playbooks](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_intro.html)
+- [ansible.builtin.ping module](https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/ping_module.html)
+- [Discovering variables: facts](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_vars_facts.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

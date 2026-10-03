@@ -1,0 +1,242 @@
+---
+title: "Blue-Green Deployment: Zero Downtime Release (Hands-On)"
+description: Run blue and green Deployments side by side on EKS, test green through a NodePort Service, switch the live LoadBalancer to green by changing one selector label, and roll back instantly.
+---
+
+In the [previous lesson](/docs/kubernetes/monitoring-and-deployment-strategies/kubernetes-deployment-strategies-blue-green) we drew blue-green deployment on a whiteboard. Now we build it: two versions of a Java web app running side by side, one live LoadBalancer Service for users, one NodePort Service for the internal test team, and a one-line switch between them.
+
+| File | Object | Role |
+| --- | --- | --- |
+| `blue-deployment.yml` | Deployment `javawebappbluedeployment` | Current version (v1), labels `color: blue` |
+| `live-service.yml` | Service `javawebappliveservice` (LoadBalancer) | What users hit. Selects the live colour |
+| `green-deployment.yml` | Deployment `javawebappgreendeployment` | New version (v2), labels `color: green` |
+| `pre-prod-service.yml` | Service `javawebpreprodservice` (NodePort) | Internal access to green for testing |
+
+The two images are the ones you used in [Rolling Updates & Rollbacks](/docs/kubernetes/namespaces-labels-and-deployments/rolling-updates-and-rollbacks-in-kubernetes-deployments): `my-web-app` for blue and `springboot-app` for green, both listening on port 8080.
+
+## Step 1: The blue Deployment (what users have today)
+
+```yaml title="blue-deployment.yml"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: javawebappbluedeployment
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: java-web-app
+      version: v1
+      color: blue
+  template:
+    metadata:
+      labels:
+        app: java-web-app
+        version: v1
+        color: blue
+    spec:
+      containers:
+        - name: javawebappcontainer
+          image: <your-dockerhub-username>/my-web-app:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+```
+
+| Field | Meaning |
+| --- | --- |
+| `strategy.type: RollingUpdate` | How **this** Deployment replaces its own pods when its template changes. It is the default, written here only to be explicit. Blue-green happens one level up, between two Deployments |
+| `app`, `version`, `color` labels | `app` groups both versions. `color` is what the live Service will switch on. `version` is for humans and dashboards |
+| `imagePullPolicy: Always` | Check the registry on every pod start and pull the image if the tag points to a new build. Useful with `:latest` |
+| `containerPort: 8080` | Documents the port the app listens on |
+
+## Step 2: The live Service
+
+```yaml title="live-service.yml"
+apiVersion: v1
+kind: Service
+metadata:
+  name: javawebappliveservice
+spec:
+  type: LoadBalancer
+  selector:
+    app: java-web-app
+    color: blue
+  ports:
+    - port: 80
+      targetPort: 8080
+```
+
+The selector has **two** labels. It matches only pods that are both `app: java-web-app` **and** `color: blue`. Without `color`, it would send users to both versions at once.
+
+```bash
+kubectl apply -f blue-deployment.yml
+kubectl apply -f live-service.yml
+kubectl get pods
+kubectl get svc
+```
+
+Copy the `EXTERNAL-IP` hostname of `javawebappliveservice`, wait 2 to 3 minutes for the load balancer, and open it in the browser. You see version 1.
+
+The app is served over plain HTTP. If your browser blocks it or forces HTTPS, open the site settings and allow insecure content for this address, or make sure the URL starts with `http://`.
+
+## Step 3: Deploy green next to blue
+
+```yaml title="green-deployment.yml"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: javawebappgreendeployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: java-web-app
+      version: v2
+      color: green
+  template:
+    metadata:
+      labels:
+        app: java-web-app
+        version: v2
+        color: green
+    spec:
+      containers:
+        - name: javawebappcontainer
+          image: <your-dockerhub-username>/springboot-app:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+```
+
+```bash
+kubectl apply -f green-deployment.yml
+kubectl get pods --show-labels
+```
+
+Four pods now: two blue, two green. Users are still on blue, because the live Service selects `color: blue`. Refresh the browser: still version 1.
+
+## Step 4: Let the team test green through a NodePort
+
+```yaml title="pre-prod-service.yml"
+apiVersion: v1
+kind: Service
+metadata:
+  name: javawebpreprodservice
+spec:
+  type: NodePort
+  selector:
+    app: java-web-app
+    color: green
+  ports:
+    - port: 80
+      targetPort: 8080
+      nodePort: 31785
+```
+
+`nodePort: 31785` opens that port on **every** worker node and forwards it to the green pods. It must be in the range 30000 to 32767. See [NodePort Service Explained](/docs/kubernetes/pods-and-services/nodeport-service-explained) for the details.
+
+```bash
+kubectl apply -f pre-prod-service.yml
+kubectl get svc
+kubectl get pods -o wide
+```
+
+Find a worker node's **public IP** in the EC2 console (with `-o wide` you can see which node runs a green pod, but any node works for NodePort). Then open `http://<node-public-ip>:31785`. You see version 2, while users still see version 1 at the load balancer URL.
+
+<Callout type="warn" title="Open only the port you need, only to yourself">
+The lecture allows **all traffic from anywhere** in the worker nodes' security group. Never do that: it exposes every port on your nodes to the internet. Add one inbound rule instead: **Custom TCP, port 31785, source My IP**. Remove the rule when testing is done. In real teams, pre-production access goes through a VPN or an internal load balancer, not public node IPs.
+</Callout>
+
+## Step 5: Switch users to green
+
+The lecture edits the live Service:
+
+```bash
+kubectl edit svc javawebappliveservice
+```
+
+In `vi`, press `i`, go to `spec.selector`, change `color: blue` to `color: green`, then `Esc` and `:wq`. The same change in one command, which is easier to script and to review:
+
+```bash
+kubectl patch svc javawebappliveservice \
+  -p '{"spec":{"selector":{"app":"java-web-app","color":"green"}}}'
+```
+
+Refresh the browser at the **same** load balancer URL: version 2. No new load balancer, no DNS change, no pods restarted. Kubernetes simply pointed the Service's endpoints at the green pods.
+
+Check it:
+
+```bash
+kubectl describe svc javawebappliveservice | grep -E "Selector|Endpoints"
+kubectl get endpointslices -l kubernetes.io/service-name=javawebappliveservice
+```
+
+The endpoints now list the IPs of the green pods.
+
+## Step 6: Something is wrong? Roll back in seconds
+
+Users report a problem with version 2. Blue is still running, so:
+
+```bash
+kubectl patch svc javawebappliveservice \
+  -p '{"spec":{"selector":{"app":"java-web-app","color":"blue"}}}'
+```
+
+Refresh: version 1 again. That is the main promise of blue-green: rollback is the same small step as the release, and the old version was never stopped.
+
+## Step 7: Finish the release
+
+When green has run without issues for a while (an hour, a day, depending on your team's rules), remove what you no longer need:
+
+```bash
+kubectl delete -f pre-prod-service.yml
+kubectl delete -f blue-deployment.yml
+```
+
+For the next release, green is the live version and the new one gets deployed as blue. The colours just alternate.
+
+<Callout type="info" title="Doing this the production way">
+Manual `kubectl edit` is fine for learning. In real projects:
+
+- The selector change goes through Git, so [Argo CD](/docs/kubernetes/jobs-helm-and-argo-cd/argo-cd-continuous-deployment-for-kubernetes) applies it and the history shows who switched and when.
+- Both Deployments have **readiness probes**, so the Service only sends traffic to green pods that are really ready.
+- Tools like **Argo Rollouts** automate blue-green: they create the preview and active Services, run checks, switch, and keep the old ReplicaSet for a set time before scaling it down.
+</Callout>
+
+## Clean up
+
+```bash
+kubectl delete -f live-service.yml       # removes the AWS load balancer
+kubectl delete -f pre-prod-service.yml
+kubectl delete -f blue-deployment.yml
+kubectl delete -f green-deployment.yml
+kubectl get deploy,svc,pods
+```
+
+Remove the inbound rule for port 31785 from the worker nodes' security group, and check **EC2, Load Balancers**. If you are done with the course for now, delete the whole cluster so it stops costing money (delete PVCs and LoadBalancer Services first, as covered in [the StatefulSet lesson](/docs/kubernetes/stateful-apps-and-storage/creating-statefulsets-with-persistent-storage-on-amazon-eks)):
+
+```bash
+eksctl delete cluster --name telusko-learning --region ap-south-1 --wait
+```
+
+## Try It Yourself
+
+1. In one terminal run `while true; do curl -s http://<elb-dns-name> | grep -o "<title>.*</title>"; sleep 1; done`. In another, switch the selector to green and back. Do you see any failed requests?
+2. Remove the `color` label from the live Service's selector (keep only `app`). Refresh the browser many times. What happens, and why is that a problem?
+3. Scale green to 0 before switching, then switch. What do users see? Why does blue-green require green to be fully up first?
+4. Add a readiness probe on `/` port 8080 to both Deployments and repeat the switch.
+5. Store all four files in a Git repository and let Argo CD manage them. Do the switch with a commit instead of `kubectl patch`.
+
+## Official references
+
+- [Kubernetes: Service](https://kubernetes.io/docs/concepts/services-networking/service/)
+- [Kubernetes: Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
+- [kubectl reference: patch](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_patch/)
+- [Argo Rollouts: Blue Green strategy](https://argo-rollouts.readthedocs.io/en/stable/features/bluegreen/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

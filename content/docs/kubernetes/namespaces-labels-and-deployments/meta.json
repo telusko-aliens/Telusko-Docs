@@ -1,0 +1,11 @@
+{
+  "title": "Namespaces, Labels & Deployments",
+  "pages": [
+    "namespaces-in-kubernetes.mdx",
+    "labels-and-selectors-in-kubernetes.mdx",
+    "maintaining-pod-availability-with-replicasets.mdx",
+    "scaling-replicasets-and-limitations.mdx",
+    "kubernetes-deployments-replicasets-scaling-and-self-healing.mdx",
+    "rolling-updates-and-rollbacks-in-kubernetes-deployments.mdx"
+  ]
+}

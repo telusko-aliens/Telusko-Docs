@@ -1,0 +1,248 @@
+---
+title: First Terraform Script on Linux VM
+description: Write a main.tf with a provider and an aws_instance resource on the Linux VM, fix a real validate error, then run init, fmt, validate, plan, apply and destroy.
+---
+
+Time to stop talking and create something. In this lesson we write a small Terraform file on the Linux VM that creates one EC2 instance, the same thing we clicked through in the console in the first lesson. Then we run the full workflow from [the previous lesson](/docs/terraform/terraform-workflow-and-state/terraform-architecture-and-terraform-commands) and finally delete the instance again.
+
+If you work on Windows with VS Code instead, read this lesson anyway for the explanation, then follow [First Terraform Script locally on Windows](/docs/terraform/terraform-workflow-and-state/first-terraform-script-locally-on-windows) for the Windows specific steps.
+
+## Step 1: Connect and set credentials
+
+Start the `terraform-vm` instance, connect over SSH, and export your credentials as shown in [Terraform Security Credentials](/docs/terraform/getting-started-with-terraform/terraform-security-credentials). Remember that `export` does not survive a new SSH session, so you do this every time you reconnect (unless you attached an IAM role to the VM).
+
+```bash
+export AWS_ACCESS_KEY_ID="AKIAxxxxxxxxxxxxxxxx"
+export AWS_SECRET_ACCESS_KEY="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
+## Step 2: Create a project folder
+
+Every Terraform project lives in its own folder, because Terraform reads all `.tf` files in the current folder together, and it stores its state there too.
+
+```bash
+mkdir 01-tf-ec2
+cd 01-tf-ec2
+vi main.tf
+```
+
+`main.tf` is just a convention. Terraform would read `abc.tf` the same way, but everyone uses `main.tf` for the main resources, so stick with it. Press `i` in vi to enter insert mode. If vi is new to you, the [Linux course](/docs/linux/getting-started) covers it.
+
+## Step 3: Write the code
+
+A Terraform file for AWS needs two things:
+
+1. **Which provider** to use, and its settings such as the region
+2. **Which resources** to create with that provider
+
+Here is the file from the lecture, after formatting:
+
+```hcl title="main.tf"
+provider "aws" {
+  region = "ap-south-1"
+}
+
+resource "aws_instance" "linux-VM" {
+  ami             = "ami-062f0cc54dbfd8ef1"
+  instance_type   = "t2.micro"
+  key_name        = "terraform_keypair"
+  security_groups = ["default"]
+
+  tags = {
+    Name = "Telusko_Terraform_Linux_VM"
+  }
+}
+```
+
+Let us read it line by line.
+
+### The provider block
+
+```hcl
+provider "aws" {
+  region = "ap-south-1"
+}
+```
+
+`provider "aws"` tells Terraform we are working with AWS. `region` is where resources are created. `ap-south-1` is Mumbai; pick the region shown at the top right of your AWS console. We do not write any keys here. The provider finds them in the environment variables.
+
+### The resource block
+
+```hcl
+resource "aws_instance" "linux-VM" {
+```
+
+Every resource block has the same shape: `resource "<TYPE>" "<NAME>"`.
+
+| Part | Meaning |
+| --- | --- |
+| `resource` | Keyword. We want Terraform to create and manage something |
+| `"aws_instance"` | The resource **type**, defined by the AWS provider. It means an EC2 instance. You cannot invent this name; it comes from the provider documentation |
+| `"linux-VM"` | The **local name**, chosen by you. Terraform uses it to refer to this resource (`aws_instance.linux-VM`). It is not the name you see in the AWS console |
+
+Inside the block are the **arguments**, the same choices you made in the console:
+
+| Argument | Console equivalent | Value used |
+| --- | --- | --- |
+| `ami` | Application and OS Images | An Amazon Linux AMI ID copied from the Launch instance page |
+| `instance_type` | Instance type | `t2.micro` (free tier eligible) |
+| `key_name` | Key pair | The key pair created earlier, `terraform_keypair` |
+| `security_groups` | Security group | The VPC's `default` security group. It is a list, so you could give several |
+| `tags` | Name and tags | `Name` is the tag the console shows as the instance name |
+
+<Callout type="warn" title="AMI IDs are per region">
+An AMI ID such as `ami-062f0cc54dbfd8ef1` only exists in one region, and Amazon publishes new AMIs regularly. Do not copy the ID from this page. Open **EC2 > Launch instance** in your own region, select Amazon Linux, and copy the AMI ID shown there. A wrong ID gives `InvalidAMIID.NotFound` during apply.
+</Callout>
+
+The lecture also mentions that adding `count = 10` inside the resource block creates ten identical instances. That is true, and it shows the real power of code over clicking. Do not try it on a free tier account, though, because only 750 instance hours per month are free.
+
+Save with `Esc` then `:wq`.
+
+## Step 4: init
+
+```bash
+terraform init
+```
+
+```text
+Initializing the backend...
+Initializing provider plugins...
+- Finding latest version of hashicorp/aws...
+- Installing hashicorp/aws v5.97.0...
+- Installed hashicorp/aws v5.97.0 (signed by HashiCorp)
+Terraform has created a lock file .terraform.lock.hcl to record the provider
+selections it made above.
+
+Terraform has been successfully initialized!
+```
+
+Terraform saw `provider "aws"`, downloaded the latest AWS provider into `.terraform/`, and recorded the version in `.terraform.lock.hcl`. In the recording that was v5.97.0; today you will get a 6.x version.
+
+## Step 5: fmt and validate, and a real error
+
+The lecture ran `terraform validate` and got an error. This is a mistake almost everyone makes once, so it is worth seeing:
+
+```text
+Error: Unsupported block type
+
+  on main.tf line 13, in resource "aws_instance" "linux-VM":
+  13:   tags {
+
+Blocks of type "tags" are not expected here. Did you mean to define argument "tags"?
+If so, use the equals sign to assign it a value.
+```
+
+The code had `tags {` instead of `tags = {`. In HCL there is a difference:
+
+| Syntax | What it is | Example |
+| --- | --- | --- |
+| `name {` ... `}` | A **nested block**, defined by the resource schema | `root_block_device { ... }` |
+| `name = {` ... `}` | An **argument** whose value is a map | `tags = { Name = "web" }` |
+
+`tags` is an argument that takes a map, so it needs `=`. Fix it in vi, then:
+
+```bash
+terraform fmt
+cat main.tf
+terraform validate
+```
+
+`terraform fmt` prints the names of files it changed and aligns all the `=` signs. `terraform validate` now says:
+
+```text
+Success! The configuration is valid.
+```
+
+## Step 6: plan
+
+```bash
+terraform plan
+```
+
+The plan lists every attribute of the new instance. Values you set (`ami`, `instance_type`, `key_name`) are shown; everything else is `(known after apply)` because AWS decides it, such as the instance ID and the public IP. The last line is the important one:
+
+```text
+Plan: 1 to add, 0 to change, 0 to destroy.
+```
+
+One resource to add, nothing changed, nothing destroyed. That is exactly what we expect.
+
+## Step 7: apply
+
+```bash
+terraform apply
+```
+
+Terraform shows the plan again and asks:
+
+```text
+Do you want to perform these actions?
+  Enter a value: yes
+```
+
+Type `yes` (only the exact word `yes` is accepted). After about a minute:
+
+```text
+aws_instance.linux-VM: Creation complete after 32s [id=i-0abc...]
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+```
+
+Refresh **EC2 > Instances** in the console. A new instance called `Telusko_Terraform_Linux_VM` is running. You did not click a single button to create it.
+
+`terraform apply -auto-approve` skips the question. It is convenient in practice sessions, but get used to reading the plan first.
+
+## Step 8: destroy
+
+```bash
+terraform destroy -auto-approve
+```
+
+Terraform refreshes its state, plans to delete the one instance it created, and deletes it. In the console the instance moves to **Terminated**. Your `terraform-vm`, which you created by hand, is not touched, because Terraform only manages what is in its state.
+
+## Two improvements to adopt now
+
+The lecture's file works, but two small changes make it more reliable. You will see them in the rest of this course.
+
+**Pin the provider version.** Without it, `init` always takes the newest provider, and a future major version could break your code.
+
+```hcl title="main.tf"
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
+    }
+  }
+}
+```
+
+**Use `vpc_security_group_ids` instead of `security_groups`.** The `security_groups` argument takes security group **names** and only works in the default VPC. With `vpc_security_group_ids` you pass IDs, which works in every VPC. We will use it in [Creating EC2 VM with user Data using Terraform](/docs/terraform/building-aws-resources/creating-ec2-vm-with-user-data-using-terraform).
+
+## Common errors
+
+| Error | Cause | Fix |
+| --- | --- | --- |
+| `No valid credential sources found` | Credentials not exported in this SSH session | Export them again, or attach an IAM role to the VM |
+| `InvalidAMIID.NotFound` | AMI ID from another region, or an old ID | Copy the AMI ID from your own region's console |
+| `InvalidKeyPair.NotFound` | Key pair name wrong or in another region | Check **EC2 > Key Pairs** in the same region |
+| `Unsupported block type` | `tags {` instead of `tags = {` | Add the `=` |
+
+## Try It Yourself
+
+1. Create `01-tf-ec2/main.tf` on the VM with your own region's AMI ID, and run `init`, `fmt`, `validate`, `plan` and `apply`.
+2. Remove the `=` after `tags` on purpose and run `terraform validate` to see the error yourself.
+3. Change the `Name` tag, run `terraform plan`, and notice that it shows `1 to change` (`~`), not a new instance.
+4. Run `ls -a` in the folder and find `.terraform/`, `.terraform.lock.hcl` and `terraform.tfstate`.
+5. Finish with `terraform destroy` and confirm in the console that the instance is terminated.
+
+## Official references
+
+- [aws_instance resource](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance)
+- [Resource blocks](https://developer.hashicorp.com/terraform/language/resources)
+- [terraform validate](https://developer.hashicorp.com/terraform/cli/commands/validate)
+- [terraform apply](https://developer.hashicorp.com/terraform/cli/commands/apply)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

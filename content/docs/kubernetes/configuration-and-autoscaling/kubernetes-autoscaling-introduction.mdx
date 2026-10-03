@@ -1,0 +1,90 @@
+---
+title: Kubernetes Autoscaling Introduction
+description: Understand what autoscaling is, the difference between horizontal and vertical scaling, the autoscalers Kubernetes and EKS offer, and why the Metrics Server must be running first.
+---
+
+So far, every time we wanted more pods we typed it ourselves: `kubectl scale deploy telusko-deploy --replicas=5`, or edited `replicas:` in the YAML. That works when you know the traffic in advance. Real traffic does not ask permission. A sale starts, a link goes viral, a batch of users logs in at 9 AM, and by the time someone notices, the pods are overloaded.
+
+The opposite problem costs money: ten pods running at 3 AM for nobody.
+
+**Autoscaling** means increasing and decreasing resources automatically, based on demand. Demand is measured with **metrics** such as:
+
+- CPU utilization
+- Memory utilization
+- Requests per second (traffic)
+- Custom metrics, for example the length of a queue
+
+The goals are simple: handle high traffic without manual work, save resources when demand is low, keep the application available, and keep the infrastructure bill under control.
+
+## Horizontal vs vertical scaling
+
+| | Horizontal scaling | Vertical scaling |
+| --- | --- | --- |
+| What changes | The **number** of pods | The **size** of each pod (CPU and memory) |
+| Going up | **Scale out**: 3 pods become 8 | **Scale up**: 0.5 CPU becomes 2 CPU |
+| Going down | **Scale in**: 8 pods become 3 | **Scale down**: 2 CPU becomes 0.5 CPU |
+| Kubernetes tool | **HorizontalPodAutoscaler (HPA)**, built in | **VerticalPodAutoscaler (VPA)**, a separate add-on |
+| Limits | Max replicas, cluster capacity | The biggest node, and traditionally a pod restart to apply the new size |
+| Typical use | Stateless web apps and APIs | Workloads that cannot run many copies, or for right-sizing requests |
+
+For stateless applications, horizontal scaling is what teams use most. More copies also means better availability: if one pod dies, the others carry on. Vertical scaling has its place (some databases, finding the right request values), but it has a ceiling and usually means restarting pods. Recent Kubernetes versions can resize a running pod's CPU and memory in place, but the HPA is still the standard tool for handling traffic.
+
+## The autoscalers you will hear about
+
+Kubernetes scales two different things: **pods** and **nodes**.
+
+| Autoscaler | Scales | Based on |
+| --- | --- | --- |
+| HorizontalPodAutoscaler (HPA) | Number of pod replicas in a Deployment or StatefulSet | CPU, memory, custom or external metrics |
+| VerticalPodAutoscaler (VPA) | CPU and memory requests of pods | Observed usage over time |
+| Cluster Autoscaler or Karpenter (on EKS) | Number of worker nodes (EC2 instances) | Pods stuck in `Pending` because no node has room |
+| KEDA | Pods, including down to zero | Events: queue length, Kafka lag, cron schedules |
+
+These work together. The HPA adds pods. If the nodes are full, the new pods stay `Pending`, and a node autoscaler such as Karpenter adds EC2 instances. Our lab cluster has a fixed node group of two `t3.small` nodes, so in this course only the pods scale.
+
+## The Metrics Server comes first
+
+The HPA cannot guess how busy a pod is. Something must measure it. That is the job of the **Metrics Server**:
+
+- A small cluster add-on that collects CPU and memory usage of every node and pod from the kubelets
+- Keeps only the latest values, in memory, and serves them through the `metrics.k8s.io` API
+- Used by `kubectl top` and by the HPA and VPA
+
+Without it the HPA has no data, and its targets show `<unknown>`.
+
+Plain Kubernetes, and Amazon EKS itself, do **not** include the Metrics Server by default. But if you created your cluster with a recent **eksctl** (v0.201.0 or later, as in this course), eksctl already installed it as an EKS add-on. Check before installing anything:
+
+```bash
+kubectl top nodes
+kubectl get deployment metrics-server -n kube-system
+```
+
+If `kubectl top nodes` prints CPU and memory per node, you are ready. If it says `Metrics API not available`, install it as an add-on (preferred on EKS):
+
+```bash
+eksctl create addon --name metrics-server --cluster telusko-learning --region ap-south-1
+```
+
+<Callout type="warn" title="Do not install it twice">
+Install the Metrics Server **one** way only: either the EKS add-on, or the upstream `components.yaml` manifest from GitHub. Applying the upstream manifest on top of the add-on can break it. In the [next lesson](/docs/kubernetes/configuration-and-autoscaling/auto-scaling-in-kubernetes-with-horizontal-pod-autoscaler-hpa) you will see exactly this problem and how to fix it.
+</Callout>
+
+The Metrics Server is for autoscaling, not monitoring. It keeps no history. For graphs and alerts over time you use Prometheus and Grafana, which come later in [Kubernetes Monitoring and Installing Prometheus](/docs/kubernetes/monitoring-and-deployment-strategies/kubernetes-monitoring-and-installing-prometheus).
+
+## Try It Yourself
+
+1. Run `kubectl top nodes` and `kubectl top pods -A` on your cluster. Which namespace uses the most memory?
+2. Run `eksctl get addon --cluster telusko-learning --region ap-south-1` and check whether `metrics-server` is listed.
+3. For each of these, choose horizontal or vertical scaling and explain why: a Spring Boot REST API, a single-instance PostgreSQL database, a nightly report job.
+4. Your HPA wants 10 pods, but only 6 are Running and 4 are `Pending`. What is the likely reason, and which kind of autoscaler fixes it?
+
+## Official references
+
+- [Kubernetes: Autoscaling Workloads](https://kubernetes.io/docs/concepts/workloads/autoscaling/)
+- [Kubernetes: Horizontal Pod Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
+- [Kubernetes: Resource metrics pipeline](https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/)
+- [Amazon EKS: View resource usage with the Kubernetes Metrics Server](https://docs.aws.amazon.com/eks/latest/userguide/metrics-server.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

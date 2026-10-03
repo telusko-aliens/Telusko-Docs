@@ -1,0 +1,175 @@
+---
+title: Maven Installation on Windows
+description: Install a JDK and Apache Maven on Windows, set JAVA_HOME and Path correctly, verify with mvn -v, and fix the errors beginners hit most often.
+---
+
+Maven is written in Java, so Java has to come first. The order on Windows is: install a JDK, tell Windows where it is, then download Maven and tell Windows where that is. Both "tell Windows" steps are about environment variables, and almost every installation problem comes from getting one of them slightly wrong.
+
+<img src="/maven/windows-path-setup.svg" alt="How Windows finds mvn and java through the Path and JAVA_HOME environment variables" width={960} height={360} />
+
+## Step 1: install a JDK
+
+Any JDK from version 17 upwards works for this course (17, 21, 25 and so on). If `java -version` already shows one of those, skip to Step 2.
+
+<Steps>
+<Step>
+### Download the installer
+
+Search for "Java 21 download" and open Oracle's download page, or use a free OpenJDK build such as Eclipse Temurin or Amazon Corretto. Choose the Windows **x64 MSI Installer**.
+</Step>
+<Step>
+### Run it
+
+Double click the downloaded `.msi` and click **Next** until it finishes. By default it installs to a folder like:
+
+```text
+C:\Program Files\Java\jdk-21
+```
+</Step>
+<Step>
+### Set JAVA_HOME
+
+Press the Windows key, search **"Edit the system environment variables"**, open it and click **Environment Variables**. Under **System variables** click **New**:
+
+| Field | Value |
+| --- | --- |
+| Variable name | `JAVA_HOME` |
+| Variable value | `C:\Program Files\Java\jdk-21` |
+
+`JAVA_HOME` points to the JDK folder itself, **not** to its `bin` folder. Maven reads this variable to find Java.
+
+If you are not allowed to edit system variables on your machine, create the same variables under **User variables**. That works too.
+</Step>
+<Step>
+### Add the JDK bin folder to Path
+
+Still in the same window, select the `Path` variable, click **Edit**, then **New**, and add:
+
+```text
+C:\Program Files\Java\jdk-21\bin
+```
+
+You can also write `%JAVA_HOME%\bin`, which keeps working when you later upgrade Java and only change `JAVA_HOME`. Click **OK** on every dialog.
+</Step>
+<Step>
+### Verify
+
+Open a **new** Command Prompt and run:
+
+```bash
+java -version
+```
+
+You should see something like `java version "21.0.7"`. If you see it, Java is ready.
+</Step>
+</Steps>
+
+## Step 2: download and install Maven
+
+<Steps>
+<Step>
+### Download the binary ZIP
+
+Go to [maven.apache.org/download.cgi](https://maven.apache.org/download.cgi) and download the **Binary zip archive**, named like `apache-maven-3.10.0-bin.zip`. Do not download the `-src` file, that is Maven's own source code.
+
+<img src="/maven/screens/maven-download-page.webp" alt="Apache Maven download page with the binary zip archive link highlighted" width={1440} height={810} />
+
+*The download page lists the binary archives first. The video picked 3.9.11, which was current at recording time.*
+</Step>
+<Step>
+### Extract it
+
+Extract the ZIP anywhere you like. Keeping it at the root of `C:` keeps paths short. Right click the ZIP, choose **Extract All**, and then open the extracted folder until you see the `bin`, `boot`, `conf` and `lib` folders.
+
+Watch out for the nested folder: **Extract All** usually creates `C:\apache-maven-3.10.0-bin\apache-maven-3.10.0\`. The folder you want is the inner one that contains `bin`.
+</Step>
+<Step>
+### Add Maven's bin folder to Path
+
+Open **Environment Variables** again, edit `Path`, click **New** and paste the full path up to `bin`:
+
+```text
+C:\apache-maven-3.10.0-bin\apache-maven-3.10.0\bin
+```
+</Step>
+<Step>
+### Optional: set MAVEN_HOME
+
+Some tools and older guides look for `MAVEN_HOME`. It is optional, and Maven itself does not need it. If you want it, create a system variable `MAVEN_HOME` that points to the Maven folder **without** `bin`:
+
+```text
+C:\apache-maven-3.10.0-bin\apache-maven-3.10.0
+```
+</Step>
+<Step>
+### Verify
+
+Open a **new** Command Prompt and run:
+
+```bash
+mvn -v
+```
+
+Expected output (your versions and paths will differ):
+
+```text
+Apache Maven 3.10.0 (...)
+Maven home: C:\apache-maven-3.10.0-bin\apache-maven-3.10.0
+Java version: 21.0.7, vendor: Oracle Corporation, runtime: C:\Program Files\Java\jdk-21
+Default locale: en_IN, platform encoding: UTF-8
+OS name: "windows 11", version: "10.0", arch: "amd64", family: "windows"
+```
+
+Read this output carefully. It tells you which Maven is running, where it lives, and which Java it is using. When a build behaves strangely later, `mvn -v` is the first thing to check.
+</Step>
+</Steps>
+
+## What each variable does
+
+| Variable | Points to | Needed? | Used by |
+| --- | --- | --- | --- |
+| `JAVA_HOME` | JDK folder, for example `C:\Program Files\Java\jdk-21` | Yes (strongly recommended) | Maven, IDEs, many Java tools |
+| `Path` entry for the JDK | `...\jdk-21\bin` | Yes | So `java` and `javac` work in any terminal |
+| `Path` entry for Maven | `...\apache-maven-x.y.z\bin` | Yes | So `mvn` works in any terminal |
+| `MAVEN_HOME` | Maven folder without `bin` | Optional | Some older tools and scripts |
+
+## Common errors and fixes
+
+<Accordions>
+<Accordion title="'mvn' is not recognized as an internal or external command">
+Windows cannot find `mvn.cmd` on the Path. Check that the Path entry ends in `\bin` and points to the inner folder that really contains `mvn.cmd`. Then close the terminal and open a new one. Terminals that were already open keep the old Path.
+</Accordion>
+<Accordion title="The JAVA_HOME environment variable is not defined correctly">
+`JAVA_HOME` is missing, has a typo, or points to the `bin` folder. It must point to the JDK root, for example `C:\Program Files\Java\jdk-21`. Do not put quotes around the value.
+</Accordion>
+<Accordion title="mvn -v shows an old Java version">
+`JAVA_HOME` still points to an old JDK. Maven uses `JAVA_HOME` first, even if `java -version` shows a newer Java on the Path. Update `JAVA_HOME`, then open a new terminal.
+</Accordion>
+<Accordion title="No compiler is provided in this environment. Perhaps you are running on a JRE rather than a JDK?">
+This appears later, when you run `mvn compile`. `JAVA_HOME` points to a JRE (which has no `javac`). Install a full JDK and point `JAVA_HOME` to it.
+</Accordion>
+<Accordion title="Builds fail to download anything">
+Corporate firewalls, proxies and some antivirus tools block Java from reaching the internet. Maven needs to reach `repo.maven.apache.org`. If you are behind a company proxy, it has to be configured in `~/.m2/settings.xml`.
+</Accordion>
+</Accordions>
+
+<Callout type="info" title="PowerShell or Command Prompt?">
+Both work for `mvn -v`. When you start passing `-D` options (next section), PowerShell can split values that contain dots. Command Prompt is the simplest choice for this course. In PowerShell, wrap each `-D...` argument in double quotes.
+</Callout>
+
+## Try It Yourself
+
+1. Install a JDK 17 or newer and confirm `java -version` and `javac -version` both work.
+2. Install Maven and confirm `mvn -v` shows the Maven home and the Java runtime you expect.
+3. Break it on purpose: temporarily rename `JAVA_HOME` to `JAVA_HOME_X`, open a new terminal and run `mvn -v`. Read the error, then fix it.
+4. Run `echo %JAVA_HOME%` and `where mvn` in Command Prompt to see exactly which folders Windows is using.
+
+## Official references
+
+- [Apache Maven: Installing Apache Maven](https://maven.apache.org/install.html)
+- [Apache Maven: Download page](https://maven.apache.org/download.cgi)
+- [Apache Maven: Maven on Windows prerequisites](https://maven.apache.org/guides/getting-started/windows-prerequisites.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

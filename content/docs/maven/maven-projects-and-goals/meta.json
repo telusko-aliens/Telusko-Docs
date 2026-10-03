@@ -1,0 +1,4 @@
+{
+  "title": "Maven Projects & Goals",
+  "pages": ["maven-java-project.mdx", "maven-java-project-linux-vm.mdx", "maven-terminologies.mdx", "maven-goals.mdx", "maven-web-app.mdx"]
+}

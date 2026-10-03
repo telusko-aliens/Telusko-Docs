@@ -1,0 +1,100 @@
+---
+title: Introduction
+description: What Kubernetes is, the problem it solves, the core vocabulary from Pod to Helm chart, how desired state works, and how Kubernetes on EKS fits with Docker, Terraform, Jenkins and monitoring tools.
+---
+
+Containers solved packaging. A Docker image runs the same way on a laptop, a test server and production. But a container on its own is still just a process on one machine. If the machine dies, the container dies. If traffic doubles, nobody starts more copies. If you push a new image, someone has to stop the old containers and start the new ones, carefully, on every server.
+
+Kubernetes takes over that work. You describe the state you want ("three copies of this image, reachable on port 80, using this configuration") and Kubernetes keeps the cluster in that state: it places containers on machines with room, replaces anything that fails, spreads traffic across healthy copies, and changes versions step by step when you ask it to.
+
+## What Kubernetes is
+
+**Kubernetes** (often written **K8s**) is an open source container orchestration platform. Google open sourced it in 2014, based on more than a decade of running its own internal system, Borg. Today it is maintained by the Cloud Native Computing Foundation and is the standard way to run containers in production on every major cloud and in private data centres.
+
+It is not a replacement for Docker. Docker (or any OCI tool) builds the images. Kubernetes runs them across a cluster of machines and keeps them running.
+
+## Desired state: the one idea behind everything
+
+Almost everything in Kubernetes follows the same loop:
+
+```text
+You write YAML (desired state)  ->  kubectl apply  ->  API server stores it in etcd
+        ^                                                     |
+        |                                                     v
+  you change the YAML              controllers compare desired state with actual state
+                                   and act until they match (create, delete, replace)
+```
+
+That loop is why a deleted pod comes back, why scaling is a one-line change, and why a rolling update happens without you touching individual containers. Once this idea clicks, every new object in the course is "another kind of desired state with its own controller".
+
+## Core vocabulary
+
+| Term | Meaning | First covered in |
+| --- | --- | --- |
+| **Cluster** | A control plane plus worker nodes that run your workloads | [Architecture](/docs/kubernetes/kubernetes-foundations/kubernetes-architecture-explained) |
+| **Control plane** | API server, etcd, scheduler, controller manager. On EKS, run by AWS | [Architecture](/docs/kubernetes/kubernetes-foundations/kubernetes-architecture-explained) |
+| **Node** | A machine (an EC2 instance on EKS) that runs pods | [Architecture](/docs/kubernetes/kubernetes-foundations/kubernetes-architecture-explained) |
+| **kubectl** | The command line client for every Kubernetes cluster | [Installing the tools](/docs/kubernetes/eks-cluster-setup/installing-kubectl-aws-cli-and-eksctl-for-eks) |
+| **Manifest** | A YAML file describing objects: `apiVersion`, `kind`, `metadata`, `spec` | [Manifest files](/docs/kubernetes/pods-and-services/understanding-kubernetes-manifest-yaml-files) |
+| **Pod** | The smallest deployable unit: one or more containers sharing an IP | [First pod](/docs/kubernetes/pods-and-services/first-pod-creation-in-kubernetes) |
+| **Service** | A stable address and load balancer for a group of pods | [Services](/docs/kubernetes/pods-and-services/introduction-to-kubernetes-services) |
+| **Namespace** | A logical partition of one cluster | [Namespaces](/docs/kubernetes/namespaces-labels-and-deployments/namespaces-in-kubernetes) |
+| **Label / selector** | Key-value tags on objects, and queries that find them | [Labels](/docs/kubernetes/namespaces-labels-and-deployments/labels-and-selectors-in-kubernetes) |
+| **ReplicaSet** | Keeps N identical pods running | [ReplicaSets](/docs/kubernetes/namespaces-labels-and-deployments/maintaining-pod-availability-with-replicasets) |
+| **Deployment** | Manages ReplicaSets for rolling updates and rollbacks | [Deployments](/docs/kubernetes/namespaces-labels-and-deployments/kubernetes-deployments-replicasets-scaling-and-self-healing) |
+| **DaemonSet** | Runs one pod on every node | [DaemonSets](/docs/kubernetes/multi-container-pods-and-daemonsets/running-pods-on-every-node-daemonsets) |
+| **StatefulSet** | Runs pods with stable names and their own storage, for databases | [StatefulSets](/docs/kubernetes/stateful-apps-and-storage/stateful-applications-and-statefulsets-explained) |
+| **PersistentVolume / Claim** | Storage that outlives pods, on EKS backed by EBS | [PV and PVC](/docs/kubernetes/stateful-apps-and-storage/kubernetes-storage-fundamentals-pv-and-pvc) |
+| **ConfigMap / Secret** | Configuration and sensitive values kept outside the image | [ConfigMaps and Secrets](/docs/kubernetes/configuration-and-autoscaling/environment-variables-configmaps-and-secrets-in-kubernetes) |
+| **HPA** | HorizontalPodAutoscaler: adds and removes pods based on load | [HPA](/docs/kubernetes/configuration-and-autoscaling/auto-scaling-in-kubernetes-with-horizontal-pod-autoscaler-hpa) |
+| **ResourceQuota** | Limits on what a namespace may consume | [ResourceQuota](/docs/kubernetes/configuration-and-autoscaling/kubernetes-resourcequota) |
+| **Job / CronJob** | Run work to completion, once or on a schedule | [Jobs](/docs/kubernetes/jobs-helm-and-argo-cd/kubernetes-jobs-non-parallel-and-parallel-jobs) |
+| **Helm chart** | A packaged, configurable set of manifests | [Helm](/docs/kubernetes/jobs-helm-and-argo-cd/helm-kubernetes-package-manager) |
+| **Argo CD** | GitOps tool that keeps the cluster in sync with Git | [Argo CD](/docs/kubernetes/jobs-helm-and-argo-cd/argo-cd-continuous-deployment-for-kubernetes) |
+| **Prometheus / Grafana** | Metrics collection and dashboards | [Prometheus](/docs/kubernetes/monitoring-and-deployment-strategies/kubernetes-monitoring-and-installing-prometheus) |
+
+## Why Amazon EKS
+
+You can run Kubernetes on your laptop (minikube, kind), on your own servers (kubeadm), or as a managed service. This course uses **Amazon Elastic Kubernetes Service (EKS)**:
+
+- AWS runs and patches the control plane across multiple Availability Zones
+- Worker nodes are ordinary EC2 instances in a managed node group
+- `type: LoadBalancer` Services create real AWS load balancers, and PersistentVolumes can be real EBS volumes
+- `eksctl` creates the whole setup with one command and deletes it with another
+
+The manifests you write are standard Kubernetes and work on any conformant cluster. Only the cluster setup and a few integrations are EKS specific.
+
+## How Kubernetes fits with the rest of the bootcamp
+
+<img src="/kubernetes/k8s-big-picture.svg" alt="Git, Jenkins, Docker and a registry produce an image that Kubernetes on EKS pulls and runs as a Deployment with a Service, ConfigMaps and an HPA. Helm and Argo CD sync YAML from Git, Terraform or eksctl create the cluster, and Prometheus and Grafana watch it" width={960} height={440} />
+
+| Tool | Role around Kubernetes |
+| --- | --- |
+| **Git** | Stores application code and the Kubernetes YAML |
+| **Maven, Docker** | Build the application and package it into an image |
+| **Docker Hub, Amazon ECR** | Registries the cluster pulls images from |
+| **Terraform, eksctl** | Create the cluster and its VPC, node groups and IAM roles |
+| **Jenkins** | Runs the CI pipeline: build, test, push the image, update the manifest |
+| **Helm, Argo CD** | Package the manifests and deploy them to the cluster from Git |
+| **Prometheus, Grafana** | Watch the cluster and the applications running on it |
+
+The final [Jenkins](/docs/jenkins/getting-started) project of the bootcamp ties these together into one pipeline that ends with a rollout on Kubernetes.
+
+## What Kubernetes does not do
+
+Kubernetes is powerful, but it is not magic. It does not build your images, write your Dockerfiles, fix your application's bugs, back up your databases by itself, or make a badly designed app scale. It also adds real operational complexity. For a single small application, a VM with Docker Compose or a simpler service such as Amazon ECS may be the better choice. Kubernetes earns its place when you run many services, deploy often, and need scaling, self-healing and consistent tooling across environments.
+
+<Callout type="info" title="Start with the foundations">
+The first section explains why orchestration exists and how the cluster is built. Do not skip the [architecture lesson](/docs/kubernetes/kubernetes-foundations/kubernetes-architecture-explained): almost every error message later in the course points to one of its components.
+</Callout>
+
+## Official references
+
+- [Kubernetes documentation: Overview](https://kubernetes.io/docs/concepts/overview/)
+- [Kubernetes: Cluster Architecture](https://kubernetes.io/docs/concepts/architecture/)
+- [Amazon EKS User Guide](https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html)
+- [CNCF: Kubernetes](https://www.cncf.io/projects/kubernetes/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

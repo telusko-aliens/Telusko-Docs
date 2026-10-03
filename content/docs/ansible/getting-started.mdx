@@ -1,0 +1,77 @@
+---
+title: Getting Started
+description: A roadmap for the Ansible course, from the configuration management problem to a working AWS lab, ad hoc commands, playbooks, variables, Vault, handlers and tags.
+icon: Sparkles
+---
+
+Creating a server takes a minute in the cloud. Making it useful takes longer: install Java, add Git, copy a config file, start a web server, create a user. Do that by hand on two servers and it is a chore. Do it on two hundred and it becomes a full-time job full of small mistakes. Ansible turns that work into YAML files you write once and run against any number of servers.
+
+This course starts with the problem and the architecture, then builds a real three-machine lab on AWS EC2: one control node with Ansible installed and two managed nodes it configures over SSH. Every lesson after that runs on this lab. You will write playbooks that create files, install Git, Java and Maven, host a static website, and then make those playbooks reusable and safe with variables, Vault, handlers and tags.
+
+By the end you will be able to:
+
+- Explain configuration management and why Ansible is agentless
+- Set up a control node and managed nodes on EC2 with passwordless SSH
+- Write an inventory with groups and target all hosts, a group or a single host
+- Run ad hoc commands for quick checks across many servers
+- Write playbooks in YAML and read the `ok`, `changed` and `PLAY RECAP` output
+- Install packages, manage files and start services with the right modules and `become`
+- Keep playbooks idempotent so they are safe to run again and again
+- Use runtime and playbook variables, and understand which value wins
+- Encrypt sensitive files with Ansible Vault and run them with a vault password
+- Control execution with handlers, `notify`, `--tags` and `--skip-tags`
+
+## Who this is for
+
+Anyone learning DevOps or cloud who can already log in to a Linux server and run basic commands. You do not need Python or any programming language: playbooks are YAML. If `ssh`, `vi`, `sudo` and `ls -l` feel unfamiliar, spend a little time on the [Linux course](/docs/linux/getting-started) first. An AWS account where you can launch EC2 instances is required for the lab.
+
+## How the course is organised
+
+| Section | Lessons | What it covers |
+| --- | --- | --- |
+| 01 Ansible Fundamentals | 5 | The problem, architecture, control and managed nodes, the AWS lab setup, ad hoc commands |
+| 02 Ansible Playbooks | 6 | YAML, the first playbook, file creation, Git, Java and Maven installation, static website hosting |
+| 03 Variables, Vault & Tags | 3 | Runtime and playbook variables, Ansible Vault, handlers and tags |
+
+## 01 - Ansible Fundamentals
+
+Why configuring servers by hand fails at scale, and what Ansible does about it. You meet the playbook, the inventory, the control node and the managed nodes, and see how Ansible pushes work over SSH without any agent. Then you build the lab: three EC2 instances, an `ansible` user with sudo rights, Ansible installed with pip, SSH keys copied with `ssh-copy-id`, an inventory with `webservers` and `dbservers` groups, and your first `ansible all -m ping`. The section ends with ad hoc commands for quick checks.
+
+## 02 - Ansible Playbooks
+
+Enough YAML to write playbooks confidently, then one playbook after another, each a little bigger. You ping every node, create files with the `file` module, install Git and then Maven with Java using the package modules and `become`, and finally host a static website with three tasks: install httpd, copy `index.html`, start the service. Along the way you learn idempotence: why a second run reports `ok` instead of `changed`.
+
+## 03 - Variables, Vault & Tags
+
+Making playbooks reusable and safe. You replace hard-coded values with variables passed at runtime with `--extra-vars` or defined under `vars:`, encrypt files with `ansible-vault` and run them with `--ask-vault-pass`, and control execution with handlers that run only on change and tags that select or skip tasks.
+
+## How to actually learn this
+
+<Steps>
+<Step>
+### Build the lab once, properly
+
+The [Ansible Config](/docs/ansible/ansible-fundamentals/ansible-config) lesson is long, and every later lesson depends on it. Do every step on all three machines. If `ansible all -m ping` does not return `pong` for every host, fix that before moving on.
+</Step>
+<Step>
+### Run every playbook twice
+
+The first run shows what Ansible changed. The second run should show `changed=0`. If it does not, you have found a task that is not idempotent, and understanding why teaches you more than the first run did.
+</Step>
+<Step>
+### Read the output, not just the colour
+
+`ok`, `changed`, `failed`, `unreachable` and the PLAY RECAP tell you exactly what happened on each host. When something fails, read the `msg` field and add `-v` for more detail before changing anything.
+</Step>
+<Step>
+### Stop your instances when you finish
+
+Three small EC2 instances are cheap, but not free once the free tier runs out. Stop them at the end of each session, and terminate them when you complete the course.
+</Step>
+</Steps>
+
+Start with the [Introduction](/docs/ansible/introduction) to see where Ansible fits among the other DevOps tools, then begin with [Ansible Introduction](/docs/ansible/ansible-fundamentals/ansible-introduction).
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

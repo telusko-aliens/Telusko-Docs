@@ -1,0 +1,7 @@
+{
+  "title": "Jenkins Setup",
+  "pages": [
+    "jenkins-installation-and-initial-setup.mdx",
+    "jenkins-dashboard-overview.mdx"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+    "title": "Variables, Vault & Tags",
+    "pages": [
+        "ansible-variables-runtime-and-playbook-variables.mdx",
+        "ansible-vault.mdx",
+        "ansible-tags.mdx"
+    ]
+}

@@ -1,0 +1,11 @@
+{
+    "title": "Ansible Playbooks",
+    "pages": [
+        "ansible-playbook-yaml-basics.mdx",
+        "ansible-first-playbook.mdx",
+        "ansible-file-creation-playbook.mdx",
+        "ansible-git-installation-playbook.mdx",
+        "ansible-java-maven-playbook.mdx",
+        "ansible-playbook-static-website-hosting.mdx"
+    ]
+}

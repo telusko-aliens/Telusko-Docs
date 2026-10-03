@@ -1,0 +1,83 @@
+---
+title: Maven Installation Guide
+description: Choose how you will practise Maven in this course, either on your own Windows machine or on a Linux VM in AWS, and see what each setup needs before you install.
+---
+
+Before we can explore projects, goals and the POM, Maven has to be installed somewhere you can run commands. You have two options, and both lead to exactly the same Maven. Pick the one that suits you and use it for the rest of the course.
+
+<img src="/maven/maven-install-options.svg" alt="Two setup options: install Java and Maven on your own machine, or launch an Amazon Linux VM on EC2 and install Maven with the package manager" width={960} height={380} />
+
+## Option 1: install locally on your machine
+
+This is the approach to use if you do not have an AWS account or do not want to create one. You install a JDK, download the Maven ZIP from the Apache website, extract it, and set two environment variables. The next lesson walks through it on Windows: [Maven Installation on Windows](/docs/maven/maven-installation/maven-installation-on-windows).
+
+On macOS and Linux desktops the steps are the same idea (extract and add `bin` to `PATH`), or you can use a package manager:
+
+<Tabs items={["Windows", "macOS", "Ubuntu / Debian"]}>
+<Tab value="Windows">
+
+Follow the next lesson. You will download `apache-maven-x.y.z-bin.zip`, extract it and add its `bin` folder to `Path`.
+
+</Tab>
+<Tab value="macOS">
+
+```bash
+brew install maven
+mvn -v
+```
+
+Homebrew installs a JDK as a dependency if you do not already have one.
+
+</Tab>
+<Tab value="Ubuntu / Debian">
+
+```bash
+sudo apt update
+sudo apt install -y openjdk-21-jdk maven
+mvn -v
+```
+
+Distribution packages are often one or two releases behind the newest Maven, which is fine for learning.
+
+</Tab>
+</Tabs>
+
+## Option 2: a Linux VM on AWS
+
+If you have an AWS account (free tier is enough), you can create a small Linux server on EC2 and install Maven there. This works the same whatever laptop you have, and it is closer to how Maven runs in real life: on a Linux build server or inside a CI agent. The steps are in [Maven Installation on Cloud Linux VM](/docs/maven/maven-installation/maven-installation-on-cloud-linux-vm).
+
+## Which one should you choose?
+
+| | Local install | Linux VM on AWS |
+| --- | --- | --- |
+| Needs an AWS account | No | Yes |
+| Cost | Free | Free tier eligible, but you must stop or terminate the instance after practice |
+| Editing files | Any editor or IDE | `vi` or `nano` in the terminal |
+| IDE lessons (IntelliJ, Eclipse) | Work directly | You still need a local IDE for those lessons |
+| Closest to a real build server | Less | More |
+
+If you are unsure, start locally. You will need a local JDK and IDE anyway for the IntelliJ and Eclipse lessons later. You can always try the Linux VM as extra practice.
+
+## What every setup needs
+
+Whichever option you pick, the requirements are the same:
+
+1. **A JDK, not just a JRE.** Maven itself only needs Java to run, but compiling your code needs the compiler (`javac`), which only a JDK has. Maven 3.9 and 3.10 run on Java 8 or newer. Use Java 17 or 21, which are long term support releases and what Spring Boot needs.
+2. **Maven's `bin` folder on your `PATH`**, so the `mvn` command works from any folder.
+3. **Internet access** the first time you build, because Maven downloads plugins and libraries from Maven Central.
+
+When both `java -version` and `mvn -v` print a version, you are ready.
+
+<Callout type="info" title="You might not even need a global install later">
+Many real projects include the Maven Wrapper (`mvnw` and `mvnw.cmd`). The wrapper downloads the exact Maven version the project expects, so team members and CI servers all use the same one. You will see it in the [Spring Boot demo](/docs/maven/lifecycle-testing-and-spring-boot/maven-springboot-app-demo). For learning, a normal install is still the best start.
+</Callout>
+
+## Official references
+
+- [Apache Maven: Installing Apache Maven](https://maven.apache.org/install.html)
+- [Apache Maven: Download page and system requirements](https://maven.apache.org/download.cgi)
+- [Apache Maven: Maven Wrapper](https://maven.apache.org/tools/wrapper/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

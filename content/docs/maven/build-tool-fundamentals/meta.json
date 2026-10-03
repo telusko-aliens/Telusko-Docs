@@ -1,0 +1,4 @@
+{
+  "title": "Build Tool Fundamentals",
+  "pages": ["introduction-to-maven.mdx", "why-and-what-is-build-tool.mdx", "what-is-maven-and-what-it-can-do.mdx"]
+}

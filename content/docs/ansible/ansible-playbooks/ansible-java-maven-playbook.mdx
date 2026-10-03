@@ -1,0 +1,133 @@
+---
+title: Ansible Java maven playbook
+description: Install Maven, and Java along with it, on all managed nodes with a short playbook, verify both versions, and learn how to pin a specific JDK instead of relying on dependencies.
+---
+
+A Java build server needs two things: a JDK to compile the code and Maven to run the build. On Amazon Linux you do not even have to ask for Java separately. The `maven` package depends on a Java runtime, so the package manager installs Java automatically when it installs Maven. That makes this playbook almost identical to the Git one, which is exactly the point: once you know the pattern, installing new software is a two-line change.
+
+## Reuse the previous playbook
+
+There is no need to type everything again. Print the Git playbook, copy it, and paste it into a new file:
+
+```bash
+sudo su - ansible
+cat git-install.yml
+vi maven-java.yml
+```
+
+Change only the task name and the package name:
+
+```yaml title="maven-java.yml"
+---
+- hosts: all
+  become: true
+  tasks:
+    - name: maven java installation
+      yum:
+        name: maven
+        state: latest
+...
+```
+
+| Line | Why it is there |
+| --- | --- |
+| `hosts: all` | Install on every managed node. Use `hosts: webservers` if only the application servers should get Java and Maven |
+| `become: true` | Installing packages needs root, as explained in the [Git playbook](/docs/ansible/ansible-playbooks/ansible-git-installation-playbook) |
+| `yum:` with `name: maven` | Install the `maven` package. Amazon Linux uses yum/dnf, Ubuntu uses apt |
+| `state: latest` | Install, or upgrade to the newest version in the repository |
+
+## Run it
+
+```bash
+ansible-playbook maven-java.yml --syntax-check
+ansible-playbook maven-java.yml
+```
+
+```text
+TASK [maven java installation] *************************************************
+changed: [172.31.9.250]
+changed: [172.31.12.18]
+```
+
+Maven brings quite a few dependencies with it, so this run takes longer than the Git one. `changed` on both hosts means Maven and Java are now installed everywhere.
+
+## Verify Maven and Java
+
+On a managed node:
+
+```bash
+mvn --version
+```
+
+```text
+Apache Maven 3.8.4 (Red Hat 3.8.4-3.amzn2023.0.5)
+Maven home: /usr/share/maven
+Java version: 17.0.15, vendor: Amazon.com Inc., runtime: /usr/lib/jvm/java-17-amazon-corretto.x86_64
+```
+
+```bash
+java --version
+```
+
+```text
+openjdk 17.0.15 2025-04-15 LTS
+OpenJDK Runtime Environment Corretto-17.0.15.6.1 (build 17.0.15+6-LTS)
+```
+
+Two things to notice:
+
+- The package is called `maven`, but the command is **`mvn`**. Typing `maven -version` gives `command not found`, which also happens in the lecture
+- Java arrived as a dependency: Amazon Corretto 17, Amazon's free build of OpenJDK
+
+Or check every node at once from the control node:
+
+```bash
+ansible all -a "mvn -v"
+ansible all -a "java -version"
+```
+
+## Pinning the Java version you actually want
+
+Getting Java "for free" through Maven is convenient, but you do not control which Java you get. It is whatever the `maven` package depends on today. If your application needs Java 21, say so explicitly. The package modules accept a list of names:
+
+```yaml title="maven-java.yml"
+---
+- name: Prepare Java build servers
+  hosts: all
+  become: true
+  tasks:
+    - name: Install JDK 21 and Maven
+      ansible.builtin.dnf:
+        name:
+          - java-21-amazon-corretto-devel
+          - maven
+        state: present
+```
+
+| Package | What it contains |
+| --- | --- |
+| `java-21-amazon-corretto-devel` | The full JDK 21 (compiler `javac` included), not just the runtime |
+| `maven` | Maven itself |
+
+When several JDKs are installed, `java -version` shows the one selected by the system `alternatives` setting, and you can switch with `sudo alternatives --config java`. On Ubuntu the equivalent packages are `openjdk-21-jdk` and `maven`, installed with `ansible.builtin.apt`.
+
+<Callout type="info" title="Why the build tools matter">
+These are the same tools the [Maven course](/docs/maven/getting-started) runs by hand on one machine. With this playbook you can prepare ten identical build servers, or rebuild one from scratch in a few minutes, instead of repeating the installation steps on each machine.
+</Callout>
+
+## Try It Yourself
+
+1. Change `hosts: all` to `hosts: webservers` and run it. Confirm with `ansible dbservers -a "mvn -v"` that nothing new happened on the database node.
+2. Run the playbook twice in a row and compare the `changed` counts.
+3. Install `java-21-amazon-corretto-devel` alongside Java 17 and check which one `java -version` reports.
+4. Write a playbook that removes Maven with `state: absent`. Does Java get removed too? Why or why not?
+
+## Official references
+
+- [ansible.builtin.dnf module](https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/dnf_module.html)
+- [ansible.builtin.yum module (redirect to dnf)](https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/yum_module.html)
+- [Amazon Corretto 21 installation on Amazon Linux](https://docs.aws.amazon.com/corretto/latest/corretto-21-ug/amazon-linux-install.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

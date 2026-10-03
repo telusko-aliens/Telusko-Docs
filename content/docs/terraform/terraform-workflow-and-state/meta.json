@@ -1,0 +1,9 @@
+{
+  "title": "Terraform Workflow & State",
+  "pages": [
+    "terraform-architecture-and-terraform-commands.mdx",
+    "first-terraform-script-on-linux-vm.mdx",
+    "first-terraform-script-locally-on-windows.mdx",
+    "terraform-statefile.mdx"
+  ]
+}

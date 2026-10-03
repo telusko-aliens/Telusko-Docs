@@ -1,0 +1,10 @@
+{
+    "title": "Ansible Fundamentals",
+    "pages": [
+        "ansible-introduction.mdx",
+        "ansible-architecture.mdx",
+        "more-on-ansible-architecture.mdx",
+        "ansible-config.mdx",
+        "ansible-adhoc-commands.mdx"
+    ]
+}

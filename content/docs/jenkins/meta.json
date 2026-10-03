@@ -1,0 +1,14 @@
+{
+  "title": "Jenkins",
+  "icon": "Workflow",
+  "pages": [
+    "getting-started.mdx",
+    "introduction.mdx",
+    "jenkins-fundamentals",
+    "jenkins-setup",
+    "freestyle-jobs",
+    "security-and-distributed-builds",
+    "jenkins-pipelines",
+    "end-to-end-cicd-with-jenkins-docker-and-kubernetes"
+  ]
+}

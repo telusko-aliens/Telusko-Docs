@@ -1,0 +1,119 @@
+---
+title: Getting Started
+description: A practical roadmap for learning Kubernetes on Amazon EKS, from your first cluster and pod to Deployments, storage, autoscaling, Helm, Argo CD, monitoring and blue-green releases.
+icon: Sparkles
+---
+
+Docker taught you how to package an application into an image and run it as a container. That is enough for one server. The moment you have dozens of services, several servers, traffic that rises and falls, and releases every day, you need something that runs those containers for you, keeps them healthy, and changes them safely. That something is Kubernetes.
+
+This course teaches Kubernetes the way most companies use it today: on a managed cluster in the cloud. Every demo runs on **Amazon EKS**. You will create a real cluster with one command, deploy a Spring Boot application to it, expose it to the internet through an AWS load balancer, scale it, update it with zero downtime, give it persistent storage, and finish with packaging, GitOps, monitoring and release strategies.
+
+By the end you will be able to:
+
+- Explain the Kubernetes architecture and what happens between `kubectl apply` and a running container
+- Create, use and safely delete an EKS cluster with `eksctl`, and keep the AWS bill under control
+- Write manifests for Pods, Services, Namespaces, ReplicaSets, Deployments and DaemonSets
+- Expose applications with ClusterIP, NodePort and LoadBalancer Services
+- Roll out new versions with rolling updates and roll back in one command
+- Build multi-container pods and sidecars, and troubleshoot `ImagePullBackOff` and `CrashLoopBackOff`
+- Run stateful workloads with StatefulSets and EBS-backed PersistentVolumes
+- Configure apps with environment variables, ConfigMaps and Secrets, scale them with the HorizontalPodAutoscaler, and limit teams with ResourceQuota
+- Run Jobs and CronJobs, package apps with Helm, and deploy from Git with Argo CD
+- Monitor the cluster with Prometheus and Grafana and release with a blue-green strategy
+
+## Who this is for
+
+This course is for developers and aspiring DevOps engineers who already know how to build and run a Docker image and now want to run applications properly in production. You should be comfortable with:
+
+- Docker images, containers, ports and registries. The [Docker](/docs/docker/getting-started) course covers all of it
+- Basic Linux: SSH, `vi`, permissions. See the [Linux](/docs/linux/getting-started) course
+- An AWS account and the basics of EC2, IAM and VPC. See the [AWS](/docs/aws/getting-started) course
+
+You do not need any previous Kubernetes experience.
+
+## How the course is organised
+
+| Stage | Section | What it covers |
+| --- | --- | --- |
+| Foundations | 01 Kubernetes Foundations | What Kubernetes is, why orchestration is needed, control plane and worker node architecture |
+| Setup | 02 EKS Cluster Setup | AWS CLI, kubectl and eksctl on an EC2 host, creating and deleting an EKS cluster |
+| Core objects | 03 Pods & Services | Manifests, your first pod, ClusterIP, NodePort and LoadBalancer Services |
+| Running apps | 04 Namespaces, Labels & Deployments | Namespaces, labels and selectors, ReplicaSets, Deployments, rolling updates and rollbacks |
+| Pod patterns | 05 Multi-Container Pods & DaemonSets | Multi-container pods, sidecars, DaemonSets, pod statuses and troubleshooting |
+| State | 06 Stateful Apps & Storage | StatefulSets, PersistentVolumes and claims backed by EBS on EKS |
+| Configuration | 07 Configuration & Autoscaling | Environment variables, ConfigMaps, Secrets, HPA, ResourceQuota |
+| Delivery | 08 Jobs, Helm & Argo CD | Jobs, CronJobs, Helm charts, GitOps with Argo CD |
+| Operations | 09 Monitoring & Deployment Strategies | Prometheus, Grafana, blue-green deployments |
+
+## 01 - Kubernetes Foundations
+
+Why running hundreds of containers by hand breaks down, what container orchestration means, and how Kubernetes and Docker work together. Then the architecture: the API server, etcd, scheduler and controller manager in the control plane, the kubelet, kube-proxy and container runtime on each worker node, and the path a pod takes from `kubectl apply` to a running container.
+
+## 02 - EKS Cluster Setup
+
+The ways to get a cluster, why we use managed EKS, and how to prepare an Ubuntu EC2 machine with the AWS CLI, kubectl and eksctl. Then one `eksctl create cluster` command builds a VPC, the EKS control plane and a managed node group, and `eksctl delete cluster` removes it all again. Cost awareness starts here.
+
+## 03 - Pods & Services
+
+The four parts of every manifest, your first pod with the real YAML errors beginners hit, and the difference between `kubectl create` and `kubectl apply`. Then Services: why pod IPs are not enough, and how ClusterIP, NodePort and LoadBalancer expose an application inside the cluster, through the nodes, and through an AWS load balancer.
+
+## 04 - Namespaces, Labels & Deployments
+
+Namespaces to divide one cluster between teams, labels and selectors to group and find objects, ReplicaSets for self-healing and scaling, and Deployments for what real projects need: rolling updates with zero downtime and rollbacks in one command.
+
+## 05 - Multi-Container Pods & DaemonSets
+
+Pods with more than one container, the sidecar pattern including native sidecars (stable since Kubernetes 1.33), DaemonSets that run one pod on every node, and a practical guide to pod statuses such as `ImagePullBackOff` and `CrashLoopBackOff` with a repeatable troubleshooting routine.
+
+## 06 - Stateful Apps & Storage
+
+Why databases need stable identity and storage, how StatefulSets differ from Deployments, and how PersistentVolumes and PersistentVolumeClaims work. On EKS this means preparing EBS storage and running a StatefulSet whose data survives pod restarts.
+
+## 07 - Configuration & Autoscaling
+
+Moving configuration out of images with environment variables, ConfigMaps and Secrets. Then scaling automatically with the HorizontalPodAutoscaler, and keeping teams within limits using ResourceQuota.
+
+## 08 - Jobs, Helm & Argo CD
+
+Workloads that run to completion with Jobs (parallel and non-parallel) and on a schedule with CronJobs. Packaging many manifests into one installable unit with Helm, and continuous deployment from Git with Argo CD.
+
+## 09 - Monitoring & Deployment Strategies
+
+Collecting cluster and application metrics with Prometheus, visualising them in Grafana dashboards, and releasing new versions with a blue-green deployment for instant switch-over and rollback.
+
+## How to actually learn this
+
+Kubernetes is learned with your hands on a real cluster. Reading YAML is easy; noticing why a Service has no endpoints or why a pod will not start only comes from running into it yourself.
+
+<Steps>
+<Step>
+### Type every manifest yourself
+
+Copying YAML hides the indentation rules that cause most errors. Type it, apply it, and read the error messages. Each lesson shows the real errors from the recordings and what they mean.
+</Step>
+<Step>
+### Break things on purpose
+
+Delete a pod and watch it come back. Use a wrong image tag. Mismatch a label and a selector. Each "Try It Yourself" section suggests a few ways to break what you just built.
+</Step>
+<Step>
+### Always look before you fix
+
+`kubectl get`, `kubectl describe`, `kubectl logs` and `kubectl get events` answer almost every question. Build the habit of reading their output before changing anything.
+</Step>
+<Step>
+### Delete the cluster when you stop
+
+EKS is not free: the control plane, worker nodes, NAT gateway and load balancers all bill by the hour. Create the cluster when you sit down to practise and run `eksctl delete cluster` when you finish. It takes 15 minutes to recreate, and it saves real money.
+</Step>
+</Steps>
+
+<Callout type="warn" title="Budget for AWS charges">
+A small practice cluster costs roughly $5 to $8 per day while it exists (control plane, two small nodes, NAT gateway), more with load balancers and volumes. Set up an [AWS Budget](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-create.html) alert before you start, and never leave a cluster running overnight by accident.
+</Callout>
+
+Head to the [Introduction](/docs/kubernetes/introduction) for the big picture, then start with [Kubernetes Foundations](/docs/kubernetes/kubernetes-foundations/introduction-to-kubernetes).
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

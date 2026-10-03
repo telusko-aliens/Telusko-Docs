@@ -1,0 +1,17 @@
+{
+  "title": "Kubernetes",
+  "icon": "Ship",
+  "pages": [
+    "getting-started.mdx",
+    "introduction.mdx",
+    "kubernetes-foundations",
+    "eks-cluster-setup",
+    "pods-and-services",
+    "namespaces-labels-and-deployments",
+    "multi-container-pods-and-daemonsets",
+    "stateful-apps-and-storage",
+    "configuration-and-autoscaling",
+    "jobs-helm-and-argo-cd",
+    "monitoring-and-deployment-strategies"
+  ]
+}

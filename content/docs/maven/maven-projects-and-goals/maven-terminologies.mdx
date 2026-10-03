@@ -1,0 +1,90 @@
+---
+title: Maven Terminologies
+description: Learn the core Maven vocabulary (archetype, groupId, artifactId, version, packaging, dependencies, goals and repositories) and how the GAV coordinates identify every artifact.
+---
+
+Maven conversations use a small set of words again and again. You already met most of them in the `archetype:generate` command. Once these terms are clear, Maven documentation, build logs and Stack Overflow answers become much easier to read. Some of them we have used already, and the rest are covered in detail in the coming lessons.
+
+## The terms from our first command
+
+| Term | Meaning | In our project |
+| --- | --- | --- |
+| **Archetype** | A template that defines the starting structure of a Maven project | `maven-archetype-quickstart` (standalone JAR) or `maven-archetype-webapp` (web app, WAR) |
+| **groupId** | The organisation or group that owns the project. Follows the reverse domain name convention | `com.telusko` (from `telusko.com`) |
+| **artifactId** | The name of this project (module). Must be unique inside the group | `telusko-app` |
+| **version** | Which release of the project this is | `1.0-SNAPSHOT` |
+| **packaging** | The format the build produces | `jar` (the default) or `war` |
+
+### groupId: who owns it
+
+Companies own a domain name, and domain names are unique worldwide. Reversing it (`telusko.com` becomes `com.telusko`) gives a unique prefix that also works as a Java package name. Large organisations add more parts, for example `org.springframework.boot` or `com.telusko.payments`.
+
+### artifactId: what it is
+
+The artifactId is the project's name. The file produced by the build is named after it, followed by the version:
+
+```text
+target/telusko-app-1.0-SNAPSHOT.jar
+```
+
+Use lowercase letters, digits and hyphens. Avoid spaces.
+
+### version: SNAPSHOT or release
+
+| Version | Meaning |
+| --- | --- |
+| `1.0-SNAPSHOT` | Work in progress. The code is still changing. A SNAPSHOT can be rebuilt many times under the same version |
+| `1.0`, `1.0.0`, `2.3.1` | A **release**. Final and fixed. Once a release version is published, it should never change |
+
+New projects start as a SNAPSHOT. When the team is ready to deliver to the client or production, the version becomes a release number such as `1.0.0`, and the next development cycle starts as `1.1.0-SNAPSHOT`.
+
+<Callout type="info" title="Small correction to the video">
+The video describes the release version as "1.0 release". In Maven you simply write `1.0` (or `1.0.0`). There is no `-RELEASE` suffix in your own versions, although some older libraries such as Spring 4 used one in their names.
+</Callout>
+
+### packaging: jar or war
+
+If you do not specify `<packaging>`, Maven uses `jar`. A web project created from the webapp archetype sets `<packaging>war</packaging>`, and you will build one in [Maven Web App](/docs/maven/maven-projects-and-goals/maven-web-app).
+
+## GAV: the address of every artifact
+
+Together, `groupId`, `artifactId` and `version` are called the **coordinates** or **GAV** of a project. They identify an artifact uniquely across the whole world, the same way a full postal address identifies one house.
+
+<img src="/maven/maven-coordinates.svg" alt="Maven coordinates groupId, artifactId, version and packaging, and where those values appear: file name, local repository path, dependency declaration" width={960} height={420} />
+
+You often see them written on one line, separated by colons:
+
+```text
+com.telusko:telusko-app:1.0-SNAPSHOT
+org.springframework:spring-core:6.2.8
+```
+
+An **artifact** is any file Maven produces or uses, identified by its coordinates: your JAR, a library JAR, a WAR, a plugin.
+
+## The terms coming next
+
+| Term | Short meaning | Full lesson |
+| --- | --- | --- |
+| **Dependency** | A library (someone else's code, packaged as a JAR) that your project needs, such as Spring, Hibernate, JUnit or a Redis client. Declared in `pom.xml` | [Maven Dependencies](/docs/maven/dependencies-pom-and-ides/maven-dependencies) |
+| **Goal** | One unit of work Maven performs, such as compiling or running tests. Part of the build lifecycle: `clean`, `compile`, `test`, `package` | [Maven Goals](/docs/maven/maven-projects-and-goals/maven-goals) |
+| **Repository** | A storage place for artifacts. Maven downloads dependencies from the **central** repository into a **local** repository on your machine. Companies also run private **remote** repositories | [Maven Repositories](/docs/maven/dependencies-pom-and-ides/maven-repositories) |
+| **POM** | Project Object Model, the `pom.xml` file where you tell Maven everything above | [Maven POM.xml file](/docs/maven/dependencies-pom-and-ides/maven-pom-xml-file) |
+| **Plugin** | The code that actually does the work behind each goal, for example the compiler plugin or the Surefire test plugin | [Maven Goals](/docs/maven/maven-projects-and-goals/maven-goals) |
+
+A useful way to connect them: you describe your project's **coordinates** and **dependencies** in the **POM**, you ask Maven to run **goals**, the **plugins** do the work, and every artifact involved is fetched from or stored in a **repository**.
+
+## Try It Yourself
+
+1. Open `telusko-app/pom.xml` and write down its full GAV in the `groupId:artifactId:version` form.
+2. Search Maven Central at [central.sonatype.com](https://central.sonatype.com/) for `junit-jupiter` and write down its GAV for the latest version.
+3. Decide the GAV you would use for a payments library at a company called `acme.in`, version 2 still in development.
+4. Explain to a friend in two sentences the difference between `1.0-SNAPSHOT` and `1.0`.
+
+## Official references
+
+- [Apache Maven: Introduction to the POM](https://maven.apache.org/guides/introduction/introduction-to-the-pom.html)
+- [Apache Maven: Guide to naming conventions](https://maven.apache.org/guides/mini/guide-naming-conventions.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>
