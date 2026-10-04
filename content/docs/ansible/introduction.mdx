@@ -1,0 +1,81 @@
+---
+title: Introduction
+description: What Ansible is, why configuration management exists, the core vocabulary from inventory to handlers, and how Ansible fits with Terraform, Docker and Jenkins.
+---
+
+A server is only as useful as the software and settings on it. The hard part has never been installing Java once. It is installing the same version, with the same settings, on every server, every time, and still knowing six months later exactly how each machine was built.
+
+Ansible answers that with a simple idea: describe the state you want in a text file, and let a tool make every server match it. That file can be reviewed, versioned in Git and re-run safely, which is something no admin's memory can offer.
+
+## What Ansible is
+
+**Ansible** is an open source automation tool for configuration management, application deployment and orchestration. It is sponsored by Red Hat, written in Python, and driven by YAML files called playbooks.
+
+Three properties make it popular:
+
+| Property | What it means for you |
+| --- | --- |
+| Agentless | Nothing to install on the servers. Ansible connects over SSH and needs only Python on the other side |
+| Readable | Playbooks are YAML. Someone who has never used Ansible can still read what a playbook does |
+| Idempotent | Most modules check before they act, so running a playbook again changes only what is different |
+
+## Core vocabulary
+
+| Term | Meaning |
+| --- | --- |
+| **Control node** | The machine with Ansible installed, where you run `ansible` and `ansible-playbook` |
+| **Managed node** | A server that Ansible configures. It does not need Ansible installed |
+| **Inventory** | The list of managed nodes, organised into groups such as `webservers` and `dbservers` |
+| **Module** | A small program that does one job: `ansible.builtin.copy`, `ansible.builtin.dnf`, `ansible.builtin.service` |
+| **Task** | One call to a module with its arguments, plus a name |
+| **Play** | A set of tasks mapped to a set of hosts |
+| **Playbook** | A YAML file with one or more plays |
+| **Ad hoc command** | A single module run from the command line, without a playbook |
+| **Facts** | Information Ansible gathers about each host (OS, IPs, memory) before running tasks |
+| **Variable** | A named value used in tasks, set in the playbook, inventory or on the command line |
+| **Vault** | Ansible's tool for encrypting files and values that hold secrets |
+| **Handler** | A task that runs only when another task notifies it of a change |
+| **Tag** | A label on a task, used to run or skip it from the command line |
+| **Collection** | A package of modules and plugins. The built-in ones live in `ansible.builtin` |
+
+## How a run works
+
+<img src="/ansible/ansible-push-model.svg" alt="Ansible push model: the control node connects over SSH, copies a module, runs it with Python, receives JSON and cleans up" width={960} height={430} />
+
+When you run a playbook, Ansible reads the inventory to find the hosts, connects to each one over SSH, copies the module for the current task, runs it with the host's Python, collects the JSON result (`ok`, `changed` or `failed`) and moves on. It works on several hosts in parallel, so ten servers take about as long as one.
+
+## Where Ansible fits
+
+<img src="/ansible/ansible-big-picture.svg" alt="DevOps toolchain: Git stores code, Terraform provisions servers, Ansible configures them, the application runs on top, Jenkins automates the steps" width={960} height={400} />
+
+Ansible usually sits between infrastructure and application:
+
+| Tool | Job | Relation to Ansible |
+| --- | --- | --- |
+| [Terraform](/docs/terraform/getting-started) | Provisioning: creates EC2 instances, VPCs, security groups | Creates the machines that Ansible then configures |
+| Ansible | Configuration: packages, files, users, services | The subject of this course |
+| [Docker](/docs/docker/getting-started) | Packages the application with its runtime | Ansible can install Docker and start containers on servers |
+| [Kubernetes](/docs/kubernetes/getting-started) | Runs containers at scale | Configures itself declaratively, so Ansible is used less inside the cluster |
+| [Jenkins](/docs/jenkins/getting-started) | CI/CD pipelines | Can run `ansible-playbook` as a pipeline stage after a build |
+
+Ansible can also create cloud resources, and Terraform can run scripts on servers. In practice, most teams let each tool do what it does best: Terraform for infrastructure, Ansible for what goes on it.
+
+## What this course builds
+
+Everything happens on one small lab on AWS: a control node and two managed nodes, one in the `webservers` group and one in the `dbservers` group. On that lab you write the playbooks a DevOps engineer writes in the first weeks of a job: creating files, installing Git, Java and Maven, deploying a website with Apache httpd, then improving those playbooks with variables, encrypted secrets, handlers and tags.
+
+<Callout type="info" title="Versions used in this course">
+The lecture installs Ansible with pip on Amazon Linux 2023, which gives `ansible` 8.7 with `ansible-core` 2.15 (the newest release that supports the system's Python 3.9). The current release at the time of writing is `ansible-core` 2.21, which needs Python 3.12 or newer on the control node. Every playbook in this course works on both. Where newer versions behave differently, the lesson says so.
+</Callout>
+
+Start with [Ansible Introduction](/docs/ansible/ansible-fundamentals/ansible-introduction).
+
+## Official references
+
+- [Ansible documentation](https://docs.ansible.com/projects/ansible/latest/index.html)
+- [Ansible concepts](https://docs.ansible.com/projects/ansible/latest/getting_started/basic_concepts.html)
+- [Red Hat: How Ansible works](https://www.redhat.com/en/ansible-collaborative/how-ansible-works)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

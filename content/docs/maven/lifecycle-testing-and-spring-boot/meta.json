@@ -1,0 +1,4 @@
+{
+  "title": "Lifecycle, Testing & Spring Boot",
+  "pages": ["maven-build-lifecycle-summary.mdx", "maven-java-project-unit-testing.mdx", "maven-springboot-app-demo.mdx", "maven-wrapup.mdx"]
+}

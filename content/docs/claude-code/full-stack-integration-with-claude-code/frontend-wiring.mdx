@@ -1,0 +1,186 @@
+---
+title: Frontend Wiring
+description: Replace the failing mockFetch with a real fetch to the FastAPI backend, run both servers, debug the stale-board bug with Claude, and merge the working full-stack app.
+---
+
+This is the moment we have been building towards: connecting the frontend to the real backend. Thanks to how the frontend was designed, this should be a one-function change.
+
+```text
+!git checkout -b feature/frontend-wiring
+```
+
+## The prompt: change one function, nothing else
+
+```text title="Prompt: frontend wiring"
+In frontend/app.js, the mockFetch() function currently rejects every
+request. Replace the BODY of mockFetch() with a real fetch() call to
+http://localhost:8000.
+
+Strict rules:
+  - Do NOT change the api.* layer that wraps mockFetch.
+  - Do NOT touch any other code in app.js.
+  - The function signature, return shape, and call sites stay identical.
+
+Only the inside of mockFetch changes, from a rejecting stub to a
+real network call that matches the contract in specs/api-contract.md.
+```
+
+<Callout type="info" title="Overriding a CLAUDE.md rule on purpose">
+Our `CLAUDE.md` says "NEVER modify files in /frontend". This prompt explicitly asks for one change in `app.js` and fences it with strict rules. When you deliberately break a standing rule, say so clearly and keep the scope as small as possible.
+</Callout>
+
+### The change
+
+```diff title="frontend/app.js"
+ function mockFetch(url, options = {}) {
+-  return new Promise((_, reject) => {
+-    // Simulate network timeout before refusing
+-    setTimeout(() => {
+-      reject(new Error(
+-        `Cannot connect to backend (${(options.method || 'GET').toUpperCase()} ${url}). ` +
+-        'Is the FastAPI server running on localhost:8000?'
+-      ));
+-    }, 400 + Math.random() * 150);
++  return fetch(`http://localhost:8000${url}`, options).then(async (response) => {
++    let data = null;
++    const contentType = response.headers.get('content-type') || '';
++    if (contentType.includes('application/json')) {
++      data = await response.json();
++    }
++    return { ok: response.ok, status: response.status, data };
+   });
+ }
+```
+
+Remember what the API contract found: the `api.*` methods expect an **envelope** of `{ ok, status, data }`, not a raw `Response`. The new function wraps the real `fetch` result into exactly that shape, so nothing else in the file needs to change. It also handles `DELETE`, which returns `204 No Content` with no JSON body.
+
+The function is still called `mockFetch`, even though it is no longer a mock. That is the cost of "change nothing else". Renaming it is a good small follow-up task.
+
+## Run both servers
+
+```text
+Run the frontend and the backend.
+```
+
+Watch what Claude does before starting anything. It behaves like a careful developer:
+
+1. Checks the database is migrated (`alembic upgrade head`)
+2. Re-runs the seed script, which skips all five existing records thanks to idempotency
+3. Starts the backend with uvicorn on port 8000 and checks `/health`
+4. Serves the frontend on a separate port
+
+Open the frontend URL in your browser. The board shows the five tasks **from the database**.
+
+<Callout type="warn" title="Ports and CORS">
+The backend only accepts browser requests from origins listed in its CORS settings. If the frontend runs on a port that is not in that list (for example 8080 when only 8000 and 5500 were allowed), every request fails with a CORS error in the browser console. The fix is to add that origin to `allow_origins` in `backend/app/main.py`. This exact fix appears later in the project's history.
+</Callout>
+
+## Debugging: the board does not update
+
+Click **Move Forward** on a card. Nothing seems to happen. Create a new task. It does not appear.
+
+Is the backend broken? Check before guessing. Refresh `GET /api/tasks` in Swagger: the new task **is** there, and the moved card **has** the new state. So the backend works. The bug is in the frontend: it does not re-render after the API call.
+
+Describe the problem precisely to Claude. A good bug report is half the fix:
+
+```text
+When I move a card, the state changes in the backend but the board does not update.
+The card stays in the old column. When I create a new task, it is saved in the database
+but does not appear on the board. Delete also fails with an error.
+```
+
+Claude investigates, reproduces the issue, and finds the cause: `renderBoard()` was drawing from the old in-memory `tasks` array instead of fetching fresh data. The fix is to make `renderBoard()` async and reload the tasks before drawing:
+
+```diff title="frontend/app.js"
+-function renderBoard() {
++async function renderBoard() {
++  tasks = await api.getTasks();
++
+   const board = document.getElementById('board');
+   board.innerHTML = '';
+```
+
+It also fixed a related bug in the drag-and-drop handler. Now moves, creates and deletes show up immediately.
+
+<Callout type="info">
+Claude can also test web UIs for you with a browser tool such as [Claude in Chrome](https://code.claude.com/docs/en/chrome), clicking through the app and reading console errors. For this small app, manual testing was enough.
+</Callout>
+
+## Debugging with browser DevTools
+
+When the UI misbehaves, open the browser's developer tools (`F12`) before asking Claude anything. Two tabs answer most questions:
+
+| Tab | What to look for |
+| --- | --- |
+| **Network** | Is the request sent at all? Which URL? What status code: 200, 404, 422, 500? What does the response body say? |
+| **Console** | JavaScript errors, and CORS errors (they appear here, not in the Network tab) |
+
+| You see | It usually means |
+| --- | --- |
+| No request in the Network tab | The frontend code never called the API, or crashed before it |
+| Request with status `(failed)` and a CORS message in the Console | The backend does not allow this origin. Check `allow_origins` |
+| `404` | Wrong URL or path |
+| `422` | The JSON body does not match the schema (wrong field name or value) |
+| `200` but the board does not change | The backend worked. The frontend does not re-render, which was exactly our bug |
+
+Paste the exact status code and error text into your prompt. "Delete fails with 404 on `/api/tasks/7`" gets a much faster fix than "delete is broken".
+
+## Commit, merge, delete
+
+```text
+Commit the changes, merge into main, and delete the feature/frontend-wiring branch.
+```
+
+`main` now has the full working application. You can push it to GitHub now or later.
+
+## What we built
+
+```text
+content-tracker/
+├── .claude/
+│   ├── CLAUDE.md
+│   ├── settings.json
+│   └── agents/
+│       ├── api-contract-extractor.md
+│       └── seed-data-extractor.md
+├── backend/
+│   ├── alembic/              # migrations
+│   ├── app/
+│   │   ├── api/v1/tasks.py   # routes
+│   │   ├── core/             # config, database
+│   │   ├── models/task.py
+│   │   ├── schemas/task.py
+│   │   ├── services/task_service.py
+│   │   └── main.py
+│   ├── seed.py
+│   └── pyproject.toml
+├── frontend/
+│   ├── index.html
+│   ├── app.js
+│   └── styles.css
+└── specs/
+    ├── api-contract.md
+    └── seed-data.json
+```
+
+Five branches, five clean merges, and every step driven by specs and reviewed by a human. That is the difference between vibe coding and building with Claude Code.
+
+## Try It Yourself
+
+Before moving to the next section, practise what you learned:
+
+1. Build the backend in the five feature branches from this section, merging and deleting each branch.
+2. Test every endpoint with the curl commands from Part 2, including the 404 and 422 cases.
+3. Open the browser DevTools Network tab while moving a card and identify the PUT request and its status.
+4. Rename `mockFetch` to `apiFetch` with a small, focused prompt, and review the diff.
+
+## Official references
+
+- [Common workflows: fix bugs efficiently](https://code.claude.com/docs/en/common-workflows)
+- [Use Claude Code with Chrome](https://code.claude.com/docs/en/chrome)
+- [MDN: Using the Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
+- [MDN: CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

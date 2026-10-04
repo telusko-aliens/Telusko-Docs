@@ -1,0 +1,130 @@
+---
+title: Terraform Modules Theory
+description: Understand what a Terraform module is, why one big folder stops scaling, and how a root module with child modules keeps EC2, S3 and other infrastructure organised.
+---
+
+Look at the `03-tf-ec2vars` folder from the earlier lessons:
+
+```text
+03-tf-ec2vars/
+├── provider.tf
+├── vars.tf
+├── main.tf
+└── output.tf
+```
+
+Without knowing it, you have already written a **module**. In Terraform, a module is simply **a folder of `.tf` files that are used together**. Every Terraform configuration is a module. The folder you run `terraform` commands in is called the **root module**.
+
+So the real question of this lesson is not "what is a module", but "how should we organise modules when the project grows?"
+
+## The problem with one big folder
+
+One folder works fine for one or two resources. Now imagine the Telusko application needs real infrastructure:
+
+- EC2 instances for the application servers
+- S3 buckets for uploads and backups
+- IAM users and roles
+- A VPC with subnets
+
+If everything goes into the same four files:
+
+| File | What it turns into |
+| --- | --- |
+| `vars.tf` | Dozens of variables for EC2, S3, IAM and VPC mixed together |
+| `main.tf` | Hundreds of lines of unrelated resources |
+| `output.tf` | Outputs for every service in one list |
+
+Finding anything becomes slow, two people editing the same file collide, and you cannot reuse the EC2 part in another project without copying it and cleaning out everything else.
+
+## Root module and child modules
+
+The solution is to give each piece of infrastructure its own folder, a **child module**, and have the root module **call** those child modules.
+
+<img src="/terraform/tf-modules.svg" alt="Root module with provider.tf, main.tf and output.tf calling ec2 and s3 child modules" width={960} height={520} />
+
+For the Telusko project the plan looks like this:
+
+```text
+05-telusko-tf-project/          <- root module (you run terraform here)
+├── provider.tf                 <- which cloud and region, only at the root
+├── main.tf                     <- calls the child modules
+├── output.tf                   <- re-exports values from child modules
+└── modules/
+    ├── ec2/                    <- child module
+    │   ├── input.tf            <- variables for EC2
+    │   ├── main.tf             <- aws_instance
+    │   └── output.tf           <- public IP etc.
+    └── s3/                     <- child module
+        └── main.tf             <- aws_s3_bucket
+```
+
+Each child module is a small, complete unit with its own inputs, resources and outputs. Adding IAM or a VPC later means adding `modules/iam/` or `modules/vpc/`, without touching the EC2 and S3 code.
+
+## How they connect
+
+A child module does nothing by itself. The root module's `main.tf` calls it with a `module` block:
+
+```hcl title="main.tf (root)"
+module "my_ec2" {
+  source = "./modules/ec2"
+}
+```
+
+That is the whole idea, and the three directions of data flow are worth remembering:
+
+| Direction | How | Example |
+| --- | --- | --- |
+| Root to child | Arguments in the `module` block set the child's input variables | `ami = "ami-..."` inside `module "my_ec2"` |
+| Child to root | The child declares an `output`; the root reads it as `module.<name>.<output>` | `module.my_ec2.ec2_vm_public_ip` |
+| Root to user | The root's own `output` blocks are what `terraform apply` prints | `output "ec2_vm_public_ip"` at the root |
+
+A child module can only see what it is given. It cannot read the root's variables or another module's resources directly. That strictness is what makes modules reusable: everything a module needs is visible in its input variables.
+
+## Rules that save you trouble
+
+1. **Run Terraform only in the root folder.** Never run `terraform apply` inside `modules/ec2`. The root holds the state.
+2. **Provider configuration lives in the root.** Child modules inherit it. Do not put `provider "aws"` blocks inside child modules.
+3. **Run `terraform init` after adding or changing a `module` block.** Init installs modules, even local ones.
+4. **Expose what callers need.** If the root needs a value from a child, the child must have an `output` for it. The root cannot reach inside the child's resources. You will see this rule produce a real error in the next lesson.
+
+## Where modules come from
+
+The `source` argument decides where Terraform gets the module code:
+
+| Source | Example |
+| --- | --- |
+| Local folder | `source = "./modules/ec2"` |
+| Terraform Registry | `source = "terraform-aws-modules/vpc/aws"` with a `version` |
+| Git repository | `source = "git::https://github.com/org/repo.git//modules/ec2?ref=v1.2.0"` |
+
+In this course we use local folders. In companies you will often see shared modules in a private Git repository or registry, so every team builds VPCs or EKS clusters the same tested way. The public Terraform Registry also has well maintained community modules, such as the `terraform-aws-modules` collection, which are worth reading even if you do not use them.
+
+## Naming
+
+The lecture names the variable file of each child module `input.tf`. The convention you will see most often in real projects and in HashiCorp's own docs is:
+
+| File | Contents |
+| --- | --- |
+| `main.tf` | Resources |
+| `variables.tf` | Input variables |
+| `outputs.tf` | Outputs |
+
+Terraform does not care about file names, so `input.tf` works. Pick a convention and use it across all your modules.
+
+Now let us build this exact structure in [Terraform Module Project Implementation](/docs/terraform/taint-and-modules/terraform-module-project-implementation).
+
+## Try It Yourself
+
+1. Draw the folder tree for a project with three child modules: `ec2`, `s3` and `iam`. Mark which files sit at the root and which inside each module.
+2. For the `ec2` module, list which values should be inputs (things that change between environments) and which outputs the root will need.
+3. Browse the `terraform-aws-modules/vpc/aws` module on the Terraform Registry and find its **Inputs** and **Outputs** tabs. Notice it follows exactly the same idea.
+
+## Official references
+
+- [Modules overview](https://developer.hashicorp.com/terraform/language/modules)
+- [Creating modules](https://developer.hashicorp.com/terraform/language/modules/develop)
+- [Use modules in your configuration (including module sources)](https://developer.hashicorp.com/terraform/language/modules/configuration)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

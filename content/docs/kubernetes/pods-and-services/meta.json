@@ -1,0 +1,12 @@
+{
+  "title": "Pods & Services",
+  "pages": [
+    "understanding-kubernetes-manifest-yaml-files.mdx",
+    "first-pod-creation-in-kubernetes.mdx",
+    "introduction-to-kubernetes-services.mdx",
+    "clusterip-service-explained.mdx",
+    "nodeport-service-explained.mdx",
+    "loadbalancer-service-explained.mdx",
+    "creating-pod-and-service-in-one-manifest-file.mdx"
+  ]
+}

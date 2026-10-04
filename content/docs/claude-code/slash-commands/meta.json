@@ -1,0 +1,8 @@
+{
+    "title": "Slash Commands",
+    "pages": [
+        "introduction-to-slash-commands.mdx",
+        "essential-slash-commands.mdx",
+        "slash-commands-recap.mdx"
+    ]
+}

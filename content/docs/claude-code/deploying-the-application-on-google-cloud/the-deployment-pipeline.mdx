@@ -1,0 +1,74 @@
+---
+title: The Deployment Pipeline
+description: The plan for taking the Content Tracker from your laptop to a public URL on Google Cloud Run, using Docker and Claude Code at every step.
+---
+
+The app is built and secured. The final step is to put it on the internet. You could do this by hand: configure a server, install Python, copy files, set up a process manager. It works, but it takes time and is easy to get wrong.
+
+Instead, we use **Claude Code** to prepare the project and write the Dockerfile, and we deploy the resulting container to **Google Cloud Run**.
+
+<Callout type="info" title="The steps matter more than the cloud">
+We use Google Cloud Run because it is simple for container-based apps and has a free tier. The same approach (single origin, Dockerfile, test locally, push an image, run it) works on AWS, Azure or any other platform. Focus on the logic, not on memorising `gcloud` commands.
+</Callout>
+
+## The pipeline
+
+<img src="/claude-code/deployment-pipeline.svg" alt="Deployment pipeline: prepare, Dockerfile, local test, gcloud setup, Cloud Build, Cloud Run" width={960} height={420} />
+
+| Step | What we do | Lesson |
+| --- | --- | --- |
+| 1. Prepare | Remove hardcoded URLs and serve the frontend from FastAPI, so the whole app runs from one origin | [Preparing the App for Deployment](/docs/claude-code/deploying-the-application-on-google-cloud/preparing-the-app-for-deployment) |
+| 2. Dockerfile | Ask Claude Code for a Dockerfile, with precise requirements | [Dockerizing and Testing the App Locally](/docs/claude-code/deploying-the-application-on-google-cloud/dockerizing-and-testing-the-app-locally) |
+| 3. Local test | Build the image and run it with Docker on your machine | Same lesson |
+| 4. Google Cloud setup | Create a project, install the Google Cloud CLI, log in | [Google Cloud Project and SDK Setup](/docs/claude-code/deploying-the-application-on-google-cloud/google-cloud-project-and-sdk-setup) |
+| 5. Build and store | Cloud Build builds the image and stores it in Artifact Registry | [Artifact Registry, Cloud Run and Testing](/docs/claude-code/deploying-the-application-on-google-cloud/artifact-registry-cloud-run-and-testing) |
+| 6. Run | Cloud Run runs the container and gives us an HTTPS URL | Same lesson |
+
+## Why a single origin?
+
+Locally we run two servers: the frontend on one port and the FastAPI backend on another. We could deploy them as two separate services, but that means two deployments, two URLs and CORS configuration between them.
+
+Our frontend is just HTML, CSS and JavaScript. FastAPI can serve those files itself. Then the entire app is **one container on one URL**.
+
+<img src="/claude-code/single-origin.svg" alt="From two origins to a single origin" width={960} height={360} />
+
+## Why Docker?
+
+A container packages the app with its exact Python version, dependencies and start command. If it runs in Docker on your laptop, it runs the same way on Cloud Run. Without a container, every difference between your machine and the server becomes a debugging session. (For a full introduction, see the [Docker docs on this site](/docs/docker/getting-started).)
+
+## Cloud Run in a nutshell
+
+<img src="/claude-code/cloud-run-concepts.svg" alt="Cloud Run service, revisions and instances" width={960} height={400} />
+
+| Concept | Meaning |
+| --- | --- |
+| **Service** | Your app on Cloud Run, with one stable HTTPS URL. Ours is `telusko-app` |
+| **Revision** | An immutable snapshot created by every deploy (image plus settings). You can send traffic back to an older revision to roll back |
+| **Instance** | A running copy of your container. Cloud Run adds instances when traffic grows |
+| **Scale to zero** | With no requests, Cloud Run can stop all instances, so an idle app costs very little |
+| **Container contract** | Your container must listen on the port in the `PORT` environment variable (8080 by default) |
+
+<Callout type="info" title="What it costs">
+Cloud Run bills for the resources used while handling requests, and there is a monthly free tier. Cloud Build and Artifact Registry also have free allowances. For a small learning project the cost is usually zero or close to it, but always check the [Cloud Run pricing page](https://cloud.google.com/run/pricing) and set a budget alert.
+</Callout>
+
+## What you need
+
+- **Docker Desktop** (or Docker Engine) installed and running
+- A **Google account** with access to the [Google Cloud console](https://console.cloud.google.com/). New accounts usually get free credits, but Cloud Run and Cloud Build may need billing enabled on the project
+- The **Google Cloud CLI** (`gcloud`), installed in a later lesson
+
+<Callout type="warn" title="Things can go wrong, and that is fine">
+Deployments often fail the first time: a missing permission, a wrong path, a typo in a flag. That is normal. Read the error, give it to Claude Code with the context, and fix one thing at a time.
+</Callout>
+
+## Official references
+
+- [Cloud Run documentation](https://cloud.google.com/run/docs)
+- [Artifact Registry documentation](https://cloud.google.com/artifact-registry/docs)
+- [Cloud Build documentation](https://cloud.google.com/build/docs)
+- [Docker: Get started](https://docs.docker.com/get-started/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

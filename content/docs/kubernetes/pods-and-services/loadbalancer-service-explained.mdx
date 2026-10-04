@@ -1,0 +1,170 @@
+---
+title: LoadBalancer Service Explained
+description: Expose the webapp pod to the internet through an AWS load balancer created by a Service of type LoadBalancer, see what EKS builds behind the scenes, and clean it up so it stops billing.
+---
+
+ClusterIP is internal. NodePort works but makes users type a node IP and a strange port. What we actually want is one stable public address, on port 80, with a proper load balancer in front that checks which backends are healthy. On a cloud such as AWS, Kubernetes can create that load balancer for you. You only change one word in the Service: `type: LoadBalancer`.
+
+## How it works on EKS
+
+When you create a Service of type `LoadBalancer`:
+
+1. Kubernetes creates a ClusterIP and a NodePort for the Service, exactly as in the previous two lessons.
+2. A cloud controller sees the new Service and calls the AWS API to create an **Elastic Load Balancer**, together with a security group and the backend registration.
+3. AWS gives the load balancer a DNS name. Kubernetes writes it into the Service's `EXTERNAL-IP` column.
+4. Traffic flows: internet, AWS load balancer, node port on a worker node, ClusterIP, pod.
+
+```text
+browser -> AWS load balancer (port 80) -> node:31463 (NodePort) -> ClusterIP -> pod:8080
+```
+
+You never create the load balancer, target registration or security group yourself. Delete the Service and they go away too.
+
+## Step 1: Start clean
+
+The lecture first removes everything from the previous lessons:
+
+```bash
+kubectl delete all --all
+```
+
+<Callout type="warn" title="Know what delete all --all really does">
+`kubectl delete all --all` deletes every pod, Service, Deployment, ReplicaSet, StatefulSet, DaemonSet, Job and CronJob **in the current namespace**. Never run it against a shared or production cluster. Two things often surprise people: "all" does **not** include ConfigMaps, Secrets, PersistentVolumeClaims or Ingresses, so those survive; and it deletes the built-in `kubernetes` Service too, which the control plane recreates automatically within seconds. A safer habit is deleting what you created with `kubectl delete -f <file>`.
+</Callout>
+
+Your manifest files on disk are not touched, so recreate the pod:
+
+```bash
+kubectl apply -f k8s-pod.yml
+kubectl get pods
+```
+
+Open **EC2**, then **Load Balancers** in the AWS console. There should be none yet.
+
+## Step 2: Write the Service
+
+```bash
+vi k8s-lbr-svc.yml
+```
+
+```yaml title="k8s-lbr-svc.yml"
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-lbr-svc
+spec:
+  type: LoadBalancer
+  selector:
+    app: telusko-webapp
+  ports:
+    - port: 80
+      targetPort: 8080
+```
+
+| Field | Meaning |
+| --- | --- |
+| `type: LoadBalancer` | Ask the cloud for an external load balancer |
+| `selector.app: telusko-webapp` | Same label as before. The label on the pod is what connects everything |
+| `port: 80` | The port on the load balancer (and the ClusterIP). Users browse to port 80 |
+| `targetPort: 8080` | The Spring Boot container port |
+
+No `nodePort` here. Kubernetes picks one automatically, and you never need to open it to the internet yourself; the load balancer's security group rules are created for you.
+
+## Step 3: Create it and wait
+
+```bash
+kubectl apply -f k8s-lbr-svc.yml
+kubectl get svc
+```
+
+```text
+NAME             TYPE           CLUSTER-IP    EXTERNAL-IP                                                                PORT(S)        AGE
+kubernetes       ClusterIP      10.100.0.1    <none>                                                                     443/TCP        6m10s
+webapp-lbr-svc   LoadBalancer   10.100.84.54  aefe9725b54fe4fcca64b49573b6a22d-2072396358.ap-south-1.elb.amazonaws.com   80:31463/TCP   13s
+```
+
+| Column | What it shows |
+| --- | --- |
+| `TYPE LoadBalancer` | The type you asked for |
+| `EXTERNAL-IP` | The DNS name of the AWS load balancer. On AWS it is a hostname, not an IP. It shows `<pending>` for the first few seconds |
+| `PORT(S) 80:31463/TCP` | Port 80 on the load balancer, mapped to node port 31463, picked at random |
+
+Refresh **EC2, Load Balancers** in the console and the new load balancer is there:
+
+<img src="/kubernetes/screens/k8s-classic-load-balancer.webp" alt="EC2 Load balancers list showing one load balancer of type classic created by Kubernetes" width={860} height={150} />
+
+*The load balancer Kubernetes created. Note the Type column says **classic**.*
+
+Copy the DNS name and open it in the browser:
+
+```text
+http://aefe9725b54fe4fcca64b49573b6a22d-2072396358.ap-south-1.elb.amazonaws.com
+```
+
+Give it **two to five minutes**. The DNS name has to propagate and the load balancer has to mark the nodes healthy. A "site can't be reached" error in the first minutes is normal. Then you see the same Telusko Learning page as in the NodePort lesson, now on a normal URL with no port number.
+
+This is the usual way to expose an application to users with a plain Service. For several HTTP applications behind one load balancer, teams add an Ingress on top, but the LoadBalancer Service is the foundation.
+
+## Which load balancer did EKS create?
+
+<Callout type="info" title="Classic Load Balancer vs the AWS Load Balancer Controller">
+With no extra setup, EKS uses the built-in AWS cloud provider controller, which creates a **Classic Load Balancer** by default, as you can see in the console. Classic Load Balancers are the previous generation of ELB, and the Amazon EKS documentation notes that this built-in controller now only receives critical bug fixes.
+
+For anything beyond practice, AWS recommends installing the **AWS Load Balancer Controller** (version 2.7.2 or later) in the cluster. With it, a `type: LoadBalancer` Service gets a modern **Network Load Balancer**. You select it with annotations such as:
+
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+```
+
+Without the `internet-facing` scheme annotation the controller creates an **internal** load balancer by default. Installing the controller needs IAM setup, so we stay with the default behaviour in this course.
+</Callout>
+
+## Summary of the three Service types
+
+| | ClusterIP | NodePort | LoadBalancer |
+| --- | --- | --- | --- |
+| Reachable from | Inside the cluster | Outside, through any node IP | Outside, through a cloud load balancer |
+| Address users see | `webapp-svc` (DNS, internal) | `<node-ip>:30080` | `<name>.elb.amazonaws.com` |
+| Creates AWS resources | No | No (you open a security group port) | Yes: load balancer and security group |
+| Extra cost | None | None | Load balancer billed per hour plus data |
+| Use it for | Service-to-service calls | Tests and labs | Exposing apps to users |
+
+## Clean up (important)
+
+<Callout type="error" title="Delete the Service before you delete the cluster">
+The load balancer is a real AWS resource billed by the hour. Delete the Service so Kubernetes removes it. If you delete the cluster while a LoadBalancer Service still exists, the load balancer can be left behind, keep charging you, and block eksctl from deleting the VPC.
+</Callout>
+
+```bash
+kubectl delete -f k8s-lbr-svc.yml
+kubectl get svc                         # webapp-lbr-svc should be gone
+```
+
+Wait a minute, then confirm in **EC2, Load Balancers** that the list is empty. The lecture then cleans up everything else with `kubectl delete all --all`; deleting by file is the cleaner habit:
+
+```bash
+kubectl delete -f k8s-pod.yml
+```
+
+If you are stopping for the day: `eksctl delete cluster --name telusko-learning --region ap-south-1 --wait`.
+
+## Try It Yourself
+
+1. Create `webapp-lbr-svc` and time how long it takes until the DNS name opens the app.
+2. Run `kubectl describe svc webapp-lbr-svc` and find the `LoadBalancer Ingress`, `NodePort` and `Endpoints` lines. Match each to a hop in the traffic flow.
+3. In the EC2 console, open the load balancer's **Instances** or health check tab and confirm both worker nodes are registered, even though only one runs the pod.
+4. Delete the Service and confirm the AWS load balancer disappears.
+
+## Official references
+
+- [Kubernetes: Service type LoadBalancer](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer)
+- [Amazon EKS: Route TCP and UDP traffic with Network Load Balancers](https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html)
+- [Amazon EKS: AWS Load Balancer Controller](https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

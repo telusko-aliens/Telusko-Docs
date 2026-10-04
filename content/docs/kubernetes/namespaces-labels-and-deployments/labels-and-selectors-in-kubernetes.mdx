@@ -1,0 +1,164 @@
+---
+title: Labels and Selectors in Kubernetes
+description: Learn how labels tag Kubernetes objects and how selectors find them, filter pods with kubectl -l, add labels on the fly, and see why Services, ReplicaSets and Deployments all depend on them.
+---
+
+Imagine a cluster running 300 pods. Someone asks: "show me only the frontend pods in the dev environment". Or a Service needs to know which of those 300 pods should receive its traffic. Pod names are random and IPs change, so neither can be used. Kubernetes answers both questions the same way, with **labels** and **selectors**.
+
+We have already used them. The `webapp` pod had the label `app: telusko-webapp`, and every Service we created had `selector: app: telusko-webapp`. Before we reach ReplicaSets and Deployments, which rely on them even more, let us look at them properly.
+
+## Labels: tags on objects
+
+A **label** is a key-value pair attached to a Kubernetes object, in `metadata.labels`. Think of it like a tag on a photo or a post: it does not change what the object is, it just makes it easy to find and group.
+
+- An object can have **many** labels
+- Many objects can share the **same** label
+- Labels are meant for identifying and selecting. Kubernetes itself does not attach any meaning to `app` or `env`; the meaning is whatever your team agrees
+
+Common keys teams use:
+
+| Key | Example values | Answers the question |
+| --- | --- | --- |
+| `app` | `telusko-webapp`, `payment` | Which application is this? |
+| `env` | `dev`, `test`, `prod` | Which environment? |
+| `tier` | `frontend`, `backend`, `db` | Which layer? |
+| `team` | `payments`, `platform` | Who owns it? |
+| `version` | `v1`, `v2` | Which release? |
+
+Kubernetes also documents a set of recommended keys with a prefix, such as `app.kubernetes.io/name` and `app.kubernetes.io/version`, which tools like Helm use. Short keys like `app` are perfectly fine while learning.
+
+Label rules: keys and values are up to 63 characters, start and end with a letter or number, and may contain `-`, `_` and `.`. A key may have an optional DNS prefix such as `app.kubernetes.io/`.
+
+## Selectors: searches over labels
+
+A **selector** is a search condition. It says "every object whose labels match this". Selectors appear in two places:
+
+1. **In kubectl**, with `-l` (or `--selector`), so that you can filter what you see
+2. **Inside other objects**, so that a Service, ReplicaSet, Deployment or DaemonSet knows which pods are "its" pods
+
+<img src="/kubernetes/k8s-labels-selectors.svg" alt="A Service with selector app=webapp selects pod 1 and pod 2, which have app=webapp, and ignores pod 3, which has app=payment" width={960} height={440} />
+
+A pod matches a selector when it has **all** the key-value pairs in the selector. Extra labels on the pod do not matter. So pod 1 (`app=webapp, env=dev`) and pod 2 (`app=webapp, env=prod`) both match `app=webapp`, and pod 3 does not.
+
+## Hands-on: a pod with two labels
+
+```bash
+vi label.yml
+```
+
+```yaml title="label.yml"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: webapp
+  labels:
+    app: telusko-webapp
+    env: dev
+spec:
+  containers:
+    - name: webapp-container
+      image: nginx
+```
+
+```bash
+kubectl apply -f label.yml
+kubectl get pods
+```
+
+### Show the labels
+
+```bash
+kubectl get pods --show-labels
+```
+
+```text
+NAME     READY   STATUS    RESTARTS   AGE   LABELS
+webapp   1/1     Running   0          44s   app=telusko-webapp,env=dev
+```
+
+### Filter by label
+
+```bash
+kubectl get pods -l app=telusko-webapp
+kubectl get pods -l env=dev
+```
+
+```text
+NAME     READY   STATUS    RESTARTS   AGE
+webapp   1/1     Running   0          7m21s
+```
+
+With one pod the filter looks pointless. With hundreds of pods across teams, it is how you find anything.
+
+### More selector forms
+
+`kubectl -l` understands two styles:
+
+| Selector | Matches pods where |
+| --- | --- |
+| `-l app=telusko-webapp` | `app` equals `telusko-webapp` |
+| `-l env!=prod` | `env` is not `prod` (or there is no `env` label) |
+| `-l app=telusko-webapp,env=dev` | Both conditions are true (comma means AND) |
+| `-l 'env in (dev,test)'` | `env` is `dev` or `test` |
+| `-l 'env notin (prod)'` | `env` is anything except `prod` |
+| `-l team` | The `team` label exists, any value |
+| `-l '!team'` | There is no `team` label |
+
+The first three are **equality-based**, the rest are **set-based**. Quote set-based selectors so the shell does not misread the brackets.
+
+You can also show labels as columns:
+
+```bash
+kubectl get pods -L app,env
+```
+
+### Add, change and remove labels without editing YAML
+
+```bash
+kubectl label pod webapp team=platform           # add
+kubectl label pod webapp env=test --overwrite    # change
+kubectl label pod webapp team-                   # remove (note the trailing dash)
+```
+
+This is handy for experiments, but remember that the YAML file is the source of truth. The next `kubectl apply` of the file may reset what you changed by hand.
+
+## Where selectors are used inside Kubernetes
+
+| Object | Selector field | What it selects |
+| --- | --- | --- |
+| Service | `spec.selector` (plain map) | Pods that receive the traffic |
+| ReplicaSet | `spec.selector.matchLabels` / `matchExpressions` | Pods it counts and keeps alive |
+| Deployment | `spec.selector.matchLabels` | Pods belonging to the Deployment |
+| DaemonSet | `spec.selector.matchLabels` | Pods it runs on each node |
+| NetworkPolicy | `podSelector` | Pods the policy applies to |
+
+ReplicaSets and Deployments use `matchLabels`, a slightly more structured form, and also accept set-based `matchExpressions`. You will write them in the next lessons.
+
+<Callout type="warn" title="A selector that matches too much">
+Selectors are powerful in both directions. If a Service selects only `env=dev`, it will happily send traffic to **every** dev pod, including your database. Use a combination that uniquely identifies the app, such as `app` plus `tier`, and keep labels consistent across your manifests.
+</Callout>
+
+## Clean up
+
+```bash
+kubectl delete -f label.yml
+```
+
+If you are finished for the day, delete the cluster: `eksctl delete cluster --name telusko-learning --region ap-south-1 --wait`.
+
+## Try It Yourself
+
+1. Create three pods: `pod1` with `app=webapp,env=dev`, `pod2` with `app=webapp,env=prod`, and `pod3` with `app=payment,env=dev`. Use `kubectl run pod1 --image=nginx --labels=app=webapp,env=dev` to save typing.
+2. Predict, then check, the output of `kubectl get pods -l app=webapp`, `-l env=dev`, `-l 'env in (dev,prod),app=payment'` and `-l env!=prod`.
+3. Create a ClusterIP Service with selector `app: webapp` and check its Endpoints. Which pod IPs appear?
+4. Remove the `app` label from `pod2` with `kubectl label pod pod2 app-` and check the Service endpoints again.
+
+## Official references
+
+- [Kubernetes: Labels and Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
+- [Kubernetes: Recommended Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/)
+- [kubectl reference: label](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_label/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

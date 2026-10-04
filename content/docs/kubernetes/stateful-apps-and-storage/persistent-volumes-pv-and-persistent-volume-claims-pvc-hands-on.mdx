@@ -1,0 +1,272 @@
+---
+title: "Persistent Volumes (PV) and Persistent Volume Claims (PVC): Hands-On"
+description: Write a PersistentVolume for an existing EBS volume, claim it with a PVC, mount it into a Deployment, then delete the pod and prove the files survive.
+---
+
+The storage is ready: a 20 GiB gp3 volume called `Pods Vol` in `ap-south-1a`, and the EBS CSI driver installed in the cluster (from [the previous lesson](/docs/kubernetes/stateful-apps-and-storage/preparing-aws-ebs-storage-for-kubernetes-eks)). Now we connect a pod to it the long way, by hand, so that every layer is visible:
+
+```text
+busybox pod -> my-pvc -> my-pv -> vol-0001b896f60f42519 (EBS)
+```
+
+At the end we will delete the pod, let the Deployment create a new one, and find our files still there.
+
+## Step 1: The PersistentVolume
+
+On the EKS home server:
+
+```bash
+vi pv.yml
+```
+
+```yaml title="pv.yml"
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: my-pv
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  csi:
+    driver: ebs.csi.aws.com
+    volumeHandle: vol-0001b896f60f42519   # replace with YOUR volume ID
+    fsType: ext4
+```
+
+| Field | Meaning |
+| --- | --- |
+| `apiVersion: v1`, `kind: PersistentVolume` | PVs are part of the core API group |
+| `metadata.name: my-pv` | PVs are cluster-scoped, so no namespace |
+| `capacity.storage: 20Gi` | The size of the real disk. Must match what you created in EC2 |
+| `accessModes: [ReadWriteOnce]` | Only one node at a time can mount it read-write. The normal mode for EBS |
+| `persistentVolumeReclaimPolicy: Retain` | If the PVC is deleted, keep the PV and the EBS volume. Your data is never deleted by accident |
+| `csi.driver: ebs.csi.aws.com` | Which CSI driver manages this volume. This is the driver installed in the last lesson |
+| `csi.volumeHandle` | The EBS volume ID. **Copy your own** from the EC2 console. Using the one from this page will fail |
+| `csi.fsType: ext4` | The Linux filesystem. A brand new EBS volume has no filesystem, so the driver formats it as ext4 on first mount |
+
+<Callout type="warn" title="Old tutorials use awsElasticBlockStore">
+You may find PV examples with `awsElasticBlockStore: volumeID: ...`. That in-tree volume type has been removed from Kubernetes. On current EKS versions, always use the `csi` block with `driver: ebs.csi.aws.com` as shown here.
+</Callout>
+
+## Step 2: The PersistentVolumeClaim
+
+```bash
+vi pvc.yml
+```
+
+```yaml title="pvc.yml"
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-pvc
+spec:
+  volumeName: my-pv
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+```
+
+| Field | Meaning |
+| --- | --- |
+| `metadata.name: my-pvc` | Pods will refer to this name. A PVC lives in a namespace (here `default`) |
+| `volumeName: my-pv` | Bind to this exact PV. Without it, Kubernetes looks for any matching PV, or asks the default StorageClass to create one |
+| `accessModes` | Must be offered by the PV |
+| `resources.requests.storage: 20Gi` | How much you need. It must be **less than or equal** to the PV capacity. Asking for 100Gi from a 20Gi PV never binds |
+
+Kubernetes binds a PVC to a PV only when the access mode matches, the PV is big enough, and the StorageClass names match.
+
+<Callout type="info" title="Set storageClassName to an empty string for static PVs">
+In the lecture the cluster had **no default StorageClass**, so both objects had an empty class and they matched. If your cluster has a default StorageClass (check with `kubectl get storageclass`), the PVC gets that class automatically and no longer matches a PV without one. It then stays `Pending`. To be safe, add `storageClassName: ""` under `spec` in **both** `pv.yml` and `pvc.yml`. An empty string means "no class, no dynamic provisioning, use a pre-created PV".
+</Callout>
+
+## Step 3: Create them and check the binding
+
+```bash
+kubectl apply -f pv.yml
+kubectl apply -f pvc.yml
+kubectl get pv
+kubectl get pvc
+```
+
+```text
+NAME    CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM            STORAGECLASS   AGE
+my-pv   20Gi       RWO            Retain           Bound    default/my-pvc                  33s
+
+NAME     STATUS   VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+my-pvc   Bound    my-pv    20Gi       RWO                           30s
+```
+
+Both show **Bound**: `my-pvc` in the `default` namespace has claimed `my-pv`. Nothing is attached to an EC2 instance yet. That happens only when a pod uses the claim.
+
+You can apply several files in one command, `kubectl apply -f pv.yml -f pvc.yml`, or a whole folder with `kubectl apply -f <dir>/`. The lecture applies them one by one because the home directory holds many other YAML files we do not want to create again.
+
+## Step 4: A Deployment that mounts the claim
+
+We reuse the shape of `k8s-deploy.yml` but run a tiny `busybox` container that just sleeps, so we can get a shell inside and create files.
+
+```bash
+vi pv-deploy.yml
+```
+
+```yaml title="pv-deploy.yml"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telusko-deploy-pv
+  labels:
+    app: teluskopv
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: teluskopv
+  template:
+    metadata:
+      labels:
+        app: teluskopv
+    spec:
+      nodeSelector:
+        topology.kubernetes.io/zone: ap-south-1a
+      containers:
+        - name: cont1
+          image: busybox
+          command: ["sleep", "10000"]
+          volumeMounts:
+            - name: my-pv
+              mountPath: /tmp/persistent
+      volumes:
+        - name: my-pv
+          persistentVolumeClaim:
+            claimName: my-pvc
+```
+
+The new parts:
+
+| Field | Meaning |
+| --- | --- |
+| `replicas: 1` | One pod is enough. A `ReadWriteOnce` EBS volume can only be attached to one node anyway |
+| `nodeSelector: topology.kubernetes.io/zone: ap-south-1a` | Run the pod only on a node in `ap-south-1a`, where the EBS volume lives. Every EKS node carries this zone label |
+| `command: ["sleep", "10000"]` | Keeps the busybox container alive for about 2.7 hours so we can exec into it |
+| `volumes[].persistentVolumeClaim.claimName: my-pvc` | The pod-level volume, backed by our claim. The pod talks to the **PVC**, never to the PV |
+| `volumeMounts[].name: my-pv` | Must match the name in `volumes`. It is just a local name inside the pod spec |
+| `volumeMounts[].mountPath: /tmp/persistent` | Where the disk appears inside the container |
+
+<Callout type="info" title="A cleaner way to pin the zone">
+The `nodeSelector` works, but it puts storage knowledge into the app's Deployment. The more standard way is to put the zone on the PV itself, so the scheduler places any pod using it in the right zone automatically:
+
+```yaml
+spec:
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: topology.kubernetes.io/zone
+              operator: In
+              values:
+                - ap-south-1a
+```
+
+With dynamic provisioning (later in this section) the driver adds this for you.
+</Callout>
+
+Apply and watch:
+
+```bash
+kubectl apply -f pv-deploy.yml
+kubectl get pods
+```
+
+The pod shows `ContainerCreating` for a few seconds while the CSI driver attaches the EBS volume to the node and formats it, then `Running`. In the EC2 console the volume state changes from **Available** to **In-use**.
+
+## Step 5: Write some data
+
+```bash
+kubectl get pods
+kubectl exec -it telusko-deploy-pv-665995d695-pnb67 -- /bin/sh
+```
+
+Inside the container:
+
+```bash
+cd /tmp/persistent
+touch alien.txt telusko.txt
+ls
+exit
+```
+
+`kubectl exec -it <pod> -- /bin/sh` opens an interactive shell. `-i` keeps stdin open, `-t` gives you a terminal, and everything after `--` is the command to run in the container. busybox has `sh`, not `bash`.
+
+## Step 6: Delete the pod and check again
+
+```bash
+kubectl delete pod telusko-deploy-pv-665995d695-pnb67
+kubectl get pods
+```
+
+Note the word `pod` in the delete command. `kubectl delete <name>` alone fails with `the server doesn't have a resource type "<name>"`, because kubectl reads the first word as the resource type.
+
+The Deployment creates a new pod with a new name. Get into the new one:
+
+```bash
+kubectl exec -it telusko-deploy-pv-665995d695-7xzjz -- /bin/sh
+cd /tmp/persistent
+ls
+```
+
+```text
+alien.txt    lost+found   telusko.txt
+```
+
+The files are still there. They were never inside the pod: they were written to the EBS volume, which was detached from the old pod and attached to the new one. (`lost+found` is a normal folder that ext4 creates on every new filesystem.)
+
+That is how you make a pod's data persistent.
+
+## What we did by hand, and why it does not scale
+
+This works, but look at what we had to do: create a disk in the console, copy its ID into a PV, write a matching PVC, and pin the pod to the right zone. For one pod that is fine. For a database with three replicas, each needing its own disk, it becomes painful. StatefulSets with a StorageClass automate all of it, which is the topic of the [next lesson](/docs/kubernetes/stateful-apps-and-storage/behind-the-scenes-of-kubernetes-statefulsets).
+
+## Troubleshooting
+
+| Symptom | Check | Usual fix |
+| --- | --- | --- |
+| PVC `Pending` | `kubectl describe pvc my-pvc` | Storage class mismatch (add `storageClassName: ""`), size larger than PV, or access mode not offered |
+| Pod `Pending`, `didn't find available persistent volumes to bind` or `volume node affinity conflict` | `kubectl describe pod` | No node in the volume's zone. Fix the `nodeSelector` or PV `nodeAffinity` |
+| Pod stuck `ContainerCreating`, `AttachVolume.Attach failed` | Events at the bottom of `describe pod` | Wrong volume ID, volume in another zone, or the driver has no IAM permission |
+| `Multi-Attach error` | A second pod on another node uses the same RWO volume | Use one replica, or `ReadWriteOncePod`, or move to EFS for shared storage |
+
+## Clean up
+
+```bash
+kubectl delete -f pv-deploy.yml
+kubectl delete -f pvc.yml
+kubectl get pv            # my-pv now shows Released, because of Retain
+kubectl delete -f pv.yml
+```
+
+Because the policy is `Retain`, deleting the PV object does **not** delete the EBS volume. Your files are still on it. When you no longer need it, delete `Pods Vol` in **EC2, Volumes**, or:
+
+```bash
+aws ec2 delete-volume --volume-id <your-volume-id> --region ap-south-1
+```
+
+## Try It Yourself
+
+1. Repeat the lab, but add `storageClassName: ""` to both PV and PVC and replace the Deployment's `nodeSelector` with the PV `nodeAffinity` shown above. Does the pod still land in `ap-south-1a`?
+2. Change `nodeSelector` to `ap-south-1b` and apply. Read the event that explains why the pod cannot start.
+3. Delete only the PVC while the pod is running. What status does the PVC show, and why? (Look up "Storage Object in Use Protection".)
+4. After deleting the PVC, try to bind a new PVC to the `Released` PV. What do you need to remove from the PV (`spec.claimRef`) to make it `Available` again?
+
+## Official references
+
+- [Kubernetes: Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
+- [Kubernetes: Configure a Pod to Use a PersistentVolume for Storage](https://kubernetes.io/docs/tutorials/configuration/configure-persistent-volume-storage/)
+- [Amazon EKS: Use Kubernetes volume storage with Amazon EBS](https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

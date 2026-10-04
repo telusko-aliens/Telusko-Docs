@@ -1,0 +1,292 @@
+---
+title: Setting Up the JWT Security Spec File
+description: Write a complete security spec for JWT authentication and RBAC, generalise the implement-spec skill, and set up secrets yourself instead of letting Claude generate them.
+---
+
+Security used to take more time than building the features. Not because the code is long, but because you must think from every angle: edge cases, attacks, mistakes. You cannot write some code and simply assume it is secure.
+
+You could type *"secure this application using JWT"* and get a login form in a few minutes. Everyone is happy, until a user finds that one endpoint was never protected. That is vibe coding, and with security it is especially dangerous.
+
+So we do what we have learned: **write a spec first**.
+
+## Where the spec goes
+
+Security is not a feature of one endpoint. It affects the whole application. So it gets its own folder:
+
+```text
+specs/
+├── api-contract.md
+├── seed-data.json
+├── features/
+│   └── task-filtering.md
+└── security/
+    └── security-spec.md
+```
+
+## Update the skill first
+
+Our `/implement-spec` skill was originally written for specs under `specs/features/`. Make its description and example path generic so it works for **any** spec under `specs/`:
+
+```markdown title=".claude/skills/implement-spec/SKILL.md (frontmatter)"
+description: Implement a feature described in a markdown spec file anywhere under specs. ...
+```
+
+<Callout type="warn" title="About the --test flag">
+In the recording, smoke tests were made opt-in (`--test`) only to keep the videos short. In your own work, **do not skip them**, especially for security. Run `/implement-spec <path> --test`.
+</Callout>
+
+## The security spec
+
+This is the longest spec in the project, because security has many moving parts. Read it section by section.
+
+```markdown title="specs/security/security-spec.md"
+# Telusko Workflow Engine: Security Specification
+
+## Scope
+Defines the authentication and authorisation system for the
+Telusko Workflow Engine backend. Replaces existing UX-only role
+checks with real server-side security.
+
+## What we are building
+
+### Authentication
+- Username + password login via POST /api/auth/login
+- Passwords hashed with bcrypt
+- Successful login returns a signed JWT (HS256, python-jose library)
+- JWT payload: sub (username), role, exp (expiry timestamp)
+- Access token expiry: 60 minutes
+
+### Authorisation (RBAC)
+- Every /api/tasks endpoint now requires a valid Bearer token
+- Unauthorised requests return 401
+- Authenticated but unauthorised requests return 403
+
+## Tech stack
+- FastAPI OAuth2PasswordBearer for the bearer token scheme
+- python-jose[cryptography] for JWT encode/decode
+- bcrypt for password hashing
+- python-multipart for OAuth2PasswordRequestForm
+- Existing SQLAlchemy 2.0 async + SQLite
+
+## New files to create
+
+### backend/app/models/user.py
+SQLAlchemy User model with columns:
+- id (int, primary key)
+- username (str, unique, indexed, max 50 chars)
+- password_hash (str, not null)
+- role (Enum: admin, content_team, video_editor, uploader)
+- created_at (datetime, default utc now)
+
+### backend/app/schemas/user.py
+- UserCreate (username, password, role), for admin user creation
+- UserResponse (id, username, role, created_at), no password field
+
+### backend/app/schemas/auth.py
+- Token (access_token: str, token_type: str defaulting to 'bearer')
+- TokenData (username: str, role: str)
+
+### backend/app/security/password.py
+- hash_password(plain: str) -> str
+- verify_password(plain: str, hashed: str) -> bool
+
+### backend/app/security/jwt.py
+- create_access_token(data: dict, expires_delta: timedelta) -> str
+- decode_access_token(token: str) -> TokenData
+Secret key and algorithm come from environment variables.
+Raise 401 HTTPException if the token is invalid or expired.
+
+### backend/app/security/dependencies.py
+- get_current_user(token = Depends(oauth2_scheme)) -> User
+  Decode JWT, look up user in DB, raise 401 if any step fails
+- require_role(*allowed_roles) -> callable
+  Returns a dependency that checks current_user.role, raises 403 if not allowed
+
+### backend/app/api/v1/auth.py
+- POST /api/auth/login: accepts OAuth2PasswordRequestForm, returns Token, 401 on bad credentials
+- POST /api/auth/users (admin only): accepts UserCreate, stores a hashed password
+- GET /api/auth/me: returns UserResponse for the current user
+
+## Files to modify
+
+### backend/app/api/v1/tasks.py
+- GET /api/tasks: Depends(get_current_user), any authenticated role
+- POST /api/tasks: Depends(require_role('admin', 'content_team'))
+- PUT /api/tasks/{id}: Depends(get_current_user) + state-advance check
+    admin: can advance from any state
+    content_team: only from code_ready
+    video_editor: from recorded or editing
+    uploader: only from uploaded
+  If role not allowed: 403 {'detail': 'role X cannot advance from state Y'}
+- DELETE /api/tasks/{id}: Depends(require_role('admin'))
+
+### backend/app/main.py
+- Include the auth router at prefix /api/auth
+- Update CORS allow_headers to include 'Authorization'
+
+## Database
+- Generate and apply a new Alembic migration for the users table
+- Update backend/seed.py to add five demo users (idempotent):
+  admin/admin123 (admin), content/content123 (content_team),
+  editor/editor123 (video_editor), uploader/uploader123 (uploader),
+  demo/demo123 (video_editor)
+  These are demo credentials only. Production must use strong passwords.
+
+## Frontend changes
+This spec EXPLICITLY OVERRIDES the CLAUDE.md no-frontend rule.
+
+### frontend/app.js
+- Remove the role dropdown logic entirely
+- Show a login form when localStorage has no 'telusko_token'
+- On successful login, store the token in localStorage as 'telusko_token'
+- In apiFetch, add Authorization: Bearer <token> to every request
+- On any 401 response, clear the token and show the login form
+- Add a logout button that clears localStorage and shows the login form
+
+### frontend/index.html
+- Add a hidden login modal at the top of <body>
+- Add a logout button in the header
+
+### frontend/styles.css
+- Style the login form and logout button to match the existing Kanban UI
+
+## Acceptance criteria
+- Unauthenticated GET /api/tasks returns 401
+- Login with correct credentials returns 200 with a JWT
+- Login with wrong credentials returns 401
+- JWT payload contains sub, role, exp
+- An expired token returns 401
+- A tampered token returns 401
+- Content team can create tasks (POST returns 201)
+- Uploader cannot create tasks (POST returns 403)
+- Admin can delete tasks (DELETE returns 204)
+- Uploader cannot delete tasks (DELETE returns 403)
+- Video editor cannot advance a code_ready task (PUT returns 403)
+- Video editor CAN advance an editing task (PUT returns 200)
+- Frontend shows login form on first load
+- After login the board renders with real data
+- Logout clears token and returns to login form
+
+## Out of scope
+- Refresh tokens (separate spec)
+- Password reset flow (separate spec)
+- Email verification (separate spec)
+- Account lockout after failed logins (separate spec)
+- HTTPS termination
+
+## Smoke tests (all must pass)
+(curl commands for: unauthenticated 401, admin login, authenticated GET,
+uploader DELETE 403, bad credentials 401. See the next lesson.)
+```
+
+### Why this spec works
+
+| Section | What it prevents |
+| --- | --- |
+| **Exact files to create and modify** | Claude scattering security code in random places |
+| **Function signatures** | Inconsistent APIs between modules |
+| **Explicit status codes** | Confusing 401 with 403 |
+| **RBAC table in the spec** | Guessing permissions |
+| **Explicit frontend override** | Claude refusing (or sneaking in) frontend changes |
+| **15 acceptance criteria** | "It logs in, ship it" without testing the dangerous cases: expired and tampered tokens |
+| **Out of scope** | Half-built refresh tokens or password reset flows |
+
+<Callout type="info" title="You do not have to write specs alone">
+A spec this detailed takes time. You can describe your requirements in plain language and ask Claude to **draft** the spec. But then read every line. Did it add a library you do not need? Every extra dependency is a potential risk. Did it miss a role rule? The spec is your responsibility.
+</Callout>
+
+## Drafting a spec with Claude's help
+
+You do not have to write a spec like this from a blank page. A good approach is to let Claude draft it in **plan mode**, so no code is touched while you shape the requirements:
+
+```text title="Prompt: draft a security spec (in plan mode)"
+I want to add authentication and authorisation to this project.
+Requirements:
+- username + password login, bcrypt hashed passwords
+- JWT access tokens, 60 minutes, HS256
+- four roles: admin, content_team, video_editor, uploader
+- the advance rules from ROLE_CONFIG in frontend/app.js, enforced on the server
+- 401 for missing or invalid tokens, 403 for wrong roles
+- a login form in the frontend, token in localStorage, logout button
+
+Read CLAUDE.md, specs/api-contract.md and the existing backend code.
+Write a spec to specs/security/security-spec.md with: scope, files to create,
+files to modify, database changes, frontend changes, acceptance criteria,
+out of scope, and curl smoke tests. Do not write any code.
+```
+
+## Spec review checklist
+
+Before you implement, read the spec and check:
+
+- [ ] Every endpoint has an explicit auth rule, including the ones that stay public (like `/api/auth/login`)
+- [ ] 401 and 403 are used correctly and consistently
+- [ ] Role names match **exactly** what the code uses (`video_editor`, not "Editor" or "video editor")
+- [ ] The tricky security cases are acceptance criteria: expired token, tampered token, wrong role
+- [ ] No unnecessary libraries were added
+- [ ] Secrets come from environment variables, never from the spec or the code
+- [ ] Out of scope is written down, so nothing half-built sneaks in
+
+## Secrets: you create them, not Claude
+
+The original spec also asked Claude to generate the `.env` file with the JWT secret. We removed that part on purpose.
+
+Anything Claude generates passes through its context. A secret key that has been in a model's context is no longer something only you have seen. So **create secrets yourself**, in your own terminal, and keep `.env` behind a `deny` rule.
+
+<Steps>
+<Step>
+### Create `.env` from the example
+
+```bash
+cd backend
+cp .env.example .env
+```
+</Step>
+<Step>
+### Generate a strong secret in your own terminal
+
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+</Step>
+<Step>
+### Fill in `.env`
+
+```bash title="backend/.env"
+DATABASE_URL=sqlite+aiosqlite:///./telusko.db
+JWT_SECRET_KEY=<paste-your-generated-secret-here>
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
+```
+</Step>
+<Step>
+### Confirm the deny rule is in place
+
+`"Read(./.env)"` only covers a `.env` file at the project root, but ours lives in `backend/`. Use a pattern that matches at any depth instead:
+
+```json title=".claude/settings.json (permissions.deny)"
+"deny": [
+  "Read(**/.env)",
+  "Read(**/.env.*)",
+  "Read(./secrets/**)"
+]
+```
+
+Now Claude cannot read any `.env` file in the project.
+</Step>
+</Steps>
+
+<Callout type="warn">
+Never commit `.env`. It is in `.gitignore`, and our `CLAUDE.md` says "NEVER commit .env files". Commit only `.env.example`, with placeholder values.
+</Callout>
+
+## Official references
+
+- [Extend Claude with skills](https://code.claude.com/docs/en/skills)
+- [Configure permissions: exclude sensitive files](https://code.claude.com/docs/en/permissions)
+- [Claude Code security](https://code.claude.com/docs/en/security)
+- [Python secrets module](https://docs.python.org/3/library/secrets.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,151 @@
+---
+title: Ansible Playbook YAML Basics
+description: Learn the YAML you need for Ansible playbooks, including key-value pairs, lists, nested mappings and indentation, with the common mistakes that break a playbook.
+---
+
+Every playbook you write is a YAML file. Ansible itself is forgiving about many things, but YAML is not: one wrong space and the whole playbook fails to load. Fifteen minutes spent on YAML now saves hours of confusing errors later.
+
+**YAML** is a format for writing structured data in plain text. People read it easily, and programs parse it easily. Files use the `.yml` or `.yaml` extension. Ansible accepts both. We use `.yml` in this course, like the lecture.
+
+You can practise in any editor. VS Code with the Red Hat **YAML** extension highlights indentation errors as you type.
+
+## Start and end markers
+
+```yaml
+---
+# your data goes here
+...
+```
+
+`---` marks the start of a YAML document and `...` marks the end. Neither is compulsory. Most Ansible playbooks start with `---` and leave out `...`. Both forms are correct.
+
+## Key-value pairs (a mapping)
+
+The simplest YAML is a list of keys and values separated by a colon and a space:
+
+```yaml title="sample1.yml"
+---
+id: 1
+name: Rohan
+city: Bengaluru
+...
+```
+
+A few rules:
+
+- There must be a **space after the colon**. `name:Rohan` is not a key-value pair
+- A space before the colon (`name : Rohan`, as typed in the lecture) is allowed, but the usual style is `name: Rohan`
+- **Do not end lines with commas.** YAML is not JSON. In `name: Rohan,` the comma becomes part of the value, so the name is literally `Rohan,`, and `id: 1,` turns the number 1 into the text `1,`
+- Strings usually need no quotes. Add quotes when a value contains a `:` followed by a space, starts with `{`, `*` or `@`, or when you want `yes`, `no` or `0644` treated as text
+
+## Lists
+
+When a key has more than one value, write each value on its own line, indented, starting with a hyphen and a space:
+
+```yaml title="sample1.yml"
+---
+id: 1
+name: Rohan
+city: Bengaluru
+hobbies:
+  - cricket
+  - music
+  - chess
+...
+```
+
+`hobbies` is now a list (an array) of three items. The same thing can be written on one line in **flow style**, which you will sometimes see in Ansible:
+
+```yaml
+hobbies: [cricket, music, chess]
+```
+
+## Nesting and indentation
+
+Data often has a hierarchy. An employee belongs to Telusko, and the employee has an id, a name and an address. The address itself has a city and a state. In YAML, you show "belongs to" by indenting:
+
+```yaml title="sample2.yml"
+---
+telusko:
+  employee:
+    id: 1
+    name: Harsh
+    address:
+      city: Udaipur
+      state: Rajasthan
+...
+```
+
+Read it from the left:
+
+- `telusko` is the top-level key
+- `employee` is indented two spaces, so it is a child of `telusko`
+- `id`, `name` and `address` are at the same level, so they are siblings, all children of `employee`
+- `city` and `state` are children of `address`
+
+You never repeat the parent. Lining up `name` exactly under `id` is enough to say "this is also part of `employee`".
+
+<Callout type="error" title="Spaces, never tabs">
+YAML does not allow tab characters for indentation. Use spaces only, and stay consistent. Two spaces per level is the convention in Ansible. Most editors can convert the Tab key into spaces for `.yml` files.
+</Callout>
+
+## Lists of mappings: the shape of every playbook
+
+Ansible playbooks combine both ideas: a **list** where each item is a **mapping**. Look at this shape carefully, because every playbook in the rest of the course follows it:
+
+```yaml
+---
+- name: First play
+  hosts: webservers
+  tasks:
+    - name: First task
+      ansible.builtin.ping:
+    - name: Second task
+      ansible.builtin.ping:
+```
+
+| Line | YAML meaning | Ansible meaning |
+| --- | --- | --- |
+| `- name: First play` | First item of the top-level list, a mapping | A **play** |
+| `hosts: webservers` | Another key in the same mapping (lined up with `name`) | Which inventory hosts the play runs on |
+| `tasks:` | A key whose value is a list | The list of tasks in this play |
+| `- name: First task` | First item of the `tasks` list | A **task** |
+| `ansible.builtin.ping:` | A key with an empty value | The **module** the task runs |
+
+The hyphen starts a new list item, and every key of that item lines up with the first key after the hyphen. You will write your first real playbook with exactly this structure in the next lesson.
+
+## Common YAML mistakes in playbooks
+
+| Mistake | What happens | Fix |
+| --- | --- | --- |
+| Tab used for indentation | `found character '\t' that cannot start any token` | Replace tabs with spaces |
+| `hosts:` indented more or less than `name:` | `did not find expected key` or the key is attached to the wrong parent | Line up sibling keys exactly |
+| Missing space after colon (`hosts:all`) | The line is read as plain text instead of a key, and YAML fails with `could not find expected ':'` | Write `hosts: all` |
+| Value starts with `{{` without quotes | `Syntax Error while loading YAML`, because YAML reads `{` as the start of a dictionary. Ansible usually adds a hint about missing quotes | Quote it: `"{{ var }}"` (covered in the variables lesson) |
+| `mode: 0644` without quotes | YAML reads it as a number instead of text, and the permissions can come out wrong (the official docs warn about this) | Write `mode: "0644"` |
+
+## Check a YAML file quickly
+
+On the control node you can let Python parse any YAML file. No output means the syntax is valid:
+
+```bash
+python3 -c 'import yaml, sys; yaml.safe_load(open(sys.argv[1]))' sample2.yml
+```
+
+For playbooks, `ansible-playbook --syntax-check` does a better job, as you will see next.
+
+## Try It Yourself
+
+1. Write `sample1.yml` with your own details and a list of three hobbies. Validate it with the Python one-liner.
+2. Add a `cities` key with a list of three cities (hometown, current city, a city you travel to).
+3. Extend `sample2.yml` with a second employee. Hint: turn `employee` into a list of mappings.
+4. Break the file on purpose: replace two spaces with a tab, then add a comma at the end of a line. Read the error each time.
+
+## Official references
+
+- [YAML syntax (Ansible documentation)](https://docs.ansible.com/projects/ansible/latest/reference_appendices/YAMLSyntax.html)
+- [YAML 1.2 specification](https://yaml.org/spec/1.2.2/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

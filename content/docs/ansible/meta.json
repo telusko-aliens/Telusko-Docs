@@ -1,0 +1,11 @@
+{
+    "title": "Ansible",
+    "icon": "Settings",
+    "pages": [
+        "getting-started.mdx",
+        "introduction.mdx",
+        "ansible-fundamentals",
+        "ansible-playbooks",
+        "variables-vault-and-tags"
+    ]
+}

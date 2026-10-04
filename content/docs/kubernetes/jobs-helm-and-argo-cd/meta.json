@@ -1,0 +1,9 @@
+{
+  "title": "Jobs, Helm & Argo CD",
+  "pages": [
+    "kubernetes-jobs-non-parallel-and-parallel-jobs.mdx",
+    "kubernetes-cronjobs-schedule-tasks-automatically.mdx",
+    "helm-kubernetes-package-manager.mdx",
+    "argo-cd-continuous-deployment-for-kubernetes.mdx"
+  ]
+}

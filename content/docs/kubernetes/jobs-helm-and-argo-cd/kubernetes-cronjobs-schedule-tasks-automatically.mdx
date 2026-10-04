@@ -1,0 +1,178 @@
+---
+title: "Kubernetes CronJobs: Schedule Tasks Automatically"
+description: Schedule recurring tasks with a CronJob, understand the CronJob to Job to Pod chain, write cron expressions, set a time zone, and control history and overlapping runs.
+---
+
+A [Job](/docs/kubernetes/jobs-helm-and-argo-cd/kubernetes-jobs-non-parallel-and-parallel-jobs) runs a task once until it succeeds. Many tasks are not one-time: back up the database every night, delete temporary files every day, email a sales report every Monday at 9 AM. Nobody wants to run `kubectl apply` at midnight.
+
+A **CronJob** creates Jobs automatically on a schedule. It works like `cron` on Linux, but inside the cluster.
+
+## The execution chain
+
+This is the most important thing to remember:
+
+```text
+CronJob  ->  creates a Job (on each schedule tick)  ->  the Job creates Pod(s)  ->  the Pod does the task and exits
+```
+
+A CronJob never creates pods directly. It creates a Job from its `jobTemplate`, and everything you learned about Jobs (completions, parallelism, retries) applies to each run.
+
+## Cron expressions in two minutes
+
+A schedule has five fields:
+
+```text
+┌───────────── minute (0 - 59)
+│ ┌───────────── hour (0 - 23)
+│ │ ┌───────────── day of month (1 - 31)
+│ │ │ ┌───────────── month (1 - 12)
+│ │ │ │ ┌───────────── day of week (0 - 6, Sunday = 0)
+│ │ │ │ │
+* * * * *
+```
+
+| Schedule | Meaning |
+| --- | --- |
+| `*/1 * * * *` (same as `* * * * *`) | Every minute |
+| `*/15 * * * *` | Every 15 minutes |
+| `0 2 * * *` | Every day at 02:00 |
+| `0 9 * * 1` | Every Monday at 09:00 |
+| `0 0 1 * *` | At midnight on the first day of every month |
+| `@daily`, `@hourly`, `@weekly` | Shortcuts that Kubernetes also accepts |
+
+[crontab.guru](https://crontab.guru) is handy for checking an expression before you use it.
+
+## Step 1: The CronJob
+
+```bash
+vi cron-job.yml
+```
+
+```yaml title="cron-job.yml"
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: telusko-cronjob
+spec:
+  schedule: "*/1 * * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: busybox-container
+              image: busybox
+              command:
+                - sh
+                - -c
+                - echo "Hello from Telusko CronJob"
+          restartPolicy: Never
+```
+
+| Field | Meaning |
+| --- | --- |
+| `kind: CronJob`, `apiVersion: batch/v1` | Same API group as Job |
+| `schedule: "*/1 * * * *"` | Run every minute. Always quote it, because `*` has a special meaning in YAML |
+| `successfulJobsHistoryLimit: 3` | Keep only the last 3 successful Jobs (and their pods) for reading logs. Older ones are deleted. The default is 3 |
+| `failedJobsHistoryLimit: 1` | Keep only the most recent failed Job for troubleshooting. The default is 1 |
+| `jobTemplate.spec` | A full Job spec. Here a single pod per run |
+| `restartPolicy: Never` | As with Jobs: on failure, a new pod is created instead of restarting the container |
+
+```bash
+kubectl apply -f cron-job.yml
+kubectl get cronjobs
+```
+
+```text
+NAME              SCHEDULE      TIMEZONE   SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+telusko-cronjob   */1 * * * *   <none>     False     0        <none>          10s
+```
+
+`kubectl get pods` shows nothing yet. The first run happens at the start of the next minute. Wait a minute or two:
+
+```bash
+kubectl get pods
+kubectl get jobs
+```
+
+```text
+NAME                       STATUS     COMPLETIONS   DURATION   AGE
+telusko-cronjob-29812345   Complete   1/1           4s         2m
+telusko-cronjob-29812346   Complete   1/1           4s         61s
+telusko-cronjob-29812347   Complete   1/1           3s         1s
+```
+
+A new Job every minute, each named `telusko-cronjob-<number>`. The number is based on the scheduled time (in minutes), so names never collide. After the fourth run you will see only 3 Jobs, because of `successfulJobsHistoryLimit: 3`.
+
+```bash
+kubectl logs <one-of-the-pod-names>
+```
+
+```text
+Hello from Telusko CronJob
+```
+
+## Step 2: Settings you will want in real CronJobs
+
+```yaml
+spec:
+  schedule: "0 2 * * *"
+  timeZone: "Asia/Kolkata"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  suspend: false
+```
+
+| Field | Meaning |
+| --- | --- |
+| `timeZone` | The time zone of the schedule. Without it, the schedule uses the time zone of the kube-controller-manager, which on EKS is UTC. So `0 2 * * *` without a time zone runs at 07:30 in India. Stable since Kubernetes 1.27. Setting `CRON_TZ=` or `TZ=` inside the schedule is not supported |
+| `concurrencyPolicy` | What if the previous run is still going? `Allow` (default): run both. `Forbid`: skip the new run. `Replace`: stop the old run and start the new one |
+| `startingDeadlineSeconds` | If a run could not start on time (controller down, cluster busy), still start it if no more than this many seconds late. Otherwise skip it |
+| `suspend: true` | Pause the schedule without deleting the CronJob. Running Jobs continue |
+
+For a nightly backup, `concurrencyPolicy: Forbid` is usually right: two backups writing at the same time help nobody.
+
+<Callout type="warn" title="Make scheduled tasks safe to run twice">
+The CronJob controller tries to create exactly one Job per schedule tick, but in rare cases it can create two, or none. Write your task so that running it twice causes no harm (idempotent): for example, a backup file named by date that is simply overwritten.
+</Callout>
+
+## Useful commands
+
+```bash
+# run a CronJob right now, for testing, without waiting for the schedule
+kubectl create job manual-run-1 --from=cronjob/telusko-cronjob
+
+# pause and resume the schedule
+kubectl patch cronjob telusko-cronjob -p '{"spec":{"suspend":true}}'
+kubectl patch cronjob telusko-cronjob -p '{"spec":{"suspend":false}}'
+```
+
+## Clean up
+
+A CronJob with a one-minute schedule keeps creating pods until you remove it:
+
+```bash
+kubectl delete -f cron-job.yml
+kubectl get cronjobs,jobs,pods
+```
+
+Deleting the CronJob also deletes the Jobs and pods it created.
+
+## Try It Yourself
+
+1. Change the schedule to every 2 minutes and add `timeZone: "Asia/Kolkata"`. Check `kubectl get cronjob` for the time zone column.
+2. Make the task take 90 seconds (`sleep 90`) with a one-minute schedule. Compare `concurrencyPolicy: Allow` and `Forbid` using `kubectl get jobs -w`.
+3. Use `kubectl create job --from=cronjob/...` to run it immediately, and find that Job in `kubectl get jobs`.
+4. Write the schedule for "at 23:30 on weekdays (Monday to Friday)" and check it on crontab.guru.
+
+## Official references
+
+- [Kubernetes: CronJob](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/)
+- [Kubernetes: Running Automated Tasks with a CronJob](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/)
+- [Kubernetes: Jobs](https://kubernetes.io/docs/concepts/workloads/controllers/job/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

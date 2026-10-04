@@ -1,0 +1,11 @@
+{
+    "title": "Full-Stack Integration with Claude Code",
+    "pages": [
+        "integration-requirements-and-flow.mdx",
+        "preparing-project-context.mdx",
+        "project-setup-with-github-uv-and-alembic.mdx",
+        "implementing-backend-features-part-1.mdx",
+        "implementing-backend-features-part-2.mdx",
+        "frontend-wiring.mdx"
+    ]
+}

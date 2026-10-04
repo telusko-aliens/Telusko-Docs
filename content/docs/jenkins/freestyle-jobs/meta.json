@@ -1,0 +1,9 @@
+{
+  "title": "Freestyle Jobs",
+  "pages": [
+    "creating-your-first-jenkins-freestyle-job.mdx",
+    "building-your-first-java-application-with-jenkins.mdx",
+    "jenkins-build-triggers.mdx",
+    "jenkins-build-parameters-parameterized-jobs.mdx"
+  ]
+}

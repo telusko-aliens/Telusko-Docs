@@ -1,0 +1,178 @@
+---
+title: Running Multiple Containers in a Single Pod
+description: Run nginx and busybox side by side in one pod, read each container's logs with -c, open a shell inside a specific container, and learn when putting containers together in one pod makes sense.
+---
+
+Every pod so far had exactly one container. That is the normal case, and it should stay your default. But a pod is not "a container with extra steps". It is a small environment that can hold **several** containers, which then share the same network address, can share files, and are always scheduled together on the same node.
+
+This lesson builds a pod with two containers so you can see how that works and how kubectl handles it. The [next lesson](/docs/kubernetes/multi-container-pods-and-daemonsets/kubernetes-sidecar-containers) turns it into the most common real use: the sidecar.
+
+## What containers in one pod share
+
+| Shared | What it means |
+| --- | --- |
+| **Network namespace** | One pod IP for all containers. They reach each other on `localhost`, and they cannot both listen on the same port |
+| **Volumes** | Any volume defined in the pod can be mounted into several containers |
+| **Lifecycle and placement** | They are scheduled onto the same node, start together and are deleted together |
+| **Not shared** | Each container has its own image, filesystem, process list (by default), CPU and memory limits, and restart counter |
+
+Use several containers in one pod only when they are **tightly coupled**: one cannot do its job without the other being right next to it. A Spring Boot app and its MySQL database are **not** tightly coupled; they belong in separate pods (and separate Deployments) so they can be scaled, updated and restarted independently.
+
+## Step 1: Write the manifest
+
+The demo runs two well known images:
+
+- **nginx**: a popular web server and reverse proxy, listening on port 80
+- **busybox**: a tiny Linux image with many common commands (often called the Swiss Army knife of Linux). It runs a small shell loop that prints a message every 10 seconds
+
+```bash
+vi multi-container.yml
+```
+
+```yaml title="multi-container.yml"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: telusko-multicontainer-pod
+  labels:
+    app: multicontainer-pod
+spec:
+  containers:
+    - name: nginx-container
+      image: nginx
+      ports:
+        - containerPort: 80
+
+    - name: busy-box-container
+      image: busybox
+      command:
+        - sh
+        - -c
+        - while true; do echo 'Hello From Telusko K8S learning'; sleep 10; done
+```
+
+| Field | Meaning |
+| --- | --- |
+| `containers:` | A list. Each `- name:` starts a new container |
+| `nginx-container` | Runs nginx with its default command, serving on port 80 |
+| `busy-box-container` | Runs busybox |
+| `command` | Overrides the image's default entrypoint. Here: run `sh -c "<script>"` |
+| `while true; ... sleep 10; done` | An endless loop, so the container keeps running. Without it, busybox would exit immediately and Kubernetes would keep restarting it |
+
+The blank line between the two containers is only for readability; YAML ignores it.
+
+`command` here is the Kubernetes equivalent of Docker's `ENTRYPOINT`, and `args` is the equivalent of `CMD`. If you have done the Docker course, [CMD vs ENTRYPOINT](/docs/docker/dockerfile-fundamentals/cmd-vs-entrypoint-basics) explains the idea.
+
+## Step 2: Apply it, and fix the field name
+
+```bash
+kubectl apply -f multi-container.yml
+```
+
+In the lecture the first attempt failed with `Pod in version "v1" cannot be handled as a Pod`, because the field was written as `commands`. The correct field name is **`command`** (singular). As with every `unknown field` error, compare the spelling with `kubectl explain pod.spec.containers`.
+
+After fixing:
+
+```bash
+kubectl get pods
+```
+
+```text
+NAME                         READY   STATUS    RESTARTS   AGE
+telusko-multicontainer-pod   2/2     Running   0          4m31s
+```
+
+`READY 2/2` means both containers in the pod are ready. You may first see `0/2 ContainerCreating` while the images are pulled. If you ever see `1/2`, one container is failing; `kubectl describe pod` shows which one.
+
+## Step 3: Logs from a specific container
+
+With more than one container, kubectl needs to know which one you mean. Use `-c`:
+
+```bash
+kubectl logs telusko-multicontainer-pod -c busy-box-container
+```
+
+```text
+Hello From Telusko K8S learning
+Hello From Telusko K8S learning
+Hello From Telusko K8S learning
+...
+```
+
+A new line every 10 seconds. And the nginx startup log:
+
+```bash
+kubectl logs telusko-multicontainer-pod -c nginx-container
+```
+
+If you get the container name wrong, kubectl tells you the valid names. You can also find them with:
+
+```bash
+kubectl describe pod telusko-multicontainer-pod          # look under Containers:
+kubectl get pod telusko-multicontainer-pod -o jsonpath='{.spec.containers[*].name}'
+```
+
+Useful log options:
+
+| Option | Meaning |
+| --- | --- |
+| `-c <name>` | Choose the container |
+| `-f` | Follow, keep printing new lines (Ctrl+C to stop) |
+| `--all-containers` | Logs from every container in the pod |
+| `--tail=20` | Only the last 20 lines |
+| `--previous` | Logs from the previous run of a container that crashed and restarted |
+
+## Step 4: Go inside a container, and prove they share the network
+
+Just as `docker exec` opens a shell in a container, `kubectl exec` does it in a pod. Again, `-c` picks the container:
+
+```bash
+kubectl exec -it telusko-multicontainer-pod -c busy-box-container -- sh
+```
+
+Inside the busybox shell, call nginx on **localhost**:
+
+```bash
+wget -qO- http://localhost:80 | head -5
+exit
+```
+
+You get the nginx welcome page HTML. busybox has no web server of its own; it reached nginx through `localhost` because both containers share the pod's network namespace. Two separate pods could not do that.
+
+Without `-c`, `kubectl exec` and `kubectl logs` use the first container in the list (or the one marked as default with the `kubectl.kubernetes.io/default-container` annotation) and print a note telling you so.
+
+## When multi-container pods make sense
+
+| Pattern | Second container does | Example |
+| --- | --- | --- |
+| **Sidecar** | Extends the main app while it runs | Log shipper, service mesh proxy, file syncer |
+| **Ambassador** | Proxies the app's outgoing connections | Local proxy to a database or external API |
+| **Adapter** | Converts the app's output into a standard format | Exposing metrics in Prometheus format |
+| **Init container** | Runs **before** the app starts, then exits | Wait for a database, download config |
+
+The sidecar is the one you will meet most often, and it now has first-class support in Kubernetes. That is the next lesson.
+
+## Clean up
+
+```bash
+kubectl delete -f multi-container.yml
+```
+
+Deleting the pod removes both containers. If you are finished for the day: `eksctl delete cluster --name telusko-learning --region ap-south-1 --wait`.
+
+## Try It Yourself
+
+1. Create the pod and confirm `READY 2/2`.
+2. Follow the busybox logs with `-f` for 30 seconds, then stop with Ctrl+C.
+3. Exec into busybox and fetch the nginx page from `localhost`. Then try to start a second web server on port 80 inside busybox (`httpd -f -p 80`) and read the error.
+4. Remove the `while` loop from the busybox command so it only runs `echo hello`. Apply (delete the pod first) and watch `RESTARTS` grow and the status become `CrashLoopBackOff`. Why does this happen? (Covered in [Kubernetes Pod Statuses](/docs/kubernetes/multi-container-pods-and-daemonsets/kubernetes-pod-statuses).)
+
+## Official references
+
+- [Kubernetes: Pods (how pods manage multiple containers)](https://kubernetes.io/docs/concepts/workloads/pods/)
+- [Kubernetes: Communicate Between Containers in the Same Pod Using a Shared Volume](https://kubernetes.io/docs/tasks/access-application-cluster/communicate-containers-same-pod-shared-volume/)
+- [kubectl reference: logs](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

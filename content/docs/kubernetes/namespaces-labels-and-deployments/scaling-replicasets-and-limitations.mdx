@@ -1,0 +1,152 @@
+---
+title: Scaling ReplicaSets & Limitations
+description: Scale a ReplicaSet out and in with kubectl scale, watch pods being created and terminated, and understand why ReplicaSets cannot do rolling updates or rollbacks.
+---
+
+Traffic is never flat. An exam result site is quiet all year and flooded for one afternoon. A shopping app peaks every evening. With a ReplicaSet you can match the number of pods to the load by changing one number. This lesson does that by hand, and then looks at what a ReplicaSet cannot do, which is the reason Deployments exist.
+
+You need the `telusko-rs` ReplicaSet from the [previous lesson](/docs/kubernetes/namespaces-labels-and-deployments/maintaining-pod-availability-with-replicasets) running:
+
+```bash
+kubectl apply -f k8s-rs.yml
+cat k8s-rs.yml        # name: telusko-rs, label: app=telusko-rs-webapp
+```
+
+## Scale out and scale in
+
+| Term | Meaning | Example |
+| --- | --- | --- |
+| **Scale out** | Add pods to handle more load | 3 to 8 pods |
+| **Scale in** | Remove pods when load drops, to save resources | 8 to 3 pods |
+
+Here we do it **manually**. Automatic scaling based on CPU or memory uses the **HorizontalPodAutoscaler** with a Deployment, which comes later in the course.
+
+### Watch in a second terminal
+
+Open a second SSH session to the EKS home server and run:
+
+```bash
+kubectl get pods --watch
+```
+
+`--watch` (or `-w`) keeps the command running and prints a new line every time a pod changes state.
+
+### Scale out to 8
+
+In the first terminal:
+
+```bash
+kubectl scale rs telusko-rs --replicas=8
+```
+
+```text
+replicaset.apps/telusko-rs scaled
+```
+
+| Part | Meaning |
+| --- | --- |
+| `kubectl scale` | Change the replica count of a scalable object |
+| `rs telusko-rs` | The type and **name** of the ReplicaSet (not its label) |
+| `--replicas=8` | The new desired count |
+
+In the watch window, five new pods go through `Pending`, `ContainerCreating` and `Running` within a few seconds. The three original pods are untouched; the ReplicaSet only adds the difference.
+
+```bash
+kubectl get pods
+kubectl get rs
+```
+
+```text
+NAME         DESIRED   CURRENT   READY   AGE
+telusko-rs   8         8         8       140m
+```
+
+<Callout type="info" title="Pods per node on small instances">
+On EKS every pod takes an IP from the node's network interfaces, so each instance type has a pod limit. A `t3.small` allows 11 pods, and system pods (CoreDNS, kube-proxy, aws-node, metrics-server) already use several. With two `t3.small` nodes, 8 replicas fit, but if you ask for 20, the extras stay `Pending` with a `Too many pods` event. That is the scheduler telling you the cluster is full, not an error in your YAML.
+</Callout>
+
+### Scale in to 3
+
+```bash
+kubectl scale rs telusko-rs --replicas=3
+```
+
+The watch window shows five pods switch to `Terminating` (you may briefly see `Error` or `Completed` as the Spring Boot process is stopped), then disappear.
+
+```bash
+kubectl get pods
+```
+
+```text
+NAME               READY   STATUS    RESTARTS   AGE
+telusko-rs-nlwl9   1/1     Running   0          143m
+telusko-rs-s7mr5   1/1     Running   0          142m
+telusko-rs-z4kg4   1/1     Running   0          143m
+```
+
+The five **newest** pods were removed and the three old ones stayed. The lecture describes this as "last in, first out". That is what usually happens, but the exact rule is a little smarter: when scaling in, the ReplicaSet first removes pods that are pending or not ready, then pods on nodes running more replicas of the same ReplicaSet, and only then prefers the most recently created pods. So treat "newest first" as a tendency, not a guarantee.
+
+### Imperative scaling vs the YAML file
+
+`kubectl scale` changes the live object only. Your `k8s-rs.yml` still says `replicas: 3`. The next time someone runs `kubectl apply -f k8s-rs.yml`, the count goes back to 3. In real projects you change `replicas` in the file, commit it, and apply it, so Git always matches the cluster.
+
+```bash
+# the declarative way: edit replicas in the file, then
+kubectl apply -f k8s-rs.yml
+```
+
+## The limitation: no rolling updates
+
+Let us check which image the pods run. Combine `describe` with `grep` using a pipe:
+
+```bash
+kubectl describe pods -l app=telusko-rs-webapp | grep -i image
+```
+
+```text
+    Image:          <your-dockerhub-username>/springboot-app:latest
+    Image ID:       docker.io/<your-dockerhub-username>/springboot-app@sha256:743c5b75...
+    Image:          <your-dockerhub-username>/springboot-app:latest
+    ...
+```
+
+All three pods run the same image. Now a new version of the application is released as a new image tag. How do we move the pods to it?
+
+Try it: change `image` in `k8s-rs.yml` to a new tag and apply. The ReplicaSet accepts the change, **but none of the running pods change**. A ReplicaSet only uses its template when it creates a **new** pod. Existing pods keep the old image until they die. To roll out the new version you would have to delete the pods yourself, a few at a time, watch them come back, and hope nothing breaks. And if the new version is bad, there is no record of the previous template to go back to.
+
+| Need | ReplicaSet | Deployment |
+| --- | --- | --- |
+| Keep N pods running (self-healing) | Yes | Yes (through a ReplicaSet) |
+| Manual scaling | Yes | Yes |
+| Autoscaling with HPA | Possible, but not used in practice | Yes, the normal setup |
+| Roll out a new image gradually | No | Yes, rolling update |
+| Roll back to a previous version | No | Yes, `kubectl rollout undo` |
+| Revision history | No | Yes |
+
+That is why, in practice, nobody creates ReplicaSets directly. You create a **Deployment**, and it creates and manages ReplicaSets for you. That is the [next lesson](/docs/kubernetes/namespaces-labels-and-deployments/kubernetes-deployments-replicasets-scaling-and-self-healing).
+
+## Clean up
+
+```bash
+kubectl delete -f k8s-rs.yml
+kubectl get pods        # the three pods are deleted along with the ReplicaSet
+```
+
+Deleting a ReplicaSet deletes its pods too (cascading deletion). If you are finished for the day: `eksctl delete cluster --name telusko-learning --region ap-south-1 --wait`.
+
+## Try It Yourself
+
+1. Scale `telusko-rs` to 6 while watching in a second terminal. Then scale to 2 and note which pods are terminated.
+2. Scale to 0. Are there any pods? Does the ReplicaSet still exist?
+3. Run `kubectl scale rs telusko-rs --replicas=5`, then `kubectl apply -f k8s-rs.yml` with `replicas: 3` in the file. What is the final count?
+4. Change the image tag in `k8s-rs.yml`, apply, and run the `describe | grep -i image` command. Then delete one pod and run it again. Which pod has the new image?
+
+## Official references
+
+- [Kubernetes: ReplicaSet (scaling and pod deletion order)](https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/)
+- [kubectl reference: scale](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_scale/)
+- [Kubernetes: Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

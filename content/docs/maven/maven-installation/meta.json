@@ -1,0 +1,4 @@
+{
+  "title": "Installing Maven",
+  "pages": ["maven-installation-guide.mdx", "maven-installation-on-windows.mdx", "maven-installation-on-cloud-linux-vm.mdx"]
+}

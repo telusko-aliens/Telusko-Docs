@@ -1,0 +1,9 @@
+{
+  "title": "Multi-Container Pods & DaemonSets",
+  "pages": [
+    "running-multiple-containers-in-a-single-pod.mdx",
+    "kubernetes-sidecar-containers.mdx",
+    "running-pods-on-every-node-daemonsets.mdx",
+    "kubernetes-pod-statuses.mdx"
+  ]
+}

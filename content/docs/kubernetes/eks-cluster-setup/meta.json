@@ -1,0 +1,7 @@
+{
+  "title": "EKS Cluster Setup",
+  "pages": [
+    "installing-kubectl-aws-cli-and-eksctl-for-eks.mdx",
+    "creating-your-first-eks-cluster.mdx"
+  ]
+}

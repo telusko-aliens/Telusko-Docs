@@ -1,0 +1,238 @@
+---
+title: Configuring Jenkins to Connect with Amazon EKS
+description: Give the jenkins user a kubeconfig for the EKS cluster, attach an IAM role to the Jenkins server, and understand exactly how kubectl in a pipeline proves who it is to EKS.
+---
+
+The cluster is running, and kubectl works on the EKS home server. But a pipeline does not run there. It runs on the Jenkins server, as the Linux user `jenkins`, and that user knows nothing about the cluster yet. If a pipeline ran `kubectl get nodes` right now, it would fail with "The connection to the server localhost:8080 was refused".
+
+Two things are missing:
+
+1. **Where is the cluster?** kubectl reads that from a kubeconfig file in the home directory of the user running it.
+2. **Who are you?** EKS only lets in IAM identities it has been told about.
+
+We fix the first by giving the `jenkins` user a kubeconfig, and the second by giving the Jenkins server an IAM role the cluster already trusts.
+
+<img src="/jenkins/cicd-jenkins-auth.svg" alt="How the Jenkins server authenticates: for Docker Hub, a Jenkins credential holding an access token is injected by withCredentials into docker login. For EKS, kubectl reads /var/lib/jenkins/.kube/config, runs aws eks get-token using the EC2 instance role, and EKS maps the role through an access entry to Kubernetes permissions" width={960} height={500} />
+
+## Where the jenkins user keeps its files
+
+The `jenkins` user's home directory is not `/home/jenkins`. It is the Jenkins home, `/var/lib/jenkins`. You can confirm it:
+
+```bash
+getent passwd jenkins
+```
+
+```text
+jenkins:x:111:113:Jenkins,,,:/var/lib/jenkins:/bin/bash
+```
+
+So kubectl, when run by Jenkins, looks for its kubeconfig at **`/var/lib/jenkins/.kube/config`**.
+
+## Step 1: copy the kubeconfig (the way shown in the lecture)
+
+On the **EKS home server**, print the kubeconfig that eksctl wrote:
+
+```bash
+cat ~/.kube/config
+```
+
+Copy the whole output, from `apiVersion: v1` to the last line.
+
+On the **Jenkins server**, create the folder, give it to the `jenkins` user, and create the file:
+
+```bash
+sudo mkdir -p /var/lib/jenkins/.kube
+sudo chown jenkins:jenkins /var/lib/jenkins/.kube
+sudo vi /var/lib/jenkins/.kube/config
+```
+
+Press `i`, paste, press `Esc`, type `:wq`. Then fix the owner and permissions of the file:
+
+```bash
+sudo chown jenkins:jenkins /var/lib/jenkins/.kube/config
+sudo chmod 600 /var/lib/jenkins/.kube/config
+```
+
+| Command | Why |
+| --- | --- |
+| `mkdir -p` | Creates `.kube`, and does not complain if it already exists |
+| `chown jenkins:jenkins` | The file was created by root through `sudo`. Without this, the `jenkins` user cannot read it |
+| `chmod 600` | Only the owner can read or write it. The file tells anyone who reads it where your cluster is, and tools such as Helm warn when a kubeconfig is readable by others |
+
+### What is inside that file
+
+It helps to look at what you pasted. An eksctl kubeconfig has three parts (shortened here):
+
+```yaml title="/var/lib/jenkins/.kube/config"
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: LS0tLS1CRUdJTi...   # the cluster's CA certificate
+    server: https://ABC123.gr7.ap-south-1.eks.amazonaws.com
+  name: telusko-learning.ap-south-1.eksctl.io
+contexts:
+- context:
+    cluster: telusko-learning.ap-south-1.eksctl.io
+    user: i-0abc123@telusko-learning.ap-south-1.eksctl.io
+  name: i-0abc123@telusko-learning.ap-south-1.eksctl.io
+current-context: i-0abc123@telusko-learning.ap-south-1.eksctl.io
+kind: Config
+users:
+- name: i-0abc123@telusko-learning.ap-south-1.eksctl.io
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      command: aws
+      args: ["eks", "get-token", "--output", "json",
+             "--cluster-name", "telusko-learning", "--region", "ap-south-1"]
+```
+
+Notice there is **no password or token** in the file. The `users` section only says "to log in, run `aws eks get-token`". Every time kubectl talks to the cluster, it runs that AWS CLI command, which creates a short-lived token signed with whatever AWS credentials the current Linux user has. That is why the Jenkins server needed the AWS CLI in the [first lesson of this section](/docs/jenkins/end-to-end-cicd-with-jenkins-docker-and-kubernetes/preparing-jenkins-server-for-ci-cd-pipelines), and why the next step is about AWS credentials.
+
+### A cleaner alternative: let the AWS CLI write the file
+
+Copying by hand works, but it is easy to miss a line, and you must repeat it every time you recreate the cluster. Once Step 2 below is done, the Jenkins server can generate its own kubeconfig:
+
+```bash
+sudo -u jenkins aws eks update-kubeconfig --region ap-south-1 --name telusko-learning
+```
+
+Running it with `sudo -u jenkins` writes the file straight into `/var/lib/jenkins/.kube/config` with the right owner. It needs only the `eks:DescribeCluster` permission. Use this whenever you recreate the cluster after a break.
+
+## Step 2: give the Jenkins server an AWS identity
+
+`aws eks get-token` needs AWS credentials. In the video, the role created for the EKS home server, `eks-telusko-learning`, is attached to the Jenkins server as well:
+
+1. **EC2 > Instances**, select the Jenkins server.
+2. **Actions > Security > Modify IAM role**.
+3. Choose `eks-telusko-learning` and click **Update IAM role**.
+
+No `aws configure`, no access keys. The AWS CLI on the instance picks up temporary credentials for the role from the instance metadata service automatically. Check it as the `jenkins` user:
+
+```bash
+sudo -u jenkins aws sts get-caller-identity
+```
+
+The `Arn` should look like `arn:aws:sts::<account-id>:assumed-role/eks-telusko-learning/i-0abc...`.
+
+### Why this is enough to get into the cluster
+
+Being able to call AWS is not the same as being allowed into Kubernetes. EKS decides who can use the Kubernetes API with **access entries**: each entry maps one IAM user or role to Kubernetes permissions.
+
+When eksctl created the cluster, it ran as the `eks-telusko-learning` role, and by default EKS gives the identity that creates a cluster an access entry with the `AmazonEKSClusterAdminPolicy`. The Jenkins server now uses the **same role**, so EKS sees the same principal and lets it in as cluster admin. You can see that entry in the console under **EKS > Clusters > telusko-learning > Access**.
+
+## Step 3: test it
+
+As the `jenkins` user on the server:
+
+```bash
+sudo -u jenkins kubectl get nodes
+```
+
+And from Jenkins itself, with a throwaway pipeline:
+
+```groovy title="Pipeline script (EKS connection test)"
+pipeline {
+    agent any
+    stages {
+        stage('Who am I') {
+            steps {
+                sh 'aws sts get-caller-identity'
+            }
+        }
+        stage('Talk to EKS') {
+            steps {
+                sh 'kubectl get nodes'
+                sh 'kubectl get svc'
+            }
+        }
+    }
+}
+```
+
+If both stages are green and the console shows your two nodes, Jenkins can deploy to EKS.
+
+## Doing it properly: a separate role for Jenkins
+
+Sharing the admin role is quick for learning, but it means a compromised Jenkins job can do anything in your AWS account and anything in the cluster. In a real setup, give Jenkins its own identity with only what it needs.
+
+**1. An IAM role for the Jenkins server** (for example `jenkins-eks-deployer`), trusted by EC2, with a small IAM policy. To run `update-kubeconfig` and `get-token`, Jenkins needs only:
+
+```json title="jenkins-eks-deployer policy"
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "eks:DescribeCluster",
+      "Resource": "arn:aws:eks:ap-south-1:<account-id>:cluster/telusko-learning"
+    }
+  ]
+}
+```
+
+**2. An access entry** that gives that role Kubernetes permissions. Run these from the EKS home server (the cluster admin):
+
+```bash
+aws eks create-access-entry \
+  --cluster-name telusko-learning \
+  --principal-arn arn:aws:iam::<account-id>:role/jenkins-eks-deployer \
+  --type STANDARD
+
+aws eks associate-access-policy \
+  --cluster-name telusko-learning \
+  --principal-arn arn:aws:iam::<account-id>:role/jenkins-eks-deployer \
+  --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSEditPolicy \
+  --access-scope type=namespace,namespaces=default
+```
+
+| Part | Meaning |
+| --- | --- |
+| `--principal-arn` | The **role** ARN (`arn:aws:iam::...:role/...`), not the `sts ... assumed-role` ARN that `get-caller-identity` prints |
+| `--type STANDARD` | A normal user or role, not a node |
+| `AmazonEKSEditPolicy` | Create, update and delete most namespaced objects (Deployments, Services, ConfigMaps). Similar to the Kubernetes `edit` ClusterRole |
+| `type=namespace,namespaces=default` | Only in the `default` namespace. Use `type=cluster` for every namespace |
+
+Check the result with `aws eks list-associated-access-policies --cluster-name telusko-learning --principal-arn <role-arn>`.
+
+<Callout type="info" title="Access entries vs the aws-auth ConfigMap">
+Many older tutorials grant access by editing the `aws-auth` ConfigMap in the `kube-system` namespace (`eksctl create iamidentitymapping` does this). That method is legacy. Clusters created by eksctl use the `API_AND_CONFIG_MAP` authentication mode, so both work, but AWS recommends access entries: they are managed with the EKS API, show up in CloudTrail, and a typo cannot lock everyone out of the cluster the way a broken ConfigMap can.
+</Callout>
+
+## Common errors
+
+<Accordions>
+<Accordion title="The connection to the server localhost:8080 was refused">
+kubectl found no kubeconfig for the `jenkins` user. Check that `/var/lib/jenkins/.kube/config` exists and is owned by `jenkins`.
+</Accordion>
+<Accordion title="error: You must be logged in to the server (Unauthorized)">
+The IAM identity Jenkins uses has no access entry on the cluster. Run `sudo -u jenkins aws sts get-caller-identity`, then compare the role with the entries under **EKS > Access**.
+</Accordion>
+<Accordion title="Unable to locate credentials (from aws eks get-token)">
+No IAM role is attached to the Jenkins instance, or the change has not reached it yet. Attach the role and wait a few seconds.
+</Accordion>
+<Accordion title="exec: executable aws not found">
+The AWS CLI is not on the `jenkins` user's `PATH`. Install it with the official installer, which uses `/usr/local/bin`.
+</Accordion>
+<Accordion title="Worked yesterday, fails today after recreating the cluster">
+A new cluster has a new API endpoint and certificate. Regenerate the file with `sudo -u jenkins aws eks update-kubeconfig --region ap-south-1 --name telusko-learning`.
+</Accordion>
+</Accordions>
+
+## Try It Yourself
+
+1. Set up `/var/lib/jenkins/.kube/config` by copying, then delete it and recreate it with `update-kubeconfig`. Compare the two files.
+2. Run the "EKS connection test" pipeline and confirm both stages pass.
+3. Detach the IAM role from the Jenkins server, run the pipeline again and read the error. Attach the role again.
+4. Create a `jenkins-eks-deployer` role with an access entry scoped to the `default` namespace, and confirm `kubectl get pods -n kube-system` is now forbidden while `kubectl get pods` works.
+
+## Official references
+
+- [Amazon EKS: Connect kubectl to an EKS cluster by creating a kubeconfig file](https://docs.aws.amazon.com/eks/latest/userguide/create-kubeconfig.html)
+- [Amazon EKS: Grant IAM users access to Kubernetes with access entries](https://docs.aws.amazon.com/eks/latest/userguide/access-entries.html)
+- [Amazon EKS: Associate access policies with access entries](https://docs.aws.amazon.com/eks/latest/userguide/access-policies.html)
+- [eksctl: EKS access entries](https://docs.aws.amazon.com/eks/latest/eksctl/access-entries.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

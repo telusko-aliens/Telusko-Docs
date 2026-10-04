@@ -1,6 +1,6 @@
 {
-    "root":true,
-    "pages":[
+    "root": true,
+    "pages": [
         "index.mdx",
         "java",
         "javascript",
@@ -12,6 +12,13 @@
         "docker",
         "system-design",
         "git",
-        "linux"
+        "linux",
+        "claude-code",
+        "devops",
+        "maven",
+        "terraform",
+        "ansible",
+        "kubernetes",
+        "jenkins"
     ]
 }

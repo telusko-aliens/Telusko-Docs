@@ -1,0 +1,132 @@
+---
+title: Maven Installation on Cloud Linux VM
+description: Launch an Amazon Linux EC2 instance, connect over SSH, install Maven and Java with one dnf command, verify the versions, and clean up the instance after practice.
+---
+
+If you would rather not install anything on your laptop, a small Linux server in the cloud is a great place to practise Maven. It also matches reality: in most companies Maven runs on Linux build servers and CI agents, not on Windows desktops. This lesson is optional. If you already installed Maven locally, you can skip it.
+
+## Step 1: launch the EC2 instance
+
+Log in to the AWS console, search for **EC2**, and click **Launch instance**. Fill in the form like this:
+
+| Setting | Value used in the demo | Why |
+| --- | --- | --- |
+| Name | `maven-server` | Any name you like. It only helps you find the instance |
+| AMI (OS image) | Amazon Linux 2023 | Free, maintained by AWS, uses `dnf`/`yum` |
+| Instance type | A free tier eligible type (`t2.micro` or `t3.micro`, the console marks it) | Enough for small Maven builds |
+| Key pair | Create new, for example `telusko-key-pair`, type RSA, format `.pem` | The private key you use to log in. It downloads once, keep it safe |
+| Network settings | Allow SSH traffic. Prefer **My IP** over **Anywhere** | Only you should be able to reach port 22 |
+
+Click **Launch instance**, then open **Instances**. Wait until the state is **Running** and the status checks pass, usually under a minute.
+
+If this is your first time with EC2, the Linux course has a full walkthrough with screenshots: [Launching a Linux VM on AWS](/docs/linux/linux-environment-setup-on-aws/launching-linux-vm-on-aws).
+
+<Callout type="warn" title="Large builds and micro instances">
+A micro instance has 1 GB of memory. That is fine for the projects in this course. A big multi-module project or a Spring Boot build with many tests can run out of memory on it. In that case use a larger type such as `t3.medium`, and remember it is not free.
+</Callout>
+
+## Step 2: connect over SSH
+
+Select the instance, click **Connect**, and open the **SSH client** tab. AWS shows you the exact commands. From the folder where your `.pem` file was downloaded, open Git Bash (Windows) or Terminal (macOS/Linux) and run:
+
+```bash
+# Make the key readable only by you. SSH refuses keys that others can read
+chmod 400 telusko-key-pair.pem
+
+# Connect. Replace the host with the Public DNS or public IP shown in the console
+ssh -i "telusko-key-pair.pem" ec2-user@ec2-13-233-xx-xx.ap-south-1.compute.amazonaws.com
+```
+
+Type `yes` the first time to trust the host. Check where you are:
+
+```bash
+pwd       # /home/ec2-user
+whoami    # ec2-user
+```
+
+The detailed version of this step, including common SSH errors, is in [Connecting to EC2 Instance Using Git Bash](/docs/linux/linux-environment-setup-on-aws/connecting-to-ec2-instance-using-gitbash).
+
+## Step 3: install Maven (and Java with it)
+
+On Amazon Linux 2023 one command installs both:
+
+```bash
+sudo dnf install -y maven
+```
+
+| Part | Meaning |
+| --- | --- |
+| `sudo` | Run as root, because installing software changes system folders |
+| `dnf` | The package manager on Amazon Linux 2023. `yum` still works as an alias, which is what the video uses |
+| `install maven` | Install the `maven` package |
+| `-y` | Answer "yes" to the confirmation prompt automatically |
+
+You do not need to install Java separately here. The Maven package depends on Java, so the package manager installs Amazon Corretto (AWS's free OpenJDK build) automatically.
+
+## Step 4: verify
+
+```bash
+mvn -v
+java -version
+```
+
+<img src="/maven/screenshots/mvn-version-amazon-linux.webp" alt="Terminal on Amazon Linux showing mvn -v output with Apache Maven 3.8.4 and Java 17 Amazon Corretto" width={1440} height={778} />
+
+*On the demo VM, the Amazon Linux package installed Maven 3.8.4 running on Java 17 (Amazon Corretto).*
+
+Notice the Maven version. The distribution package is behind the official latest release (3.10.0 at the time of writing). That is perfectly fine for this course. Older Maven versions use older default plugin versions, so your build logs may show slightly different plugin numbers than mine. The commands and results are the same.
+
+<Accordions>
+<Accordion title="Optional: install the latest Maven on Linux manually">
+
+If you want the newest Maven and Java 21, install the JDK from the package manager and Maven from the official archive. Copy the current **Binary tar.gz** link from the [download page](https://maven.apache.org/download.cgi) and use it in place of the URL below.
+
+```bash
+# JDK 21 (Amazon Corretto) with the compiler included
+sudo dnf install -y java-21-amazon-corretto-devel
+
+# Download and extract Maven into /opt
+cd /tmp
+curl -LO https://dlcdn.apache.org/maven/maven-3/3.10.0/binaries/apache-maven-3.10.0-bin.tar.gz
+sudo tar -xzf apache-maven-3.10.0-bin.tar.gz -C /opt
+
+# Put it on the PATH for your user
+echo 'export PATH=/opt/apache-maven-3.10.0/bin:$PATH' >> ~/.bashrc
+source ~/.bashrc
+mvn -v
+```
+
+</Accordion>
+</Accordions>
+
+## Step 5: stop or terminate when you are done
+
+A running instance can cost money once you are outside the free tier limits. When you finish a practice session:
+
+| Action | What happens | When to use |
+| --- | --- | --- |
+| **Stop** | The VM shuts down. Disk and installed software stay. Start it again later and Maven is still there | You will continue tomorrow |
+| **Terminate** | The VM and its disk are deleted permanently | You are finished with this setup |
+
+In the console: select the instance, then **Instance state > Stop instance** or **Terminate (delete) instance**. After a terminate, you would have to reinstall Java and Maven on a new instance.
+
+<Callout type="info" title="Public IP changes after stop and start">
+Without an Elastic IP, the instance gets a new public IP and DNS name every time it starts. Copy the new address from the console before you SSH in again.
+</Callout>
+
+## Try It Yourself
+
+1. Launch an Amazon Linux 2023 instance, connect with SSH and install Maven with `dnf`.
+2. Run `mvn -v` and write down the Maven version, the Maven home and the Java runtime it shows.
+3. Run `which mvn` and `readlink -f $(which mvn)` to see where the package placed Maven.
+4. Stop the instance, start it again, reconnect with the new address and confirm `mvn -v` still works.
+
+## Official references
+
+- [Apache Maven: Installing Apache Maven](https://maven.apache.org/install.html)
+- [AWS: Amazon Corretto as the default JVM on Amazon Linux 2023](https://docs.aws.amazon.com/linux/al2023/ug/compare-al2-java.html)
+- [AWS: Connect to your Linux instance using SSH](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/connect-linux-inst-ssh.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

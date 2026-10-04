@@ -1,0 +1,206 @@
+---
+title: "Ansible Variables: Runtime and Playbook Variables"
+description: Replace hard-coded values with variables in a playbook, pass them at runtime with --extra-vars or define them under vars, and learn which value wins when both are set.
+---
+
+Look at the website playbook from the last lesson. The word `httpd` appears twice: once in the install task and once in the service task. If you ever switch to a different web server, you must find and change every occurrence, and forgetting one breaks the playbook. A **variable** gives that value a name, so you write it once and use it anywhere.
+
+The idea is the same as in any programming language: a variable stores data. In Ansible, variables can be defined in many places:
+
+| Type | Where it is defined | Covered |
+| --- | --- | --- |
+| **Runtime variable** (extra var) | On the command line, when you run the playbook | This lesson |
+| **Playbook variable** | Inside the playbook, under `vars:` | This lesson |
+| Host variable | For one host, in the inventory or a `host_vars/` file | Short intro below |
+| Group variable | For a group, in the inventory or a `group_vars/` file | Short intro below |
+
+## Using a variable in a playbook
+
+Copy the website playbook into a new file:
+
+```bash
+sudo su - ansible
+cat website-hosting.yml
+vi vars.yml
+```
+
+Replace both occurrences of `httpd` with a variable called `package_name`:
+
+```yaml title="vars.yml"
+---
+- hosts: webservers
+  become: true
+  tasks:
+    - name: httpd server installation
+      yum:
+        name: "{{ package_name }}"
+        state: latest
+    - name: copy index.html
+      copy:
+        src: index.html
+        dest: /var/www/html/index.html
+    - name: start httpd server
+      service:
+        name: "{{ package_name }}"
+        state: started
+...
+```
+
+`{{ package_name }}` is **Jinja2** template syntax. When the task runs, Ansible replaces it with the variable's value. The spaces inside the braces are optional (`{{package_name}}` as typed in the lecture works too), but `{{ package_name }}` is the common style.
+
+<Callout type="error" title="Quote values that start with {{">
+In YAML, `{` at the start of a value means "a dictionary starts here". So `name: {{ package_name }}` breaks the playbook with a syntax error. When a value **starts** with `{{`, wrap the whole value in quotes: `name: "{{ package_name }}"`. A value like `/var/www/{{ site }}/index.html` does not start with `{`, so it needs no quotes, although quoting it does no harm.
+</Callout>
+
+Variable names may contain letters, numbers and underscores, and must start with a letter or underscore. `package_name` is valid. `package-name` and `2nd_package` are not.
+
+## Runtime variables: pass the value with --extra-vars
+
+The playbook now uses `package_name`, but nothing defines it. If you run it as it is, Ansible stops with:
+
+```text
+fatal: [172.31.9.250]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'package_name' is undefined..."}
+```
+
+Pass the value when you run the playbook:
+
+```bash
+ansible-playbook vars.yml --extra-vars package_name=httpd
+```
+
+`--extra-vars` (short form `-e`) sets variables at **runtime**. The playbook stays generic and the person running it decides the value. The run looks the same as before, and the site still loads in the browser.
+
+There are three ways to write extra vars:
+
+| Form | Example |
+| --- | --- |
+| `key=value` pairs | `-e "package_name=httpd site_title=Telusko"` |
+| JSON | `-e '{"package_name": "httpd", "ports": [80, 443]}'` |
+| From a file (YAML or JSON) | `-e "@web_vars.yml"` |
+
+Values passed as `key=value` are always strings. Use the JSON form when you need a number, a boolean (`true`/`false`) or a list.
+
+## Playbook variables: define the value under vars
+
+When the value rarely changes, define it inside the playbook. Add a `vars:` section to the play, at the same level as `hosts`, `become` and `tasks`:
+
+```yaml title="vars.yml"
+---
+- hosts: webservers
+  become: true
+  vars:
+    package_name: httpd
+  tasks:
+    - name: httpd server installation
+      yum:
+        name: "{{ package_name }}"
+        state: latest
+    - name: copy index.html
+      copy:
+        src: index.html
+        dest: /var/www/html/index.html
+    - name: start httpd server
+      service:
+        name: "{{ package_name }}"
+        state: started
+...
+```
+
+Now run it without any `-e`:
+
+```bash
+ansible-playbook vars.yml
+```
+
+The value is written once at the top and used in both tasks. Change it in one place and every task follows.
+
+## When both are set: precedence
+
+What happens if `vars:` says `httpd` and you also pass `-e package_name=nginx`? Ansible has a fixed order of **variable precedence** with 22 levels. You do not need to memorise it. Remember the shape, and especially the top:
+
+<img src="/ansible/ansible-variable-precedence.svg" alt="Simplified Ansible variable precedence: extra vars highest, then set_fact and include_vars, vars_files, play vars, host and group vars, role defaults lowest" width={960} height={480} />
+
+**Extra vars always win.** A value passed with `-e` overrides the same variable defined anywhere else. That makes `-e` perfect for one-off overrides, and a reason to be careful with it.
+
+You can see this with the `debug` module, which prints messages:
+
+```yaml title="precedence.yml"
+---
+- name: Show variable precedence
+  hosts: webservers
+  gather_facts: false
+  vars:
+    package_name: httpd
+  tasks:
+    - name: Print the value Ansible will use
+      ansible.builtin.debug:
+        msg: "package_name is {{ package_name }}"
+```
+
+```bash
+ansible-playbook precedence.yml
+ansible-playbook precedence.yml -e package_name=nginx
+```
+
+```text
+ok: [172.31.9.250] => {
+    "msg": "package_name is httpd"
+}
+...
+ok: [172.31.9.250] => {
+    "msg": "package_name is nginx"
+}
+```
+
+## Host and group variables (a first look)
+
+The lecture mentions two more types. They let different machines get different values from the **same** playbook.
+
+```ini title="/etc/ansible/hosts"
+[webservers]
+172.31.9.250 http_port=80
+
+[dbservers]
+172.31.12.18
+
+[webservers:vars]
+package_name=httpd
+```
+
+`http_port=80` on the host line is a **host variable**: it applies only to that host. The `[webservers:vars]` section defines a **group variable** for every host in the group. In bigger projects these move into files such as `group_vars/webservers.yml` and `host_vars/172.31.9.250.yml` next to the inventory, which keeps the inventory itself short.
+
+## Variables from a separate file
+
+For many variables, or for values you want to keep apart from the playbook (and later encrypt), use `vars_files`:
+
+```yaml title="web_vars.yml"
+package_name: httpd
+```
+
+```yaml
+- hosts: webservers
+  become: true
+  vars_files:
+    - web_vars.yml
+  tasks:
+    # ...same tasks as before
+```
+
+This is the usual way to keep secrets in a file that you then protect with [Ansible Vault](/docs/ansible/variables-vault-and-tags/ansible-vault), the next lesson.
+
+## Try It Yourself
+
+1. Run `vars.yml` without `vars:` and without `-e`, and read the "undefined variable" error.
+2. Add a variable `web_root: /var/www/html` and use it in the copy task's `dest` as `"{{ web_root }}/index.html"`.
+3. Run `precedence.yml` with `-e '{"package_name": "httpd"}'` (JSON form) and with `-e "@web_vars.yml"` (file form).
+4. Add `[webservers:vars]` with `package_name=httpd` to the inventory, remove `vars:` from the playbook, and run it without `-e`.
+
+## Official references
+
+- [Using variables](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_variables.html)
+- [Variable precedence: where should I put a variable?](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_variables.html#variable-precedence-where-should-i-put-a-variable)
+- [ansible.builtin.debug module](https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/debug_module.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

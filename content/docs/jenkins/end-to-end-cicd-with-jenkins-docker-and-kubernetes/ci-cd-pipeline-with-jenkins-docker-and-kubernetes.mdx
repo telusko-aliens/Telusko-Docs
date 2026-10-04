@@ -1,0 +1,265 @@
+---
+title: CI CD Pipeline with Jenkins, Docker & Kubernetes
+description: Build the real end-to-end pipeline where the Dockerfile and Kubernetes manifest live in Git with the code, and every build rolls out a uniquely tagged image to Amazon EKS.
+---
+
+The previous pipeline worked, but it carried the Dockerfile and the Kubernetes YAML inside the Jenkinsfile. Every time a developer wanted to change the base image or the number of replicas, someone had to edit the Jenkins job. That does not scale past one person.
+
+In a real team the split is clear. Developers keep the code, the `Dockerfile` and the Kubernetes manifest together in the Git repository. The pipeline only **runs** them: clone, build, package, push, deploy. That is what we build now.
+
+<img src="/jenkins/cicd-complete-pipeline.svg" alt="End-to-end flow from developer push to GitHub, through Jenkins checkout, Maven and Docker build, Docker Hub push and kubectl deploy to Amazon EKS, to the user through a load balancer" width={960} height={430} />
+
+## The repository
+
+The lecture uses [Haider7214/WebAppMaven](https://github.com/Haider7214/WebAppMaven). Fork it to your own GitHub account so you can change it later.
+
+```text
+WebAppMaven/
+├── src/                     application code (Spring Boot, packaged as a WAR)
+├── pom.xml                  Maven build: artifactId WebAppProject1, version 0.0.1
+├── Dockerfile               how to build the image
+└── k8s-deployment.yaml      Deployment + Service for Kubernetes
+```
+
+The Dockerfile in the repo (the `maintainer` label is shortened here; it is only metadata):
+
+```dockerfile title="Dockerfile"
+FROM tomcat:10.1-jdk17-temurin
+LABEL maintainer="Telusko"
+RUN rm -rf /usr/local/tomcat/webapps/*
+COPY target/WebAppProject1-0.0.1.war /usr/local/tomcat/webapps/ROOT.war
+EXPOSE 8080
+```
+
+`RUN rm -rf /usr/local/tomcat/webapps/*` removes anything Tomcat ships in its webapps folder, so our WAR is the only application, deployed at `/` as `ROOT.war`. The base image is pinned to Tomcat 10.1 on Java 17, which matches the Spring Boot 3 project.
+
+The manifest holds both objects in one file, separated by `---`:
+
+```yaml title="k8s-deployment.yaml"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+      - name: web-container
+        image: haidertelusko/my-web-app:latest
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-app-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: web-app
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+```
+
+Two replicas of the app, exposed through an AWS load balancer on port 80. Same objects as in the [previous lesson](/docs/jenkins/end-to-end-cicd-with-jenkins-docker-and-kubernetes/deploying-docker-applications-to-amazon-eks), now owned by the repository.
+
+## The pipeline
+
+Create a new Pipeline job, `cicd-java-project`, with a short description. Before running it, confirm the Docker Hub credential exists under **Manage Jenkins > Credentials** (the `dockerhub-creds` credential from [Build & Push Docker Images Using Jenkins Pipeline](/docs/jenkins/end-to-end-cicd-with-jenkins-docker-and-kubernetes/build-and-push-docker-images-using-jenkins-pipeline)).
+
+The lecture also deleted the Deployment, Service and load balancer from the previous lesson, so this pipeline starts from a clean cluster:
+
+```bash
+kubectl delete svc web-app-service
+kubectl delete deployment web-app-deployment
+```
+
+```groovy title="Pipeline script (cicd-java-project)"
+pipeline {
+    agent any
+
+    environment {
+        DOCKERHUB_USER = 'your-dockerhub-username'
+        IMAGE_NAME     = "${DOCKERHUB_USER}/my-web-app"
+        IMAGE_TAG      = "${BUILD_NUMBER}"
+    }
+
+    tools {
+        maven 'maven'
+    }
+
+    stages {
+        stage('git clone') {
+            steps {
+                git branch: 'main', url: 'https://github.com/<your-github-user>/WebAppMaven.git'
+            }
+        }
+
+        stage('maven build') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                // Uses the Dockerfile from the repository
+                sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .'
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
+                                                  usernameVariable: 'DOCKER_USER',
+                                                  passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push $IMAGE_NAME:$IMAGE_TAG
+                        docker push $IMAGE_NAME:latest
+                    '''
+                }
+            }
+        }
+
+        stage('k8s - deployment') {
+            steps {
+                // Point the manifest at the image this build just pushed
+                sh 'sed -i "s|image: .*|image: $IMAGE_NAME:$IMAGE_TAG|" k8s-deployment.yaml'
+                sh 'grep "image:" k8s-deployment.yaml'
+                sh 'kubectl apply -f k8s-deployment.yaml'
+                sh 'kubectl rollout status deployment/web-app-deployment --timeout=180s'
+            }
+        }
+    }
+
+    post {
+        success {
+            sh 'kubectl get svc web-app-service'
+        }
+        always {
+            sh 'docker logout || true'
+            sh 'docker rmi $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest || true'
+        }
+    }
+}
+```
+
+Compared with the earlier pipeline, the Build Docker Image stage shrinks to a single `docker build` line, and the deploy stage to a single `kubectl apply`. All the "what" lives in Git; Jenkins only does the "how".
+
+## Why we edit the image line before applying
+
+The lecture's deploy stage is just:
+
+```groovy
+sh 'kubectl apply -f k8s-deployment.yaml'
+```
+
+On the **first** run that works perfectly. On the **second** run it quietly does nothing useful. The manifest still says `image: haidertelusko/my-web-app:latest`, exactly like last time. `kubectl apply` compares it with what is running, finds no difference, and reports `deployment.apps/web-app-deployment unchanged`. The pods keep running the old code, even though Docker Hub has a newer `latest`. The pipeline is green and nothing was deployed.
+
+The fix is to give Kubernetes a **different** image reference each time. The `sed` command rewrites the `image:` line in the workspace copy of the manifest (never in Git) to `your-user/my-web-app:<build number>`:
+
+| Part | Meaning |
+| --- | --- |
+| `sed -i` | Edit the file in place |
+| `s\|image: .*\|image: ...\|` | Replace any `image:` line with the new value. `\|` is used as the separator because the image name contains `/` |
+| `$IMAGE_NAME:$IMAGE_TAG` | Expanded by the shell, for example `your-user/my-web-app:12` |
+| `grep "image:"` | Prints the result into the console log, so you can see which image was deployed |
+
+This also replaces the instructor's Docker Hub user with yours, so you do not deploy someone else's image by accident. The manifest has only one container, so one `image:` line; with several containers you would use a more specific pattern, or a tool such as Kustomize or Helm.
+
+Another common way is to leave the manifest alone and change only the image of the running Deployment:
+
+```bash
+kubectl set image deployment/web-app-deployment web-container=$IMAGE_NAME:$IMAGE_TAG
+```
+
+`web-container` is the container name from the manifest. This is handy for a quick update, but if you also `kubectl apply` the original manifest later, it switches the image back to `:latest`. Keeping the file and the cluster in agreement, as the `sed` approach does, avoids that surprise.
+
+## What happens during the rollout
+
+When the image changes, the Deployment does a **rolling update**: it creates a new ReplicaSet for the new pod template, starts new pods, waits until they are ready, and only then removes old ones. Users keep getting answers the whole time.
+
+<img src="/jenkins/cicd-rollout.svg" alt="Rolling update in three steps: before, two pods run image 42 in ReplicaSet A; during, one old pod and two new pods run as A scales down and B scales up; after, two pods run image 43 in ReplicaSet B. Reusing the same tag gives no rollout; a new tag creates a new ReplicaSet; kubectl rollout undo returns to the previous one" width={960} height={440} />
+
+`kubectl rollout status` makes Jenkins wait for this to finish. If the new pods crash or cannot pull the image, the stage fails after 180 seconds and the build turns red, while the old pods keep serving traffic. To go back by hand:
+
+```bash
+kubectl rollout history deployment/web-app-deployment
+kubectl rollout undo deployment/web-app-deployment
+```
+
+[Rolling Updates and Rollbacks in Kubernetes Deployments](/docs/kubernetes/namespaces-labels-and-deployments/rolling-updates-and-rollbacks-in-kubernetes-deployments) covers `maxSurge`, `maxUnavailable` and rollbacks in detail.
+
+## Run it and check
+
+Click **Build Now**. Tool install, clone, Maven, Docker build, push and deploy run one after another, in about a minute. Then:
+
+1. **Docker Hub**: `my-web-app` shows a push "less than a minute ago", with a tag for this build number and `latest`.
+2. **Cluster**: from the EKS home server run `kubectl get all`. You see two running pods, the Deployment, its ReplicaSet, and `web-app-service` with a load balancer DNS name in `EXTERNAL-IP`.
+3. **Browser**: open `http://<EXTERNAL-IP>`. The first time, give the new load balancer a minute or two. The DNS name is also shown in **EC2 > Load Balancers**.
+
+Now make a small change to `index.jsp` in your fork, push it, and run the pipeline again. Watch `kubectl get pods -w` in another terminal: two new pods appear with a new hash in their names, become ready, and the old ones terminate. Refresh the browser and your change is live.
+
+## From here to fully automatic
+
+Two small steps make this a real CI/CD pipeline. Both were covered earlier in the course:
+
+- **Trigger on every push**: enable **GitHub hook trigger for GITScm polling** in the job and add a webhook in the GitHub repository, as in [Jenkins Build Triggers](/docs/jenkins/freestyle-jobs/jenkins-build-triggers). Now a `git push` deploys without anyone clicking anything.
+- **Keep the pipeline in Git too**: save the pipeline above as a file named `Jenkinsfile` in the root of the repository, and change the job's **Definition** to **Pipeline script from SCM**. Then the pipeline itself is reviewed and versioned like the rest of the code. With this setup Jenkins checks out the repository by itself, so you can drop the `git clone` stage.
+
+## Common errors
+
+<Accordions>
+<Accordion title="deployment.apps/web-app-deployment unchanged, but the site shows old content">
+The manifest still points to the same tag as before. Check the `grep "image:"` line in the console log; it must show this build's number.
+</Accordion>
+<Accordion title="COPY failed: file not found ... WebAppProject1-0.0.1.war">
+The Maven stage did not produce the WAR (look for test failures in the Maven log), or you changed `artifactId` or `version` in `pom.xml` without updating the Dockerfile.
+</Accordion>
+<Accordion title="Pods in ImagePullBackOff">
+The image name in the manifest is wrong. Compare the `grep` output with the tag on Docker Hub. If your repository on Docker Hub is private, the nodes also need an `imagePullSecret`.
+</Accordion>
+<Accordion title="Error from server (Forbidden)">
+The Jenkins IAM role can reach the cluster but lacks permission for this namespace or resource. Check its access policy and scope.
+</Accordion>
+</Accordions>
+
+## Clean up
+
+<Callout type="error" title="Delete in this order when you finish">
+1. `kubectl delete -f k8s-deployment.yaml` (removes the Deployment and the Service, which deletes the AWS load balancer).
+2. Confirm in **EC2 > Load Balancers** that it is gone.
+3. `eksctl delete cluster --name telusko-learning --region ap-south-1 --wait` from the EKS home server.
+4. Stop the Jenkins server and the EKS home server.
+
+A forgotten cluster with a load balancer costs several dollars a day.
+</Callout>
+
+## Try It Yourself
+
+1. Fork WebAppMaven, point the pipeline at your fork, and run it twice. Confirm the second run deploys new pods (new names) instead of reporting `unchanged`.
+2. Remove the `sed` line, change `index.jsp`, push, and run the pipeline. Notice the page does not change. Put the `sed` line back.
+3. Change `replicas` to 3 in the manifest in Git, push, and run. No change to Jenkins should be needed.
+4. Push a change that breaks the build (for example a failing test). Confirm the pipeline stops at Maven and the running app is untouched.
+5. Move the pipeline into a `Jenkinsfile` in your fork and switch the job to **Pipeline script from SCM**.
+
+## Official references
+
+- [Kubernetes: Deployments, updating a Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#updating-a-deployment)
+- [Kubernetes: kubectl set image](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_set/kubectl_set_image/)
+- [Kubernetes: kubectl rollout status](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_status/)
+- [Jenkins: Using a Jenkinsfile](https://www.jenkins.io/doc/book/pipeline/jenkinsfile/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

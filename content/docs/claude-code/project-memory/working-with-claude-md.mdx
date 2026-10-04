@@ -1,0 +1,99 @@
+---
+title: Working with CLAUDE.md
+description: Learn where CLAUDE.md files can live, how they combine across organisation, user, project and folder levels, and how to create one manually or with /init.
+---
+
+One `CLAUDE.md` in the project root is enough to start. But real teams quickly run into questions. I prefer one coding style, my teammate prefers another. The company has security rules that every project must follow. The tests folder needs different conventions from the backend. Claude Code handles all of this with **multiple levels** of `CLAUDE.md`.
+
+## The levels
+
+<img src="/claude-code/claude-md-levels.svg" alt="CLAUDE.md levels from managed policy to subfolder" width={960} height={470} />
+
+| Level | Location | Who it is for | Shared through |
+| --- | --- | --- | --- |
+| **Managed policy** | Linux/WSL: `/etc/claude-code/CLAUDE.md`<br />macOS: `/Library/Application Support/ClaudeCode/CLAUDE.md`<br />Windows: `C:\Program Files\ClaudeCode\CLAUDE.md` | The whole organisation: security policies, compliance, deployment rules | IT or DevOps tooling |
+| **User** | `~/.claude/CLAUDE.md` | You, across all your projects | Only your machine |
+| **Project** | `./CLAUDE.md` or `./.claude/CLAUDE.md` | Everyone working on this project | Git |
+| **Local** | `./CLAUDE.local.md` | Only you, only this project | Nobody. Add it to `.gitignore` |
+| **Subfolder** | e.g. `./backend/CLAUDE.md`, `./tests/CLAUDE.md` | Rules for one part of the codebase | Git |
+
+### How they combine
+
+This is a point where many tutorials get it slightly wrong, so let us be precise.
+
+Claude Code does **not** pick one file and ignore the rest. It **loads all of them and combines them** into the context:
+
+- Files from the managed policy, user and project levels load at launch, from the broadest scope to the most specific
+- For each directory, `CLAUDE.local.md` is added after `CLAUDE.md`
+- `CLAUDE.md` files in **subfolders** load **on demand**, only when Claude reads files in that folder
+
+Because more specific files appear later in the context, they usually carry more weight in practice. But there is no strict override. If two files contradict each other, Claude may follow either one. So the real rule is: **keep your files consistent**.
+
+<Callout type="warn" title="Respect the organisation level">
+Organisation-level instructions usually contain guardrails: security rules, deployment flow, compliance requirements. Do not try to work around them in your own files. A managed policy file cannot be excluded by individual settings.
+</Callout>
+
+## Keep it short
+
+Every line in `CLAUDE.md` is loaded into context in **every** session. A 1,000-line file wastes context and, worse, makes Claude **less** likely to follow each instruction.
+
+The official recommendation is to keep each `CLAUDE.md` **under 200 lines**. Some tips:
+
+- Put only project-wide facts in the root file
+- Move folder-specific rules into a `CLAUDE.md` inside that folder, so they load only when needed
+- Write concrete instructions that can be verified:
+
+| Vague | Concrete |
+| --- | --- |
+| "Format code properly" | "Use 2-space indentation" |
+| "Test your changes" | "Run `uv run pytest` before committing" |
+| "Keep files organised" | "API handlers live in `backend/app/api/v1/`" |
+
+You can also split large instruction sets into topic files under `.claude/rules/` (for example `testing.md`, `api-design.md`), and scope them to specific paths with a `paths` field in their frontmatter.
+
+## Creating CLAUDE.md manually
+
+If you know your project well, write the file yourself. Create `CLAUDE.md` at the project root and describe the project in plain markdown. Then start a **new** session and ask:
+
+```text
+What is this project about?
+```
+
+This time Claude answers directly from `CLAUDE.md`, without scanning every file. If you open the transcript with `Ctrl+O`, you will see far fewer file reads.
+
+## Creating CLAUDE.md with `/init`
+
+Even better, let Claude write the first draft:
+
+```text
+/init
+```
+
+Claude explores the codebase, reads the project structure and existing files, detects patterns and conventions, and proposes a `CLAUDE.md`. Approve the file creation, then open it. For our project it produced sections like:
+
+- **Project**: a static, frontend-only Kanban board, no build step or backend yet
+- **Running locally**: open `frontend/index.html` or serve it with `python -m http.server`
+- **Architecture**: the three key globals `STATES`, `ROLE_CONFIG` and `tasks`
+- **Mock API layer**: why `mockFetch` always rejects and how the backend will slot in
+- **Roles and permissions**: enforced in JavaScript only, so UX-only, not a trust boundary
+
+If a `CLAUDE.md` already exists, `/init` suggests improvements instead of overwriting it.
+
+<Callout type="info" title="Tip: /btw for side questions">
+While Claude is busy with something, you can ask a quick side question with `/btw`, for example `/btw what does ROLE_CONFIG control?`. The answer is shown to you but is **not** added to the conversation, so it does not use up your main context.
+</Callout>
+
+### Moving it into `.claude/`
+
+The project `CLAUDE.md` can live at `./CLAUDE.md` or `./.claude/CLAUDE.md`. Both work the same way. In our project we moved it into `.claude/` to keep the root folder clean. If the `.claude` folder does not exist yet, simply create it.
+
+## Official references
+
+- [How Claude remembers your project](https://code.claude.com/docs/en/memory)
+- [How CLAUDE.md files load](https://code.claude.com/docs/en/memory#how-claude-md-files-load)
+- [Organize rules with .claude/rules/](https://code.claude.com/docs/en/memory#organize-rules-with-claude/rules/)
+- [Side questions with /btw](https://code.claude.com/docs/en/interactive-mode)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

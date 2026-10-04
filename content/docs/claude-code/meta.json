@@ -1,0 +1,20 @@
+{
+    "title": "Claude Code",
+    "icon": "Bot",
+    "pages": [
+        "getting-started.mdx",
+        "introduction.mdx",
+        "claude-code-introduction",
+        "setup-and-configuration",
+        "local-model-setup",
+        "agentic-workflow-and-safety",
+        "project-memory",
+        "slash-commands",
+        "sub-agents-and-worktrees",
+        "full-stack-integration-with-claude-code",
+        "custom-commands-skills-and-spec-driven-development",
+        "securing-the-application-with-jwt",
+        "github-mcp-server-integration",
+        "deploying-the-application-on-google-cloud"
+    ]
+}

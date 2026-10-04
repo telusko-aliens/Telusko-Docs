@@ -1,0 +1,4 @@
+{
+  "title": "Dependencies, POM & IDEs",
+  "pages": ["maven-dependencies.mdx", "maven-repositories.mdx", "maven-pom-xml-file.mdx", "maven-in-intellij-ide.mdx", "effective-pom.mdx", "maven-project-in-eclipse-ide.mdx"]
+}

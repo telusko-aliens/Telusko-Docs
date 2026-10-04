@@ -1,0 +1,9 @@
+{
+    "title": "Custom Commands, Skills and Spec-Driven Development",
+    "pages": [
+        "custom-commands-and-skills-explained.mdx",
+        "creating-a-custom-status-skill.mdx",
+        "endpoint-scaffolding-skill-and-writing-specs.mdx",
+        "implementing-features-with-spec-driven-development.mdx"
+    ]
+}

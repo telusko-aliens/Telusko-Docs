@@ -1,0 +1,178 @@
+---
+title: Terraform Installation on Linux VM on AWS
+description: Launch an Amazon Linux EC2 instance, connect to it over SSH from Git Bash, and install Terraform from the official HashiCorp repository.
+---
+
+Every learner has a different laptop. Some use Windows, some use a Mac, some have a company machine where installing software needs approval. A Linux virtual machine on AWS removes all of that. Everyone gets the same operating system, the same package manager and the same commands, so what you see in the lecture is exactly what you see on your screen.
+
+That is the approach in this lesson. We create one small Linux machine on AWS, connect to it, and install Terraform on it. If you prefer to work on your own Windows laptop, the [next lesson](/docs/terraform/getting-started-with-terraform/terraform-installation-locally-on-windows) covers that. You only need one of the two.
+
+<Callout type="info">
+You need an AWS account for this. If you do not have one yet, follow [Creating an AWS Account](/docs/aws/cloud-and-aws-fundamentals/creating-an-aws-account) first. A free tier account is enough for the whole Terraform course.
+</Callout>
+
+## Step 1: Launch the Linux VM
+
+<Steps>
+<Step>
+### Open EC2 and click Launch instance
+
+In the AWS console, search for **EC2**, open it, and click **Launch instance**. Check the region in the top right corner first. Pick the region closest to you (for example `ap-south-1`, Mumbai) and use the same one for the whole course.
+</Step>
+<Step>
+### Name and image
+
+Give the instance a name such as `terraform-vm`. Under **Application and OS Images**, choose **Amazon Linux** (Amazon Linux 2023 is the current default).
+</Step>
+<Step>
+### Instance type
+
+Keep a **free tier eligible** type, for example `t2.micro` or `t3.micro`, depending on what your region shows as free tier eligible. Terraform itself is a small program and does not need a big machine.
+</Step>
+<Step>
+### Key pair
+
+Click **Create new key pair**, give it a name such as `terraform-keypair`, keep the type **RSA** and the format **.pem**, and create it. The `.pem` file downloads to your machine. This is the private key that proves who you are when you connect, so keep it safe. AWS does not let you download it again.
+</Step>
+<Step>
+### Security group
+
+Let the wizard create a new security group that allows **SSH (port 22)**. For a practice machine, choose **My IP** as the source instead of **Anywhere** so only your network can attempt to log in.
+</Step>
+<Step>
+### Launch
+
+Click **Launch instance**, then open the instance list and wait until the **Instance state** shows **Running** and the status checks pass.
+</Step>
+</Steps>
+
+If EC2 is new to you, the AWS course explains each of these choices in [Introduction to EC2](/docs/aws/compute-with-ec2/introduction-to-ec2).
+
+## Step 2: Connect over SSH
+
+Select your instance and click **Connect**, then open the **SSH client** tab. AWS shows you the exact commands for your instance. You can use any SSH tool (MobaXterm and PuTTY also work), but **Git Bash** on Windows, or the normal Terminal on macOS and Linux, is the simplest because the commands are the same everywhere.
+
+Open Git Bash in the folder where the `.pem` file was downloaded (usually `Downloads`), then run:
+
+```bash
+chmod 400 terraform-keypair.pem
+ssh -i "terraform-keypair.pem" ec2-user@<your-instance-public-dns>
+```
+
+| Part | Meaning |
+| --- | --- |
+| `chmod 400` | Makes the key readable only by you. SSH refuses keys that other users can read |
+| `ssh -i <file>` | Use this private key file to log in |
+| `ec2-user` | Default user on Amazon Linux. On Ubuntu AMIs it is `ubuntu` |
+| `<your-instance-public-dns>` | The public DNS name or public IP shown on the Connect page |
+
+The first time, SSH asks whether you trust the host. Type `yes`. Then check where you are:
+
+```bash
+whoami    # ec2-user
+pwd       # /home/ec2-user
+```
+
+You are now inside the Linux machine on AWS.
+
+<Accordions>
+<Accordion title="Connection timed out">
+The security group does not allow port 22 from your current IP. Edit the inbound rules of the instance's security group and allow SSH from **My IP**. If your home IP changes often, you will need to update this rule again.
+</Accordion>
+<Accordion title="Permission denied (publickey)">
+Either the user name is wrong (`ec2-user` for Amazon Linux, `ubuntu` for Ubuntu) or you are using a different key from the one selected at launch.
+</Accordion>
+<Accordion title="UNPROTECTED PRIVATE KEY FILE">
+You skipped `chmod 400`. Run it, then try again.
+</Accordion>
+</Accordions>
+
+## Step 3: Install Terraform
+
+Do not download Terraform from random websites. Go to the official install page at [developer.hashicorp.com/terraform/install](https://developer.hashicorp.com/terraform/install), scroll to **Linux**, and pick the tab that matches your distribution. We chose Amazon Linux, so we use that tab.
+
+<img src="/terraform/screens/install-amazon-linux-commands.webp" alt="HashiCorp Terraform install page with the Amazon Linux package manager commands" width={1440} height={1004} />
+
+*The official install page, Linux section, with the Amazon Linux tab selected.*
+
+Copy the commands and run them on the VM. The Amazon Linux tab is what we use in the lecture. The Ubuntu tab is there in case you picked an Ubuntu AMI instead.
+
+<Tabs items={["Amazon Linux", "Ubuntu"]}>
+<Tab value="Amazon Linux">
+
+```bash
+sudo yum install -y yum-utils shadow-utils
+sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
+sudo yum -y install terraform
+```
+
+</Tab>
+<Tab value="Ubuntu">
+
+```bash
+wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update && sudo apt install terraform
+```
+
+</Tab>
+</Tabs>
+
+| Command | What it does |
+| --- | --- |
+| `yum install -y yum-utils shadow-utils` | Installs `yum-config-manager`, the helper we need to add a repository |
+| `yum-config-manager --add-repo ...` | Adds the official HashiCorp package repository, so `yum` knows where Terraform lives |
+| `yum -y install terraform` | Downloads and installs Terraform from that repository. `-y` answers yes to the prompt |
+
+On Amazon Linux 2023, `yum` is simply an alias for `dnf`, so both names work. Because Terraform now comes from a repository, updating later is a single command: `sudo yum update terraform`.
+
+## Step 4: Verify the installation
+
+```bash
+terraform -v
+```
+
+```text
+Terraform v1.16.5
+on linux_amd64
+```
+
+`terraform version` prints the same thing. The lecture shows `v1.11.4`, which was current at recording time. You will see a newer number, and that is fine: everything in this course works on any recent Terraform 1.x release.
+
+Two more commands worth running once:
+
+```bash
+terraform -help                   # list all subcommands
+terraform -install-autocomplete   # tab completion for terraform commands (open a new shell after)
+```
+
+## Step 5: Stop the VM when you finish
+
+When your practice session is over, go back to **EC2 > Instances**, select `terraform-vm`, and choose **Instance state > Stop instance**.
+
+- A stopped instance keeps its disk, so Terraform and your `.tf` files are still there next time.
+- You are not charged for compute while it is stopped, but the EBS disk is still billed if you go beyond the free tier storage.
+- The public IP address usually changes after stop and start, so copy the new SSH command from the **Connect** page each time.
+
+Next time, choose **Instance state > Start instance**, connect again the same way, and carry on.
+
+<Callout type="warn" title="Stop is not terminate">
+**Stop** pauses the machine and keeps the disk. **Terminate** deletes the instance and, by default, its root disk. Only terminate the VM when you have finished the whole course.
+</Callout>
+
+## Try It Yourself
+
+1. Launch an Amazon Linux `t2.micro` or `t3.micro` instance called `terraform-vm` with SSH allowed only from your IP.
+2. Connect with `ssh -i` from Git Bash or Terminal and run `whoami` and `pwd`.
+3. Install Terraform using the official repository and confirm the version with `terraform -v`.
+4. Stop the instance, start it again, and reconnect. Confirm Terraform is still installed and note that the public IP changed.
+
+## Official references
+
+- [Install Terraform](https://developer.hashicorp.com/terraform/install)
+- [Connect to your Linux instance using SSH](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/connect-linux-inst-ssh.html)
+- [Terraform CLI commands overview](https://developer.hashicorp.com/terraform/cli/commands)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

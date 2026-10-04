@@ -1,0 +1,57 @@
+---
+title: Introduction to Maven
+description: A short tour of what this Maven crash course covers, what you need before starting, and how the lessons build from build tool basics to a Spring Boot project.
+---
+
+Every Java project you will meet in a real company, whether it is a small utility library or a large Spring Boot microservice, is built by a tool. The most widely used of those tools is **Apache Maven**. When a Jenkins pipeline says "Building with Maven", when a Dockerfile runs `mvn package`, or when a developer says "pull the latest and run a clean install", Maven is doing the work.
+
+This course takes you from zero to confident with Maven. There are no prerequisites. You do not need to be a Java expert either: we will write only a few small classes, and the focus stays on how Maven builds, tests and packages them.
+
+## What you will do in this course
+
+The lessons follow one path, and each one adds a single new idea.
+
+| Step | What you learn | Lesson |
+| --- | --- | --- |
+| 1 | Why a build tool exists and what Maven automates | [Why and what is build tool](/docs/maven/build-tool-fundamentals/why-and-what-is-build-tool) |
+| 2 | Install Java and Maven on Windows or on a Linux VM in AWS | [Maven Installation Guide](/docs/maven/maven-installation/maven-installation-guide) |
+| 3 | Generate a Java project from the command line and read its structure | [Maven Java Project](/docs/maven/maven-projects-and-goals/maven-java-project) |
+| 4 | Run the goals `clean`, `compile`, `test` and `package` | [Maven Goals](/docs/maven/maven-projects-and-goals/maven-goals) |
+| 5 | Add libraries as dependencies and see where Maven downloads them from | [Maven Dependencies](/docs/maven/dependencies-pom-and-ides/maven-dependencies) |
+| 6 | Read every part of `pom.xml` and the effective POM | [Maven POM.xml file](/docs/maven/dependencies-pom-and-ides/maven-pom-xml-file) |
+| 7 | Work with Maven inside IntelliJ IDEA and Eclipse | [Maven in IntelliJ IDE](/docs/maven/dependencies-pom-and-ides/maven-in-intellij-ide) |
+| 8 | Understand the full build lifecycle, write unit tests, and build a Spring Boot app | [Maven Build LifeCycle Summary](/docs/maven/lifecycle-testing-and-spring-boot/maven-build-lifecycle-summary) |
+
+We will do most things twice: once from the terminal without any IDE, and once inside an IDE. That is on purpose. When you have seen Maven work from a plain terminal, the buttons in IntelliJ and Eclipse stop being magic. They run the same commands you already know.
+
+## What you need
+
+- A laptop with Windows, macOS or Linux, **or** an AWS account where you can launch one small Linux VM
+- A JDK (Java 17 or 21 is a good choice in 2026)
+- Maven itself, which we install in the next section
+- Optional: IntelliJ IDEA Community Edition or Eclipse IDE for the IDE lessons
+
+<Callout type="info" title="Which Maven version?">
+At the time of writing, the current Maven release is 3.10.0 (September 2026), and the 3.9.x line is still supported. The video uses Maven 3.9.11 on Windows and the Amazon Linux package (3.8.4) on the cloud VM. Everything in this course works the same on all of them. Maven 4 is still a release candidate and is not meant for production yet.
+</Callout>
+
+## How to get the most out of it
+
+Type every command yourself. Maven prints a lot of output, and learning to read that output (which plugin ran, which test failed, which file was produced) is half of the skill. When a build fails, do not skip ahead. Read the `[ERROR]` lines from the top, find the first real cause, and fix it. That habit will save you hours later when you debug a broken Jenkins pipeline.
+
+At the end of the course there is a [wrap-up](/docs/maven/lifecycle-testing-and-spring-boot/maven-wrapup) with a one-page summary of every command and concept, so you can revise quickly.
+
+## Try It Yourself
+
+1. Open a terminal and run `java -version`. Note whether Java is installed and which version you have.
+2. Run `mvn -v`. If it prints "command not found", that is fine, you will install Maven in the next section.
+3. Pick your practice environment now: your own machine or an AWS EC2 Linux VM. Stick with it for the whole course.
+
+## Official references
+
+- [Apache Maven: What is Maven?](https://maven.apache.org/what-is-maven.html)
+- [Apache Maven: Download page and release notes](https://maven.apache.org/download.cgi)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

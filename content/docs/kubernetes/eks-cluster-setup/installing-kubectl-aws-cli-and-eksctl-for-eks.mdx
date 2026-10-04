@@ -1,0 +1,256 @@
+---
+title: Installing kubectl, AWS CLI and eksctl for EKS
+description: Compare the ways to get a Kubernetes cluster, launch an Ubuntu EC2 instance as your EKS host, and install the AWS CLI, kubectl and eksctl with a verified script.
+---
+
+Before we can create anything on Kubernetes, we need a cluster, and before we can create the cluster, we need a machine with the right tools on it. This lesson sets up that machine. It takes about 15 minutes and you only do it once.
+
+## Ways to get a Kubernetes cluster
+
+There are many ways to run Kubernetes. They fall into three groups.
+
+| Option | What it is | Where it fits |
+| --- | --- | --- |
+| **minikube** (also kind, k3d) | A single-node cluster on your laptop | Learning and local testing, never production |
+| **kubeadm** | Official tool to bootstrap a cluster on servers you own | On-premises or self-managed clusters. You install, upgrade and back up everything yourself |
+| **kOps** | Tool to create and manage production clusters, mostly on AWS | Was popular before managed services matured, used less now |
+| **Managed Kubernetes** | The cloud provider runs the control plane for you | Most production clusters today |
+
+Managed options exist on every major cloud: **Amazon EKS** (Elastic Kubernetes Service), Azure AKS, Google GKE and Oracle OKE. With a managed service, all the control plane components from the [architecture lesson](/docs/kubernetes/kubernetes-foundations/kubernetes-architecture-explained) (API server, etcd, scheduler, controller manager) are installed, patched and kept highly available by the provider.
+
+We use EKS for the whole course.
+
+## The plan
+
+We will not click through the EKS console to create the cluster. That path involves creating a VPC, subnets, IAM roles, a cluster, a node group and add-ons by hand, and missing one step gives you a cluster that does not work. Instead we use a command line tool that does all of it in one go.
+
+```text
+Your laptop --SSH--> EC2 "EKS home server" (Ubuntu)
+                       |- aws     : talks to AWS, provides credentials
+                       |- eksctl  : creates / deletes the EKS cluster
+                       '- kubectl : talks to Kubernetes once the cluster exists
+```
+
+| Tool | Made by | Purpose |
+| --- | --- | --- |
+| **AWS CLI v2** | AWS | Command line access to every AWS service. eksctl and kubectl use its credentials, and kubectl uses `aws eks get-token` to log in to EKS |
+| **eksctl** | Originally Weaveworks, now maintained under AWS | Creates, scales and deletes EKS clusters, using CloudFormation behind the scenes |
+| **kubectl** | Kubernetes project | The client for every Kubernetes cluster: create, list, describe, delete resources |
+
+<Callout type="info" title="Why an EC2 instance instead of your laptop?">
+You can install these three tools on Windows, macOS or Linux and work from your laptop. We use a small Ubuntu EC2 instance so everyone gets the same operating system and the same commands, and because an IAM role on the instance can give it AWS permissions without storing access keys on your laptop. If you prefer your laptop, the official install pages are linked at the end.
+</Callout>
+
+## Step 1: Launch the EKS home server
+
+<Steps>
+<Step>
+### Open EC2 in the right region
+
+Sign in to the AWS console, search for **EC2** and click **Launch instance**. Check the region in the top right. We use **Asia Pacific (Mumbai) `ap-south-1`**. Use the same region for the EC2 instance and the cluster.
+</Step>
+<Step>
+### Name and operating system
+
+Name it `EKS-HOME-Server`. Under **Application and OS Images** pick **Ubuntu**, then **Ubuntu Server 26.04 LTS**, the image used in the lecture (24.04 LTS works the same way). The install script below is written for Ubuntu.
+</Step>
+<Step>
+### Instance type
+
+`t3.micro` is enough. This machine only runs command line tools; the real work happens on the cluster. Pick whichever type your account marks as **Free tier eligible**.
+</Step>
+<Step>
+### Key pair
+
+Click **Create new key pair**, name it `kubernetes-keypair`, keep **RSA** and **.pem**, and create it. The file downloads once and cannot be downloaded again. Move it to a folder where you keep your keys.
+</Step>
+<Step>
+### Network settings
+
+Create a new security group and keep **Allow SSH traffic** ticked. Without it you cannot connect. For better security choose **My IP** as the source instead of Anywhere.
+</Step>
+<Step>
+### Storage and launch
+
+The default 8 GB disk is enough. Click **Launch instance** and wait until the state is **Running**.
+</Step>
+</Steps>
+
+## Step 2: Connect with SSH
+
+Select the instance, click **Connect**, open the **SSH client** tab and copy the example command. Open Git Bash (Windows) or Terminal (macOS, Linux) **in the folder where the .pem file is**, then run:
+
+```bash
+chmod 400 kubernetes-keypair.pem
+ssh -i "kubernetes-keypair.pem" ubuntu@<public-dns-of-your-instance>
+```
+
+The default user on Ubuntu AMIs is `ubuntu`. Type `yes` the first time when SSH asks about the host fingerprint. If you get stuck, [Connecting to an EC2 Instance Using Git Bash](/docs/linux/linux-environment-setup-on-aws/connecting-to-ec2-instance-using-gitbash) in the Linux course walks through SSH in detail, and [vi Editor Basics](/docs/linux/linux-fundamentals/vi-editor-basics) covers the editor we use next.
+
+## Step 3: Install the three tools
+
+In the lecture, the script came from an AI assistant using a prompt like "create a production-ready, idempotent bash script to install kubectl, AWS CLI v2 and eksctl on Ubuntu, with verification steps". The first version failed with `unzip: command not found`, and after a fix it installed everything. That is a fine way to work, but always check generated commands against the official install pages, because AI tools often reproduce old flags.
+
+<Callout type="warn" title="What went wrong in the recorded script">
+The generated script ran `kubectl version --client --short`. The `--short` flag was removed in kubectl 1.28, so the verification step printed `error: unknown flag: --short`. Use `kubectl version --client` instead. The script below is built only from the official AWS, Kubernetes and eksctl instructions.
+</Callout>
+
+Create the script:
+
+```bash
+vi install-kubernetes-tools.sh
+```
+
+Press `i` for insert mode, paste the following, then press `Esc` and type `:wq` to save and quit.
+
+```bash title="install-kubernetes-tools.sh"
+#!/usr/bin/env bash
+# Installs AWS CLI v2, kubectl and eksctl on Ubuntu (x86_64 / amd64)
+set -euo pipefail
+
+echo "=== Installing prerequisites ==="
+sudo apt-get update -y
+sudo apt-get install -y curl unzip tar
+
+cd /tmp
+
+echo "=== AWS CLI v2 ==="
+curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+unzip -q -o awscliv2.zip
+sudo ./aws/install --update
+rm -rf aws awscliv2.zip
+
+echo "=== kubectl (latest stable) ==="
+KVER=$(curl -L -s https://dl.k8s.io/release/stable.txt)
+curl -sSLO "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl"
+curl -sSLO "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl.sha256"
+echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+rm -f kubectl kubectl.sha256
+
+echo "=== eksctl (latest) ==="
+PLATFORM=$(uname -s)_amd64
+curl -sSLO "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_${PLATFORM}.tar.gz"
+curl -sSL "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_checksums.txt" | grep "${PLATFORM}" | sha256sum --check
+tar -xzf "eksctl_${PLATFORM}.tar.gz" -C /tmp && rm "eksctl_${PLATFORM}.tar.gz"
+sudo install -m 0755 /tmp/eksctl /usr/local/bin && rm /tmp/eksctl
+
+echo "=== Versions ==="
+aws --version
+kubectl version --client
+eksctl version
+```
+
+Make it executable and run it:
+
+```bash
+chmod +x install-kubernetes-tools.sh
+./install-kubernetes-tools.sh
+```
+
+| Line | Why it is there |
+| --- | --- |
+| `set -euo pipefail` | Stop at the first error instead of carrying on with a half-installed system |
+| `apt-get install unzip` | The AWS CLI comes as a zip file. Fresh Ubuntu images do not include `unzip`, which is exactly the error seen in the lecture |
+| `./aws/install --update` | Installs the CLI, or updates it if it is already there, so the script is safe to run twice |
+| `stable.txt` | Returns the latest stable Kubernetes version, for example `v1.37.1` |
+| `sha256sum --check` | Confirms the downloaded binary was not corrupted or tampered with |
+| `install -m 0755 ... /usr/local/bin` | Copies the binary into a folder on your `PATH` with execute permission |
+
+When it finishes you should see something like this (your versions will be newer or older):
+
+```text
+aws-cli/2.x.x Python/3.x.x Linux/... exe/x86_64.ubuntu.24
+Client Version: v1.37.1
+Kustomize Version: v5.x.x
+0.231.0
+```
+
+<Callout type="info" title="kubectl version skew">
+kubectl is supported within **one minor version** of the cluster. A 1.37 kubectl works with 1.36, 1.37 and 1.38 clusters. If you create an older cluster later, download a matching kubectl. The [Amazon EKS install page](https://docs.aws.amazon.com/eks/latest/userguide/install-kubectl.html) lists a download link for every EKS version.
+</Callout>
+
+## Step 4: Give the tools AWS credentials
+
+eksctl needs permission to create a VPC, IAM roles, CloudFormation stacks, EC2 instances and the EKS cluster. There are two ways to give it that permission.
+
+### The way shown in the lecture: `aws configure` with access keys
+
+The lecture creates an access key from the **Security credentials** page and runs:
+
+```bash
+aws configure
+```
+
+```text
+AWS Access Key ID [None]: <your access key id>
+AWS Secret Access Key [None]: <your secret access key>
+Default region name [None]: ap-south-1
+Default output format [None]: json
+```
+
+This works, but be careful:
+
+- **Never create access keys for the root user.** If you are signed in as root, create an IAM user first (see [IAM: root vs IAM user](/docs/aws/identity-and-access-management/iam-introduction-root-vs-iam-user)) and create the key for that user.
+- The keys are saved in plain text in `~/.aws/credentials` on the EC2 instance. Anyone who gets into that machine gets your AWS account.
+- Never paste keys into screenshots, chat messages or Git repositories.
+
+### The better way: an IAM role on the EC2 instance
+
+The [next lesson](/docs/kubernetes/eks-cluster-setup/creating-your-first-eks-cluster) attaches an IAM role to this EC2 instance. A role gives the instance temporary credentials that rotate automatically, and nothing secret is stored on disk. If you use the role, you do **not** need access keys at all. Just set the region:
+
+```bash
+aws configure set region ap-south-1
+```
+
+<Callout type="warn" title="Keys override the role">
+The AWS CLI checks `~/.aws/credentials` before it checks the instance role. If you ran `aws configure` with keys earlier and later attach a role, the keys still win. Delete the keys from the file, and deactivate them in IAM, if you switch to the role.
+</Callout>
+
+Whichever method you choose, confirm who you are before creating anything:
+
+```bash
+aws sts get-caller-identity
+```
+
+It prints the user or role ARN that eksctl will use. AWS recommends that you create and manage the cluster as this same identity throughout.
+
+## Common errors
+
+<Accordions>
+<Accordion title="unzip: command not found">
+Fresh Ubuntu images do not ship with `unzip`. Run `sudo apt-get install -y unzip` and run the script again. The script above already does this.
+</Accordion>
+<Accordion title="error: unknown flag: --short">
+Your script uses `kubectl version --short`, which was removed in kubectl 1.28. Use `kubectl version --client`.
+</Accordion>
+<Accordion title="Unable to locate credentials">
+Neither access keys nor an instance role are available. Either run `aws configure`, or attach an IAM role to the instance (next lesson).
+</Accordion>
+<Accordion title="Connection timed out when using ssh">
+The security group does not allow port 22 from your IP. Edit its inbound rules, or your IP changed since you chose My IP.
+</Accordion>
+</Accordions>
+
+## Cost note
+
+The `t3.micro` EKS home server is small, and free tier eligible on most new accounts. When you take a break of several days, **stop** it from the EC2 console rather than terminating it. The tools stay installed and you only pay for the 8 GB disk while it is stopped. The expensive part is the EKS cluster, which we create and delete in the next lesson.
+
+## Try It Yourself
+
+1. Launch the EKS home server and install all three tools with the script above.
+2. Run `aws --version`, `kubectl version --client` and `eksctl version` and note the versions.
+3. Run `kubectl get nodes` now, before any cluster exists. Read the error and explain why it happens (hint: there is no kubeconfig yet).
+4. Run `aws sts get-caller-identity` and identify whether you are using an IAM user or a role.
+5. Run the script a second time and confirm it completes without errors.
+
+## Official references
+
+- [Amazon EKS: Set up kubectl and eksctl](https://docs.aws.amazon.com/eks/latest/userguide/install-kubectl.html)
+- [Kubernetes: Install kubectl on Linux](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
+- [eksctl: Installation](https://docs.aws.amazon.com/eks/latest/eksctl/installation.html)
+- [AWS CLI: Install or update to the latest version](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

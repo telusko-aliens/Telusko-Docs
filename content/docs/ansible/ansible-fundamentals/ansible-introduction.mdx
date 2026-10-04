@@ -1,0 +1,84 @@
+---
+title: Ansible Introduction
+description: Understand why configuring many servers by hand breaks down, what configuration management means, and where Ansible fits as an open source automation tool.
+---
+
+Picture a small team running an application on five EC2 instances. The developers want Java 17 on every one of them. One admin logs in to the first server, runs the install commands, checks the version, logs out, and moves to the second server. Then the third. By the fifth server it is boring but manageable.
+
+Now make it 200 servers. Then, a month later, the developers ask for Java 21 instead. The same admin has to visit every machine again. This is the everyday problem that **configuration management** tools exist to solve.
+
+<img src="/ansible/ansible-manual-vs-automated.svg" alt="An admin configuring servers one by one compared with Ansible applying one playbook to many servers" width={960} height={470} />
+
+## What "configuration" means here
+
+When people say "configure a server", they usually mean everything the application needs on that machine before it can run:
+
+| Kind of work | Examples |
+| --- | --- |
+| Install software | Java, Git, Maven, Nginx, a database client |
+| Update or remove software | Move from Java 17 to Java 21, uninstall an old package |
+| Manage files | Copy a config file, create a directory, set owner and permissions |
+| OS maintenance | Apply security patches, update all packages |
+| Users and services | Create a deploy user, start a service and enable it at boot |
+
+Deploying a Java application, for example, is impossible until a Java runtime is installed on the target machine. So configuration always comes before deployment.
+
+## Why doing it by hand fails
+
+Doing this work manually has three problems, and they get worse as the number of servers grows.
+
+1. **It is a repeated task.** The exact same commands are typed again on every server, and again every time a version changes.
+2. **It is time consuming.** If one installation takes ten minutes, fifty servers take a whole working day.
+3. **It is error prone.** A human typing the same thing 200 times will eventually skip a step or make a typo. Now one server behaves differently from the others, and nobody knows why.
+
+There is also a quieter fourth problem: nothing is written down. If the admin leaves the company, the knowledge of how the servers were built leaves too.
+
+## Configuration as code
+
+The fix is to stop typing commands and start describing the desired configuration in a file. A tool then reads that file and applies it to every server for you. That idea is called **configuration as code**.
+
+Because the configuration is now a text file:
+
+- The same file gives the same result on 5 servers or 500
+- You can store it in Git, review changes and roll back
+- Moving from Java 17 to Java 21 becomes a one-line change followed by one command
+- A new team member can read the file and understand exactly how a server is built
+
+## What Ansible is
+
+**Ansible** is an open source automation tool used for configuration management, application deployment and orchestration. You describe the configuration you want in YAML files called **playbooks**, and Ansible applies that configuration to the machines you list.
+
+A few facts worth knowing from day one:
+
+| Fact | Detail |
+| --- | --- |
+| Open source | Free to use. The command line tool is maintained by the Ansible community on GitHub |
+| Owned by Red Hat | Red Hat (now part of IBM) sponsors the project and sells an enterprise product, Red Hat Ansible Automation Platform |
+| Written in Python | You do not need to know Python to use it. You write YAML |
+| Agentless | It connects to servers over SSH. Nothing extra has to run on the managed servers |
+
+<Callout type="info" title="Configuration management vs provisioning">
+Ansible configures servers that already exist: it installs software, copies files and starts services. Creating the servers themselves (EC2 instances, VPCs, load balancers) is usually the job of a provisioning tool such as [Terraform](/docs/terraform/getting-started). Many teams use both: Terraform creates the machines, Ansible configures them.
+</Callout>
+
+## Other tools in the same space
+
+Ansible is not the only configuration management tool. You will hear these names in interviews and job descriptions:
+
+| Tool | How it works | Language you write |
+| --- | --- | --- |
+| Ansible | Push over SSH, no agent on servers | YAML playbooks |
+| Puppet | Agent on every server pulls from a Puppet server | Puppet DSL |
+| Chef | Agent on every server pulls from a Chef server | Ruby based recipes |
+| SaltStack | Usually agent based (minions), can also work over SSH | YAML states |
+
+Ansible became popular because it needs nothing installed on the servers and its YAML playbooks are easy to read, even for someone who has never used it. The next lesson looks at how its pieces fit together.
+
+## Official references
+
+- [Ansible documentation: Getting started](https://docs.ansible.com/projects/ansible/latest/getting_started/index.html)
+- [Red Hat: What is Ansible?](https://www.redhat.com/en/ansible-collaborative/how-ansible-works)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,228 @@
+---
+title: First Pod Creation in Kubernetes
+description: Write your first Pod manifest, fix the real YAML errors that come up, inspect the pod with get, -o wide and describe, compare kubectl create with apply, and delete it.
+---
+
+Time to run something. We will write a manifest for a single pod that runs a Spring Boot application, submit it to our EKS cluster, look at it from a few angles, and then delete it. Along the way we will hit two YAML mistakes that almost everyone makes in their first week, so you will recognise them when they happen to you.
+
+Make sure your cluster from [Creating Your First EKS Cluster](/docs/kubernetes/eks-cluster-setup/creating-your-first-eks-cluster) is running and `kubectl get nodes` shows two `Ready` nodes.
+
+## The image we will run
+
+The lecture runs a Spring Boot web application image that listens on port **8080**, pulled from Docker Hub. Use the Spring Boot image you pushed in the Docker course ([Push Spring Boot Image to Docker Hub](/docs/docker/dockerizing-applications/push-spring-boot-image-to-docker-hub)), written as `<your-dockerhub-username>/springboot-app:latest` below.
+
+<Callout type="info" title="No image of your own yet?">
+Any public image works for this lesson. `nginx:1.29` is a good choice. It listens on port **80**, so change `containerPort: 8080` to `containerPort: 80` wherever you use it. Everything else stays the same.
+</Callout>
+
+## Step 1: Write the manifest
+
+On the EKS home server, create the file:
+
+```bash
+vi k8s-pod.yml
+```
+
+Press `i` and type the following:
+
+```yaml title="k8s-pod.yml"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: webapp
+  labels:
+    app: telusko-webapp
+spec:
+  containers:
+    - name: webapp-container
+      image: <your-dockerhub-username>/springboot-app:latest
+      ports:
+        - containerPort: 8080
+```
+
+Save with `Esc`, then `:wq`.
+
+| Line | Meaning |
+| --- | --- |
+| `apiVersion: v1` | Pods belong to the core API group, version `v1`. Note the capital V in the key name `apiVersion` |
+| `kind: Pod` | Capital P. `pod` is rejected |
+| `metadata.name: webapp` | The pod's name. kubectl commands use it |
+| `metadata.labels.app: telusko-webapp` | A key-value label. Services will use it later to find this pod |
+| `spec.containers` | A list of containers in the pod. Here, just one |
+| `name: webapp-container` | Name of the container inside the pod |
+| `image` | The image the container runtime pulls from the registry |
+| `ports.containerPort: 8080` | The port the application listens on inside the container |
+
+### What containerPort does (and does not do)
+
+`containerPort` is mostly **documentation**. It tells readers and tools which port the app listens on, and it lets you give the port a name. It does **not** open the application to the outside world, and leaving it out does not block the port either. Without a Service, the pod is reachable only from inside the cluster, using the pod's IP. We fix that with Services starting in the [next lesson](/docs/kubernetes/pods-and-services/introduction-to-kubernetes-services).
+
+## Step 2: Apply it, and fix the errors
+
+```bash
+kubectl apply -f k8s-pod.yml
+```
+
+In the lecture, the first attempt failed:
+
+```text
+Error from server (BadRequest): error when creating "k8s-pod.yml": Pod in version "v1" cannot be
+handled as a Pod: json: cannot unmarshal object into Go struct field Container.spec.containers.ports
+of type []v1.ContainerPort
+```
+
+**Cause:** the line was written `-containerPort: 8080`, without a space after the dash. YAML then reads `ports` as a map instead of a **list**, and Kubernetes expects a list of ports. The fix is `- containerPort: 8080`.
+
+After fixing that, the second attempt failed differently:
+
+```text
+Error from server (BadRequest): error when creating "k8s-pod.yml": Pod in version "v1" cannot be
+handled as a Pod: strict decoding error: unknown field "metadata.app"
+```
+
+**Cause:** `app: telusko-webapp` was at the same indentation as `labels:`, so YAML treated `app` as a field of `metadata`, and `metadata` has no field called `app`. Indenting it two more spaces makes it a child of `labels`.
+
+| Error text contains | Usual cause |
+| --- | --- |
+| `cannot unmarshal object into ... of type []...` | Something that should be a list is not. Check the `- ` |
+| `cannot unmarshal array into ...` | The opposite: a list where a single map is expected |
+| `strict decoding error: unknown field "X.Y"` | Wrong indentation or a typo in a field name |
+| `no matches for kind "pod" in version "v1"` | Wrong case in `kind`, or wrong `apiVersion` |
+| `error converting YAML to JSON` | Tabs instead of spaces, or a missing space after `:` |
+
+Third time lucky:
+
+```text
+pod/webapp created
+```
+
+## Step 3: Look at the pod
+
+```bash
+kubectl get pods
+```
+
+```text
+NAME     READY   STATUS    RESTARTS   AGE
+webapp   1/1     Running   0          17s
+```
+
+| Column | Meaning |
+| --- | --- |
+| `READY 1/1` | 1 of 1 containers in the pod is ready |
+| `STATUS Running` | The pod is on a node and its container is running. Other statuses are covered in [Kubernetes Pod Statuses](/docs/kubernetes/multi-container-pods-and-daemonsets/kubernetes-pod-statuses) |
+| `RESTARTS 0` | How many times the container restarted. A rising number means it keeps crashing |
+| `AGE` | Time since the pod was created |
+
+If you are quick enough you may see `ContainerCreating` first, while the image is pulled.
+
+For more detail, add `-o wide`:
+
+```bash
+kubectl get pods -o wide
+```
+
+```text
+NAME     READY   STATUS    RESTARTS   AGE   IP              NODE                                         NOMINATED NODE   READINESS GATES
+webapp   1/1     Running   0          46s   192.168.23.99   ip-192-168-9-81.ap-south-1.compute.internal  <none>           <none>
+```
+
+Now you can see the pod's **IP** and the **node** the scheduler chose. On EKS the pod IP comes from your VPC subnet, thanks to the VPC CNI add-on.
+
+When something goes wrong, `describe` is your best friend:
+
+```bash
+kubectl describe pod webapp
+```
+
+It prints the labels, the node, the IP, each container's image, image ID, port, state and restart count, and at the bottom the **Events** list: `Scheduled`, `Pulling`, `Pulled`, `Created`, `Started`. When a pod is stuck, the reason is almost always in those events.
+
+A few more useful commands:
+
+```bash
+kubectl logs webapp                         # the application's stdout, here the Spring Boot startup log
+kubectl get pod webapp -o yaml              # the full object, including the status section
+kubectl port-forward pod/webapp 8080:8080   # temporary tunnel for testing, see note below
+```
+
+`port-forward` opens a tunnel from port 8080 on the EKS home server to the pod. In a second SSH session, `curl localhost:8080` reaches the app. It is a debugging tool only; real access goes through a Service.
+
+## Step 4: create vs apply
+
+Both commands submit a manifest. The difference shows when the object already exists.
+
+```bash
+kubectl create -f k8s-pod.yml
+```
+
+```text
+Error from server (AlreadyExists): error when creating "k8s-pod.yml": pods "webapp" already exists
+```
+
+```bash
+kubectl apply -f k8s-pod.yml
+```
+
+```text
+pod/webapp unchanged
+```
+
+| | `kubectl create -f` | `kubectl apply -f` |
+| --- | --- | --- |
+| Object does not exist | Creates it | Creates it |
+| Object exists | Error: `AlreadyExists` | Compares and updates only what changed, or reports `unchanged` |
+| Style | Imperative: "create this now" | Declarative: "make it look like this file" |
+| Typical use | One-off creation | Everyday work, CI/CD pipelines, GitOps |
+
+Teams use `apply` almost always, because the same command works the first time and every time after.
+
+<Callout type="info" title="You cannot change most fields of a running pod">
+Try changing the `image` in the file and running `kubectl apply` again: it works, because the image is one of the few pod fields that can be updated in place. Now try changing `containerPort` or adding a new container: you get `Forbidden: pod updates may not change fields other than ...`. Pods are meant to be replaced, not edited. Deployments, which you meet soon, handle that replacement for you.
+</Callout>
+
+## Step 5: Delete the pod
+
+```bash
+kubectl delete pod webapp
+# or, using the file
+kubectl delete -f k8s-pod.yml
+```
+
+```text
+pod "webapp" deleted
+```
+
+```bash
+kubectl get pods
+```
+
+```text
+No resources found in default namespace.
+```
+
+The pod is gone and **nothing brings it back**. A bare pod has no controller watching it. If it had crashed or its node had died, it would also have stayed gone. That limitation is exactly why we will move to [ReplicaSets](/docs/kubernetes/namespaces-labels-and-deployments/maintaining-pod-availability-with-replicasets) and Deployments later.
+
+The word "default namespace" in that message refers to [Namespaces](/docs/kubernetes/namespaces-labels-and-deployments/namespaces-in-kubernetes), which we cover in a later section.
+
+## Try It Yourself
+
+1. Create the `webapp` pod and watch it start with `kubectl get pods -w` (press Ctrl+C to stop watching).
+2. Introduce each YAML mistake from this lesson on purpose and match the error you get to the table above.
+3. Run `kubectl describe pod webapp` and write down the five events at the bottom in order.
+4. Change the image to a tag that does not exist (for example `nginx:does-not-exist`), apply, and look at the STATUS column and the events. You will see `ErrImagePull` and then `ImagePullBackOff`.
+5. Delete the pod and confirm nothing recreates it.
+
+<Callout type="warn" title="Cluster cost">
+If you are done for the day, delete the cluster: `eksctl delete cluster --name telusko-learning --region ap-south-1 --wait`.
+</Callout>
+
+## Official references
+
+- [Kubernetes: Pods](https://kubernetes.io/docs/concepts/workloads/pods/)
+- [kubectl reference: apply](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/)
+- [kubectl reference: describe](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_describe/)
+- [kubectl Quick Reference](https://kubernetes.io/docs/reference/kubectl/quick-reference/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

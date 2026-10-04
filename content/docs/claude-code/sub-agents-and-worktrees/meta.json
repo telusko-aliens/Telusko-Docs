@@ -1,0 +1,9 @@
+{
+    "title": "Sub-Agents and Worktrees",
+    "pages": [
+        "understanding-sub-agents.mdx",
+        "creating-and-using-sub-agents.mdx",
+        "sub-agent-workflow-demo.mdx",
+        "worktrees-and-parallel-tasks.mdx"
+    ]
+}

@@ -1,0 +1,190 @@
+---
+title: Namespaces in Kubernetes
+description: Use namespaces to divide one cluster into isolated areas, create them with kubectl and YAML, deploy a pod into a namespace, query it with -n, and understand what deleting a namespace removes.
+---
+
+Every time you ran `kubectl get pods` on an empty cluster, the answer was `No resources found in default namespace.` That word, **namespace**, has been there from the start. Now it is time to use it.
+
+## The problem namespaces solve
+
+Picture one company cluster shared by several teams: two development teams, a testing team, and production workloads. Each team wants a pod called `webapp`. Inside a single area that is impossible, because **object names must be unique per kind within a namespace**. Without some way to divide the cluster, teams would trip over each other's names, accidentally delete each other's pods, and nobody could tell which resources belong to whom.
+
+A **namespace** is a logical partition inside one Kubernetes cluster. It groups and isolates resources. Think of it as a folder: `dev`, `test` and `prod` folders can each contain a file named `webapp` without any conflict.
+
+```text
+cluster telusko-learning
+ |- namespace default   : pods, services you created so far
+ |- namespace dev       : webapp pod (dev team)
+ |- namespace test      : webapp pod (test team)
+ '- namespace kube-system : coredns, kube-proxy, aws-node ...
+```
+
+## Namespaces that exist already
+
+```bash
+kubectl get namespaces      # short form: kubectl get ns
+```
+
+```text
+NAME              STATUS   AGE
+default           Active   3h
+kube-node-lease   Active   3h
+kube-public       Active   3h
+kube-system       Active   3h
+```
+
+| Namespace | Purpose |
+| --- | --- |
+| `default` | Where your objects go when you do not specify a namespace. Everything we created so far lives here |
+| `kube-system` | System components: CoreDNS, kube-proxy, the VPC CNI (`aws-node`), metrics-server. Do not delete or edit things here unless you know exactly why |
+| `kube-public` | Readable by everyone, including unauthenticated users. Holds a small amount of public cluster info |
+| `kube-node-lease` | One Lease object per node. The kubelet updates it as a heartbeat so the control plane knows the node is alive |
+
+## Creating a namespace
+
+### With a command
+
+```bash
+kubectl create namespace dev
+kubectl get ns
+```
+
+### With a manifest
+
+```bash
+vi ns.yml
+```
+
+```yaml title="ns.yml"
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: alien
+```
+
+A Namespace needs no `spec`. Apply it:
+
+```bash
+kubectl apply -f ns.yml
+kubectl get ns
+```
+
+Both `dev` (created by command) and `alien` (created from YAML) now appear with status `Active`. The YAML way is better for real projects, because the namespace is then stored in Git with the rest of the application.
+
+Namespace names follow DNS label rules: lowercase letters, numbers and `-`, at most 63 characters. Avoid names starting with `kube-`, which is reserved for the system.
+
+## Deleting a namespace
+
+```bash
+kubectl delete namespace alien
+```
+
+<Callout type="error" title="Deleting a namespace deletes everything inside it">
+Every pod, Service, Deployment, ConfigMap, Secret and PersistentVolumeClaim in that namespace is deleted with it, and there is no undo. Before deleting, run `kubectl get all -n <name>` and make sure that is what you want. On a shared cluster, deleting the wrong namespace is one of the most damaging mistakes you can make.
+</Callout>
+
+Deletion can stay in `Terminating` status for a while as Kubernetes deletes the contents first.
+
+## Creating a pod in a namespace
+
+Edit the pod manifest from earlier and add `namespace` under `metadata`:
+
+```yaml title="k8s-pod.yml"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: webapp
+  namespace: dev
+  labels:
+    app: telusko-webapp
+spec:
+  containers:
+    - name: webapp-container
+      image: <your-dockerhub-username>/springboot-app:latest
+      ports:
+        - containerPort: 8080
+```
+
+```bash
+kubectl apply -f k8s-pod.yml
+kubectl get pods
+```
+
+```text
+No resources found in default namespace.
+```
+
+The pod is not missing. kubectl looks in `default` unless told otherwise. Ask for `dev`:
+
+```bash
+kubectl get pods -n dev
+```
+
+```text
+NAME     READY   STATUS    RESTARTS   AGE
+webapp   1/1     Running   0          12s
+```
+
+| Option | Meaning |
+| --- | --- |
+| `-n dev` or `--namespace dev` | Run this command against the `dev` namespace |
+| `-A` or `--all-namespaces` | List objects from every namespace, for example `kubectl get pods -A` |
+
+You can also leave `namespace` out of the YAML and choose it at apply time with `kubectl apply -f k8s-pod.yml -n dev`. If the file says one namespace and `-n` says another, kubectl refuses with an error, which protects you from deploying to the wrong place.
+
+### Stop typing -n every time
+
+If you work in one namespace for a while, make it the default for your kubectl context:
+
+```bash
+kubectl config set-context --current --namespace=dev
+kubectl config view --minify | grep namespace     # confirm
+kubectl config set-context --current --namespace=default   # switch back
+```
+
+## Now delete the namespace and watch the pod go
+
+```bash
+kubectl delete namespace dev
+kubectl get pods -n dev
+```
+
+```text
+No resources found in dev namespace.
+```
+
+The pod went with the namespace, exactly as the warning said.
+
+## What namespaces do and do not isolate
+
+Namespaces are about **organisation and access control**, not network walls.
+
+| Isolated by namespace | Not isolated by namespace |
+| --- | --- |
+| Object names (two `webapp` pods can exist in two namespaces) | Network traffic. A pod in `dev` can call a Service in `prod` using `svc-name.prod` unless a NetworkPolicy blocks it |
+| RBAC permissions (give a team rights to only their namespace) | Nodes. Pods from all namespaces share the same worker nodes |
+| Resource limits per team (ResourceQuota, covered later in the course) | Cluster-scoped objects such as Nodes, Namespaces themselves, PersistentVolumes, StorageClasses |
+
+To list which kinds live inside namespaces and which are cluster-wide:
+
+```bash
+kubectl api-resources --namespaced=true
+kubectl api-resources --namespaced=false
+```
+
+## Try It Yourself
+
+1. Create namespaces `dev` and `test`, one with a command and one with YAML.
+2. Create a pod named `webapp` in **both** namespaces at the same time. Confirm with `kubectl get pods -A` that two pods share the same name.
+3. Set your current context's namespace to `test`, run `kubectl get pods` without `-n`, then switch back to `default`.
+4. Delete the `test` namespace and confirm its pod disappeared.
+
+## Official references
+
+- [Kubernetes: Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
+- [Kubernetes: Share a Cluster with Namespaces](https://kubernetes.io/docs/tasks/administer-cluster/namespaces/)
+- [kubectl Quick Reference: contexts and namespaces](https://kubernetes.io/docs/reference/kubectl/quick-reference/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

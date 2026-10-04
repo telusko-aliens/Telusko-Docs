@@ -1,0 +1,333 @@
+---
+title: Linux Navigation and Basic Commands
+---
+
+
+Now that we are connected to our Linux server through SSH, it's time to start working with the Linux command line.
+
+One of the first skills you need is **navigation** - understanding where you are, viewing what's around you, creating directories and files, and moving between locations.
+
+In this lecture, we'll learn a small set of commands that form the foundation for working with the Linux filesystem.
+
+## Everything is a File in Linux
+
+One of the important concepts in Linux is that many system resources are represented through a **file-like interface**.
+
+For everyday Linux usage, you'll commonly work with three types of filesystem objects:
+
+| Type         | Description                                               | Example                             |
+| ------------ | --------------------------------------------------------- | ----------------------------------- |
+| Regular File | Stores data such as text, configuration, or source code.  | `file.txt`, `config.yml`, `main.tf` |
+| Directory    | A container used to organize files and other directories. | `/home`, `/etc`, `telusko/`         |
+| Link         | A reference that points to another file or directory.     | Symbolic link                       |
+
+> **Note:** A directory is technically a special type of filesystem object rather than an ordinary file. The phrase "everything is a file" is a useful Linux concept because many resources are accessed through file-like interfaces.
+
+Understanding these objects makes Linux navigation much easier.
+
+
+---
+<Steps>
+
+<Step>
+
+## `pwd` - Print Working Directory
+
+The `pwd` command displays the **absolute path of your current directory**.
+
+```bash
+pwd
+```
+
+Example output:
+
+```text
+/home/ubuntu
+```
+
+This tells you exactly where you are in the filesystem.
+
+### Why use `pwd`?
+
+When working from the command line, there is no graphical folder window showing your current location. `pwd` gives you that information immediately.
+
+> **Tip:** If you're unsure where you are, run `pwd`.
+
+</Step>
+
+---
+
+<Step>
+## `mkdir` - Create a Directory
+
+The `mkdir` command creates a new directory.
+
+```bash
+mkdir telusko
+```
+
+This creates a directory named `telusko` in your current location.
+
+You can verify it with:
+
+```bash
+ls
+```
+
+Example:
+
+```text
+telusko
+```
+
+### Creating Multiple Directories
+
+You can also create multiple directories with one command:
+
+```bash
+mkdir projects notes backups
+```
+
+This creates three directories in the current location.
+
+</Step>
+
+---
+
+<Step>
+## `ls` - List Directory Contents
+
+The `ls` command displays the files and directories in your current location.
+
+```bash
+ls
+```
+
+Example output:
+
+```text
+projects  notes  telusko
+```
+
+You can also specify a directory:
+
+```bash
+ls telusko
+```
+
+This lists the contents of the `telusko` directory without moving into it.
+
+### A Useful Option
+
+To see more detailed information:
+
+```bash
+ls -l
+```
+
+This displays details such as permissions, ownership, size, and modification time.
+
+We'll explore these options in more detail when we learn Linux file permissions.
+
+</Step>
+
+---
+
+<Step>
+## `cd` - Change Directory
+
+The `cd` command is used to move from one directory to another.
+
+For example:
+
+```bash
+cd telusko
+```
+
+Now check your location:
+
+```bash
+pwd
+```
+
+Output:
+
+```text
+/home/ubuntu/telusko
+```
+
+You have moved from `/home/ubuntu` into `/home/ubuntu/telusko`.
+
+### Move to the Parent Directory
+
+To move one level up, use:
+
+```bash
+cd ..
+```
+
+For example:
+
+```text
+/home/ubuntu/telusko
+            |
+         cd ..
+            |
+            v
+/home/ubuntu
+```
+
+You can verify the change with:
+
+```bash
+pwd
+```
+
+### Go to Your Home Directory
+
+You can return to your home directory using:
+
+```bash
+cd ~
+```
+
+You can also simply use:
+
+```bash
+cd
+```
+
+For the `ubuntu` user, this will typically take you to:
+
+```text
+/home/ubuntu
+```
+
+</Step>
+
+---
+
+<Step>
+## `touch` - Create an Empty File
+
+The `touch` command can be used to create an empty file.
+
+```bash
+touch alien.txt
+```
+
+Verify that the file exists:
+
+```bash
+ls
+```
+
+Output:
+
+```text
+alien.txt
+```
+
+You can create files with different names and extensions:
+
+```bash
+touch config.yml
+touch main.tf
+touch data.json
+```
+
+> Linux does not determine a file's type simply from its extension. An extension such as `.txt` or `.json` is mainly a naming convention. The actual contents and format of a file determine what it contains.
+
+`touch` can also update a file's timestamps if the file already exists.
+
+
+</Step>
+
+</Steps>
+
+---
+
+
+## Putting the Commands Together
+
+Let's combine everything into a small practice exercise.
+
+Start by checking your current location:
+
+```bash
+pwd
+```
+
+Create a directory:
+
+```bash
+mkdir telusko
+```
+
+Check that it was created:
+
+```bash
+ls
+```
+
+Move into the directory:
+
+```bash
+cd telusko
+```
+
+Confirm your location:
+
+```bash
+pwd
+```
+
+Create an empty file:
+
+```bash
+touch alien.txt
+```
+
+Verify the file:
+
+```bash
+ls
+```
+
+Move back to the parent directory:
+
+```bash
+cd ..
+```
+
+Finally, confirm your location:
+
+```bash
+pwd
+```
+
+This simple workflow introduces the basic pattern you'll use repeatedly when working with Linux:
+
+**check your location → create something → inspect it → navigate → verify**
+
+
+---
+
+
+## Quick Command Reference
+
+| Command | Purpose                      | Example           |
+| ------- | ---------------------------- | ----------------- |
+| `pwd`   | Show the current directory   | `pwd`             |
+| `ls`    | List directory contents      | `ls`              |
+| `mkdir` | Create a directory           | `mkdir projects`  |
+| `cd`    | Move to another directory    | `cd projects`     |
+| `cd ..` | Move to the parent directory | `cd ..`           |
+| `cd ~`  | Go to the home directory     | `cd ~`            |
+| `touch` | Create an empty file         | `touch notes.txt` |
+
+
+> **Remember:** Don't try to memorize commands in isolation. Practise them together and build a mental picture of the filesystem. Once you understand where you are and how to move around, the rest of Linux becomes much easier to explore.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

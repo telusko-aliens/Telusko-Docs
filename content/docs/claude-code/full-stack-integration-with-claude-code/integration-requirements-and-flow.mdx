@@ -1,0 +1,115 @@
+---
+title: Integration Requirements and Flow
+description: The plan for building the backend in small feature branches, the target architecture, and how the frontend, FastAPI and SQLite fit together.
+---
+
+We have done the groundwork. The frontend is ready, our `CLAUDE.md` describes the project and its rules, and the sub-agents produced two specs: `api-contract.md` and `seed-data.json`. Now we connect everything.
+
+We could vibe code the backend in one shot. But the whole point is **control**: building in small, verifiable steps that we understand and can roll back.
+
+## The target architecture
+
+<img src="/claude-code/fullstack-architecture.svg" alt="Content Tracker architecture: frontend, FastAPI layers, SQLite" width={960} height={470} />
+
+| Layer | Responsibility |
+| --- | --- |
+| **Browser + frontend** | The Kanban UI. Calls `api.getTasks()`, `api.createTask()` and so on |
+| **Routes** (`api/v1/tasks.py`) | Receive HTTP requests, validate input, call the service, return responses. No database code |
+| **Schemas** (`schemas/task.py`) | Pydantic v2 models for requests and responses, with camelCase on the wire |
+| **Service** (`services/task_service.py`) | Business logic. No HTTP code |
+| **Models** (`models/task.py`) | SQLAlchemy 2.0 table definitions |
+| **Database** | SQLite through the async `aiosqlite` driver, as decided in the worktree experiment |
+| **Alembic + seed** | Create tables from models, and load the sample data |
+
+## The plan: five feature branches
+
+Professional teams never build a whole backend directly on `main`. `main` is what gets deployed. Every change happens on a **feature branch**, is tested, then merged. Once merged, the branch is deleted.
+
+We follow the same discipline with Claude Code:
+
+<img src="/claude-code/feature-branch-flow.svg" alt="Five feature branches merged into main" width={960} height={330} />
+
+| # | Branch | What we build |
+| --- | --- | --- |
+| 1 | `feature/backend-setup` | The skeleton: folder structure, `uv` project, dependencies. No business code yet |
+| 2 | `feature/task-model` | SQLAlchemy `Task` model, Pydantic schemas, async database engine, first Alembic migration |
+| 3 | `feature/crud-endpoints` | The four API endpoints and the service layer. Test with Swagger |
+| 4 | `feature/seed-data` | An idempotent seed script that loads `specs/seed-data.json` |
+| 5 | `feature/frontend-wiring` | Replace the failing `mockFetch` with a real `fetch` to the backend |
+
+For every branch the loop is the same:
+
+1. Create the branch
+2. Start a fresh session (or `/clear`)
+3. Give Claude a precise prompt that points at the specs
+4. Review the changes with `/diff`
+5. Test it
+6. Commit, merge into `main`, delete the branch
+
+## Git commands for every branch
+
+You will repeat this cycle five times, so it is worth knowing by heart:
+
+```bash
+git checkout -b feature/<name>    # 1. start the feature
+# ... work with Claude, review with /diff ...
+git add .                         # 2. stage
+git commit -m "feat: ..."         # 3. commit (or let Claude write the message)
+git checkout main                 # 4. go back to main
+git merge feature/<name>          # 5. bring the feature in
+git branch -d feature/<name>      # 6. delete the merged branch
+```
+
+Inside Claude Code you can run each line with the `!` prefix, for example `!git status`, so it does not go through the model.
+
+## Definition of done for each branch
+
+Before you merge a branch, every box should be ticked:
+
+- [ ] The prompt referenced the spec files instead of describing things from memory
+- [ ] You read the full `/diff`, not just Claude's summary
+- [ ] The code follows `CLAUDE.md`: service layer, schemas and models in their folders, snake_case, type hints
+- [ ] You ran it yourself (Swagger, curl or the browser), not only Claude's own checks
+- [ ] Nothing outside the feature changed (no surprise edits in `frontend/` or `specs/`)
+- [ ] The commit message explains **what** and **why**
+
+## A note on uv
+
+While planning, we realised something was missing: we want **uv** as the Python package manager, not plain `pip`. uv is much faster, manages Python versions, and keeps dependencies locked in `pyproject.toml` and `uv.lock`.
+
+This should have been in `CLAUDE.md` from day one. It is never too late. We add it as the very first step of the backend setup.
+
+<Callout type="info" title="Lesson learned">
+Decide your tooling (package manager, Python version, formatter, test runner) before Claude writes the first file, and put it in `CLAUDE.md`. Changing tools later is always more work.
+</Callout>
+
+## The request flow we are aiming for
+
+```text
+Browser (http://localhost:8080)
+   │
+   ▼
+frontend/app.js  ── api.getTasks() ──►  fetch("http://localhost:8000/api/tasks")
+                                              │
+                                              ▼
+                                FastAPI route  (api/v1/tasks.py)
+                                              │
+                                              ▼
+                                Service layer  (services/task_service.py)
+                                              │
+                                              ▼
+                                SQLAlchemy  ──►  SQLite (telusko.db)
+```
+
+When this works end to end, clicking **Move Forward** on a card updates the database, and the board shows the new state after a refresh.
+
+## Official references
+
+- [Common workflows](https://code.claude.com/docs/en/common-workflows)
+- [Best practices for Claude Code](https://code.claude.com/docs/en/best-practices)
+- [uv documentation](https://docs.astral.sh/uv/)
+- [FastAPI documentation](https://fastapi.tiangolo.com/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

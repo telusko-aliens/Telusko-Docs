@@ -1,0 +1,237 @@
+---
+title: Implementing Backend Features - Part 2
+description: Build the four CRUD endpoints with a clean service layer, test them with Swagger, and write an idempotent seed script that loads the sample data.
+---
+
+The data layer is ready. Now we build the API itself, test it in the browser, and load our seed data into the database.
+
+## Feature 3: CRUD endpoints
+
+```text
+!git checkout -b feature/crud-endpoints
+/clear
+```
+
+### The prompt
+
+```text title="Prompt: CRUD endpoints"
+Read @specs/api-contract.md.
+
+Build the four FastAPI endpoints in backend/app/api/v1/tasks.py:
+  GET    /api/tasks       - list all tasks
+  POST   /api/tasks       - create a task (return 201)
+  PUT    /api/tasks/{id}  - update a task
+  DELETE /api/tasks/{id}  - delete a task (return 204)
+
+Business logic goes in backend/app/services/task_service.py.
+Routes call the service. Service talks to the database.
+Routes know nothing about SQLAlchemy. Service knows nothing about HTTP.
+Response shapes must match exactly what is in the spec.
+Handle errors with HTTPException using the status codes from the spec.
+Wire the router into backend/app/main.py with CORS enabled so the frontend can call it.
+```
+
+In the video, the first version of this prompt did not include the last four lines. We stopped Claude and added them before it started. Those lines are what make the result match the spec exactly, so it is worth the extra ten seconds.
+
+### What Claude built
+
+**Routes** are thin: validate, call the service, translate "not found" into a 404, return.
+
+```python title="backend/app/api/v1/tasks.py (trimmed)"
+router = APIRouter(prefix="/api/tasks", tags=["tasks"])
+DbDep = Annotated[AsyncSession, Depends(get_db)]
+
+
+@router.get("", response_model=list[TaskResponse], response_model_by_alias=True)
+async def list_tasks(db: DbDep) -> list[Task]:
+    return await task_service.get_all_tasks(db)
+
+
+@router.post("", response_model=TaskResponse, response_model_by_alias=True,
+             status_code=status.HTTP_201_CREATED)
+async def create_task(data: TaskCreate, db: DbDep) -> Task:
+    return await task_service.create_task(db, data)
+
+
+@router.put("/{task_id}", response_model=TaskResponse, response_model_by_alias=True)
+async def update_task(task_id: int, data: TaskUpdate, db: DbDep) -> Task:
+    task = await task_service.update_task(db, task_id, data)
+    if task is None:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+    return task
+
+
+@router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_task(task_id: int, db: DbDep) -> None:
+    if not await task_service.delete_task(db, task_id):
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+```
+
+`response_model_by_alias=True` is the important detail: it makes FastAPI send `assignedRole` and `createdAt`, as the frontend expects.
+
+**The service** holds the logic and knows nothing about HTTP:
+
+```python title="backend/app/services/task_service.py (trimmed)"
+async def update_task(db: AsyncSession, task_id: int, data: TaskUpdate) -> Task | None:
+    task = await db.get(Task, task_id)
+    if task is None:
+        return None
+
+    # Only change the fields the client actually sent
+    patch = data.model_dump(exclude_unset=True)
+    for field, value in patch.items():
+        setattr(task, field, value)
+
+    await db.commit()
+    await db.refresh(task)
+    return task
+```
+
+`model_dump(exclude_unset=True)` means a request that only sends `{"state": "editing"}` changes only the state, instead of wiping the title and description.
+
+<img src="/claude-code/request-lifecycle.svg" alt="Life of a PUT request through route, schema, service and database" width={960} height={430} />
+
+**`main.py`** registers the router and enables CORS for the origins the frontend may run on, plus a `/health` endpoint.
+
+### Test with Swagger
+
+Claude ran its own quick end-to-end checks and committed. But we verify ourselves. Ask:
+
+```text
+Run the backend server with uv.
+```
+
+Claude starts it through uv, for example with `uv run uvicorn app.main:app --reload` from the `backend` folder. Open the interactive API docs that FastAPI generates automatically:
+
+```text
+http://localhost:8000/docs
+```
+
+Expand `GET /api/tasks`, click **Try it out**, then **Execute**. You get a JSON list of tasks back. In our case there were two records: the ones Claude created during its own `curl` tests. The real seed data is not loaded yet, and that is the next feature.
+
+<img src="/claude-code/swagger-flow.svg" alt="Testing endpoints with FastAPI Swagger UI" width={960} height={300} />
+
+### Test every endpoint from the terminal
+
+Swagger is great for clicking through. `curl` is faster to repeat and easy to paste into a spec later:
+
+```bash
+# List all tasks (200)
+curl -s http://localhost:8000/api/tasks
+
+# Create a task (201). Note the camelCase field names on the wire
+curl -s -X POST http://localhost:8000/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Docker basics","description":"Intro video","assignedRole":"Content","state":"code_ready"}'
+
+# Move task 1 forward (200). Only the state is sent
+curl -s -X PUT http://localhost:8000/api/tasks/1 \
+  -H "Content-Type: application/json" \
+  -d '{"state":"recorded"}'
+
+# Invalid state is rejected by Pydantic (422)
+curl -s -o /dev/null -w "%{http_code}\n" -X PUT http://localhost:8000/api/tasks/1 \
+  -H "Content-Type: application/json" -d '{"state":"flying"}'
+
+# Delete the task you created (204), then delete it again (404)
+# Replace <id> with the id returned by the POST above
+curl -s -o /dev/null -w "%{http_code}\n" -X DELETE http://localhost:8000/api/tasks/<id>
+curl -s -o /dev/null -w "%{http_code}\n" -X DELETE http://localhost:8000/api/tasks/<id>
+```
+
+### Status codes our API uses
+
+| Code | Meaning | When we return it |
+| --- | --- | --- |
+| `200 OK` | Success with a body | GET list, PUT update |
+| `201 Created` | A new resource was created | POST |
+| `204 No Content` | Success, nothing to return | DELETE |
+| `404 Not Found` | The id does not exist | PUT or DELETE on a missing task |
+| `422 Unprocessable Entity` | The body failed validation | Wrong enum value, empty title, wrong types. FastAPI and Pydantic produce this automatically |
+
+### Merge
+
+```text
+Merge this branch into main and then delete the feature/crud-endpoints branch.
+```
+
+<Callout type="warn" title="Read before you approve">
+When Claude proposes git commands, read them. "Delete the branch" must target `feature/crud-endpoints`, not `main`. A permission prompt is only useful if you actually look at it.
+</Callout>
+
+## Feature 4: Seed data
+
+```text
+!git checkout -b feature/seed-data
+```
+
+### The prompt
+
+```text title="Prompt: seed script"
+Read @specs/seed-data.json. Write a seed script at backend/seed.py
+that reads this file and inserts all records into the tasks table
+using the async SQLAlchemy session.
+
+The script must be idempotent: if run twice, it should not create
+duplicates. Check whether a task with the same id already exists
+before inserting.
+
+Run it with uv and confirm the database has five records.
+```
+
+### What "idempotent" means
+
+An **idempotent** operation gives the same result no matter how many times you run it. Seed scripts often run on every deploy or restart. Without this rule, every restart would insert the same five tasks again.
+
+Claude's script checks each `id` before inserting:
+
+```python title="backend/seed.py (trimmed)"
+async def seed() -> None:
+    records = json.loads(SEED_FILE.read_text(encoding="utf-8"))
+    async with AsyncSessionLocal() as db:
+        for rec in records:
+            if await db.get(Task, rec["id"]) is not None:
+                print(f"  SKIP   id={rec['id']}")
+                continue
+            db.add(Task(
+                id=rec["id"],
+                title=rec["title"],
+                description=rec["description"],
+                assigned_role=AssignedRole(rec["assigned_role"]),
+                state=TaskState(rec["state"]),
+                created_at=date.fromisoformat(rec["created_at"]),
+            ))
+        await db.commit()
+```
+
+Run it:
+
+```bash
+cd backend
+uv run python seed.py
+```
+
+Claude reported that two of the ids already existed from its earlier `curl` tests, skipped them, and inserted the rest. Back in Swagger, `GET /api/tasks` now returns all **five** tasks.
+
+### Merge and check your context
+
+```text
+Merge this branch into main and delete the feature/seed-data branch.
+```
+
+Now run `/context`. In the video, after several features in one session, it was already at **44%**. That is the moment to start fresh, before the next feature:
+
+```text
+/clear
+```
+
+## Official references
+
+- [FastAPI: bigger applications with routers](https://fastapi.tiangolo.com/tutorial/bigger-applications/)
+- [FastAPI: interactive API docs](https://fastapi.tiangolo.com/tutorial/first-steps/#interactive-api-docs)
+- [FastAPI: CORS](https://fastapi.tiangolo.com/tutorial/cors/)
+- [Pydantic: model_dump and exclude_unset](https://docs.pydantic.dev/latest/concepts/serialization/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,8 @@
+{
+    "title": "Securing the Application with JWT",
+    "pages": [
+        "jwt-security-flow.mdx",
+        "setting-up-the-jwt-security-spec-file.mdx",
+        "implementing-jwt-security-with-spec-driven-development.mdx"
+    ]
+}

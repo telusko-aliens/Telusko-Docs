@@ -1,0 +1,137 @@
+---
+title: Maven Web App
+description: Generate a Java web application with the maven-archetype-webapp template, see how its structure and packaging differ from a JAR project, and build a deployable WAR file with mvn clean package.
+---
+
+So far our project produced a JAR, which is right for a standalone program. A classic Java web application is different: it has web pages, a deployment descriptor, and it runs inside a servlet container such as Apache Tomcat. That kind of application is packaged as a **WAR** file. Maven creates and builds it with the same commands you already know. Only the template changes.
+
+## Generate the web project
+
+The command is the same as before, with two changes: a new `artifactId` and the `webapp` archetype instead of `quickstart`.
+
+```bash title="Command Prompt or Bash, one line"
+mvn archetype:generate -DgroupId=com.telusko -DartifactId=telusko-web-app -DarchetypeArtifactId=maven-archetype-webapp -DarchetypeVersion=1.5 -DinteractiveMode=false
+```
+
+| Parameter | Value | What changed |
+| --- | --- | --- |
+| `groupId` | `com.telusko` | Same company |
+| `artifactId` | `telusko-web-app` | New project name, so the WAR will be `telusko-web-app.war` |
+| `archetypeArtifactId` | `maven-archetype-webapp` | Web template instead of `quickstart` |
+| `archetypeVersion` | `1.5` | The video uses `1.0`. Both work. 1.5 is the current template version |
+| `interactiveMode` | `false` | No prompts |
+
+Run it in the same parent folder as `telusko-app` (Windows) or in your home folder on the VM. In PowerShell, remember to quote each `-D` argument.
+
+## What is inside
+
+```text
+telusko-web-app/
+├── .mvn/                       <- small Maven config folder (template 1.5 only)
+├── pom.xml
+└── src/
+    └── main/
+        ├── resources/              <- config files (template 1.0 creates this)
+        └── webapp/
+            ├── index.jsp           <- a sample "Hello World!" page
+            └── WEB-INF/
+                └── web.xml         <- deployment descriptor
+```
+
+Compare it with the quickstart project:
+
+| | Quickstart project | Webapp project |
+| --- | --- | --- |
+| Main new folder | `src/main/java` | `src/main/webapp` |
+| Sample file | `App.java` | `index.jsp` |
+| Deployment descriptor | none | `WEB-INF/web.xml` |
+| `<packaging>` in POM | `jar` (or omitted) | `war` |
+| Build output | `target/telusko-app-1.0-SNAPSHOT.jar` | `target/telusko-web-app.war` |
+
+The webapp template does not create `src/main/java`. When you write servlets or controllers, create `src/main/java` yourself and Maven will compile it automatically.
+
+Open `pom.xml`. The important lines are:
+
+```xml title="pom.xml (generated with template 1.0, trimmed)"
+<groupId>com.telusko</groupId>
+<artifactId>telusko-web-app</artifactId>
+<packaging>war</packaging>
+<version>1.0-SNAPSHOT</version>
+<name>telusko-web-app Maven Webapp</name>
+...
+<build>
+  <finalName>telusko-web-app</finalName>
+</build>
+```
+
+`<packaging>war</packaging>` tells Maven to use the WAR plugin during `package`. `<finalName>` overrides the default file name (`artifactId-version`), which is why the WAR is called `telusko-web-app.war` with no version in it. That is convenient, because Tomcat uses the WAR file name as the URL path (`/telusko-web-app`).
+
+<img src="/maven/jar-vs-war.svg" alt="Comparison of jar packaging and war packaging: archetype, output file, contents and where each runs" width={960} height={330} />
+
+## Build the WAR
+
+`cd` into the project and run the goals exactly as before:
+
+```bash
+cd telusko-web-app
+mvn clean package
+```
+
+`clean package` deletes any old `target` folder, compiles (if there is Java code), runs tests (if any), and packages the WAR. The first run downloads the WAR plugin, so expect some `Downloading from central` lines.
+
+<img src="/maven/screenshots/war-build-success.webp" alt="Command Prompt output of mvn clean package showing Packaging webapp, Building war: target/telusko-web-app.war and BUILD SUCCESS" width={1440} height={778} />
+
+*The end of the build on Windows: "Building war: ...\target\telusko-web-app.war" followed by BUILD SUCCESS.*
+
+Look inside `target`:
+
+```text
+target/
+├── telusko-web-app/           <- the exploded (unzipped) web app
+│   ├── index.jsp
+│   ├── META-INF/
+│   └── WEB-INF/
+│       ├── web.xml
+│       └── classes/
+└── telusko-web-app.war        <- the deployable archive
+```
+
+A WAR is just a ZIP file with a fixed layout. Compiled classes go to `WEB-INF/classes` and dependency JARs go to `WEB-INF/lib`. You can check with `jar tf target/telusko-web-app.war`.
+
+Every time you change the code, run `mvn clean package` again to get a fresh WAR.
+
+## What happens to the WAR next?
+
+The WAR does nothing on its own. You copy it into a servlet container's `webapps` folder (for example Tomcat's), and Tomcat unpacks and serves it at `http://localhost:8080/telusko-web-app/`. In the Docker course you package exactly this kind of WAR into a Tomcat image: [Dockerizing A Maven Web Application](/docs/docker/dockerizing-applications/dockerizing-a-maven-web-application).
+
+<Callout type="warn" title="javax or jakarta?">
+The webapp template's `web.xml` uses an old Servlet specification version. Tomcat 10 and newer use the `jakarta.*` namespace, so when you add real servlets, depend on the Jakarta Servlet API with `provided` scope and update `web.xml` to a current version. For the empty sample project, nothing needs to change.
+</Callout>
+
+## Common problems
+
+<Accordions>
+<Accordion title="Cannot access defaults field of Properties">
+Your Maven version binds an old `maven-war-plugin` (2.x) that does not work on Java 16 and newer. Add a current version of the plugin to `pom.xml` inside `<build><plugins>`: groupId `org.apache.maven.plugins`, artifactId `maven-war-plugin`, version `3.5.1` (current at the time of writing). Newer Maven versions already use 3.x by default.
+</Accordion>
+<Accordion title="webxml attribute is required">
+Also an old WAR plugin symptom when `WEB-INF/web.xml` is missing. Use `maven-war-plugin` 3.x, which does not require `web.xml`.
+</Accordion>
+</Accordions>
+
+## Try It Yourself
+
+1. Generate `telusko-web-app` and compare its `pom.xml` with the one in `telusko-app`. List every difference.
+2. Run `mvn clean package` and list the contents of the WAR with `jar tf target/telusko-web-app.war`.
+3. Remove the `<finalName>` line, rebuild, and note the new WAR file name. Put it back.
+4. If you have Tomcat installed, copy the WAR into its `webapps` folder, start Tomcat and open `http://localhost:8080/telusko-web-app/`.
+
+## Official references
+
+- [Apache Maven: Webapp Archetype](https://maven.apache.org/archetypes/maven-archetype-webapp/)
+- [Apache Maven: WAR Plugin](https://maven.apache.org/plugins/maven-war-plugin/)
+- [Apache Maven: Introduction to the Build Lifecycle (packaging bindings)](https://maven.apache.org/guides/introduction/introduction-to-the-lifecycle.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

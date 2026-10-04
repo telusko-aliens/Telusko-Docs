@@ -1,0 +1,152 @@
+---
+title: Kubernetes Monitoring and Installing Prometheus
+description: Learn what observability means for a Kubernetes cluster, how Prometheus and Grafana work together, and install Prometheus on EKS with its Helm chart in a monitoring namespace.
+---
+
+Deploying an application is half the job. The other half is knowing how it behaves once it runs. Is a node running out of memory? Which pod is eating the CPU? Did the restarts start after the last release? Is a node about to become `NotReady`? Without data, you find out when users complain.
+
+**Observability** is the ability to understand what is happening inside your applications and infrastructure from the data they produce. In DevOps it rests on three kinds of data:
+
+| Signal | What it is | Examples |
+| --- | --- | --- |
+| **Metrics** | Numbers measured over time | CPU, memory, network, disk usage, request rate, error rate |
+| **Logs** | Text records of events | Application logs, system logs, `kubectl logs` output |
+| **Alerts** | Notifications when something crosses a limit | "Node memory above 90% for 5 minutes", sent to email or Slack |
+
+Many teams also add **traces**, which follow one request through several services. Observability helps developers and operations teams find and fix problems quickly.
+
+The [Metrics Server](/docs/kubernetes/configuration-and-autoscaling/kubernetes-autoscaling-introduction) you met with the HPA only keeps the latest CPU and memory values. For history, graphs and alerts we need real monitoring tools.
+
+## Prometheus and Grafana
+
+The most common open-source pair for Kubernetes monitoring:
+
+| | Prometheus | Grafana |
+| --- | --- | --- |
+| Role | **Collects and stores** metrics | **Visualises** metrics as dashboards |
+| How | Pulls (scrapes) metrics from targets every few seconds and stores them in its time-series database | Queries data sources and draws graphs, tables and gauges |
+| Without the other | Has data but only a basic UI | Has nice dashboards but no data |
+| Query language | PromQL | Uses each data source's language |
+
+So Prometheus is the **data source** and Grafana is the **dashboard**. Grafana asks Prometheus for numbers and shows them in a way people can read at a glance.
+
+<img src="/kubernetes/k8s2-prometheus-grafana-stack.svg" alt="node-exporter, kube-state-metrics, the kubelet and application endpoints expose metrics; the Prometheus server scrapes and stores them and sends alerts to Alertmanager; Grafana queries Prometheus and shows dashboards to the user" width={960} height={470} />
+
+Where do the metrics come from? Small **exporters** expose them over HTTP:
+
+- **node-exporter**: a DaemonSet that reports each node's CPU, memory, disk and network
+- **kube-state-metrics**: reports the state of Kubernetes objects (desired vs ready replicas, pod phases, restarts)
+- **kubelet / cAdvisor**: per-container CPU and memory
+- **Your application**: Spring Boot exposes metrics at `/actuator/prometheus` with Micrometer
+
+In this lesson we install Prometheus. In the [next lesson](/docs/kubernetes/monitoring-and-deployment-strategies/visualizing-kubernetes-metrics-with-grafana) we add Grafana on top.
+
+## Step 1: Find the chart
+
+Open [Artifact Hub](https://artifacthub.io) and search for **prometheus**. Choose the `prometheus` chart from the **prometheus-community** repository (the official community charts). Its install tab gives the repository:
+
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+```
+
+`helm repo update` refreshes the chart lists from all repositories, so you install the latest version.
+
+## Step 2: Create a namespace
+
+```bash
+kubectl create namespace monitoring
+```
+
+Keeping monitoring tools in their own namespace makes them easy to find, secure and remove. (`kubectl create ns monitoring` is the short form.)
+
+## Step 3: Install Prometheus
+
+```bash
+helm install prometheus prometheus-community/prometheus \
+  -n monitoring \
+  --create-namespace \
+  --set server.persistentVolume.enabled=false \
+  --set alertmanager.persistence.enabled=false
+```
+
+| Part | Meaning |
+| --- | --- |
+| `prometheus` | Release name. The main Service will be called `prometheus-server` |
+| `prometheus-community/prometheus` | `<repository>/<chart>` |
+| `-n monitoring` | Install into the `monitoring` namespace |
+| `--create-namespace` | Create the namespace if it does not exist (harmless here, since we already created it) |
+| `--set server.persistentVolume.enabled=false` | Store Prometheus data in an `emptyDir` instead of an EBS-backed PVC |
+| `--set alertmanager.persistence.enabled=false` | Same for Alertmanager |
+
+<Callout type="warn" title="The Alertmanager key in the lecture is wrong">
+The lecture passes `--set alertmanager.persistentVolume.enabled=false`. Alertmanager is a sub-chart, and its key is `alertmanager.persistence.enabled`. Helm silently ignores unknown keys, so with the lecture's command Alertmanager still asks for a PVC. On an EKS cluster without a default StorageClass, the `prometheus-alertmanager-0` pod then stays `Pending`. Use the key shown above, or check any key with `helm show values prometheus-community/prometheus`.
+</Callout>
+
+<Callout type="info" title="Why disable persistence, and when not to">
+Without persistent storage, all collected metrics are lost when the Prometheus pod restarts. That is fine for learning, and it avoids paying for EBS volumes. In production you keep persistence on (it needs the [EBS CSI driver and a StorageClass](/docs/kubernetes/stateful-apps-and-storage/creating-statefulsets-with-persistent-storage-on-amazon-eks)), set a retention period, and size the volume for it.
+</Callout>
+
+## Step 4: See what Helm created
+
+```bash
+kubectl get all -n monitoring
+```
+
+You will see, among others:
+
+| Object | Purpose |
+| --- | --- |
+| `deployment/prometheus-server` | Prometheus itself: scraping, storage, queries |
+| `statefulset/prometheus-alertmanager` | Receives alerts from Prometheus and sends notifications |
+| `daemonset/prometheus-prometheus-node-exporter` | One pod per node, for node metrics |
+| `deployment/prometheus-kube-state-metrics` | Metrics about Kubernetes objects |
+| `deployment/prometheus-prometheus-pushgateway` | For short-lived jobs that push metrics instead of being scraped |
+| `service/prometheus-server` | ClusterIP Service on port 80. Grafana will use it |
+
+Imagine writing all of that YAML by hand: Deployments, a DaemonSet, a StatefulSet, Services, ConfigMaps with scrape configuration, ServiceAccounts and RBAC rules. Helm did it with one command.
+
+To peek at Prometheus itself before Grafana is ready, forward its port to the home server and open **Status, Targets** to see what it scrapes:
+
+```bash
+kubectl port-forward svc/prometheus-server -n monitoring 9090:80 --address 0.0.0.0
+```
+
+Then browse to `http://<home-server-public-ip>:9090` (allow port 9090 from your IP in the home server's security group), and press Ctrl+C when done. Try a query such as `up` or `node_memory_MemAvailable_bytes`.
+
+<Callout type="info" title="The all-in-one alternative: kube-prometheus-stack">
+The same repository also has **kube-prometheus-stack**, which installs Prometheus (through the Prometheus Operator), Alertmanager, Grafana, node-exporter, kube-state-metrics and a set of ready-made Kubernetes dashboards and alert rules in one release. Many teams use it in production:
+
+```bash
+helm install monitoring prometheus-community/kube-prometheus-stack -n monitoring
+```
+
+The course installs Prometheus and Grafana separately, which shows more clearly how the two connect. Do not install both on the same cluster.
+</Callout>
+
+## Clean up
+
+Leave Prometheus running for the Grafana lesson. When you are finished with monitoring:
+
+```bash
+helm uninstall prometheus -n monitoring
+kubectl get pvc -n monitoring        # delete any PVCs left behind
+```
+
+## Try It Yourself
+
+1. Run `helm show values prometheus-community/prometheus | grep -n persist` and find the persistence keys for the server and for Alertmanager.
+2. List the node-exporter pods with `kubectl get pods -n monitoring -o wide | grep node-exporter`. How many are there, and why that number?
+3. Port-forward to Prometheus and run the query `kube_pod_container_status_restarts_total`. Which pods have restarted?
+4. Run `helm list -n monitoring` and `helm status prometheus -n monitoring` and read the notes again.
+
+## Official references
+
+- [Prometheus: Overview](https://prometheus.io/docs/introduction/overview/)
+- [prometheus-community: prometheus Helm chart](https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus)
+- [prometheus-community: kube-prometheus-stack Helm chart](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack)
+- [Kubernetes: Tools for Monitoring Resources](https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-usage-monitoring/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

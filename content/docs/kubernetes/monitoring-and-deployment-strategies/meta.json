@@ -1,0 +1,9 @@
+{
+  "title": "Monitoring & Deployment Strategies",
+  "pages": [
+    "kubernetes-monitoring-and-installing-prometheus.mdx",
+    "visualizing-kubernetes-metrics-with-grafana.mdx",
+    "kubernetes-deployment-strategies-blue-green.mdx",
+    "blue-green-deployment-zero-downtime-release-hands-on.mdx"
+  ]
+}

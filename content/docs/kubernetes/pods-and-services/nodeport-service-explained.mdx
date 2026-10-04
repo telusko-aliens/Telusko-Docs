@@ -1,0 +1,157 @@
+---
+title: NodePort Service Explained
+description: Expose the webapp pod outside the cluster with a NodePort Service, open the port in the node security group, reach it in a browser, and understand why NodePort is not used for production traffic.
+---
+
+ClusterIP keeps everything inside the cluster. The first time you want to open your application in a browser, you need something that crosses the boundary between the cluster and the outside world. The simplest option is **NodePort**.
+
+## How NodePort works
+
+A NodePort Service does three things:
+
+1. It creates a normal **ClusterIP** for internal use, exactly like the previous lesson.
+2. It reserves a port from the **node port range, 30000 to 32767**, and opens that same port on **every** worker node.
+3. kube-proxy on each node forwards anything arriving on that port to the Service, which forwards to a matching pod.
+
+```text
+browser  ->  <any-node-public-ip>:30080  ->  ClusterIP :80  ->  pod :8080
+```
+
+You can choose the port with `nodePort`, or let Kubernetes pick a free one from the range. Choosing it yourself makes your firewall rules and notes predictable; letting Kubernetes pick avoids collisions when many teams share a cluster.
+
+## Step 1: Write the manifest
+
+The `webapp` pod from [First Pod Creation](/docs/kubernetes/pods-and-services/first-pod-creation-in-kubernetes) should be running.
+
+```bash
+vi nodePort-service.yml
+```
+
+```yaml title="nodePort-service.yml"
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-nodeport-svc
+spec:
+  type: NodePort
+  selector:
+    app: telusko-webapp
+  ports:
+    - port: 80
+      targetPort: 8080
+      nodePort: 30080
+```
+
+| Field | Meaning |
+| --- | --- |
+| `type: NodePort` | Without this line you get a ClusterIP Service |
+| `selector.app` | Must match the pod label `telusko-webapp` |
+| `port: 80` | The port of the internal ClusterIP |
+| `targetPort: 8080` | The port the Spring Boot app listens on inside the container |
+| `nodePort: 30080` | The port opened on every node. Must be between 30000 and 32767 and unused, or the API server rejects it |
+
+## Step 2: Create it
+
+```bash
+kubectl apply -f nodePort-service.yml
+kubectl get svc
+```
+
+```text
+NAME                  TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+kubernetes            ClusterIP   10.100.0.1       <none>        443/TCP        171m
+webapp-nodeport-svc   NodePort    10.100.24.0      <none>        80:30080/TCP   15s
+webapp-svc            ClusterIP   10.100.113.192   <none>        80/TCP         97m
+```
+
+`80:30080/TCP` reads as "Service port 80, node port 30080". The NodePort Service still has its own `CLUSTER-IP`, which shows that a NodePort is a ClusterIP plus an extra door.
+
+## Step 3: Find a node's public IP
+
+The easiest way is kubectl:
+
+```bash
+kubectl get nodes -o wide
+```
+
+The `EXTERNAL-IP` column shows each node's public IP. eksctl puts the default node group in public subnets, so the nodes have public IPs. (Node groups in private subnets have none, and then NodePort cannot be reached from the internet at all.)
+
+The lecture finds the node that runs the pod first, with `kubectl get pods -o wide`, and then looks up that node's public IP in the EC2 console. That works, but it is not required: **any** node's public IP works, because the port is open on every node and kube-proxy forwards across nodes. Try both nodes and see for yourself.
+
+## Step 4: Allow the port in the security group
+
+The worker nodes sit behind an EC2 security group created by eksctl. Inbound traffic from the internet on port 30080 has to be allowed:
+
+<Steps>
+<Step>
+### Open the node's security group
+
+In the EC2 console, select one of the worker node instances, open the **Security** tab and click its security group.
+</Step>
+<Step>
+### Add an inbound rule
+
+**Edit inbound rules**, **Add rule**: type **Custom TCP**, port **30080**, source **My IP**. Save.
+</Step>
+</Steps>
+
+The lecture uses source **Anywhere (0.0.0.0/0)**. For a practice cluster, **My IP** is safer: only your network can reach the port. Remove the rule when you finish.
+
+## Step 5: Open it in the browser
+
+```text
+http://<node-public-ip>:30080
+```
+
+<img src="/kubernetes/screens/k8s-telusko-webapp-browser.webp" alt="The Telusko Learning Spring Boot page showing a list of courses, served from the pod" width={1240} height={560} />
+
+*The Spring Boot application from the lecture, served by the pod through the NodePort.*
+
+You can test from the EKS home server too:
+
+```bash
+curl http://<node-public-ip>:30080
+```
+
+## Why NodePort is not for production
+
+NodePort works, and it is handy for a quick test. It is not how you expose a real application, for these reasons:
+
+| Limitation | Why it matters |
+| --- | --- |
+| Clients must know a node IP | Nodes are replaced during upgrades and scaling, and their IPs change. Every client would need updating |
+| No health-checked front door | If the node a client uses goes down, that client fails, even though other nodes are fine |
+| Unusual high ports | Users expect port 80 or 443, not 30080 |
+| Every node is opened | You must open the port on the node security group for all nodes |
+| Load spreads per connection only | There is no proper external load balancer distributing clients across nodes |
+
+<Callout type="info" title="A correction to the lecture">
+The lecture says NodePort sends all traffic to the single node whose IP you use, which would overload that node. Traffic does **enter** through the node you choose, but kube-proxy can forward it to a pod on any node, so it is not limited to pods on that node. The real issue is the list in the table above. The fix is the same either way: put a load balancer in front, which is exactly what the [LoadBalancer Service](/docs/kubernetes/pods-and-services/loadbalancer-service-explained) does.
+</Callout>
+
+NodePort is also the building block underneath LoadBalancer Services on EKS, so the concept is worth understanding even if you rarely type `type: NodePort` at work.
+
+## Clean up
+
+```bash
+kubectl delete -f nodePort-service.yml
+```
+
+Remove the inbound rule for port 30080 from the node security group. If you are done for the day, delete the cluster: `eksctl delete cluster --name telusko-learning --region ap-south-1 --wait`.
+
+## Try It Yourself
+
+1. Create the NodePort Service and open the app using **both** nodes' public IPs. Both should work.
+2. Remove `nodePort: 30080` from the manifest, delete and recreate the Service, and see which port Kubernetes picks.
+3. Try `nodePort: 8080` and read the error from the API server.
+4. Remove your security group rule and try the browser again. What happens, and why?
+
+## Official references
+
+- [Kubernetes: Service type NodePort](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport)
+- [Kubernetes: Virtual IPs and Service Proxies](https://kubernetes.io/docs/reference/networking/virtual-ips/)
+- [Amazon EKS: Security group requirements](https://docs.aws.amazon.com/eks/latest/userguide/sec-group-reqs.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

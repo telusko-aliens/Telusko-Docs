@@ -1,0 +1,88 @@
+---
+title: Ansible Architecture
+description: See how Ansible replaces the manual admin with a playbook and a host inventory, and how inventory groups decide which servers get which configuration.
+---
+
+In the previous lesson one admin walked from server to server installing software. Ansible takes the place of that admin. But Ansible still needs two answers before it can do anything: **what** should be done, and **where** should it be done. Each answer lives in its own file.
+
+<img src="/ansible/ansible-architecture.svg" alt="Ansible architecture: control node with playbook, inventory, modules and ansible.cfg connecting over SSH to webservers and dbservers groups" width={960} height={480} />
+
+## The playbook: what to do
+
+A **playbook** is a file where you write the configuration you want, as code. It is written in **YAML** (the name stands for "YAML Ain't Markup Language", although many people still say "Yet Another Markup Language"). Files end in `.yml` or `.yaml`, and Ansible treats both the same.
+
+Inside a playbook you list the work in plain, readable steps: install Python on these machines, copy this file to that path, start this service. You will write your first one in [Ansible First Playbook](/docs/ansible/ansible-playbooks/ansible-first-playbook). For now, just look at the shape:
+
+```yaml title="install-java.yml"
+- name: Prepare web servers
+  hosts: webservers
+  become: true
+  tasks:
+    - name: Install Java 17
+      ansible.builtin.package:
+        name: java-17-amazon-corretto
+        state: present
+```
+
+Even without knowing YAML, you can read it: on the `webservers` machines, install Java 17. That readability is a big reason teams pick Ansible.
+
+## The host inventory: where to do it
+
+The **inventory** (often called the host inventory file) lists the machines Ansible manages. Its most useful feature is **groups**.
+
+Suppose you have five servers. Three of them run the web application and need Java. Two of them run the database. You put them into two groups:
+
+```ini title="hosts"
+[webservers]
+172.31.10.11
+172.31.10.12
+172.31.10.13
+
+[dbservers]
+172.31.20.21
+172.31.20.22
+```
+
+Now the playbook can say `hosts: webservers` and only the three web machines get Java. Another play can say `hosts: dbservers` and install a database only on the other two. The group name in square brackets is your choice. `webservers` and `dbservers` are just common conventions.
+
+| If the playbook says | Ansible runs on |
+| --- | --- |
+| `hosts: webservers` | The three hosts in the `[webservers]` group |
+| `hosts: dbservers` | The two hosts in the `[dbservers]` group |
+| `hosts: all` | Every host in the inventory (`all` is a built-in group) |
+
+The exact inventory you will use on AWS, with users and SSH keys, is built in [Ansible Config](/docs/ansible/ansible-fundamentals/ansible-config).
+
+## How the pieces work together
+
+1. You run Ansible and point it at a playbook.
+2. Ansible reads the `hosts:` line of each play and looks up those hosts in the inventory.
+3. It connects to each matching host over SSH.
+4. It carries out the tasks in the playbook, in order, on every host.
+5. It prints a result for each task on each host.
+
+Two more pieces appear in the diagram. **Modules** are the small programs that do the actual work (`package` installs software, `copy` copies files, and so on). **ansible.cfg** holds default settings such as where the inventory file lives. Both get their own lessons later.
+
+## Summary so far
+
+| Point | What to remember |
+| --- | --- |
+| What Ansible is | An open source IT configuration management, deployment and orchestration tool, owned by Red Hat |
+| Built with | Python. You do not need to learn Python to use it |
+| Main idea | Define configuration as code |
+| Where the code lives | Playbooks, written in YAML |
+| Where the host list lives | The inventory file, with hosts organised into groups |
+
+<Callout type="info" title="Playbook and inventory are separate on purpose">
+The same playbook can run against a test inventory today and a production inventory tomorrow, without changing a single line of the playbook. Keeping "what" and "where" apart is what makes that possible.
+</Callout>
+
+## Official references
+
+- [Ansible concepts](https://docs.ansible.com/projects/ansible/latest/getting_started/basic_concepts.html)
+- [How to build your inventory](https://docs.ansible.com/projects/ansible/latest/inventory_guide/intro_inventory.html)
+- [YAML syntax](https://docs.ansible.com/projects/ansible/latest/reference_appendices/YAMLSyntax.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

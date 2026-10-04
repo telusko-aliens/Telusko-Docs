@@ -1,0 +1,13 @@
+{
+  "title": "End-to-End CI/CD with Jenkins, Docker & Kubernetes",
+  "pages": [
+    "preparing-jenkins-server-for-ci-cd-pipelines.mdx",
+    "installing-kubectl-aws-cli-and-eksctl-for-eks.mdx",
+    "creating-your-first-eks-cluster.mdx",
+    "configuring-jenkins-to-connect-with-amazon-eks.mdx",
+    "build-and-push-docker-images-using-jenkins-pipeline.mdx",
+    "deploying-docker-applications-to-amazon-eks.mdx",
+    "ci-cd-pipeline-with-jenkins-docker-and-kubernetes.mdx",
+    "separating-ci-and-cd-into-independent-jenkins-pipelines.mdx"
+  ]
+}

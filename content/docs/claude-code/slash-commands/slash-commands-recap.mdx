@@ -1,0 +1,147 @@
+---
+title: Slash Commands Recap
+description: Planning, reviewing changes, session management with rename and resume, goals, diagnostics, and a complete cheat sheet of the commands used so far.
+---
+
+We have covered the core commands. Let us finish with the ones for planning, reviewing your changes and managing sessions, and then put everything into one cheat sheet.
+
+## Planning: `/plan`
+
+```text
+/plan add task filtering by state and role
+```
+
+`/plan` switches into **plan mode**, optionally with a task description. Claude explores the code and proposes a plan, but does not edit your files until you approve. It is the same as pressing `Shift+Tab` until you see `plan mode on`. We will use it a lot when building features.
+
+## Reviewing changes
+
+### `/diff`
+
+```text
+/diff
+```
+
+Shows the changes in your working tree, including everything Claude has edited so far. Untracked (new) files are listed. For tracked files, you see the actual line-by-line changes. Use it before every commit.
+
+### `/review` and `/security-review`
+
+| Command | What it does |
+| --- | --- |
+| `/review` (alias of `/code-review`) | Reviews the current diff, a branch, or a pull request number for correctness bugs |
+| `/security-review` | Reviews the changes on your branch against the default branch for vulnerabilities like injection, auth issues and data exposure |
+
+These are a great second pair of eyes before you push. They do not replace your own review.
+
+## Undo: `/rewind`
+
+```text
+/rewind
+```
+
+The same menu as pressing `Esc` twice. Restore code, the conversation, or both to an earlier prompt. See [Permissions and Checkpoints](/docs/claude-code/agentic-workflow-and-safety/permissions-and-checkpoints).
+
+## Session management
+
+Each conversation with Claude Code is a **session**, saved locally under `~/.claude/projects/`. You can name sessions, leave them and come back later.
+
+<img src="/claude-code/session-lifecycle.svg" alt="Lifecycle of a healthy Claude Code session" width={960} height={360} />
+
+### `/rename`
+
+By default, a session is labelled with the start of your first message, which is not very helpful when the first message was "hi". Give it a proper name:
+
+```text
+/rename frontend-design
+```
+
+The name appears in the prompt bar and in the session list. Without a name, `/rename` generates one from the conversation.
+
+### `/resume`
+
+Come back tomorrow and continue where you left off:
+
+```text
+/resume frontend-design
+```
+
+Run `/resume` without arguments to open a picker of recent sessions. You can also do this when launching Claude Code:
+
+```bash
+claude --continue            # continue the most recent session in this folder
+claude --resume              # pick a session from a list
+claude --resume frontend-design
+```
+
+<Callout type="info" title="Tip">
+Name a session as soon as you start a feature. A list of sessions called "backend-crud", "jwt-security" and "deploy-cloud-run" is much easier to work with than ten sessions called "hi".
+</Callout>
+
+### `/goal`
+
+```text
+/goal all tests in backend/tests pass
+```
+
+Sets a completion condition. Claude keeps working across turns until the condition is met, instead of stopping after one reply. Useful for tasks like "make the test suite pass". Use `/goal clear` to remove it.
+
+## Diagnostics: `/doctor`
+
+```text
+/doctor
+```
+
+If Claude Code behaves strangely, run this first. It checks your installation health, version, `PATH` problems and invalid settings files, and can fix many issues for you.
+
+## Cheat sheet
+
+| Group | Command | Purpose |
+| --- | --- | --- |
+| **Setup** | `/init` | Generate a `CLAUDE.md` |
+| | `/memory` | Edit `CLAUDE.md` files and manage auto memory |
+| | `/permissions` | View and manage allow, ask and deny rules |
+| | `/config` | Open settings |
+| | `/doctor` | Diagnose and fix installation issues |
+| **Context** | `/context` | See what is using the context window |
+| | `/compact [focus]` | Summarise the conversation, same task |
+| | `/clear` | Fresh conversation, new task |
+| | `/btw <question>` | Side question that is not added to the conversation |
+| **Model** | `/model [name]` | Switch model (`opus`, `sonnet`, `haiku`, `opusplan`) |
+| | `/effort [level]` | Set reasoning effort |
+| | `/usage` | Plan usage and costs |
+| **Workflow** | `/plan [task]` | Enter plan mode |
+| | `/diff` | Review working tree changes |
+| | `/review` | Code review of the diff, branch or PR |
+| | `/security-review` | Security review of your branch |
+| | `/goal <condition>` | Keep working until a condition is met |
+| **Sessions** | `/rename <name>` | Name the session |
+| | `/resume [name]` | Continue a previous session |
+| | `/rewind` | Restore code or conversation to an earlier point |
+| | `/exit` | Leave Claude Code |
+
+And three keyboard shortcuts you should know by heart:
+
+| Shortcut | Action |
+| --- | --- |
+| `Shift+Tab` | Cycle permission modes |
+| `Esc` | Stop Claude. Press twice on an empty prompt to rewind |
+| `Ctrl+O` | Open the detailed transcript view |
+
+## Try It Yourself
+
+Before moving to the next section, practise what you learned:
+
+1. Run `/context` at the start of a session and again after a few prompts. Note which category grew.
+2. Use `/btw` for a side question and confirm with `/context` that the conversation did not grow.
+3. Name a session with `/rename`, exit, and come back to it with `claude --resume <name>`.
+4. Run `/compact` with your own focus text and read the summary it creates.
+
+## Official references
+
+- [Commands reference](https://code.claude.com/docs/en/commands)
+- [Manage sessions](https://code.claude.com/docs/en/sessions)
+- [Keep Claude working toward a goal](https://code.claude.com/docs/en/goal)
+- [Code Review](https://code.claude.com/docs/en/code-review)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

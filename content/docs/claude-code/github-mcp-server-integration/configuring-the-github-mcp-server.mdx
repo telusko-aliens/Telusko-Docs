@@ -1,0 +1,148 @@
+---
+title: Configuring the GitHub MCP Server
+description: Create a least-privilege fine-grained GitHub token, add the GitHub MCP server to Claude Code safely, choose the right scope, and verify the connection.
+---
+
+Let us connect Claude Code to GitHub through GitHub's official MCP server. It needs two things: a **token** that proves who you are, and the **server configuration** in Claude Code.
+
+## Check what is already connected
+
+```text
+/mcp
+```
+
+This lists your MCP servers and their status. In the video, two connectors (Gmail and Google Calendar) were already listed but needed authentication. If you do not use them, disable or remove them.
+
+## Step 1: Create a fine-grained personal access token
+
+GitHub offers two kinds of personal access tokens (PAT):
+
+| Type | Access | Use it? |
+| --- | --- | --- |
+| **Classic tokens** | Broad scopes across all your repositories | Avoid for this |
+| **Fine-grained tokens** | Specific repositories, specific permissions, expiry date | Yes |
+
+If a token ever leaks, a fine-grained token limits the damage to exactly what you allowed.
+
+<Steps>
+<Step>
+### Open token settings
+
+GitHub → your avatar → **Settings** → **Developer settings** → **Personal access tokens** → **Fine-grained tokens** → **Generate new token**. Or go directly to [github.com/settings/personal-access-tokens](https://github.com/settings/personal-access-tokens).
+</Step>
+<Step>
+### Name, description and expiry
+
+For example: name `claude-code-demo`, description "Experiment with Claude Code MCP", expiry **30 days**. Short expiry is safer. You can always create a new token.
+</Step>
+<Step>
+### Repository access
+
+Choose **Only select repositories** and pick `content-tracker`. Do not choose "All repositories".
+</Step>
+<Step>
+### Permissions
+
+Grant only what this workflow needs:
+
+| Permission | Access | Why |
+| --- | --- | --- |
+| **Contents** | Read and write | Read files and branches |
+| **Issues** | Read and write | List and create issues |
+| **Pull requests** | Read and write | Open pull requests |
+| **Metadata** | Read-only | Added automatically, required by GitHub |
+</Step>
+<Step>
+### Generate and copy
+
+Click **Generate token** and copy it. GitHub shows it only once.
+</Step>
+</Steps>
+
+<Callout type="warn" title="Treat the token like a password">
+Do not share it, do not commit it, do not paste it into a Claude prompt, and do not show it on screen while recording. If it is exposed, revoke it immediately in the same settings page. In the video the token was briefly visible and was deleted after recording.
+</Callout>
+
+## Step 2: Add the GitHub MCP server
+
+The command, from the [official Claude Code docs](https://code.claude.com/docs/en/mcp#example-connect-to-github-for-code-reviews):
+
+```bash
+claude mcp add --transport http github https://api.githubcopilot.com/mcp/ \
+  --header "Authorization: Bearer YOUR_GITHUB_PAT"
+```
+
+| Part | Meaning |
+| --- | --- |
+| `claude mcp add` | Register a new MCP server |
+| `--transport http` | It is a remote server reached over HTTP |
+| `github` | The name you give the server inside Claude Code |
+| `https://api.githubcopilot.com/mcp/` | GitHub's hosted MCP server endpoint |
+| `--header "Authorization: Bearer ..."` | Sends your token with every request |
+
+<Callout type="info" title="Run it in a separate terminal">
+Run this command in a **normal terminal**, not as a prompt inside Claude Code. If you type it into the Claude Code prompt, the token becomes part of the conversation. That is exactly what we want to avoid.
+</Callout>
+
+On Windows PowerShell, put it on one line (or use a backtick for line continuation instead of `\`).
+
+### Where is it saved? Scopes
+
+| Scope | Flag | Stored in | Shared? |
+| --- | --- | --- | --- |
+| **Local** (default) | none, or `--scope local` | `~/.claude.json`, under this project | Only you, only this project |
+| **Project** | `--scope project` | `.mcp.json` in the project root | Yes, through git |
+| **User** | `--scope user` | `~/.claude.json` | Only you, all projects |
+
+We used the default **local** scope, which is right for a personal token. If you want to share the server with your team through `.mcp.json`, never put the token in the file itself. Use environment variable expansion instead:
+
+```json title=".mcp.json"
+{
+  "mcpServers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_PAT}"
+      }
+    }
+  }
+}
+```
+
+Each teammate sets `GITHUB_PAT` in their own environment.
+
+## Step 3: Verify the connection
+
+A running session does not pick up servers added from another terminal. Start a new Claude Code session and run:
+
+```text
+/mcp
+```
+
+You should see `github` with the status **connected**. You can also check from any terminal:
+
+```bash
+claude mcp list
+claude mcp get github
+```
+
+If the status says it failed to connect, the most common causes are a mistyped token, an expired token, or missing permissions.
+
+| Command | Purpose |
+| --- | --- |
+| `claude mcp list` | List all servers and their health |
+| `claude mcp get github` | Details and status of one server |
+| `claude mcp remove github` | Remove the server |
+| `/mcp` (inside Claude Code) | Manage, enable, disable, reconnect or authenticate servers |
+
+## Official references
+
+- [Connect Claude Code to tools via MCP](https://code.claude.com/docs/en/mcp)
+- [MCP installation scopes](https://code.claude.com/docs/en/mcp#mcp-installation-scopes)
+- [GitHub MCP server](https://github.com/github/github-mcp-server)
+- [GitHub Docs: Managing personal access tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

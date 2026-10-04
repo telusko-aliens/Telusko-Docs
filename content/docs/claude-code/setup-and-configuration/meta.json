@@ -1,0 +1,8 @@
+{
+    "title": "Setup and Configuration",
+    "pages": [
+        "installation-and-plans.mdx",
+        "first-launch-and-login.mdx",
+        "models-settings-and-vs-code.mdx"
+    ]
+}

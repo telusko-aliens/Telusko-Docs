@@ -1,0 +1,165 @@
+---
+title: Installing kubectl, AWS CLI and eksctl for EKS
+description: Launch a small EKS home server next to your Jenkins server, install the AWS CLI, kubectl and eksctl on it with one script, and give it AWS credentials safely.
+---
+
+Our pipeline needs a Kubernetes cluster to deploy into. Jenkins will not create that cluster. Creating and deleting clusters is an occasional admin job, while deploying happens on every build, so we keep the two apart: a small **EKS home server** creates and manages the cluster, and the Jenkins server only deploys to it.
+
+This lecture is the same recording used in the Kubernetes course. If you already built the EKS home server there, you have nothing to do here: start it from the EC2 console and continue with [Creating Your First EKS Cluster](/docs/jenkins/end-to-end-cicd-with-jenkins-docker-and-kubernetes/creating-your-first-eks-cluster). If you are following the Jenkins course on its own, do the steps below.
+
+<Callout type="info" title="Longer version in the Kubernetes course">
+This page covers what you need for the CI/CD project. The Kubernetes lesson [Installing kubectl, AWS CLI and eksctl for EKS](/docs/kubernetes/eks-cluster-setup/installing-kubectl-aws-cli-and-eksctl-for-eks) explains each install step and each way of running Kubernetes in more depth.
+</Callout>
+
+## Where Kubernetes can run
+
+The lecture opens with the options for getting a cluster:
+
+| Option | What it is | Good for |
+| --- | --- | --- |
+| minikube | Single-node cluster on your laptop | Learning only |
+| kubeadm | Bootstrap your own cluster on servers you manage | On-premises, full control, lots of manual work |
+| kOps | Tool to build production clusters, mostly on AWS | Older setups, used less now |
+| Managed Kubernetes (EKS, AKS, GKE, OKE) | The cloud provider runs the control plane | Most real projects |
+
+We use **Amazon EKS**. AWS runs the API server, etcd and the scheduler for us, and we only manage the worker nodes and what runs on them.
+
+## Two servers, two jobs
+
+| | Jenkins server | EKS home server |
+| --- | --- | --- |
+| Purpose | Build, push and deploy on every commit | Create, inspect and delete the cluster |
+| Tools | Java, Jenkins, Git, Maven, Docker, kubectl, AWS CLI | AWS CLI, kubectl, eksctl |
+| Runs commands as | the `jenkins` Linux user | the `ubuntu` Linux user |
+| AWS identity | IAM role (next lessons) | IAM role (next lesson) |
+
+You could install eksctl on the Jenkins server and do everything from one machine. Keeping a separate admin machine is closer to how teams work: the CI server should be able to deploy applications, not tear down whole clusters.
+
+## Step 1: launch the EKS home server
+
+In the EC2 console, in the **same region** as your Jenkins server (the video uses Mumbai, `ap-south-1`), click **Launch instance**:
+
+| Setting | Value |
+| --- | --- |
+| Name | `EKS-HOME-Server` |
+| AMI | Ubuntu Server 24.04 LTS or 26.04 LTS |
+| Instance type | `t3.micro` (free tier eligible in most accounts) |
+| Key pair | Create new: `kubernetes-keypair`, RSA, `.pem` |
+| Security group | New, allow SSH. Prefer **My IP** as the source |
+| Storage | Default 8 GiB |
+
+This machine only runs command line tools, so a micro instance is enough.
+
+Connect from Git Bash or a terminal opened in the folder that holds the key:
+
+```bash
+chmod 400 kubernetes-keypair.pem
+ssh -i "kubernetes-keypair.pem" ubuntu@<public-dns-of-instance>
+```
+
+## Step 2: install the three tools with one script
+
+In the video the script came from an AI assistant. The first version failed with `unzip: command not found`, the error was pasted back into the assistant, and the fixed version worked. That is a reasonable way to work, as long as you compare the result with the official install pages. The script below is built from those pages and already includes the fix.
+
+```bash
+vi install-kubernetes-tools.sh
+```
+
+Press `i`, paste the script, press `Esc`, type `:wq`.
+
+```bash title="install-kubernetes-tools.sh"
+#!/usr/bin/env bash
+# AWS CLI v2, kubectl and eksctl on Ubuntu (amd64)
+set -euo pipefail
+
+sudo apt-get update -y
+sudo apt-get install -y curl unzip tar
+cd /tmp
+
+# AWS CLI v2
+curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+unzip -q -o awscliv2.zip
+sudo ./aws/install --update
+rm -rf aws awscliv2.zip
+
+# kubectl (latest stable, checksum verified)
+KVER=$(curl -L -s https://dl.k8s.io/release/stable.txt)
+curl -sSLO "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl"
+curl -sSLO "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl.sha256"
+echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+rm -f kubectl kubectl.sha256
+
+# eksctl (latest release, checksum verified)
+PLATFORM=$(uname -s)_amd64
+curl -sSLO "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_${PLATFORM}.tar.gz"
+curl -sSL "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_checksums.txt" | grep "${PLATFORM}" | sha256sum --check
+tar -xzf "eksctl_${PLATFORM}.tar.gz" -C /tmp && rm "eksctl_${PLATFORM}.tar.gz"
+sudo install -m 0755 /tmp/eksctl /usr/local/bin && rm /tmp/eksctl
+
+aws --version
+kubectl version --client
+eksctl version
+```
+
+```bash
+chmod +x install-kubernetes-tools.sh
+./install-kubernetes-tools.sh
+```
+
+| Tool | What it does in this project |
+| --- | --- |
+| **AWS CLI** | Supplies AWS credentials to the other two tools and generates EKS login tokens |
+| **eksctl** | Creates the cluster, its VPC and its node group through CloudFormation, and deletes them again |
+| **kubectl** | Talks to the cluster once it exists: nodes, pods, services |
+
+<Callout type="warn" title="kubectl version --short no longer exists">
+The AI-generated script in the recording verified kubectl with `kubectl version --client --short`. The `--short` flag was removed in kubectl 1.28, so that line prints `unknown flag: --short`. Use `kubectl version --client`.
+</Callout>
+
+## Step 3: give the server AWS credentials
+
+eksctl must call AWS APIs to build a cluster, so the server needs an AWS identity.
+
+The video runs `aws configure` and pastes an access key and secret key created under **Security credentials**, with region `ap-south-1` and output `json`. That works, but the keys are long-lived and are stored in plain text in `~/.aws/credentials`. If they leak, someone else has your AWS account.
+
+The better way, which the next lesson sets up anyway, is an **IAM role attached to the instance**. A role gives the instance short-lived credentials that rotate automatically, and nothing secret is written to disk. With a role you only set the region:
+
+```bash
+aws configure set region ap-south-1
+```
+
+If you do use access keys for now:
+
+- Create them for an IAM user, never for the root user.
+- Never show them on screen, in screenshots or in Git.
+- Delete them (and remove `~/.aws/credentials`) once the role is attached, because keys in that file take priority over the role.
+
+Either way, check who you are before you create anything:
+
+```bash
+aws sts get-caller-identity
+```
+
+This matters for Jenkins later. The IAM identity that creates the cluster becomes its first administrator, and in [Configuring Jenkins to Connect with Amazon EKS](/docs/jenkins/end-to-end-cicd-with-jenkins-docker-and-kubernetes/configuring-jenkins-to-connect-with-amazon-eks) we give the Jenkins server cluster access based on that.
+
+## Cost note
+
+The EKS home server is cheap. **Stop** it (do not terminate it) when you take a break, so the tools stay installed. The expensive part is the cluster itself, which we create and delete in the next lesson.
+
+## Try It Yourself
+
+1. Launch the EKS home server in the same region as your Jenkins server.
+2. Run the install script, then run it a second time and confirm it still succeeds.
+3. Run `kubectl get nodes` now and read the error. Explain why there is nothing to connect to yet.
+4. Run `aws sts get-caller-identity` and note whether you are using an IAM user or a role.
+
+## Official references
+
+- [Amazon EKS: Set up kubectl and eksctl](https://docs.aws.amazon.com/eks/latest/userguide/install-kubectl.html)
+- [eksctl: Installation](https://docs.aws.amazon.com/eks/latest/eksctl/installation.html)
+- [AWS CLI: Install or update to the latest version](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>
