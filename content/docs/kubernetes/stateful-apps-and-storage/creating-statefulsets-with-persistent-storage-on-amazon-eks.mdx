@@ -92,7 +92,7 @@ parameters:
 kubectl apply -f ebs-sc.yml
 ```
 
-If you want PVCs without a `storageClassName` to use it, mark it default by adding `storageclass.kubernetes.io/is-default-class: "true"` under `metadata.annotations`. Another option: the EBS CSI add-on (version 1.31.0 and later) can install a recommended default class for you when you set its configuration value `defaultStorageClass.enabled: true`.
+If you want PVCs without a `storageClassName` to use it, mark it default by adding `storageclass.kubernetes.io/is-default-class: "true"` under `metadata.annotations`. Another option: recent versions of the EBS CSI add-on can install a recommended default class for you when you set its configuration value `defaultStorageClass.enabled: true`.
 
 <img src="/kubernetes/k8s2-dynamic-provisioning.svg" alt="Five steps of dynamic provisioning: PVC from volumeClaimTemplates, StorageClass ebs-sc, pod scheduled with WaitForFirstConsumer, CSI driver creates the EBS volume in that zone, PV created and bound; compared with static provisioning" width={960} height={430} />
 
@@ -203,8 +203,8 @@ kubectl delete pvc mysql-storage-mysql-0
 kubectl apply -f statefulset.yml
 ```
 
-<Callout type="info" title="Still Pending? Check the driver">
-In the lecture the PVC stayed `Pending` even with `storageClassName: gp2`, and `describe pvc` showed it waiting for the external provisioner. The cluster had been recreated since the storage lesson, so the **EBS CSI driver add-on was missing**. A recreated cluster does not remember add-ons you installed by hand. Run `eksctl get addon --cluster telusko-learning --region ap-south-1`, and if `aws-ebs-csi-driver` is not listed, repeat Steps 3 and 4 of [Preparing AWS EBS Storage](/docs/kubernetes/stateful-apps-and-storage/preparing-aws-ebs-storage-for-kubernetes-eks). The PVCs bind within a minute after the driver is back.
+<Callout type="info" title="Still Pending? Check the old PVC and the driver">
+In the lecture the first fix did not work straight away. After adding `storageClassName: gp2` and applying again, `describe pvc` still said `no storage class is set`. The reason: `kubectl delete -f statefulset.yml` removed the StatefulSet but **not** the PVC from the first attempt, so the new pod picked up the old claim that had no class. The lecture then ran `kubectl delete pvc --all` (fine on a lab cluster, dangerous anywhere else) and also reinstalled the **EBS CSI driver add-on**, because the cluster had been recreated since the storage lesson and a recreated cluster does not remember add-ons you installed by hand. Check both: delete the stale PVC, and run `eksctl get addon --cluster telusko-learning --region ap-south-1`. If `aws-ebs-csi-driver` is not listed, repeat Steps 3 and 4 of [Preparing AWS EBS Storage](/docs/kubernetes/stateful-apps-and-storage/preparing-aws-ebs-storage-for-kubernetes-eks). The PVCs bind within a minute after that.
 </Callout>
 
 ## Step 5: Watch it work

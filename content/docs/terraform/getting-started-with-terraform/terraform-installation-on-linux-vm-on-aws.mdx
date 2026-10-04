@@ -95,21 +95,7 @@ Do not download Terraform from random websites. Go to the official install page 
 
 *The official install page, Linux section, with the Amazon Linux tab selected.*
 
-Copy the commands and run them on the VM:
-
-```bash
-sudo yum install -y yum-utils shadow-utils
-sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
-sudo yum -y install terraform
-```
-
-| Command | What it does |
-| --- | --- |
-| `yum install -y yum-utils shadow-utils` | Installs `yum-config-manager`, the helper we need to add a repository |
-| `yum-config-manager --add-repo ...` | Adds the official HashiCorp package repository, so `yum` knows where Terraform lives |
-| `yum -y install terraform` | Downloads and installs Terraform from that repository. `-y` answers yes to the prompt |
-
-Because Terraform now comes from a repository, updating later is a single command: `sudo yum update terraform`.
+Copy the commands and run them on the VM. The Amazon Linux tab is what we use in the lecture. The Ubuntu tab is there in case you picked an Ubuntu AMI instead.
 
 <Tabs items={["Amazon Linux", "Ubuntu"]}>
 <Tab value="Amazon Linux">
@@ -132,6 +118,14 @@ sudo apt update && sudo apt install terraform
 </Tab>
 </Tabs>
 
+| Command | What it does |
+| --- | --- |
+| `yum install -y yum-utils shadow-utils` | Installs `yum-config-manager`, the helper we need to add a repository |
+| `yum-config-manager --add-repo ...` | Adds the official HashiCorp package repository, so `yum` knows where Terraform lives |
+| `yum -y install terraform` | Downloads and installs Terraform from that repository. `-y` answers yes to the prompt |
+
+On Amazon Linux 2023, `yum` is simply an alias for `dnf`, so both names work. Because Terraform now comes from a repository, updating later is a single command: `sudo yum update terraform`.
+
 ## Step 4: Verify the installation
 
 ```bash
@@ -143,7 +137,7 @@ Terraform v1.16.5
 on linux_amd64
 ```
 
-`terraform version` prints the same thing. The lecture shows `v1.11.4`, which was current at recording time. You will see a newer number, and that is fine: everything in this course works on any Terraform 1.x release.
+`terraform version` prints the same thing. The lecture shows `v1.11.4`, which was current at recording time. You will see a newer number, and that is fine: everything in this course works on any recent Terraform 1.x release.
 
 Two more commands worth running once:
 

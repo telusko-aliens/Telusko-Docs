@@ -6,7 +6,7 @@ icon: Sparkles
 
 Docker taught you how to package an application into an image and run it as a container. That is enough for one server. The moment you have dozens of services, several servers, traffic that rises and falls, and releases every day, you need something that runs those containers for you, keeps them healthy, and changes them safely. That something is Kubernetes.
 
-This course teaches Kubernetes the way most companies use it today: on a managed cluster in the cloud. Every demo runs on **Amazon EKS**. You will create a real cluster with one command, deploy a Spring Boot application to it, expose it to the internet through an AWS load balancer, scale it, update it with zero downtime, give it persistent storage, and finish with packaging, GitOps, monitoring and release strategies.
+This course teaches Kubernetes the way most companies use it today: on a managed cluster in the cloud. Every demo runs on **Amazon EKS**. You will create a real cluster with one command, deploy a Spring Boot application to it, expose it to the internet through an AWS load balancer, scale it, update it with zero downtime, run a MySQL database with EBS-backed persistent storage, and finish with packaging, GitOps, monitoring and release strategies.
 
 By the end you will be able to:
 
@@ -67,7 +67,7 @@ Pods with more than one container, the sidecar pattern including native sidecars
 
 ## 06 - Stateful Apps & Storage
 
-Why databases need stable identity and storage, how StatefulSets differ from Deployments, and how PersistentVolumes and PersistentVolumeClaims work. On EKS this means preparing EBS storage and running a StatefulSet whose data survives pod restarts.
+Why databases need stable identity and storage, how StatefulSets differ from Deployments, and how PersistentVolumes and PersistentVolumeClaims work. On EKS this means creating an EBS volume, installing the EBS CSI driver, binding a PersistentVolume by hand, and then running a MySQL StatefulSet whose volumes are created dynamically and survive pod restarts.
 
 ## 07 - Configuration & Autoscaling
 

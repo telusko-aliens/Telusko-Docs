@@ -24,7 +24,7 @@ If you generated the project with archetype **1.0**, as the video does, the POM 
 | 3.8.x (the Amazon Linux package) | 3.1 | 1.5 (Java 5) |
 | Recent 3.9.x (the video's 3.9.11) and 3.10.x | 3.13.0 or newer | 1.8 (Java 8) |
 
-Modern JDKs cannot even compile for Java 5 any more, so on the Linux VM the first `mvn compile` fails with an error like `Source option 5 is no longer supported. Use 8 or later.` (the exact minimum depends on your JDK). The fix is to tell Maven which Java version to target.
+Modern JDKs cannot even compile for Java 5 any more, so on the Linux VM the first `mvn compile` fails with an error like `Source option 5 is no longer supported. Use 7 or later.` (that is the Java 17 wording; Java 21 and newer say "Use 8 or later"). The fix is to tell Maven which Java version to target.
 
 The video adds the compiler plugin to `pom.xml`, inside `<build>` and after `</dependencies>`:
 
@@ -129,7 +129,7 @@ mvn package
 
 Compiles, runs the tests, and then packages the compiled classes into the format set by `<packaging>`. For our quickstart project that is a JAR. So **package = compile + test + package**.
 
-<img src="/maven/screens/mvn-package-output.webp" alt="Terminal output of mvn package showing the surefire test results, the jar plugin building telusko-app-1.0-SNAPSHOT.jar, and BUILD SUCCESS" width={1440} height={810} />
+<img src="/maven/screenshots/mvn-package-output.webp" alt="Terminal output of mvn package showing the surefire test results, the jar plugin building telusko-app-1.0-SNAPSHOT.jar, and BUILD SUCCESS" width={1440} height={778} />
 
 *End of `mvn package` on the VM: one test passed, then the jar plugin built `target/telusko-app-1.0-SNAPSHOT.jar`.*
 

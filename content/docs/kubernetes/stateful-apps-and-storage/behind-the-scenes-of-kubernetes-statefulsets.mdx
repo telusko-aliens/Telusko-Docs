@@ -72,7 +72,7 @@ If your application does not need the ordering, `podManagementPolicy: Parallel` 
 
 This surprises many people: **deleting or scaling down a StatefulSet does not delete its PVCs**. Kubernetes keeps the data on purpose, because data loss is worse than a forgotten disk. If you scale from 3 to 2 and back to 3, `mysql-2` comes back with its old data.
 
-Since Kubernetes 1.32 you can change this with `persistentVolumeClaimRetentionPolicy`:
+You can change this with `persistentVolumeClaimRetentionPolicy` (enabled by default since Kubernetes 1.27 and stable since 1.32):
 
 ```yaml
 spec:

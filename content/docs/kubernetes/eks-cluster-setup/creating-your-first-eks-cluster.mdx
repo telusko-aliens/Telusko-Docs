@@ -50,7 +50,7 @@ The `Arn` should end with `assumed-role/eks-telusko-learning/i-...`. If it shows
 
 ## Step 2: Create the cluster
 
-This is the command from the lecture with one addition, `--version`:
+This is the command from the lecture with two additions: `--version`, and `--nodes 2`, which is the default anyway but is written out so you can see it:
 
 ```bash
 eksctl create cluster \
@@ -66,7 +66,7 @@ eksctl create cluster \
 | --- | --- |
 | `--name telusko-learning` | Cluster name. Letters, numbers and hyphens, starting with a letter |
 | `--region ap-south-1` | AWS region (Mumbai). Defaults to your AWS CLI region if omitted |
-| `--version 1.36` | Kubernetes version of the control plane and nodes. See the callout below |
+| `--version 1.36` | Kubernetes version of the control plane and nodes. 1.37 is the newest on EKS (released there on 1 October 2026) and also fine if your eksctl version already supports it. See the callout below |
 | `--node-type t3.small` | EC2 instance type for the worker nodes. The default is `m5.large`, which costs much more |
 | `--nodes 2` | Number of worker nodes. Two is the default, written here so it is visible |
 | `--zones ap-south-1a,ap-south-1b` | Availability Zones for the subnets. You need at least two |

@@ -118,7 +118,7 @@ ansible-playbook ansiblevault.yml
 ERROR! Attempting to decrypt but no vault secrets found
 ```
 
-Ansible needs the password. Ask for it with `--ask-vault-pass` (short form `-J` in recent versions):
+Ansible needs the password. Ask for it with `--ask-vault-pass`. From ansible-core 2.16 onwards there is also a short form, `-J`, but the 2.15 we installed in the lab only accepts the long one:
 
 ```bash
 ansible-playbook ansiblevault.yml --ask-vault-pass

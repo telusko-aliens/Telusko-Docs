@@ -27,6 +27,7 @@ Run it in the same parent folder as `telusko-app` (Windows) or in your home fold
 
 ```text
 telusko-web-app/
+├── .mvn/                       <- small Maven config folder (template 1.5 only)
 ├── pom.xml
 └── src/
     └── main/
@@ -78,7 +79,7 @@ mvn clean package
 
 `clean package` deletes any old `target` folder, compiles (if there is Java code), runs tests (if any), and packages the WAR. The first run downloads the WAR plugin, so expect some `Downloading from central` lines.
 
-<img src="/maven/screens/war-build-success.webp" alt="Command Prompt output of mvn clean package showing Packaging webapp, Building war: target/telusko-web-app.war and BUILD SUCCESS" width={1440} height={810} />
+<img src="/maven/screenshots/war-build-success.webp" alt="Command Prompt output of mvn clean package showing Packaging webapp, Building war: target/telusko-web-app.war and BUILD SUCCESS" width={1440} height={778} />
 
 *The end of the build on Windows: "Building war: ...\target\telusko-web-app.war" followed by BUILD SUCCESS.*
 
