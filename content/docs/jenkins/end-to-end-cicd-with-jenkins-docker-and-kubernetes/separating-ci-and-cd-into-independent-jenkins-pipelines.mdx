@@ -12,7 +12,7 @@ Everything we built so far lives in one pipeline: clone, build, image, push, dep
 
 The usual answer is to split the work. **CI** (continuous integration) takes code and produces a tested, versioned artifact, here a Docker image. **CD** (continuous delivery or deployment) takes a version of that artifact and puts it into an environment. The two are separate Jenkins jobs, and CI starts CD automatically when it succeeds.
 
-<img src="/jenkins/cicd-combined-vs-split.svg" alt="Top: a single pipeline with checkout, Maven build, Docker build, push and deploy. Bottom: a CI pipeline with checkout, Maven build and tests, Docker build with BUILD_NUMBER tag and push, which triggers a CD pipeline with build job CD Pipeline and parameter IMAGE_TAG. The CD pipeline checks out manifests, applies the image tag and waits for rollout status, and can be run by hand with an older tag to roll back" width={960} height={470} />
+<img src="/jenkins/cicd-combined-vs-split.svg" alt="Top: a single pipeline with checkout, Maven build, Docker build, push and deploy. Bottom: a CI pipeline with checkout, Maven build and tests, Docker build with BUILD_NUMBER tag and push, which triggers a CD pipeline with build job cd-pipeline and parameter IMAGE_TAG. The CD pipeline checks out manifests, applies the image tag and waits for rollout status, and can be run by hand with an older tag to roll back" width={960} height={470} />
 
 ## What the lecture builds
 
@@ -20,7 +20,7 @@ The video creates two Pipeline jobs:
 
 | Job | Description in the video | Stages |
 | --- | --- | --- |
-| `CI Pipeline` | "pipeline from git repo to docker image" | git clone, maven build, Build Docker Image, CD Trigger |
+| `CI Pipeline` | "CI pipeline from git to docker image" | git clone, maven build, Build Docker Image, CD Trigger |
 | `CD Pipeline` | "deploying into Kubernetes cluster on AWS" | git clone, k8s - deployment |
 
 The CD Trigger stage was generated with the Snippet Generator: **Pipeline Syntax > build: Build a job**, Project to Build `CD Pipeline`, **Wait for completion** and **Propagate errors** ticked. It produced:

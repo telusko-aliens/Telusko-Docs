@@ -20,7 +20,7 @@ Open [start.spring.io](https://start.spring.io/), the official Spring Initializr
 | Java | 17 |
 | Dependencies | **Spring Web** |
 
-<img src="/maven/screens/spring-initializr.webp" alt="Spring Initializr with Maven selected, Spring Boot 3.4.8, group com.telusko, artifact SpringBootMavenApp, Jar packaging, Java 17 and the Spring Web dependency" width={1440} height={810} />
+<img src="/maven/screenshots/spring-initializr.webp" alt="Spring Initializr with Maven selected, Spring Boot 3.4.8, group com.telusko, artifact SpringBootMavenApp, Jar packaging, Java 17 and the Spring Web dependency" width={1440} height={778} />
 
 *The Initializr settings used in the demo.*
 
@@ -194,12 +194,12 @@ Instead of a page, the browser **downloads** a file. Embedded Tomcat does not in
 ```
 
 <Callout type="info" title="Correction: use tomcat-embed-jasper without a version">
-The video adds `org.apache.tomcat:tomcat-jasper` with a fixed version `10.1.16`, while the embedded Tomcat in that Spring Boot release was 10.1.19 (you can see it in the startup log). Mixing Tomcat versions like this can cause hard to debug errors. The artifact meant for embedded Tomcat is `org.apache.tomcat.embed:tomcat-embed-jasper`, and leaving the version out lets the Spring Boot parent pick the exact version that matches its Tomcat.
+The video adds `org.apache.tomcat:tomcat-jasper` with a fixed version `10.1.16`, while the startup log in the video shows the embedded Tomcat running a different version (10.1.19). Mixing Tomcat versions like this can cause hard to debug errors. The artifact meant for embedded Tomcat is `org.apache.tomcat.embed:tomcat-embed-jasper`, and leaving the version out lets the Spring Boot parent pick the exact version that matches its Tomcat.
 </Callout>
 
 Save, run **Maven > Update Project...**, start the application again and refresh the browser:
 
-<img src="/maven/screens/greeting-page-browser.webp" alt="Browser at localhost:8484/greeting showing Telusko Learning and Hey! Good Afternoon" width={1440} height={810} />
+<img src="/maven/screenshots/greeting-page-browser.webp" alt="Browser at localhost:8484/greeting showing Telusko Learning and Hey! Good Afternoon" width={1440} height={778} />
 
 *The finished app. The greeting changes with the time of day.*
 

@@ -120,8 +120,8 @@ The hyphen starts a new list item, and every key of that item lines up with the 
 | --- | --- | --- |
 | Tab used for indentation | `found character '\t' that cannot start any token` | Replace tabs with spaces |
 | `hosts:` indented more or less than `name:` | `did not find expected key` or the key is attached to the wrong parent | Line up sibling keys exactly |
-| Missing space after colon (`hosts:all`) | Parsed as one string, Ansible complains the play has no hosts | Write `hosts: all` |
-| Value starts with `{{` without quotes | `A malformed block was encountered` | Quote it: `"{{ var }}"` (covered in the variables lesson) |
+| Missing space after colon (`hosts:all`) | The line is read as plain text instead of a key, and YAML fails with `could not find expected ':'` | Write `hosts: all` |
+| Value starts with `{{` without quotes | `Syntax Error while loading YAML`, because YAML reads `{` as the start of a dictionary. Ansible usually adds a hint about missing quotes | Quote it: `"{{ var }}"` (covered in the variables lesson) |
 | `mode: 0644` without quotes | YAML reads it as a number instead of text, and the permissions can come out wrong (the official docs warn about this) | Write `mode: "0644"` |
 
 ## Check a YAML file quickly

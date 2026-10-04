@@ -119,7 +119,7 @@ A graph shows it more clearly:
 
 <img src="/jenkins/screens/parallel-stages-graph.webp" alt="Pipeline graph with Git Clone, Building Project Using Maven, then Code Review and Nexus Upload on two parallel branches, then Deploying" width={1260} height={330} />
 
-*Code Review and Nexus Upload appear as two branches of the same stage.*
+*Code Review and Nexus Upload appear as two branches of the same stage (this is the Blue Ocean view used in the video).*
 
 <Callout type="warn" title="Blue Ocean is deprecated">
 In the video, this graph comes from the **Blue Ocean** plugin, installed from **Manage Jenkins > Plugins**, along with **Pipeline: Stage View**. The Jenkins project deprecated Blue Ocean in July 2026, and it no longer gets security fixes, so do not install it on new servers. Use **Pipeline Graph View** instead (already part of the suggested plugins). It shows parallel branches the same way under the **Stages** link of a build. **Pipeline: Stage View** is still maintained if you like its table layout.

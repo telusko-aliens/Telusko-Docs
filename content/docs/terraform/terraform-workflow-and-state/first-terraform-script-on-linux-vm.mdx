@@ -94,7 +94,7 @@ Inside the block are the **arguments**, the same choices you made in the console
 An AMI ID such as `ami-062f0cc54dbfd8ef1` only exists in one region, and Amazon publishes new AMIs regularly. Do not copy the ID from this page. Open **EC2 > Launch instance** in your own region, select Amazon Linux, and copy the AMI ID shown there. A wrong ID gives `InvalidAMIID.NotFound` during apply.
 </Callout>
 
-The lecture also mentions that adding `count = 10` inside the resource block creates ten identical instances. That is true, and it shows the real power of code over clicking. Do not try it on a free tier account, though, because only 750 instance hours per month are free.
+The lecture also mentions that adding `count = 10` inside the resource block creates ten identical instances. That is true, and it shows the real power of code over clicking. Do not try it on a free tier account, though: ten instances eat through your free allowance ten times faster.
 
 Save with `Esc` then `:wq`.
 

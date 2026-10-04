@@ -57,7 +57,7 @@ sudo chmod 600 /var/lib/jenkins/.kube/config
 | --- | --- |
 | `mkdir -p` | Creates `.kube`, and does not complain if it already exists |
 | `chown jenkins:jenkins` | The file was created by root through `sudo`. Without this, the `jenkins` user cannot read it |
-| `chmod 600` | Only the owner can read or write it. kubectl warns when a kubeconfig is readable by others |
+| `chmod 600` | Only the owner can read or write it. The file tells anyone who reads it where your cluster is, and tools such as Helm warn when a kubeconfig is readable by others |
 
 ### What is inside that file
 

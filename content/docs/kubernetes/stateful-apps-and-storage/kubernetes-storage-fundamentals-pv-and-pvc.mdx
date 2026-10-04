@@ -40,6 +40,10 @@ And about a PVC:
 - A pod never points at a PV directly. It points at a **PVC**, and the PVC is bound to a PV.
 - Binding is **one to one**. One PVC binds to exactly one PV, and that PV is then reserved for it.
 
+<Callout type="info" title="A PVC does not take a slice of a PV">
+The lecture describes a claim as asking for 10 GB "out of" a 20 GB PV. Binding does not split a volume. Kubernetes binds the claim to a whole PV that is at least as large as the request, so a 10Gi claim bound to a 20Gi PV gets the full 20Gi and no other claim can use that PV. Size your PVs and PVCs to match.
+</Callout>
+
 Why two objects instead of one? Separation of jobs. The person writing the pod YAML should not need to know the EBS volume ID, the Availability Zone or the driver. They ask for "20Gi, ReadWriteOnce". The admin (or a StorageClass) decides where that storage really comes from.
 
 <img src="/kubernetes/k8s2-pv-pvc-flow.svg" alt="Application writes to a path in the pod, the pod references a PVC, the PVC is bound to a PV, and the PV represents an AWS EBS volume outside the cluster" width={960} height={400} />

@@ -23,11 +23,11 @@ On the first page, leave **Create a simple project (skip archetype selection)** 
 
 Select `org.apache.maven.archetypes : maven-archetype-quickstart` and click **Next**.
 
-<img src="/maven/screens/eclipse-select-archetype.webp" alt="Eclipse New Maven Project wizard listing archetypes with maven-archetype-quickstart version 1.1 selected" width={1440} height={810} />
+<img src="/maven/screenshots/eclipse-select-archetype.webp" alt="Eclipse New Maven Project wizard listing archetypes with maven-archetype-quickstart version 1.1 selected" width={1440} height={778} />
 
 *The archetype list in Eclipse. The built-in catalog shows quickstart 1.1.*
 
-Eclipse's built-in catalog only offers the old version 1.1 (Java 1.8, JUnit 3.8.1). To get the current 1.5 template, click **Add Archetype...** and enter groupId `org.apache.maven.archetypes`, artifactId `maven-archetype-quickstart`, version `1.5`. Either works for this lesson.
+Eclipse's built-in catalog only offers the old version 1.1 (no Java version in the POM, JUnit 3.8.1). To get the current 1.5 template, click **Add Archetype...** and enter groupId `org.apache.maven.archetypes`, artifactId `maven-archetype-quickstart`, version `1.5`. Either works for this lesson.
 </Step>
 <Step>
 ### Enter the coordinates
@@ -45,7 +45,7 @@ Click **Finish**. Eclipse runs `archetype:generate` in the background. The **Con
 
 ## Explore the project
 
-<img src="/maven/screens/eclipse-maven-project-structure.webp" alt="Eclipse Project Explorer showing MavenSimpleApp with src/main/java, src/test/java, JRE System Library JavaSE-1.8, Maven Dependencies, target and pom.xml, and App.java open" width={1440} height={810} />
+<img src="/maven/screenshots/eclipse-maven-project-structure.webp" alt="Eclipse Project Explorer showing MavenSimpleApp with src/main/java, src/test/java, JRE System Library JavaSE-1.8, Maven Dependencies, target and pom.xml, and App.java open" width={1440} height={778} />
 
 *The generated project in Eclipse's Project Explorer, with the sample App.java open.*
 

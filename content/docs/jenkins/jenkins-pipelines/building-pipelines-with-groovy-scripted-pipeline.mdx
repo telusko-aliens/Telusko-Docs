@@ -96,6 +96,7 @@ The demo shows the syntax. Here is the kind of logic that justifies using Groovy
 ```groovy
 node {
     def services = ['orders', 'payments', 'users']
+    def mvnHome = tool 'maven'
 
     stage('Checkout') {
         git branch: 'main', url: 'https://github.com/<your-org>/<monorepo>.git'
@@ -104,7 +105,7 @@ node {
     for (svc in services) {
         stage("Build ${svc}") {
             dir(svc) {
-                sh 'mvn -B clean package'
+                sh "${mvnHome}/bin/mvn -B clean package"
             }
         }
     }
