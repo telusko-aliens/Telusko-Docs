@@ -46,7 +46,7 @@ The lecture describes a claim as asking for 10 GB "out of" a 20 GB PV. Binding d
 
 Why two objects instead of one? Separation of jobs. The person writing the pod YAML should not need to know the EBS volume ID, the Availability Zone or the driver. They ask for "20Gi, ReadWriteOnce". The admin (or a StorageClass) decides where that storage really comes from.
 
-<img src="/kubernetes/k8s2-pv-pvc-flow.svg" alt="Application writes to a path in the pod, the pod references a PVC, the PVC is bound to a PV, and the PV represents an AWS EBS volume outside the cluster" width={960} height={400} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s2-pv-pvc-flow.svg" alt="Application writes to a path in the pod, the pod references a PVC, the PVC is bound to a PV, and the PV represents an AWS EBS volume outside the cluster" width={960} height={400} />
 
 The control flow, from the application down:
 

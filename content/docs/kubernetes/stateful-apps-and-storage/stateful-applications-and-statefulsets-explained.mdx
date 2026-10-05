@@ -52,7 +52,7 @@ The same Spring Boot app needs MySQL. Suppose you run MySQL with a Deployment to
 
 The "state" in **stateful application** is exactly this: information the application must remember between restarts (its data, and often who it is in a cluster). Databases, message brokers and distributed stores are stateful: MySQL, PostgreSQL, MongoDB, Kafka, Cassandra, Elasticsearch, ZooKeeper.
 
-<img src="/kubernetes/k8s2-stateless-vs-stateful.svg" alt="Left: three Spring Boot pods with random names behind a load balancer, one crashed and replaced with a new name. Right: three MySQL pods named mysql-0, mysql-1 and mysql-2, each with its own disk" width={960} height={470} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s2-stateless-vs-stateful.svg" alt="Left: three Spring Boot pods with random names behind a load balancer, one crashed and replaced with a new name. Right: three MySQL pods named mysql-0, mysql-1 and mysql-2, each with its own disk" width={960} height={470} />
 
 ## What a StatefulSet gives you
 

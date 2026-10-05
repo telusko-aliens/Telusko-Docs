@@ -66,7 +66,7 @@ Open `pom.xml`. The important lines are:
 
 `<packaging>war</packaging>` tells Maven to use the WAR plugin during `package`. `<finalName>` overrides the default file name (`artifactId-version`), which is why the WAR is called `telusko-web-app.war` with no version in it. That is convenient, because Tomcat uses the WAR file name as the URL path (`/telusko-web-app`).
 
-<img src="/maven/jar-vs-war.svg" alt="Comparison of jar packaging and war packaging: archetype, output file, contents and where each runs" width={960} height={330} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Maven/jar-vs-war.svg" alt="Comparison of jar packaging and war packaging: archetype, output file, contents and where each runs" width={960} height={330} />
 
 ## Build the WAR
 
@@ -79,7 +79,7 @@ mvn clean package
 
 `clean package` deletes any old `target` folder, compiles (if there is Java code), runs tests (if any), and packages the WAR. The first run downloads the WAR plugin, so expect some `Downloading from central` lines.
 
-<img src="/maven/screenshots/war-build-success.webp" alt="Command Prompt output of mvn clean package showing Packaging webapp, Building war: target/telusko-web-app.war and BUILD SUCCESS" width={1440} height={778} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Maven/screenshots/war-build-success.webp" alt="Command Prompt output of mvn clean package showing Packaging webapp, Building war: target/telusko-web-app.war and BUILD SUCCESS" width={1440} height={778} />
 
 *The end of the build on Windows: "Building war: ...\target\telusko-web-app.war" followed by BUILD SUCCESS.*
 

@@ -16,7 +16,7 @@ A **cluster** is a group of machines (called **nodes**) that work together to ru
 
 A cluster can have one worker node or thousands. In this course our EKS cluster starts with two.
 
-<img src="/kubernetes/k8s-architecture.svg" alt="kubectl talks over HTTPS to the control plane, which contains kube-apiserver, etcd, kube-scheduler and kube-controller-manager. Two worker nodes each run kubelet, kube-proxy, containerd and pods" width={960} height={560} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s-architecture.svg" alt="kubectl talks over HTTPS to the control plane, which contains kube-apiserver, etcd, kube-scheduler and kube-controller-manager. Two worker nodes each run kubelet, kube-proxy, containerd and pods" width={960} height={560} />
 
 ## How we will talk to the cluster
 
@@ -91,7 +91,7 @@ Older tutorials say the worker node runs "Docker". Since Kubernetes 1.24 the kub
 
 The Kubernetes documentation draws the same architecture like this. Notice `c-c-m` (cloud-controller-manager) talking to the cloud provider API, and that every arrow from a node goes to `api`, never to etcd.
 
-<img src="/kubernetes/k8s-components-of-kubernetes.svg" alt="Official Kubernetes components diagram showing a control plane with api, etcd, sched, c-m and c-c-m, and several nodes each running kubelet and kube-proxy" width={1352} height={649} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s-components-of-kubernetes.svg" alt="Official Kubernetes components diagram showing a control plane with api, etcd, sched, c-m and c-c-m, and several nodes each running kubelet and kube-proxy" width={1352} height={649} />
 
 *Image: kubernetes.io, CC BY 4.0. Source: [Kubernetes Components](https://kubernetes.io/docs/concepts/overview/components/).*
 
@@ -99,7 +99,7 @@ The Kubernetes documentation draws the same architecture like this. Notice `c-c-
 
 Now put it all together. Here is what happens when you create a pod.
 
-<img src="/kubernetes/k8s-apply-flow.svg" alt="Six steps: kubectl apply, API server stores in etcd, scheduler picks a node, kubelet sees the pod, containerd pulls and starts, status reported Running. Controller manager keeps desired and actual state equal" width={960} height={440} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s-apply-flow.svg" alt="Six steps: kubectl apply, API server stores in etcd, scheduler picks a node, kubelet sees the pod, containerd pulls and starts, status reported Running. Controller manager keeps desired and actual state equal" width={960} height={440} />
 
 <Steps>
 <Step>

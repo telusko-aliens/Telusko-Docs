@@ -127,7 +127,7 @@ If you have not used Dockerfiles before, [Dockerfile Basics with a Hands-on Exam
 
 ## Three things we changed from the lecture, and why
 
-<img src="/jenkins/cicd-image-tags.svg" alt="Comparison: with only the latest tag every build overwrites the same image name and you cannot roll back; with a tag per build, images 41, 42 and 43 are all kept, latest points to the newest, and a new tag triggers a Kubernetes rollout" width={960} height={390} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/cicd-image-tags.svg" alt="Comparison: with only the latest tag every build overwrites the same image name and you cannot roll back; with a tag per build, images 41, 42 and 43 are all kept, latest points to the newest, and a new tag triggers a Kubernetes rollout" width={960} height={390} />
 
 ### 1. The token never appears on a command line
 
@@ -163,7 +163,7 @@ Remove `IMAGE_TAG` from the `environment` block if you do this, because values s
 
 The stage view should show all stages green:
 
-<img src="/jenkins/screens/cicd-docker-push-stage-view.webp" alt="Jenkins stage view of pipeline-docker with Declarative Tool Install, git clone, maven build, Build Docker Image and Docker Push all successful" width={1440} height={686} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/screens/cicd-docker-push-stage-view.webp" alt="Jenkins stage view of pipeline-docker with Declarative Tool Install, git clone, maven build, Build Docker Image and Docker Push all successful" width={1440} height={686} />
 
 *The pipeline from the lecture: tool install, clone, Maven build, Docker build and push all succeeded in about 38 seconds.*
 

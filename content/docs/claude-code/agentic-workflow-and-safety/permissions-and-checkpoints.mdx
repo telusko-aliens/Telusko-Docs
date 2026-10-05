@@ -12,7 +12,7 @@ Claude Code has two safety mechanisms, and you should understand both before let
 
 Suppose your prompt was about fixing a bug, but Claude decides the cleanest fix is to delete a file. Maybe that is right, maybe it is a disaster. You want to be asked first. Every time Claude wants to edit a file, run a command or reach the network, the request goes through a permission check.
 
-<img src="/claude-code/permission-modes.svg" alt="Permission modes from plan to bypass" width={960} height={400} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/permission-modes.svg" alt="Permission modes from plan to bypass" width={960} height={400} />
 
 ## Permission modes
 
@@ -100,7 +100,7 @@ Writing "never read .env" in `CLAUDE.md` shapes what Claude tries to do, but it 
 
 Even with permissions, you will sometimes approve a change and then regret it. You could use git, but only if you committed before the change. Claude Code gives you another safety net: **checkpoints**.
 
-<img src="/claude-code/checkpoints-rewind.svg" alt="Checkpoints and rewind" width={960} height={360} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/checkpoints-rewind.svg" alt="Checkpoints and rewind" width={960} height={360} />
 
 Before each prompt you send, Claude Code takes a snapshot of the files it is about to edit. You can jump back to any of those points.
 
