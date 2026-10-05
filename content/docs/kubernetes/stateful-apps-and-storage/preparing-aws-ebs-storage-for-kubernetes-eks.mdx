@@ -27,7 +27,7 @@ Click **Create volume** and fill in:
 | Snapshot ID | Don't create volume from a snapshot | We start empty |
 | Encryption | Optional for the lab, recommended in real use | Encrypted volumes need the driver to have KMS permissions if you use a custom key |
 
-<img src="/kubernetes/screens/k8s2-ebs-create-volume.webp" alt="AWS console Create volume form with General Purpose SSD gp3, 20 GiB, 3000 IOPS, 125 MiB/s throughput and Availability Zone ap-south-1a" width={960} height={560} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/screens/k8s2-ebs-create-volume.webp" alt="AWS console Create volume form with General Purpose SSD gp3, 20 GiB, 3000 IOPS, 125 MiB/s throughput and Availability Zone ap-south-1a" width={960} height={560} />
 
 *The Create volume form: gp3, 20 GiB, and the zone `ap-south-1a`, where one of our worker nodes runs.*
 
@@ -69,7 +69,7 @@ The driver can:
 - **Format and mount** them inside the pod
 - **Detach and delete** them when they are no longer needed
 
-<img src="/kubernetes/k8s2-ebs-csi-driver.svg" alt="The ebs-csi-controller in kube-system watches PVCs and PVs in the Kubernetes API, assumes an IAM role and calls EC2 to create and attach volumes, while an ebs-csi-node pod on each worker node formats and mounts the disk into pods" width={960} height={500} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s2-ebs-csi-driver.svg" alt="The ebs-csi-controller in kube-system watches PVCs and PVs in the Kubernetes API, assumes an IAM role and calls EC2 to create and attach volumes, while an ebs-csi-node pod on each worker node formats and mounts the disk into pods" width={960} height={500} />
 
 It runs as two parts: an `ebs-csi-controller` Deployment that calls the EC2 API, and an `ebs-csi-node` DaemonSet on every node that mounts the disks. The controller calls AWS, so it needs an **IAM role**. Without that role, PVCs fail with `could not create volume in EC2: UnauthorizedOperation`.
 

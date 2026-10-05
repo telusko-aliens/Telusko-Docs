@@ -13,7 +13,7 @@ But some stages do not depend on each other at all. Once the Maven build has pro
 
 That is what **parallel stages** are for: independent stages that run at the same time.
 
-<img src="/jenkins/jenkins-parallel-stages.svg" alt="Sequential pipeline with five stages compared to a parallel pipeline where Code Review and Nexus Upload run side by side inside a parallel block, saving time" width={960} height={430} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/jenkins-parallel-stages.svg" alt="Sequential pipeline with five stages compared to a parallel pipeline where Code Review and Nexus Upload run side by side inside a parallel block, saving time" width={960} height={430} />
 
 ## The flow we want
 
@@ -117,7 +117,7 @@ Uploading Artifact to Nexus
 
 A graph shows it more clearly:
 
-<img src="/jenkins/screens/parallel-stages-graph.webp" alt="Pipeline graph with Git Clone, Building Project Using Maven, then Code Review and Nexus Upload on two parallel branches, then Deploying" width={1260} height={330} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/screens/parallel-stages-graph.webp" alt="Pipeline graph with Git Clone, Building Project Using Maven, then Code Review and Nexus Upload on two parallel branches, then Deploying" width={1260} height={330} />
 
 *Code Review and Nexus Upload appear as two branches of the same stage (this is the Blue Ocean view used in the video).*
 

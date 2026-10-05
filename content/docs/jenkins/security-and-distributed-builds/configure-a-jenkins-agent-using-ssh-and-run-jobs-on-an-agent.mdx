@@ -64,7 +64,7 @@ In the video, the agent first had Java 17, and the connection failed. The agent 
 
 On the controller's web UI, go to **Manage Jenkins > Nodes > New Node**. Enter the name `slave-node`, choose **Permanent Agent**, and click **Create**. Fill in the form:
 
-<img src="/jenkins/screens/agent-node-config.webp" alt="New node form with description, 2 executors, remote root directory /home/ubuntu/slavenode, label slave-node and usage Use this node as much as possible" width={1440} height={774} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/screens/agent-node-config.webp" alt="New node form with description, 2 executors, remote root directory /home/ubuntu/slavenode, label slave-node and usage Use this node as much as possible" width={1440} height={774} />
 
 *The node configuration before the launch method is changed to SSH.*
 
@@ -85,7 +85,7 @@ On the controller's web UI, go to **Manage Jenkins > Nodes > New Node**. Enter t
 
 Next to **Credentials**, click **+ Add** (or create it first under **Manage Jenkins > Credentials > System > Global credentials**). Choose the kind **SSH Username with private key**:
 
-<img src="/jenkins/screens/ssh-credential-dialog.webp" alt="Add SSH Username with private key dialog with scope Global, ID slave-node, description key for agent, username, private key and passphrase fields" width={600} height={801} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/screens/ssh-credential-dialog.webp" alt="Add SSH Username with private key dialog with scope Global, ID slave-node, description key for agent, username, private key and passphrase fields" width={600} height={801} />
 
 *The credential form. The private key is pasted into the Enter directly box.*
 

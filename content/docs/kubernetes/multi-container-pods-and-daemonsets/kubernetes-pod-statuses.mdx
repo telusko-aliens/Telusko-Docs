@@ -21,7 +21,7 @@ Every pod has a **phase** in `status.phase`, and there are only five possible va
 
 The **STATUS** column in `kubectl get pods` is friendlier and more specific. When a container is waiting or terminated, kubectl shows the **reason** instead of the phase. That is why you see `ContainerCreating`, `ImagePullBackOff` or `CrashLoopBackOff`, which are not phases at all. For example, a pod in `CrashLoopBackOff` is still in the `Running` phase, and one in `ImagePullBackOff` is `Pending`.
 
-<img src="/kubernetes/k8s-pod-phases.svg" alt="Pod phases Pending, Running, Succeeded, Failed and Unknown, with the kubectl status reasons that appear in each: ContainerCreating and ImagePullBackOff under Pending, CrashLoopBackOff under Running, Completed under Succeeded, Error and OOMKilled under Failed" width={960} height={440} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s-pod-phases.svg" alt="Pod phases Pending, Running, Succeeded, Failed and Unknown, with the kubectl status reasons that appear in each: ContainerCreating and ImagePullBackOff under Pending, CrashLoopBackOff under Running, Completed under Succeeded, Error and OOMKilled under Failed" width={960} height={440} />
 
 ```bash
 kubectl get pod <name> -o jsonpath='{.status.phase}{"\n"}'     # the real phase

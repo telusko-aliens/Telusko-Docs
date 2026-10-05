@@ -9,7 +9,7 @@ Before we write our first script, it helps to know what actually happens when yo
 
 You write code in **HCL** (HashiCorp Configuration Language) and save it in files with the `.tf` extension, just like Python uses `.py` and Java uses `.java`. Terraform reads **every** `.tf` file in the current folder and treats them as one configuration, so you can split code across `main.tf`, `variables.tf` and `outputs.tf` as the project grows.
 
-<img src="/terraform/tf-architecture.svg" alt="Terraform architecture showing .tf files, Terraform core, the state file, providers and cloud APIs" width={960} height={470} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Terraform/tf-architecture.svg" alt="Terraform architecture showing .tf files, Terraform core, the state file, providers and cloud APIs" width={960} height={470} />
 
 | Piece | What it does |
 | --- | --- |
@@ -23,7 +23,7 @@ The split between core and providers is what makes Terraform multi-cloud. Core s
 
 ## The everyday commands
 
-<img src="/terraform/tf-workflow.svg" alt="Terraform workflow: write code, init, fmt and validate, plan, apply, destroy" width={960} height={360} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Terraform/tf-workflow.svg" alt="Terraform workflow: write code, init, fmt and validate, plan, apply, destroy" width={960} height={360} />
 
 ### terraform init
 

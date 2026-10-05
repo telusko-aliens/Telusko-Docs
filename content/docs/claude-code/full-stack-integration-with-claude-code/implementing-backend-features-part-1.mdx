@@ -152,7 +152,7 @@ uv run alembic upgrade head
 | `alembic revision --autogenerate` | Compares your models with the database and writes a migration script |
 | `alembic upgrade head` | Applies all pending migrations, creating the `tasks` table |
 
-<img src="/claude-code/alembic-migration-flow.svg" alt="Alembic migration flow from model change to database" width={960} height={330} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/alembic-migration-flow.svg" alt="Alembic migration flow from model change to database" width={960} height={330} />
 
 <Callout type="info" title="Why migrations matter">
 Six months from now you will need a new column. Do not add it by hand in the database. Change the model, generate a migration, apply it. That is why our `CLAUDE.md` says "Always create a migration when changing models". Every schema change is recorded, reviewable and repeatable on every environment.

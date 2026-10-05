@@ -7,7 +7,7 @@ Everything you learned in this bootcamp comes together in this section. We will 
 
 Jenkins does not do any of this work by itself. It runs commands. So before we write a single line of the pipeline, the Jenkins server must have every tool those commands need. That is what this lesson is about.
 
-<img src="/jenkins/cicd-complete-pipeline.svg" alt="End-to-end flow: developer pushes to GitHub, Jenkins clones the code, Maven builds the WAR, Docker builds an image, the image is pushed to Docker Hub, kubectl applies manifests to Amazon EKS, a LoadBalancer Service exposes the pods to the user" width={960} height={430} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/cicd-complete-pipeline.svg" alt="End-to-end flow: developer pushes to GitHub, Jenkins clones the code, Maven builds the WAR, Docker builds an image, the image is pushed to Docker Hub, kubectl applies manifests to Amazon EKS, a LoadBalancer Service exposes the pods to the user" width={960} height={430} />
 
 ## What each tool does in the pipeline
 
@@ -23,7 +23,7 @@ Jenkins does not do any of this work by itself. It runs commands. So before we w
 
 You do not need `eksctl` on the Jenkins server. eksctl creates and deletes clusters, and that is an admin task we do from a separate machine (the EKS home server in the next lesson). The pipeline only deploys into a cluster that already exists, and for that kubectl plus the AWS CLI are enough.
 
-<img src="/jenkins/cicd-servers-and-tools.svg" alt="Two EC2 instances: the Jenkins server with Java, Jenkins, Git, Maven, Docker, kubectl and AWS CLI, and the EKS home server with AWS CLI, eksctl and kubectl. Both use the same IAM role. The EKS home server creates the cluster, the Jenkins server deploys to it" width={960} height={470} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/cicd-servers-and-tools.svg" alt="Two EC2 instances: the Jenkins server with Java, Jenkins, Git, Maven, Docker, kubectl and AWS CLI, and the EKS home server with AWS CLI, eksctl and kubectl. Both use the same IAM role. The EKS home server creates the cluster, the Jenkins server deploys to it" width={960} height={470} />
 
 ## Before you start: check the server size
 

@@ -26,7 +26,7 @@ For this Kubernetes has the **Job**. A Job creates one or more pods to perform a
 
 With `parallelism: 1`, the pods run **one after another**: a non-parallel Job. With a higher `parallelism`, several pods work **at the same time**: a parallel Job. It is the same `kind: Job` in both cases. Only these two numbers differ.
 
-<img src="/kubernetes/k8s2-job-vs-cronjob.svg" alt="Left: a non-parallel Job with completions 3 and parallelism 1 runs three pods one after another, and a parallel Job with completions 6 and parallelism 3 runs two waves of three pods. Right: a CronJob with a one-minute schedule creates a new Job, and that Job creates a pod, every minute" width={960} height={480} />
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s2-job-vs-cronjob.svg" alt="Left: a non-parallel Job with completions 3 and parallelism 1 runs three pods one after another, and a parallel Job with completions 6 and parallelism 3 runs two waves of three pods. Right: a CronJob with a one-minute schedule creates a new Job, and that Job creates a pod, every minute" width={960} height={480} />
 
 ## Step 1: A non-parallel Job
 
