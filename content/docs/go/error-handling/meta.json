@@ -1,0 +1,10 @@
+{
+    "title": "Error Handling",
+    "pages": [
+        "errors-as-values.mdx",
+        "creating-and-wrapping-errors.mdx",
+        "custom-error-types.mdx",
+        "inspecting-errors-with-is-and-as.mdx",
+        "panic-and-recover.mdx"
+    ]
+}

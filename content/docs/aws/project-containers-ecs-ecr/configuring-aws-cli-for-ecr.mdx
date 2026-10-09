@@ -107,3 +107,5 @@ The ECR login token **expires after about 12 hours.** If a `docker push` suddenl
 Just like the plain CLI, when this runs on an EC2 instance or in a CI pipeline, you should **not** store access keys - attach an **IAM role** with ECR permissions, and `get-login-password` works using the role's temporary credentials. Same security principle as everywhere else in this course: roles over long-lived keys.
 
 The handshake is done - CLI authenticated, repo created, Docker logged in. Next we stand up the ECS cluster and run our first container in it: MySQL.
+
+Written By: <a href="https://www.linkedin.com/in/shivasrivastava1/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shiva Srivastava <ExternalLink className="w-4 h-4" /></a>

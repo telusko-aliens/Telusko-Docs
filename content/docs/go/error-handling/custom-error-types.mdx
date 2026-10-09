@@ -1,0 +1,335 @@
+---
+title: Custom Error Types
+---
+
+A string message is enough for most errors. Sometimes it is not. When the caller needs to know *which field* failed validation, *which HTTP status* to return, or *how long* to wait before retrying, the error has to carry data, and that means a type of your own.
+
+```go
+type ValidationError struct {
+    Field   string
+    Value   any
+    Rule    string
+}
+
+func (e *ValidationError) Error() string {
+    return fmt.Sprintf("field %q failed rule %q (got %v)", e.Field, e.Rule, e.Value)
+}
+```
+
+Any type with an `Error() string` method is an error. That is the only requirement.
+
+## Using one
+
+```go
+func validateAge(age int) error {
+    if age < 0 {
+        return &ValidationError{Field: "age", Value: age, Rule: "non-negative"}
+    }
+    if age > 150 {
+        return &ValidationError{Field: "age", Value: age, Rule: "max 150"}
+    }
+    return nil
+}
+```
+
+The caller can now do more than print it:
+
+```go
+if err := validateAge(input); err != nil {
+    var vErr *ValidationError
+    if errors.As(err, &vErr) {
+        // Structured data, not a parsed string
+        writeFieldError(w, vErr.Field, vErr.Rule)
+        return
+    }
+    return err
+}
+```
+
+Compare that with parsing the message text, which is what you would be reduced to without a type.
+
+## Pointer or value receiver
+
+Use a **pointer** receiver and return a **pointer**. This is one of the few places where the guidance is close to absolute.
+
+```go
+func (e *ValidationError) Error() string     // yes
+func (e ValidationError) Error() string      // causes problems
+```
+
+Two reasons.
+
+**Identity comparison.** With pointers, two errors are equal only if they are the same value. With value receivers, two independently created errors with identical fields compare equal, which makes `errors.Is` behave in surprising ways.
+
+**Consistency with the ecosystem.** `*os.PathError`, `*json.SyntaxError`, `*net.OpError`, and `*url.Error` are all pointers. Callers write `var e *SomeError` out of habit, and a value type breaks that.
+
+## The nil trap, again
+
+This is the single most dangerous thing about custom error types, and it deserves the repetition:
+
+```go
+func process() error {
+    var e *ValidationError = nil
+    return e                        // NOT nil as an error
+}
+
+err := process()
+fmt.Println(err == nil)             // false
+```
+
+The interface holds the type `*ValidationError` with a nil value, so it is not a nil interface.
+
+```go
+// Wrong: err is declared as the concrete type
+func validate(u User) error {
+    var err *ValidationError
+    if u.Name == "" {
+        err = &ValidationError{Field: "name"}
+    }
+    return err                      // non-nil even when nothing failed
+}
+
+// Right: err is the interface, or return nil literally
+func validate(u User) error {
+    if u.Name == "" {
+        return &ValidationError{Field: "name"}
+    }
+    return nil
+}
+```
+
+<Callout type="warn">
+The rule that avoids it entirely: never declare a variable of a concrete error type and return it as `error`. Return `&YourError{...}` at the failure site and a literal `nil` on the success path.
+</Callout>
+
+## Wrapping inside a custom type
+
+Implement `Unwrap() error` and your type joins the chain, so `errors.Is` and `errors.As` can see through it:
+
+```go
+type QueryError struct {
+    Query string
+    Args  []any
+    Err   error
+}
+
+func (e *QueryError) Error() string {
+    return fmt.Sprintf("query %q failed: %v", e.Query, e.Err)
+}
+
+func (e *QueryError) Unwrap() error {
+    return e.Err
+}
+```
+
+```go
+err := &QueryError{Query: "SELECT ...", Err: sql.ErrNoRows}
+
+errors.Is(err, sql.ErrNoRows)      // true, thanks to Unwrap
+```
+
+Without `Unwrap`, the chain stops at your type and every check below it fails.
+
+For a type wrapping several errors, `Unwrap() []error` is the Go 1.20 form:
+
+```go
+type MultiError struct {
+    Errors []error
+}
+
+func (e *MultiError) Error() string {
+    parts := make([]string, len(e.Errors))
+    for i, err := range e.Errors {
+        parts[i] = err.Error()
+    }
+    return strings.Join(parts, "; ")
+}
+
+func (e *MultiError) Unwrap() []error {
+    return e.Errors
+}
+```
+
+## Controlling equality with Is
+
+By default `errors.Is` compares with `==`. When your type needs different matching rules, implement `Is(target error) bool`:
+
+```go
+type HTTPError struct {
+    StatusCode int
+    Message    string
+}
+
+func (e *HTTPError) Error() string {
+    return fmt.Sprintf("http %d: %s", e.StatusCode, e.Message)
+}
+
+func (e *HTTPError) Is(target error) bool {
+    t, ok := target.(*HTTPError)
+    if !ok {
+        return false
+    }
+    return e.StatusCode == t.StatusCode      // match on status alone
+}
+```
+
+```go
+var ErrNotFound = &HTTPError{StatusCode: 404}
+
+err := &HTTPError{StatusCode: 404, Message: "user 42 does not exist"}
+errors.Is(err, ErrNotFound)      // true, messages differ but status matches
+```
+
+This is a sharp tool. Use it when a family of errors shares an identity, and leave it alone otherwise.
+
+## Adding behaviour
+
+An error type can carry methods that help the caller decide what to do:
+
+```go
+type APIError struct {
+    StatusCode int
+    Code       string
+    Message    string
+    RetryAfter time.Duration
+}
+
+func (e *APIError) Error() string {
+    return fmt.Sprintf("api error %s (%d): %s", e.Code, e.StatusCode, e.Message)
+}
+
+func (e *APIError) Retryable() bool {
+    return e.StatusCode == 429 || e.StatusCode >= 500
+}
+
+func (e *APIError) Temporary() bool {
+    return e.Retryable()
+}
+```
+
+```go
+func callWithRetry(ctx context.Context, fn func() error) error {
+    var lastErr error
+
+    for attempt := 0; attempt < 5; attempt++ {
+        err := fn()
+        if err == nil {
+            return nil
+        }
+        lastErr = err
+
+        var apiErr *APIError
+        if !errors.As(err, &apiErr) || !apiErr.Retryable() {
+            return err                       // not worth retrying
+        }
+
+        wait := apiErr.RetryAfter
+        if wait == 0 {
+            wait = time.Duration(1<<attempt) * time.Second
+        }
+
+        select {
+        case <-time.After(wait):
+        case <-ctx.Done():
+            return ctx.Err()
+        }
+    }
+
+    return fmt.Errorf("giving up after 5 attempts: %w", lastErr)
+}
+```
+
+The retry logic asks the error whether retrying makes sense, instead of guessing from a status code it had to parse out of a string.
+
+## A behaviour interface instead of a type
+
+Sometimes you care that an error *can do something*, not what type it is. Define a small interface and assert against that:
+
+```go
+type temporary interface {
+    Temporary() bool
+}
+
+func isTemporary(err error) bool {
+    var t temporary
+    return errors.As(err, &t) && t.Temporary()
+}
+```
+
+Now any error from any package that has a `Temporary() bool` method works, without your code importing it. This is the same implicit satisfaction idea from the interfaces section, applied to errors.
+
+<Callout type="info">
+`net.Error` used to expose `Temporary()` and it is now deprecated, because the semantics were never clear enough. The pattern is still sound for your own error hierarchies, just be precise about what the method promises.
+</Callout>
+
+## Sentinel or custom type
+
+The decision comes down to whether the caller needs data.
+
+| Need | Use |
+| --- | --- |
+| Caller checks "did this specific thing happen" | sentinel with `errors.Is` |
+| Caller needs field values from the error | custom type with `errors.As` |
+| A family of related failures with a code | custom type with an `Is` method |
+| Aggregating several failures | `errors.Join` or a custom multi-error |
+| Simple, no caller will inspect it | `fmt.Errorf` |
+
+Start with `fmt.Errorf`. Promote to a sentinel when a caller needs to branch on it. Promote to a type when the branch needs details.
+
+## A domain error set
+
+Here is how a real service tends to organise this:
+
+```go
+package order
+
+import "errors"
+
+// Sentinels for conditions callers branch on.
+var (
+    ErrNotFound   = errors.New("order not found")
+    ErrNotPayable = errors.New("order is not in a payable state")
+)
+
+// A type for failures that carry detail.
+type InsufficientStockError struct {
+    SKU       string
+    Requested int
+    Available int
+}
+
+func (e *InsufficientStockError) Error() string {
+    return fmt.Sprintf("insufficient stock for %s: requested %d, available %d",
+        e.SKU, e.Requested, e.Available)
+}
+```
+
+```go
+// The HTTP layer maps them to responses.
+func handleError(w http.ResponseWriter, err error) {
+    var stockErr *order.InsufficientStockError
+
+    switch {
+    case errors.Is(err, order.ErrNotFound):
+        respond(w, 404, "order not found")
+
+    case errors.Is(err, order.ErrNotPayable):
+        respond(w, 409, "order cannot be paid in its current state")
+
+    case errors.As(err, &stockErr):
+        respondJSON(w, 422, map[string]any{
+            "error":     "insufficient stock",
+            "sku":       stockErr.SKU,
+            "available": stockErr.Available,
+        })
+
+    default:
+        slog.Error("unhandled error", "error", err)
+        respond(w, 500, "internal server error")
+    }
+}
+```
+
+The domain package knows nothing about HTTP, the HTTP layer knows nothing about the database, and the error carries enough structure for the client to show a useful message.
+
+Next, let's look properly at `errors.Is` and `errors.As`, which every example on this page depended on.

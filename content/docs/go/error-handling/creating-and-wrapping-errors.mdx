@@ -1,0 +1,275 @@
+---
+title: Creating and Wrapping Errors
+---
+
+An error that says `permission denied` and nothing else is almost useless. Which file? During which operation? Called from where? Wrapping is how a Go error picks up that story as it travels up the stack, and it is a single verb in a format string.
+
+```go
+return fmt.Errorf("reading config %s: %w", path, err)
+```
+
+## Creating an error from nothing
+
+Two functions, and the choice between them is whether you need formatting.
+
+```go
+import "errors"
+
+err := errors.New("connection refused")
+```
+
+```go
+import "fmt"
+
+err := fmt.Errorf("user %s not found in %s", id, table)
+```
+
+`errors.New` for a fixed message, `fmt.Errorf` when values need to appear. Both return an `error` you can return, compare, and wrap.
+
+### Message conventions
+
+Go error strings follow three rules consistently, and following them makes your errors compose well with everyone else's.
+
+```go
+errors.New("connection refused")          // lowercase, no punctuation
+errors.New("Connection refused.")         // wrong on both counts
+errors.New("failed to connect")           // redundant, everything here failed
+```
+
+- **Lowercase first letter**, because errors get embedded in larger messages
+- **No trailing punctuation**, for the same reason
+- **No "failed to" or "error:"** prefixes, since the context already says it is an error
+
+The reason is composition. When your error becomes part of `reading config app.yaml: connection refused`, a capital letter mid-sentence looks wrong and a trailing period breaks the chain.
+
+## Wrapping with %w
+
+`fmt.Errorf` normally formats a value into text. The `%w` verb is different: it formats the error into the message **and** keeps a reference to the original.
+
+```go
+func loadConfig(path string) (*Config, error) {
+    data, err := os.ReadFile(path)
+    if err != nil {
+        return nil, fmt.Errorf("reading config: %w", err)
+    }
+    // ...
+}
+
+func startup() error {
+    cfg, err := loadConfig("app.yaml")
+    if err != nil {
+        return fmt.Errorf("startup failed: %w", err)
+    }
+    // ...
+}
+```
+
+```text
+startup failed: reading config: open app.yaml: no such file or directory
+```
+
+Three layers of context in one line, and the original `*os.PathError` is still in there, reachable with `errors.As`.
+
+### %w versus %v
+
+```go
+fmt.Errorf("reading config: %w", err)     // wraps, chain preserved
+fmt.Errorf("reading config: %v", err)     // formats, chain broken
+```
+
+The printed output is identical. The difference is that `errors.Is` and `errors.As` can see through `%w` and cannot see through `%v`.
+
+<Callout type="warn">
+Using `%v` where you meant `%w` produces an error that looks correct and silently breaks every caller trying to inspect it. The failure is invisible in logs and only shows up when a `errors.Is(err, sql.ErrNoRows)` check mysteriously returns false. Default to `%w` and use `%v` only when you deliberately want to hide the underlying error, which is rare.
+</Callout>
+
+### Wrapping several errors
+
+Since Go 1.20, one format string can wrap more than one:
+
+```go
+return fmt.Errorf("both attempts failed: %w, %w", primaryErr, fallbackErr)
+```
+
+And `errors.Join` combines a slice of them:
+
+```go
+func validateAll(u User) error {
+    var errs []error
+
+    if u.Name == "" {
+        errs = append(errs, errors.New("name is required"))
+    }
+    if !strings.Contains(u.Email, "@") {
+        errs = append(errs, fmt.Errorf("invalid email %q", u.Email))
+    }
+    if u.Age < 13 {
+        errs = append(errs, errors.New("must be 13 or older"))
+    }
+
+    return errors.Join(errs...)     // nil when errs is empty
+}
+```
+
+`errors.Join` returns nil if every element is nil, which means you can call it unconditionally at the end of a validation function. `errors.Is` works against every wrapped error in the set.
+
+## What to write in the message
+
+The most useful convention: **say what you were doing, not what went wrong.** The underlying error already says what went wrong.
+
+```go
+// Redundant, the wrapped error already says "no such file"
+return fmt.Errorf("could not read the file because it does not exist: %w", err)
+
+// Adds the missing information: which operation, which input
+return fmt.Errorf("reading config %s: %w", path, err)
+```
+
+Include the identifiers that let someone reproduce the failure:
+
+```go
+return fmt.Errorf("fetching user %s: %w", userID, err)
+return fmt.Errorf("connecting to %s:%d: %w", host, port, err)
+return fmt.Errorf("parsing row %d of %s: %w", lineNum, filename, err)
+```
+
+<Callout type="warn">
+Never wrap with data that should not appear in logs. Passwords, tokens, API keys, full request bodies, and personal data all end up in log aggregators and stack traces. Include an identifier, not the payload.
+</Callout>
+
+## Wrap once per boundary, not per call
+
+The failure mode at the other extreme is wrapping at every level, which produces messages nobody reads:
+
+```text
+handler failed: service failed: repository failed: query failed: exec failed:
+    driver failed: connection failed: dial tcp: connection refused
+```
+
+A workable rule: wrap when crossing a meaningful boundary, and pass through inside one. Package boundaries, layer boundaries, and public API edges are worth wrapping. Two helper functions in the same file usually are not.
+
+```go
+// Inside the repository package, this adds nothing
+func (r *Repo) find(id string) (User, error) {
+    u, err := r.query(id)
+    if err != nil {
+        return User{}, err                    // just pass it up
+    }
+    return u, nil
+}
+
+// At the package boundary, wrapping earns its place
+func (r *Repo) FindUser(ctx context.Context, id string) (User, error) {
+    u, err := r.find(id)
+    if err != nil {
+        return User{}, fmt.Errorf("repository: finding user %s: %w", id, err)
+    }
+    return u, nil
+}
+```
+
+## Sentinel errors
+
+A package level error variable that callers can compare against:
+
+```go
+var (
+    ErrNotFound     = errors.New("not found")
+    ErrUnauthorized = errors.New("unauthorized")
+    ErrConflict     = errors.New("already exists")
+)
+
+func (r *Repo) Find(id string) (User, error) {
+    row := r.db.QueryRow("SELECT ... WHERE id = $1", id)
+
+    var u User
+    if err := row.Scan(&u.ID, &u.Name); err != nil {
+        if errors.Is(err, sql.ErrNoRows) {
+            return User{}, ErrNotFound
+        }
+        return User{}, fmt.Errorf("scanning user %s: %w", id, err)
+    }
+    return u, nil
+}
+```
+
+Callers test with `errors.Is`, which works through wrapping:
+
+```go
+u, err := repo.Find(id)
+if errors.Is(err, ErrNotFound) {
+    http.Error(w, "user not found", http.StatusNotFound)
+    return
+}
+```
+
+The naming convention is an `Err` prefix. The standard library is full of them: `io.EOF`, `sql.ErrNoRows`, `os.ErrNotExist`, `context.Canceled`, `context.DeadlineExceeded`.
+
+Sentinels are still wrappable, which is what makes them useful rather than limiting:
+
+```go
+return fmt.Errorf("loading profile for %s: %w", id, ErrNotFound)
+```
+
+The message carries the context, and `errors.Is(err, ErrNotFound)` still returns true.
+
+<Callout type="info">
+Sentinel errors become part of your package's public API. Renaming or removing one breaks callers just as surely as removing a function. Add them deliberately, and only for conditions callers genuinely need to distinguish.
+</Callout>
+
+## The wrap chain
+
+Wrapping builds a linked list, and `errors.Unwrap` walks one link:
+
+```go
+base := errors.New("connection refused")
+mid := fmt.Errorf("dialing database: %w", base)
+top := fmt.Errorf("starting service: %w", mid)
+
+fmt.Println(top)                    // starting service: dialing database: connection refused
+fmt.Println(errors.Unwrap(top))     // dialing database: connection refused
+fmt.Println(errors.Unwrap(errors.Unwrap(top)))   // connection refused
+```
+
+You rarely call `Unwrap` directly. `errors.Is` and `errors.As` walk the chain for you, and the next page covers them properly.
+
+## Adding context on the way out
+
+The `defer` trick from the functions section applies neatly here, when a function has many return points that all deserve the same context:
+
+```go
+func ProcessBatch(ctx context.Context, id string) (err error) {
+    defer func() {
+        if err != nil {
+            err = fmt.Errorf("processing batch %s: %w", id, err)
+        }
+    }()
+
+    // Every return below picks up the wrapping automatically
+    items, err := fetch(ctx, id)
+    if err != nil {
+        return err
+    }
+    if err := validate(items); err != nil {
+        return err
+    }
+    return store(ctx, items)
+}
+```
+
+This needs a **named** return value. Without one, the deferred function has nothing to assign to and the wrapping silently does nothing.
+
+## A quick reference
+
+```go
+errors.New("message")                       // simple error
+fmt.Errorf("with %s", value)                // formatted, no wrapping
+fmt.Errorf("context: %w", err)              // wrapped
+fmt.Errorf("a: %w, b: %w", err1, err2)      // multiple, Go 1.20+
+errors.Join(err1, err2, err3)               // combine, nils dropped
+errors.Unwrap(err)                          // one link down
+errors.Is(err, target)                      // is this error in the chain
+errors.As(err, &target)                     // extract a type from the chain
+```
+
+Next, let's look at errors that carry structured data rather than only a message.

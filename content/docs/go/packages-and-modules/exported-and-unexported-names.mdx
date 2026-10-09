@@ -1,0 +1,248 @@
+---
+title: Exported and Unexported Names
+---
+
+Go's entire access control system is one rule:
+
+```text
+   Name starts with an uppercase letter  →  visible outside the package
+   Name starts with anything else        →  visible only inside the package
+```
+
+No `public`, no `private`, no `protected`, no `internal` keyword. Just capitalisation, applied uniformly to functions, types, methods, struct fields, constants, and variables.
+
+```go
+package storage
+
+type Store struct {          // exported
+    DB     *sql.DB           // exported field
+    logger *slog.Logger      // unexported field
+}
+
+func Open(dsn string) (*Store, error)   // exported
+func (s *Store) Close() error           // exported method
+func (s *Store) connect() error         // unexported method
+```
+
+From another package you can reach `storage.Store`, `storage.Open`, `s.DB`, and `s.Close()`. You cannot reach `s.logger` or `s.connect()`, and the compiler will not even suggest them in autocomplete.
+
+## Why this is better than it sounds
+
+The single rule has two properties that keyword-based systems do not.
+
+**Visibility is readable at the point of use.** `store.Close()` versus `store.connect()` tells you which is part of the API without opening the definition. In Java you have to look at the declaration to know.
+
+**There is nothing to forget.** You cannot leave off a modifier and get an unintended default, because there is no default and no modifier.
+
+The cost is that renaming changes visibility. Renaming `Close` to `close` makes it private and breaks every caller, which is a surprise the first time. In practice this almost never causes trouble, because renaming an exported name is a breaking change anyway.
+
+## Two levels only
+
+Go has no protected, no package-private-plus-subpackages, and no friend classes. Subpackages get no special access:
+
+```go
+// package storage
+type Store struct {
+    conn *sql.DB      // unexported
+}
+```
+
+```go
+// package storage/postgres -- a SUBFOLDER, and still a different package
+func use(s *storage.Store) {
+    s.conn.Ping()     // compile error, conn is not accessible
+}
+```
+
+A folder inside another folder is just a different package. There is no hierarchy in visibility terms.
+
+## The internal directory
+
+There is one exception, and it operates at the module level rather than the package level. Any package inside a folder named `internal` can only be imported by code rooted at the parent of that `internal` folder.
+
+```text
+   github.com/yourorg/app/
+   ├── internal/
+   │   ├── database/     ← importable only within github.com/yourorg/app
+   │   └── auth/
+   ├── pkg/
+   │   └── client/       ← importable by anyone
+   └── cmd/
+       └── api/
+```
+
+Your own code imports `internal/database` freely. A different module trying the same import gets a compile error:
+
+```text
+use of internal package github.com/yourorg/app/internal/database not allowed
+```
+
+This is enormously useful. Everything under `internal` can be refactored, renamed, or deleted with confidence, because the compiler guarantees nobody outside could have depended on it.
+
+<Callout type="info">
+A sound default for a new project: put everything in `internal` and move things out only when you deliberately decide to support them as a public API. It is far easier to export something later than to unexport it after people depend on it.
+</Callout>
+
+`internal` can appear at any depth, which lets you scope access more narrowly:
+
+```text
+   app/
+   ├── billing/
+   │   ├── internal/
+   │   │   └── ledger/     ← only billing and its subpackages can import this
+   │   └── invoice.go
+   └── shipping/           ← cannot import billing/internal/ledger
+```
+
+## Designing what to export
+
+The habit worth forming: **write everything unexported, and export only when something outside needs it.**
+
+```go
+package cache
+
+type Cache struct {              // exported, callers need the type
+    mu      sync.RWMutex         // unexported, an implementation detail
+    entries map[string]entry     // unexported
+    ttl     time.Duration        // unexported
+}
+
+type entry struct {              // unexported, callers never see one
+    value   []byte
+    expires time.Time
+}
+
+func New(ttl time.Duration) *Cache          // exported
+func (c *Cache) Get(k string) ([]byte, bool) // exported
+func (c *Cache) Set(k string, v []byte)      // exported
+func (c *Cache) evictExpired()               // unexported, runs internally
+```
+
+The exported surface is four things. Everything else is free to change. That ratio is what a well designed Go package looks like.
+
+## Exported fields versus accessors
+
+Go does not use getters and setters by default. If a field is safe to read and write directly, export it:
+
+```go
+type Config struct {
+    Host    string
+    Port    int
+    Timeout time.Duration
+}
+```
+
+Use unexported fields with methods when there is an invariant to protect:
+
+```go
+type Account struct {
+    id      string
+    balance int64        // must never go negative
+}
+
+func (a *Account) Balance() int64 { return a.balance }
+
+func (a *Account) Withdraw(amount int64) error {
+    if amount <= 0 {
+        return errors.New("amount must be positive")
+    }
+    if amount > a.balance {
+        return ErrInsufficientFunds
+    }
+    a.balance -= amount
+    return nil
+}
+```
+
+Note the naming. Go's convention is `Balance()`, not `GetBalance()`. The `Get` prefix is reserved for operations that genuinely fetch something, such as `http.Get`. Setters do keep the `Set` prefix, because `SetTimeout` reads better than `Timeout(d)`.
+
+<Callout type="warn">
+Exporting a field is a permanent commitment. You cannot later add validation without breaking every caller that assigns to it directly. When in doubt, keep the field unexported and add an accessor, since going the other way is always possible and coming back is not.
+</Callout>
+
+## Visibility and struct literals
+
+An unexported field stops other packages constructing the struct positionally or completely:
+
+```go
+package auth
+
+type Token struct {
+    Value     string
+    expiresAt time.Time     // unexported
+}
+
+func NewToken(v string, ttl time.Duration) Token {
+    return Token{Value: v, expiresAt: time.Now().Add(ttl)}
+}
+```
+
+```go
+// another package
+t := auth.Token{Value: "abc"}                    // compiles, but expiresAt is zero
+t := auth.Token{"abc", time.Now()}               // compile error, unknown field
+```
+
+To force construction through your function, add an unexported field that callers cannot set. This is the technique behind types that must be built correctly.
+
+## Exported names and JSON
+
+`encoding/json` uses reflection, and reflection cannot read unexported fields. This catches everyone once:
+
+```go
+type User struct {
+    Name  string      // marshalled
+    email string      // silently ignored
+}
+
+u := User{Name: "Shiva", email: "shiva@example.com"}
+data, _ := json.Marshal(u)
+fmt.Println(string(data))     // {"Name":"Shiva"}
+```
+
+No error, no warning, the field simply is not there. The same applies to database scanning libraries, YAML parsers, and anything else driven by reflection.
+
+If a field needs to be serialised, it must be exported. To keep it out of the output while still exporting it, use a tag:
+
+```go
+type User struct {
+    Name         string `json:"name"`
+    PasswordHash string `json:"-"`     // exported, but never marshalled
+}
+```
+
+## Documentation follows visibility
+
+`go doc` and pkg.go.dev show only exported names. That makes the doc output a precise description of your package's API:
+
+```bash
+go doc ./internal/cache
+```
+
+```text
+package cache
+
+func New(ttl time.Duration) *Cache
+type Cache struct{ ... }
+    func (c *Cache) Get(k string) ([]byte, bool)
+    func (c *Cache) Set(k string, v []byte)
+```
+
+If that listing looks bigger than the package's actual purpose, something is exported that should not be. Reading your own `go doc` output is a quick and surprisingly effective API review.
+
+## Naming conventions worth following
+
+| Convention | Example |
+| --- | --- |
+| MixedCaps, never underscores | `maxRetries`, `MaxRetries` |
+| Initialisms keep their case | `userID`, `HTTPClient`, `parseURL` |
+| Accessors drop `Get` | `Name()`, not `GetName()` |
+| Setters keep `Set` | `SetTimeout(d)` |
+| Errors start with `Err` | `ErrNotFound` |
+| Error types end in `Error` | `ValidationError` |
+| One-method interfaces end in `er` | `Reader`, `Formatter` |
+| Constructors are `New` or `NewThing` | `cache.New`, `http.NewRequest` |
+
+The initialism rule catches people from Java and C#. Go writes `userID` and `HTTPServer`, never `userId` or `HttpServer`. It looks odd for a week and then becomes invisible.
+
+Next, let's look at the module system that decides which version of everything you actually get.
