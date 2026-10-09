@@ -28,7 +28,8 @@ export async function GET(
 
   try {
     // Read the actual .mdx file from disk
-    const filePath = path.join(process.cwd(), page.data.info.fullPath);
+    // Scoped to content/docs so the build only traces docs, not the whole project
+    const filePath = path.join(process.cwd(), 'content/docs', page.path);
     const rawContent = await fs.readFile(filePath, 'utf-8');
 
     return new NextResponse(rawContent, {
