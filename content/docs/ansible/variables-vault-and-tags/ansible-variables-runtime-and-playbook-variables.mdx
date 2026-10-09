@@ -118,7 +118,7 @@ The value is written once at the top and used in both tasks. Change it in one pl
 
 What happens if `vars:` says `httpd` and you also pass `-e package_name=nginx`? Ansible has a fixed order of **variable precedence** with 22 levels. You do not need to memorise it. Remember the shape, and especially the top:
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-variable-precedence.svg" alt="Simplified Ansible variable precedence: extra vars highest, then set_fact and include_vars, vars_files, play vars, host and group vars, role defaults lowest" width={960} height={480} />
+![Simplified Ansible variable precedence: extra vars highest, then set_fact and include_vars, vars_files, play vars, host and group vars, role defaults lowest](https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-variable-precedence.svg)
 
 **Extra vars always win.** A value passed with `-e` overrides the same variable defined anywhere else. That makes `-e` perfect for one-off overrides, and a reason to be careful with it.
 

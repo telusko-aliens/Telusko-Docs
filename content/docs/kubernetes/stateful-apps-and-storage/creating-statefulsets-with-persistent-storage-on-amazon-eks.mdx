@@ -94,7 +94,7 @@ kubectl apply -f ebs-sc.yml
 
 If you want PVCs without a `storageClassName` to use it, mark it default by adding `storageclass.kubernetes.io/is-default-class: "true"` under `metadata.annotations`. Another option: recent versions of the EBS CSI add-on can install a recommended default class for you when you set its configuration value `defaultStorageClass.enabled: true`.
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s2-dynamic-provisioning.svg" alt="Five steps of dynamic provisioning: PVC from volumeClaimTemplates, StorageClass ebs-sc, pod scheduled with WaitForFirstConsumer, CSI driver creates the EBS volume in that zone, PV created and bound; compared with static provisioning" width={960} height={430} />
+![Five steps of dynamic provisioning: PVC from volumeClaimTemplates, StorageClass ebs-sc, pod scheduled with WaitForFirstConsumer, CSI driver creates the EBS volume in that zone, PV created and bound; compared with static provisioning](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s2-dynamic-provisioning.svg)
 
 ## Step 3: The StatefulSet
 
@@ -241,7 +241,7 @@ You see two pods, two PVCs (`mysql-storage-mysql-0`, `mysql-storage-mysql-1`) an
 
 Now open **EC2, Elastic Block Store, Volumes** in the console:
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/screens/k8s2-dynamic-ebs-volumes.webp" alt="EC2 Volumes list with two new 10 GiB volumes named telusko-learning-dynamic-pvc, next to the node root volumes and the manually created Pods Vol" width={1280} height={210} />
+![EC2 Volumes list with two new 10 GiB volumes named telusko-learning-dynamic-pvc, next to the node root volumes and the manually created Pods Vol](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/screens/k8s2-dynamic-ebs-volumes.webp)
 
 *Two new 10 GiB volumes named `telusko-learning-dynamic-pvc-...` appeared on their own, one per pod, each in the zone of the node its pod runs on. (These are gp2 because the lecture used the gp2 class. With `ebs-sc` they are gp3.)*
 

@@ -38,7 +38,7 @@ You already used two of these. [Rolling Updates & Rollbacks](/docs/kubernetes/na
 
 The key idea: the switch is a single, small change, and the old version is still running, warm and ready, when you make it.
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s2-blue-green-switch.svg" alt="Before the switch, the live LoadBalancer Service selects color blue and sends users to the blue v1 pods while green v2 pods wait; after the switch the selector says color green, users reach the green pods at the same URL, and blue is kept for instant rollback" width={960} height={470} />
+![Before the switch, the live LoadBalancer Service selects color blue and sends users to the blue v1 pods while green v2 pods wait; after the switch the selector says color green, users reach the green pods at the same URL, and blue is kept for instant rollback](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s2-blue-green-switch.svg)
 
 ## How Kubernetes makes it simple
 

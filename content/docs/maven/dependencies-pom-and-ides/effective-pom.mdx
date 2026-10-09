@@ -9,7 +9,7 @@ The answer: Maven never builds from your `pom.xml` alone. It combines your POM w
 
 ## Where the extra settings come from
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Maven/effective-pom.svg" alt="The Super POM, an optional parent POM and your pom.xml are merged in memory into the effective POM, which Maven uses to build" width={960} height={400} />
+![The Super POM, an optional parent POM and your pom.xml are merged in memory into the effective POM, which Maven uses to build](https://dyz1pdcuffwr5.cloudfront.net/Maven/effective-pom.svg)
 
 | Layer | What it contributes |
 | --- | --- |
@@ -29,7 +29,7 @@ The video calls the effective POM "a file that gets created" and also calls it "
 
 Right click `pom.xml` (or anywhere in it), then choose **Maven > Show Effective POM**. IntelliJ opens a read-only file such as `MavenApp-effective-pom.xml`.
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Maven/screenshots/intellij-effective-pom.webp" alt="IntelliJ IDEA showing the effective POM with the central repository and pluginRepository entries, and the Run panel below with surefire, jar and BUILD SUCCESS" width={1440} height={778} />
+![IntelliJ IDEA showing the effective POM with the central repository and pluginRepository entries, and the Run panel below with surefire, jar and BUILD SUCCESS](https://dyz1pdcuffwr5.cloudfront.net/Maven/screenshots/intellij-effective-pom.webp)
 
 *The effective POM in IntelliJ. The `repositories` and `pluginRepositories` entries pointing to Maven Central came from the Super POM, not from our pom.xml.*
 

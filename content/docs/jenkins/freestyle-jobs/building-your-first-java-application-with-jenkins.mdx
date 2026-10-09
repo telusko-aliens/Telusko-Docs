@@ -56,7 +56,7 @@ Click **+ New Item**, name it `java-app-build`, choose **Freestyle project**, cl
 
 Select **Git** and fill in:
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/screens/git-scm-config.webp" alt="Git source code management with repository URL https://github.com/Haider7214/springboot-mvnapp.git, no credentials and branch specifier */main" width={1440} height={872} />
+![Git source code management with repository URL https://github.com/Haider7214/springboot-mvnapp.git, no credentials and branch specifier */main](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/screens/git-scm-config.webp)
 
 *The Git section of the job: repository URL, credentials and the branch to build.*
 
@@ -72,7 +72,7 @@ If the branch is wrong, the console shows `Couldn't find any revision to build. 
 
 Click **Add build step > Invoke top-level Maven targets**:
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/screens/maven-build-step.webp" alt="Invoke top-level Maven targets build step with Maven Version maven and Goals compile package" width={1440} height={628} />
+![Invoke top-level Maven targets build step with Maven Version maven and Goals compile package](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/screens/maven-build-step.webp)
 
 *The Maven build step uses the `maven` tool we registered and runs the goals `compile package`.*
 

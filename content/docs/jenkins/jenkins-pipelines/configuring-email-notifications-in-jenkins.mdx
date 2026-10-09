@@ -7,7 +7,7 @@ Once you have many jobs and pipelines, nobody can keep watching the dashboard to
 
 The simplest way is email. Jenkins sends a message when a build succeeds or fails, with a link and the log attached.
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/jenkins-email-notification-flow.svg" alt="Pipeline result goes to the post block, which calls emailext; the Email Extension plugin sends through the SMTP server to the team inbox" width={960} height={400} />
+![Pipeline result goes to the post block, which calls emailext; the Email Extension plugin sends through the SMTP server to the team inbox](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/jenkins-email-notification-flow.svg)
 
 Two plugins handle email, and both come with the suggested plugins:
 
@@ -42,7 +42,7 @@ Anyone with it can send email as you. Paste it only into the Jenkins credential 
 
 Go to **Manage Jenkins > System** and scroll to **Extended E-mail Notification**.
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/screens/extended-email-smtp-settings.webp" alt="Extended E-mail Notification section with SMTP server smtp.gmail.com, SMTP port 465 and the Advanced options Credentials, Use SSL, Use TLS and Use OAuth 2.0" width={1440} height={587} />
+![Extended E-mail Notification section with SMTP server smtp.gmail.com, SMTP port 465 and the Advanced options Credentials, Use SSL, Use TLS and Use OAuth 2.0](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/screens/extended-email-smtp-settings.webp)
 
 *SMTP server and port, with the Advanced section open. The Credentials drop-down is still empty here; select the app password credential in it once you have created it.*
 

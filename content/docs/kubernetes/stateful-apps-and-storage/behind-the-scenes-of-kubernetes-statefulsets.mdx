@@ -56,7 +56,7 @@ mysql-1.mysql.default.svc.cluster.local
 
 These names stay the same when pods are recreated (the IP behind the name may change, the name does not). So an application, or another MySQL pod, can always reach `mysql-0` directly. The StatefulSet's `serviceName` field points at this Service, and you must create the Service yourself.
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s2-statefulset-identity.svg" alt="A client talks to a headless Service named mysql, which gives each of the pods mysql-0, mysql-1 and mysql-2 its own DNS name; each pod has its own PVC, PV and EBS volume, and pods are created in order 0, 1, 2" width={960} height={520} />
+![A client talks to a headless Service named mysql, which gives each of the pods mysql-0, mysql-1 and mysql-2 its own DNS name; each pod has its own PVC, PV and EBS volume, and pods are created in order 0, 1, 2](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s2-statefulset-identity.svg)
 
 ## Ordered, predictable behaviour
 

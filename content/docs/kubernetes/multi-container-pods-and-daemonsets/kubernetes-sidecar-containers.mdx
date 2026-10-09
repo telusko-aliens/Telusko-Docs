@@ -17,7 +17,7 @@ In Kubernetes:
 
 Because both containers are in the same pod, they share the pod's network (`localhost`) and can share volumes. The sidecar pattern is the most common real use of the multi-container pods from the [previous lesson](/docs/kubernetes/multi-container-pods-and-daemonsets/running-multiple-containers-in-a-single-pod).
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s-sidecar-pattern.svg" alt="A pod containing an app container that writes /var/log/app.log into a shared emptyDir volume, and a sidecar container that reads the same file and ships logs to a store" width={960} height={420} />
+![A pod containing an app container that writes /var/log/app.log into a shared emptyDir volume, and a sidecar container that reads the same file and ships logs to a store](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s-sidecar-pattern.svg)
 
 ## The shared volume: emptyDir
 

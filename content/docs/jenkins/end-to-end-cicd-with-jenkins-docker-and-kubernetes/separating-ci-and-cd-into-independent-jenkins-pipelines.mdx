@@ -12,7 +12,7 @@ Everything we built so far lives in one pipeline: clone, build, image, push, dep
 
 The usual answer is to split the work. **CI** (continuous integration) takes code and produces a tested, versioned artifact, here a Docker image. **CD** (continuous delivery or deployment) takes a version of that artifact and puts it into an environment. The two are separate Jenkins jobs, and CI starts CD automatically when it succeeds.
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/cicd-combined-vs-split.svg" alt="Top: a single pipeline with checkout, Maven build, Docker build, push and deploy. Bottom: a CI pipeline with checkout, Maven build and tests, Docker build with BUILD_NUMBER tag and push, which triggers a CD pipeline with build job cd-pipeline and parameter IMAGE_TAG. The CD pipeline checks out manifests, applies the image tag and waits for rollout status, and can be run by hand with an older tag to roll back" width={960} height={470} />
+![Top: a single pipeline with checkout, Maven build, Docker build, push and deploy. Bottom: a CI pipeline with checkout, Maven build and tests, Docker build with BUILD_NUMBER tag and push, which triggers a CD pipeline with build job cd-pipeline and parameter IMAGE_TAG. The CD pipeline checks out manifests, applies the image tag and waits for rollout status, and can be run by hand with an older tag to roll back](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/cicd-combined-vs-split.svg)
 
 ## What the lecture builds
 
@@ -31,7 +31,7 @@ build 'CD Pipeline'
 
 Running only `CI Pipeline` started `CD Pipeline` by itself a few seconds later:
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/screens/cicd-ci-triggers-cd.webp" alt="Stage view of CI Pipeline: Tool Install, git clone, maven build and Build Docker Image succeeded, and the CD Trigger stage is running while it waits for the CD Pipeline" width={1440} height={644} />
+![Stage view of CI Pipeline: Tool Install, git clone, maven build and Build Docker Image succeeded, and the CD Trigger stage is running while it waits for the CD Pipeline](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/screens/cicd-ci-triggers-cd.webp)
 
 *The CD Trigger stage stays blue (running) while it waits for the CD Pipeline to finish, because Wait for completion was ticked.*
 
@@ -258,7 +258,7 @@ Check **EC2 > Load Balancers**, **EC2 > Instances** and **CloudFormation** to co
 
 Take a moment to look at what this last pipeline actually does. A `git push` starts a chain that touches almost every course in the bootcamp:
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/cicd-bootcamp-recap.svg" alt="Eight tiles: Linux and Bash for servers and scripts, Git and GitHub as the source of every build, Maven to compile and package the WAR, AWS for EC2, IAM roles, ELB and VPC, Terraform and Ansible to create servers as code, Docker to pack the image, Kubernetes on EKS to run the containers, and Jenkins to connect it all" width={960} height={420} />
+![Eight tiles: Linux and Bash for servers and scripts, Git and GitHub as the source of every build, Maven to compile and package the WAR, AWS for EC2, IAM roles, ELB and VPC, Terraform and Ansible to create servers as code, Docker to pack the image, Kubernetes on EKS to run the containers, and Jenkins to connect it all](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/cicd-bootcamp-recap.svg)
 
 - **Linux and Bash**: every server here is Ubuntu, and you fixed users, groups, permissions and file ownership along the way (the `jenkins` user, the `docker` group, `chmod 600` on the kubeconfig).
 - **Git and GitHub**: the repository is the single source of truth for code, Dockerfile and manifests.
