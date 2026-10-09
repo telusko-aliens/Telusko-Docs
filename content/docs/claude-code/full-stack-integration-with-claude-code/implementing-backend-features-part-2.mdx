@@ -89,7 +89,7 @@ async def update_task(db: AsyncSession, task_id: int, data: TaskUpdate) -> Task 
 
 `model_dump(exclude_unset=True)` means a request that only sends `{"state": "editing"}` changes only the state, instead of wiping the title and description.
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/request-lifecycle.svg" alt="Life of a PUT request through route, schema, service and database" width={960} height={430} />
+![Request_Lifecycle](https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/request-lifecycle.svg)
 
 **`main.py`** registers the router and enables CORS for the origins the frontend may run on, plus a `/health` endpoint.
 
@@ -109,7 +109,7 @@ http://localhost:8000/docs
 
 Expand `GET /api/tasks`, click **Try it out**, then **Execute**. You get a JSON list of tasks back. In our case there were two records: the ones Claude created during its own `curl` tests. The real seed data is not loaded yet, and that is the next feature.
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/swagger-flow.svg" alt="Testing endpoints with FastAPI Swagger UI" width={960} height={300} />
+![Swagger_Flow](https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/swagger-flow.svg)
 
 ### Test every endpoint from the terminal
 

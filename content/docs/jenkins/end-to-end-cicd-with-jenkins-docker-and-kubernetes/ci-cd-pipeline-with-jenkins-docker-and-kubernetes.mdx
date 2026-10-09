@@ -7,7 +7,7 @@ The previous pipeline worked, but it carried the Dockerfile and the Kubernetes Y
 
 In a real team the split is clear. Developers keep the code, the `Dockerfile` and the Kubernetes manifest together in the Git repository. The pipeline only **runs** them: clone, build, package, push, deploy. That is what we build now.
 
-![End-to-end flow from developer push to GitHub, through Jenkins checkout, Maven and Docker build, Docker Hub push and kubectl deploy to Amazon EKS, to the user through a load balancer](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/cicd-complete-pipeline.svg)
+![Complete_Pipeline](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/cicd-complete-pipeline.svg)
 
 ## The repository
 
@@ -189,7 +189,7 @@ kubectl set image deployment/web-app-deployment web-container=$IMAGE_NAME:$IMAGE
 
 When the image changes, the Deployment does a **rolling update**: it creates a new ReplicaSet for the new pod template, starts new pods, waits until they are ready, and only then removes old ones. Users keep getting answers the whole time.
 
-![Rolling update in three steps: before, two pods run image 42 in ReplicaSet A; during, one old pod and two new pods run as A scales down and B scales up; after, two pods run image 43 in ReplicaSet B. Reusing the same tag gives no rollout; a new tag creates a new ReplicaSet; kubectl rollout undo returns to the previous one](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/cicd-rollout.svg)
+![Rollout](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/cicd-rollout.svg)
 
 `kubectl rollout status` makes Jenkins wait for this to finish. If the new pods crash or cannot pull the image, the stage fails after 180 seconds and the build turns red, while the old pods keep serving traffic. To go back by hand:
 
