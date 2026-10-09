@@ -23,7 +23,7 @@ Use the api-extractor and seed-data-extractor agents to produce both spec files 
 
 Watch the terminal. Claude starts **two sub-agents at the same time**, each shown in its own colour: blue for `api-extractor` and green for `seed-data-extractor`. Because the two tasks do not depend on each other, they run in parallel.
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/subagents-architecture.svg" alt="Two sub-agents running in parallel and returning summaries" width={960} height={500} />
+![Subagents_Architecture](https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/subagents-architecture.svg)
 
 - `seed-data-extractor` finishes quickly because it runs on Haiku and has a small, mechanical job
 - `api-extractor` takes longer because it analyses all four API methods and the error handling

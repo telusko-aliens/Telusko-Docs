@@ -36,7 +36,7 @@ A **selector** is a search condition. It says "every object whose labels match t
 1. **In kubectl**, with `-l` (or `--selector`), so that you can filter what you see
 2. **Inside other objects**, so that a Service, ReplicaSet, Deployment or DaemonSet knows which pods are "its" pods
 
-![A Service with selector app=webapp selects pod 1 and pod 2, which have app=webapp, and ignores pod 3, which has app=payment](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s-labels-selectors.svg)
+![K8s_Labels_Selectors](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s-labels-selectors.svg)
 
 A pod matches a selector when it has **all** the key-value pairs in the selector. Extra labels on the pod do not matter. So pod 1 (`app=webapp, env=dev`) and pod 2 (`app=webapp, env=prod`) both match `app=webapp`, and pod 3 does not.
 

@@ -24,7 +24,7 @@ That last point is why Jenkins shows the warning "Building on the built-in node 
 
 Keep Jenkins on its current server, but stop running builds there. Instead, connect other machines, and send the builds to them.
 
-![Jenkins controller receives users and GitHub webhooks and sends builds to Linux, Docker and Windows agents over SSH or inbound connections](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/jenkins-controller-agent.svg)
+![Jenkins_Controller_Agent](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/jenkins-controller-agent.svg)
 
 - The machine where Jenkins is installed becomes the **controller**. It serves the web UI, stores job configuration, plugins and credentials, keeps the build queue, decides which build runs where, and stores logs and results.
 - The other machines are **agents**. They run the actual build steps: clone the code, run Maven, build Docker images. The workspace and the generated WAR file live on the agent.

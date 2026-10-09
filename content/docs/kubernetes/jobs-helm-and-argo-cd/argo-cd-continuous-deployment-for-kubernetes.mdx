@@ -13,7 +13,7 @@ Every deployment in this course so far ended the same way: log in to the EKS hom
 
 The "CD" means **continuous deployment** (or delivery). You commit, Argo CD deploys. Nobody runs `kubectl apply` by hand.
 
-![A developer pushes YAML to a Git repository; Argo CD in the argocd namespace polls the repository, renders the manifests, compares them with the live cluster and syncs the EKS cluster; drift in the cluster is detected and can be self-healed](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s2-gitops-argocd.svg)
+![Gitops_Argocd](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s2-gitops-argocd.svg)
 
 ## Step 1: Install Argo CD with Helm
 
@@ -157,7 +157,7 @@ In the UI click **+ New App** and fill in:
 
 Click **Create**. The app shows **Synced** and then **Healthy**. Click it to see the tree that Argo CD builds from live objects: the Application, the Service and the Deployment, its ReplicaSet, and four pods.
 
-![Argo CD application tree: telusko-learning application linked to the teluskoappsvc Service and the product-deployment Deployment, its ReplicaSet and eight product-deployment pods](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/screens/k8s2-argocd-app-tree.webp)
+![Argocd_App_Tree](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/screens/k8s2-argocd-app-tree.webp)
 
 *The Application tree right after the replica count in Git was changed to 8: new pods appear next to the existing ones.*
 

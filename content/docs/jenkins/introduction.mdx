@@ -19,7 +19,7 @@ The trade-off: you host and maintain Jenkins yourself. That means upgrades, back
 
 ## How the pieces fit
 
-![Developer pushes to GitHub, a webhook or poll notifies Jenkins, and Jenkins calls Maven, SonarQube, Docker and Kubernetes](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/jenkins-delivery-flow.svg)
+![Jenkins_Delivery_Flow](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/jenkins-delivery-flow.svg)
 
 ```text
 You push:        git push origin main
@@ -72,7 +72,7 @@ Freestyle jobs are the quickest way to understand what Jenkins does. Pipelines a
 
 Jenkins is the conductor. It does not replace any tool you learned earlier in the bootcamp; it calls them in the right order.
 
-![CI pipeline: GitHub, Maven, Docker build, Docker Hub push, then trigger the CD job with IMAGE_TAG; CD pipeline: kubectl apply of that image tag on Amazon EKS; plus what the Jenkins server needs](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/jenkins-end-to-end-pipeline.svg)
+![Jenkins_End_To_End_Pipeline](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/jenkins-end-to-end-pipeline.svg)
 
 | Tool | How Jenkins uses it |
 | --- | --- |

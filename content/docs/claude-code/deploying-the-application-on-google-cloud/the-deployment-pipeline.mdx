@@ -13,7 +13,7 @@ We use Google Cloud Run because it is simple for container-based apps and has a 
 
 ## The pipeline
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/deployment-pipeline.svg" alt="Deployment pipeline: prepare, Dockerfile, local test, gcloud setup, Cloud Build, Cloud Run" width={960} height={420} />
+![Deployment_Pipeline](https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/deployment-pipeline.svg)
 
 | Step | What we do | Lesson |
 | --- | --- | --- |
@@ -30,7 +30,7 @@ Locally we run two servers: the frontend on one port and the FastAPI backend on 
 
 Our frontend is just HTML, CSS and JavaScript. FastAPI can serve those files itself. Then the entire app is **one container on one URL**.
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/single-origin.svg" alt="From two origins to a single origin" width={960} height={360} />
+![Single_Origin](https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/single-origin.svg)
 
 ## Why Docker?
 
@@ -38,7 +38,7 @@ A container packages the app with its exact Python version, dependencies and sta
 
 ## Cloud Run in a nutshell
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/cloud-run-concepts.svg" alt="Cloud Run service, revisions and instances" width={960} height={400} />
+![Cloud_Run_Concepts](https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/cloud-run-concepts.svg)
 
 | Concept | Meaning |
 | --- | --- |

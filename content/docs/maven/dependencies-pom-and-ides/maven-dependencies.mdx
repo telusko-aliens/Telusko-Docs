@@ -55,7 +55,7 @@ Open `telusko-app/pom.xml` in any editor or IDE. Find the `<dependencies>` secti
 </dependencies>
 ```
 
-![pom.xml open in IntelliJ IDEA with the junit dependency and the new spring-core 6.2.8 dependency inside the dependencies element](https://dyz1pdcuffwr5.cloudfront.net/Maven/screenshots/spring-core-dependency-pom.webp)
+![Spring_Core_Dependency_POM](https://dyz1pdcuffwr5.cloudfront.net/Maven/screenshots/spring-core-dependency-pom.webp)
 
 *The spring-core dependency pasted inside `<dependencies>`, right after JUnit. (This is the archetype 1.0 POM. If you used archetype 1.5, your JUnit entries look different, and that is fine.)*
 
@@ -91,7 +91,7 @@ You can add as many dependencies as you need: Spring, Spring Security, Hibernate
 
 Libraries have their own dependencies. `spring-core` 6.2.x needs `spring-jcl` (Spring's logging bridge). You never declared it, but Maven reads spring-core's own POM, sees that requirement, and downloads it too. These are **transitive dependencies**.
 
-![telusko-app depends directly on spring-core and junit; spring-core brings spring-jcl as a transitive dependency](https://dyz1pdcuffwr5.cloudfront.net/Maven/transitive-dependencies.svg)
+![Transitive_Dependencies](https://dyz1pdcuffwr5.cloudfront.net/Maven/transitive-dependencies.svg)
 
 See the full tree at any time:
 

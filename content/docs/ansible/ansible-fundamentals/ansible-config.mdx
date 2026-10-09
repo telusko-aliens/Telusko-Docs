@@ -13,7 +13,7 @@ The plan:
 | `managed-node-1` | Managed node, in the `webservers` group | An `ansible` user with sudo rights, password login over SSH (temporarily) |
 | `managed-node-2` | Managed node, in the `dbservers` group | Same as managed node 1 |
 
-![Lab setup: control node with ansible user and SSH key, copying its public key to two managed nodes over private IPs](https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-lab-setup.svg)
+![Ansible_Lab_Setup](https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-lab-setup.svg)
 
 ## Step 1: Launch three EC2 instances
 
@@ -307,7 +307,7 @@ You will probably also see a purple warning like "Platform linux on host ... is 
 
 `ansible --version` showed `config file = None`, which means Ansible is running on built-in defaults. The lecture does not create a config file, but a small one makes the lab quieter and more explicit. Ansible looks for it in this order and uses the **first** one it finds:
 
-![ansible.cfg search order: ANSIBLE_CONFIG, ./ansible.cfg, ~/.ansible.cfg, /etc/ansible/ansible.cfg](https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-config-order.svg)
+![Ansible_Config_Order](https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-config-order.svg)
 
 Create a system-wide one:
 
