@@ -145,7 +145,7 @@ Only `172.31.9.250` appears in the output. On `managed-node-1` (webservers) you 
 
 Most modules are **idempotent**: they check the current state first and only change something if it differs from what you asked for. Running the same playbook ten times gives the same result as running it once.
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-idempotence.svg" alt="Idempotence flow: a task checks whether the host is already in the desired state, reports ok if yes and changed if it had to act" width={960} height={440} />
+![Idempotence flow: a task checks whether the host is already in the desired state, reports ok if yes and changed if it had to act](https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-idempotence.svg)
 
 Now run the same playbook a second time. You might expect `ok`, because the file already exists. Instead you see:
 

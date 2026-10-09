@@ -13,7 +13,7 @@ When you typed `mvn package`, Maven did not run just one step. It ran a whole se
 | **clean** | Removes the output of previous builds (`target/`) | Every day, usually as `mvn clean ...` |
 | **site** | Generates a documentation website for the project | Rarely |
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Maven/maven-three-lifecycles.svg" alt="The clean, default and site lifecycles with their phases, and the plugin goals bound to the main default lifecycle phases for jar packaging" width={960} height={470} />
+![The clean, default and site lifecycles with their phases, and the plugin goals bound to the main default lifecycle phases for jar packaging](https://dyz1pdcuffwr5.cloudfront.net/Maven/maven-three-lifecycles.svg)
 
 The lifecycles are independent. `mvn clean package` runs the clean lifecycle up to `clean`, then the default lifecycle up to `package`.
 

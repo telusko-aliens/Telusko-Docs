@@ -30,7 +30,7 @@ The most common open-source pair for Kubernetes monitoring:
 
 So Prometheus is the **data source** and Grafana is the **dashboard**. Grafana asks Prometheus for numbers and shows them in a way people can read at a glance.
 
-<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s2-prometheus-grafana-stack.svg" alt="node-exporter, kube-state-metrics, the kubelet and application endpoints expose metrics; the Prometheus server scrapes and stores them and sends alerts to Alertmanager; Grafana queries Prometheus and shows dashboards to the user" width={960} height={470} />
+![node-exporter, kube-state-metrics, the kubelet and application endpoints expose metrics; the Prometheus server scrapes and stores them and sends alerts to Alertmanager; Grafana queries Prometheus and shows dashboards to the user](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s2-prometheus-grafana-stack.svg)
 
 Where do the metrics come from? Small **exporters** expose them over HTTP:
 
