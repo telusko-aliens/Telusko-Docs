@@ -3,10 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "next build",
+    "build": "node scripts/build-search-index.mjs && next build",
     "dev": "next dev",
     "start": "next start",
-    "postinstall": "fumadocs-mdx",
+    "postinstall": "fumadocs-mdx && node scripts/build-search-index.mjs",
     "lint": "eslint"
   },
   "dependencies": {

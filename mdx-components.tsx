@@ -10,7 +10,17 @@ import Badge from '@/components/ui/Badge';
 import { ComingSoonCard } from '@/components/coming-soon-card';
 import { ComingSoonAccordion } from '@/components/coming-soon-accordion';
 import Image from 'next/image';
-import { ExternalLink } from 'lucide-react'
+// Icons used directly in MDX (MDX files can't import packages: pages are compiled at runtime)
+import {
+  CodeXml,
+  Globe,
+  Database,
+  Cloud,
+  MonitorCog,
+  Library,
+  GraduationCap,
+  ExternalLink,
+} from 'lucide-react';
 
 import Video from './components/ui/Video';
 import { ImageZoom } from 'fumadocs-ui/components/image-zoom';
@@ -40,6 +50,13 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
     Badge,
     ComingSoonCard,
     ComingSoonAccordion,
+    CodeXml,
+    Globe,
+    Database,
+    Cloud,
+    MonitorCog,
+    Library,
+    GraduationCap,
     ExternalLink,
     Image,
     ...components,
