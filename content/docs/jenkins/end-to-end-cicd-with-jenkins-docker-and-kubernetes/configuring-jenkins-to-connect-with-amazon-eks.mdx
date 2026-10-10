@@ -12,7 +12,7 @@ Two things are missing:
 
 We fix the first by giving the `jenkins` user a kubeconfig, and the second by giving the Jenkins server an IAM role the cluster already trusts.
 
-![Jenkins_Auth](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/cicd-jenkins-auth.svg)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/cicd-jenkins-auth.svg" alt="How the Jenkins server authenticates: for Docker Hub, a Jenkins credential holding an access token is injected by withCredentials into docker login. For EKS, kubectl reads /var/lib/jenkins/.kube/config, runs aws eks get-token using the EC2 instance role, and EKS maps the role through an access entry to Kubernetes permissions" width={960} height={500} />
 
 ## Where the jenkins user keeps its files
 

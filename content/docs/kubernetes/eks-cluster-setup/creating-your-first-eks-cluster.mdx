@@ -5,7 +5,7 @@ description: Give the EKS home server an IAM role, create a two-node Amazon EKS 
 
 The tools are installed. Now one command will build an entire Kubernetes cluster on AWS: a VPC, subnets, security groups, IAM roles, the EKS control plane, a managed node group with two EC2 worker nodes, and the core add-ons. Doing that by hand in the console takes an hour and is easy to get wrong. With eksctl it takes one line and about 15 minutes of waiting.
 
-![K8s_EKS_Setup](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s-eks-setup.svg)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s-eks-setup.svg" alt="Your machine with aws cli, eksctl and kubectl calls CloudFormation, which creates a VPC, the EKS control plane and a managed node group of two EC2 nodes in your AWS account" width={960} height={500} />
 
 ## Step 1: Give the EC2 instance permission to build a cluster
 
@@ -159,7 +159,7 @@ kubectl config current-context       # which cluster kubectl is pointing at
 
 Open **Elastic Kubernetes Service**, then **Clusters**. Your cluster is listed as **Active**, with its Kubernetes version and support period.
 
-![K8s_EKS_Console_Cluster_Active](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/screens/k8s-eks-console-cluster-active.webp)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/screens/k8s-eks-console-cluster-active.webp" alt="Amazon EKS console Clusters page showing telusko-learning as Active on Kubernetes 1.34 with standard support until December 2, 2026" width={1440} height={300} />
 
 *The cluster from the lecture. Note the support period column: this is where you see when the version leaves standard support.*
 

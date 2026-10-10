@@ -93,7 +93,7 @@ Set **Prometheus server URL** to the address of the `prometheus-server` Service 
 http://prometheus-server.monitoring.svc.cluster.local
 ```
 
-![Grafana_Prometheus_Datasource](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/screens/k8s2-grafana-prometheus-datasource.webp)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/screens/k8s2-grafana-prometheus-datasource.webp" alt="Grafana Prometheus data source settings with the name prometheus, set as default, and the server URL http://prometheus-server.monitoring.svc.cluster.local" width={950} height={420} />
 
 *The Prometheus data source in Grafana. The URL is the cluster DNS name of the `prometheus-server` Service.*
 
@@ -110,7 +110,7 @@ Go to **Dashboards, New, Import**, type the ID, click **Load**, select the **pro
 | `15661` | A whole-cluster overview: nodes, namespaces, workloads, total pods, CPU and memory by node, network |
 | `8171` | Kubernetes nodes only: idle CPU, system load, memory, disk I/O, disk space, network per node |
 
-![Grafana_K8s_Dashboard](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/screens/k8s2-grafana-k8s-dashboard.webp)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/screens/k8s2-grafana-k8s-dashboard.webp" alt="Grafana K8S Dashboard showing node memory and CPU ratios, namespace resource statistics for argocd, monitoring, kube-system and default, workload 17, total pods 22, total nodes 2, and memory and CPU usage graphs" width={1260} height={550} />
 
 *Dashboard 15661 on the course cluster: 2 nodes, 22 pods, and the `argocd` and `monitoring` namespaces we created.*
 

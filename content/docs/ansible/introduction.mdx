@@ -40,13 +40,13 @@ Three properties make it popular:
 
 ## How a run works
 
-![Ansible_Push_Model](https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-push-model.svg)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-push-model.svg" alt="Ansible push model: the control node connects over SSH, copies a module, runs it with Python, receives JSON and cleans up" width={960} height={430} />
 
 When you run a playbook, Ansible reads the inventory to find the hosts, connects to each one over SSH, copies the module for the current task, runs it with the host's Python, collects the JSON result (`ok`, `changed` or `failed`) and moves on. It works on several hosts in parallel, so ten servers take about as long as one.
 
 ## Where Ansible fits
 
-![Ansible_Big_Picture](https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-big-picture.svg)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-big-picture.svg" alt="DevOps toolchain: Git stores code, Terraform provisions servers, Ansible configures them, the application runs on top, Jenkins automates the steps" width={960} height={400} />
 
 Ansible usually sits between infrastructure and application:
 

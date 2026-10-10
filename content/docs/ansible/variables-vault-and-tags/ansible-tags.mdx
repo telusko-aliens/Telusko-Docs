@@ -66,7 +66,7 @@ In the lecture, the first `--syntax-check` fails with an error pointing at the h
 
 ## Handlers: run only when something changed
 
-![Ansible_Handlers](https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-handlers.svg)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-handlers.svg" alt="Handlers: the copy task notifies the handler only when it reports changed; the handler then runs once at the end of the play" width={960} height={480} />
 
 ```bash
 ansible-playbook handlers.yml --syntax-check
@@ -163,7 +163,7 @@ The install task is not even shown: it was skipped because it does not have the 
 ansible-playbook handlers.yml --skip-tags install
 ```
 
-![Ansible_Tags](https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-tags.svg)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-tags.svg" alt="Three runs of handlers.yml: no tag flag runs all tasks, --tags copy runs only the copy task, --skip-tags install runs everything except installation; the handler runs whenever copy changed" width={960} height={400} />
 
 | Option | Effect |
 | --- | --- |

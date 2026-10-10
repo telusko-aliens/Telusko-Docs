@@ -129,7 +129,7 @@ mvn package
 
 Compiles, runs the tests, and then packages the compiled classes into the format set by `<packaging>`. For our quickstart project that is a JAR. So **package = compile + test + package**.
 
-![Mvn_Package_Output](https://dyz1pdcuffwr5.cloudfront.net/Maven/screenshots/mvn-package-output.webp)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Maven/screenshots/mvn-package-output.webp" alt="Terminal output of mvn package showing the surefire test results, the jar plugin building telusko-app-1.0-SNAPSHOT.jar, and BUILD SUCCESS" width={1440} height={778} />
 
 *End of `mvn package` on the VM: one test passed, then the jar plugin built `target/telusko-app-1.0-SNAPSHOT.jar`.*
 
@@ -153,7 +153,7 @@ mvn clean package
 
 Two steps in one command: delete `target`, then compile, test and package from scratch. This is the command you will type most often in real projects and see most often in CI pipelines, because it guarantees no leftover files from an older build end up in the JAR.
 
-![Maven_Goals_Nesting](https://dyz1pdcuffwr5.cloudfront.net/Maven/maven-goals-nesting.svg)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Maven/maven-goals-nesting.svg" alt="Nested boxes: mvn package contains mvn test which contains mvn compile; mvn clean is separate; mvn clean package combines them" width={960} height={420} />
 
 ## Summary
 

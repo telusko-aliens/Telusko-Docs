@@ -7,7 +7,7 @@ Until now every playbook had a single task. Real configuration is a sequence: in
 
 This lesson hosts a small static website on the `webservers` group. The web server is **Apache httpd**, the package is called `httpd` on Amazon Linux, and by default it serves files from `/var/www/html`.
 
-![Ansible_Website_Flow](https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-website-flow.svg)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-website-flow.svg" alt="Static website flow: control node sends three tasks over SSH to the web server, then a browser requests the page on port 80" width={960} height={420} />
 
 ## Write the playbook
 
@@ -124,7 +124,7 @@ PLAY RECAP *********************************************************************
 
 `ok=4` counts Gathering Facts plus the three tasks, and `changed=3` means all three actually did something. In the EC2 console, find the **public IPv4 address** of the instance whose private IP is `172.31.9.250` and open `http://<public-ip>` in your browser.
 
-![Ansible_Website_Browser](https://dyz1pdcuffwr5.cloudfront.net/Ansible/screens/ansible-website-browser.webp)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Ansible/screens/ansible-website-browser.webp" alt="Browser showing the Telusko DevOps Learning heading served by httpd on the managed node" width={1440} height={260} />
 
 *The page served by httpd on the web server, deployed entirely from the control node.*
 

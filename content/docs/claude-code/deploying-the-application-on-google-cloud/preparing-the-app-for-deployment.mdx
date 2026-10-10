@@ -108,7 +108,7 @@ app.mount("/", StaticFiles(directory="../frontend", html=True), name="static")
 | Routers first, then static mount | Matched by the tasks router. Works |
 | Static mount first | The `/` mount catches it first and looks for a file called `api/tasks`. The API breaks |
 
-![Static_Mount_Order](https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/static-mount-order.svg)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/ClaudeCode/static-mount-order.svg" alt="Route order: API routers before the static mount" width={960} height={400} />
 
 `html=True` makes the static mount serve `index.html` when someone opens `/`.
 

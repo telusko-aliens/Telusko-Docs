@@ -7,7 +7,7 @@ The image is on Docker Hub. Nobody can use it yet. The last step is to tell Kube
 
 By the end of this lesson, one click on **Build Now** takes the code from GitHub all the way to a URL you can open in the browser.
 
-![EKS_Deploy](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/cicd-eks-deploy.svg)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/cicd-eks-deploy.svg" alt="Jenkins runs kubectl apply against the EKS API server, which creates web-app-deployment with two pods on two worker nodes and web-app-service of type LoadBalancer. AWS creates a load balancer whose public DNS name sends user traffic to the node ports and on to the pods on port 8080" width={960} height={470} />
 
 ## Step 1: make sure Jenkins is allowed into the cluster
 
@@ -189,7 +189,7 @@ For a refresher on these objects see [Kubernetes Deployments](/docs/kubernetes/n
 
 Click **Build Now**. The stage view gains a sixth column:
 
-![Deploy_Stage_View](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/screens/cicd-deploy-stage-view.webp)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/screens/cicd-deploy-stage-view.webp" alt="Jenkins stage view of complete-cicd-pipeline. Build 3 runs Tool Install, git clone, maven build, Build Docker Image, Docker Push and Deploy to Kubernetes, all green. Build 1 had no deploy stage" width={1440} height={712} />
 
 *Build #3 ran all six stages. The older build #1 stopped at Docker Push because the deploy stage did not exist yet.*
 
@@ -214,7 +214,7 @@ The `EXTERNAL-IP` column holds the load balancer's DNS name. You can also find i
 
 Open `http://<that-dns-name>` in the browser. Use `http`, not `https`. A brand new load balancer needs one to three minutes before DNS resolves and the health checks pass, so if the page does not load at first, wait and refresh.
 
-![App_In_Browser](https://dyz1pdcuffwr5.cloudfront.net/Jenkins/screens/cicd-app-in-browser.webp)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Jenkins/screens/cicd-app-in-browser.webp" alt="The Telusko Learning web page served from EKS through the AWS load balancer, listing Courses Offered" width={1440} height={708} />
 
 *The application running on EKS, opened through the load balancer DNS name.*
 

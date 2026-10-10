@@ -31,7 +31,7 @@ Tools like Puppet and Chef install an **agent** (a background program) on every 
 
 Ansible works the other way round. It is **agentless** and uses a **push** model. When you run a playbook, the control node opens an SSH connection to each managed node and pushes the work to it.
 
-![Ansible_Push_Model](https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-push-model.svg)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Ansible/ansible-push-model.svg" alt="Ansible push model: the control node connects over SSH, copies a module, runs it with Python, receives JSON and cleans up" width={960} height={430} />
 
 For each task, roughly this happens:
 

@@ -22,7 +22,7 @@ A **DaemonSet** ensures that a copy of a pod runs on every eligible node in the 
 - **Node removed:** its DaemonSet pod is removed with it (garbage collected)
 - **Self-healing:** delete a DaemonSet pod and it is recreated on the same node
 
-![K8s_Daemonset](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s-daemonset.svg)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s-daemonset.svg" alt="Three nodes each running one DaemonSet pod, including a newly added node, while Deployment app pods are spread unevenly across the first two nodes" width={960} height={400} />
 
 "Eligible" matters. You can limit a DaemonSet to some nodes with a `nodeSelector` or node affinity (for example only GPU nodes), and nodes with taints only get the pod if it has a matching toleration. Without such rules, every node gets one.
 

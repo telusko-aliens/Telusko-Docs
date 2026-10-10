@@ -223,7 +223,7 @@ telusko-app   Deployment/telusko-app   cpu: 187%/20%   2         10        10   
 
 Ten pods, the maximum. The HPA will not go beyond `--max` however high the load.
 
-![HPA_Loop](https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s2-hpa-loop.svg)
+<img src="https://dyz1pdcuffwr5.cloudfront.net/Kubernetes/k8s2-hpa-loop.svg" alt="The kubelet on each node reports usage to metrics-server, the HPA controller queries it every 15 seconds, computes desired replicas as current times current usage divided by target, and changes the Deployment's replicas between min 2 and max 10" width={960} height={470} />
 
 How the HPA decides, every 15 seconds:
 
