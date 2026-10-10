@@ -6,10 +6,10 @@ const withMDX = createMDX();
 const config = {
   reactStrictMode: true,
   experimental: {
-    // Keep build memory under Vercel's 8 GB build machine limit
+    // Keep build memory under the 8 GB build machine limit (Amplify Standard)
     turbopackFileSystemCacheForBuild: false,
-    turbopackPluginRuntimeStrategy: 'workerThreads',
     cpus: 2,
+    turbopackSourceMaps: false,
   },
   images: {
     remotePatterns: [
