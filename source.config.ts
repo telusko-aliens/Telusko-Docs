@@ -11,9 +11,8 @@ export const docs = defineDocs({
   dir: 'content/docs',
   docs: {
     schema: frontmatterSchema,
-    postprocess: {
-      includeProcessedMarkdown: true,
-    },
+    // Load each page on demand instead of bundling all pages into one huge chunk
+    async: true,
   },
   meta: {
     schema: metaSchema,

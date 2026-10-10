@@ -10,6 +10,8 @@ const config = {
     turbopackFileSystemCacheForBuild: false,
     cpus: 2,
     turbopackSourceMaps: false,
+    // Amplify SSR compute has 1 GB; preloading every route at startup exhausts it
+    preloadEntriesOnStart: false,
   },
   images: {
     remotePatterns: [

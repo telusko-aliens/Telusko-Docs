@@ -25,9 +25,7 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   
   if (!page) notFound();
 
-  const MDX = page.data.body;
-
-  const {lastModified} = page.data;
+  const { body: MDX, toc, lastModified } = await page.data.load();
 
    const markdownUrl = params.slug?.length 
   ? `/api/docs/${params.slug.join('/')}/raw`
@@ -36,7 +34,7 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   //  console.log(params.slug,'params slug')
 
   return (
-    <DocsPage toc={page.data.toc} full={page.data.full} lastUpdate={lastModified ? new Date(lastModified) : undefined} tableOfContent={{
+    <DocsPage toc={toc} full={page.data.full} lastUpdate={lastModified ? new Date(lastModified) : undefined} tableOfContent={{
         style: 'clerk',
         enabled: true,
       }}
