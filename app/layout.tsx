@@ -43,7 +43,7 @@ export default function Layout({ children }: LayoutProps<'/'>) {
     rel="noopener noreferrer" 
     className="flex items-center gap-2 justify-center no-underline hover:no-underline text-sm sm:text-base md:text-lg"
   >
-    Agentic AI with Java: Live Cohort
+    Agentic AI with Java: Live Now
     <ExternalLink className="w-4 h-4" />
   </a></Banner>
         <RootProvider>{children}</RootProvider>
