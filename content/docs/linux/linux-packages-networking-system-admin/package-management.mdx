@@ -1,0 +1,207 @@
+---
+title: Linux Package Management
+---
+
+## What Is Package Management?
+
+A **package manager** is a tool used to install, update, and remove software on a Linux system. It downloads software from configured repositories and handles many of the tasks required to install and maintain it.
+
+For example, instead of downloading Git manually, you can install it using a single command. The package manager also resolves required dependencies and keeps track of installed packages.
+
+Different Linux distributions use different package managers:
+
+![Linux_Package_Managers](https://dyz1pdcuffwr5.cloudfront.net/Linux/linux_package_manager.png)
+
+`dnf` is the modern successor to `yum` in many RPM-based distributions. The available command depends on the Linux distribution and version.
+
+
+---
+
+
+## Updating the Package Index
+
+Before installing software on Ubuntu or Debian, refresh the local list of available packages:
+
+```bash
+sudo apt update
+```
+
+This command downloads updated package information from the configured repositories. It helps `apt` identify which package versions are available.
+
+**Important:** `apt update` refreshes package information; it does not upgrade the software already installed on your system.
+
+To upgrade installed packages, use:
+
+```bash
+sudo apt upgrade
+```
+
+Review the proposed changes before confirming an upgrade, especially on production servers.
+
+
+---
+
+
+## Installing Software
+
+The general syntax for installing a package with `apt` is:
+
+```bash
+sudo apt install package-name
+```
+
+Let's look at some common examples.
+
+### Installing Git
+
+Git is a version control system used to track changes in source code.
+
+```bash
+sudo apt install git
+```
+
+Verify the installation:
+
+```bash
+git --version
+```
+
+If Git is installed successfully, the command displays its version.
+
+### Installing Maven
+
+Maven is a build automation and dependency management tool commonly used in Java projects.
+
+```bash
+sudo apt install maven
+```
+
+The package manager installs Maven along with the dependencies required by the package. Whether a Java runtime is installed as part of this operation depends on the package dependencies and the system's existing software.
+
+Verify the installation:
+
+```bash
+mvn --version
+```
+
+Check Java separately:
+
+```bash
+java -version
+```
+
+If Java is not installed, you may need to install a suitable Java package for your project.
+
+### Installing Nginx
+
+Nginx is a web server commonly used to serve static files and act as a reverse proxy.
+
+```bash
+sudo apt install nginx
+```
+
+After installation, you can check whether the service is running:
+
+```bash
+systemctl status nginx
+```
+
+On systems using systemd, you can start the service with:
+
+```bash
+sudo systemctl start nginx
+```
+
+Installing a package does not guarantee that its service has started automatically. The behavior depends on the package and system configuration.
+
+
+---
+
+
+## Removing Software
+
+To uninstall a package while generally retaining its system-wide configuration files, use:
+
+```bash
+sudo apt remove nginx
+```
+
+To remove the package along with its package-managed configuration files, use:
+
+```bash
+sudo apt purge nginx
+```
+
+**Note:** Neither command necessarily removes every file associated with the application. Files created manually or stored outside the package's managed locations may remain.
+
+After removing packages, you can check whether unused dependencies can be removed:
+
+```bash
+sudo apt autoremove
+```
+
+Review the list before confirming, particularly on servers where other software may depend on installed packages.
+
+
+----
+
+
+## Common Package Management Commands
+
+| Command | Purpose |
+|---|---|
+| `sudo apt update` | Refresh available package information |
+| `sudo apt upgrade` | Upgrade installed packages |
+| `sudo apt install git` | Install Git |
+| `sudo apt remove nginx` | Remove a package while generally retaining configuration |
+| `sudo apt purge nginx` | Remove a package and its package-managed configuration |
+| `sudo apt autoremove` | Remove packages no longer needed as dependencies |
+| `apt list --installed` | List installed packages |
+| `apt show git` | Display package details |
+| `git --version` | Check the installed Git version |
+
+
+---
+
+
+## Package Management on Amazon Linux and RHEL-Based Systems
+
+Ubuntu and Debian use `apt`, while Amazon Linux and RHEL-based distributions use RPM package management tools such as `dnf` or `yum`.
+
+Common examples include:
+
+```bash
+# Install a package
+sudo dnf install git
+
+# Remove a package
+sudo dnf remove git
+
+# Refresh package information
+sudo dnf check-update
+```
+
+On systems that use `yum`, the equivalent installation and removal commands are:
+
+```bash
+sudo yum install git
+sudo yum remove git
+```
+
+The exact commands and behavior can vary by distribution and version. Check which package manager is available on your system before using these examples.
+
+
+---
+
+
+## Summary
+
+- A package manager simplifies software installation, upgrades, and removal.
+- Use `apt` on Ubuntu/Debian and `dnf` or `yum` on supported RPM-based distributions.
+- Run `sudo apt update` to refresh package information; use `sudo apt upgrade` to upgrade installed packages.
+- Package managers resolve dependencies automatically, reducing the need for manual installation.
+- Use `apt remove` to uninstall a package, `apt purge` to remove its package-managed configuration, and `apt autoremove` to clean up unneeded dependencies.
+- Verify installations with the software's own version command, such as `git --version` or `mvn --version`.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

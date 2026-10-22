@@ -6,6 +6,7 @@
         "linux-environment-setup-on-aws",
         "linux-fundamentals",
         "linux-search-text-processing",
-        "linux-users-permissions-ownership"
+        "linux-users-permissions-ownership",
+        "linux-packages-networking-system-admin"
     ]
 }  

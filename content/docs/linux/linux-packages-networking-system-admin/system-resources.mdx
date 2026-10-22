@@ -1,0 +1,242 @@
+---
+title: System Resource Monitoring in Linux
+---
+
+
+When a Linux server becomes slow or an application stops responding, one of the first steps is to check system resource usage. High CPU utilization, insufficient memory, or a disk running out of space can affect application performance.
+
+Linux provides several commands to monitor these resources and identify potential bottlenecks. In this lecture, we'll explore five useful commands for checking memory, storage, running processes, and overall system performance.
+
+
+## `free` - Monitor Memory Usage
+
+The `free` command displays information about system memory, including RAM and swap space.
+
+```bash
+free
+```
+
+By default, memory values are displayed in bytes. Use `-h` to display them in a human-readable format.
+
+```bash
+free -h
+```
+
+### Understanding the Output
+
+```text
+               total   used   free  shared  buff/cache  available
+Mem:            976M   450M   120M      1M        406M       380M
+Swap:             0B     0B     0B
+```
+
+| Column | Meaning |
+|---|---|
+| `total` | Total memory available to the system |
+| `used` | Memory currently in use, including memory used for caching |
+| `free` | Memory that is currently unused |
+| `shared` | Memory primarily used by shared memory mechanisms |
+| `buff/cache` | Memory used for buffers and caches |
+| `available` | Estimated memory available for new applications without significant swapping |
+
+**Important:** Don't judge memory pressure by the `free` column alone. Linux uses otherwise idle RAM for caching to improve performance. The `available` column is generally a better indicator of how much memory can be used by applications.
+
+
+---
+
+
+## `df` - Monitor Disk Space
+
+The `df` command reports the available and used space on mounted filesystems.
+
+```bash
+df -h
+```
+
+The `-h` option displays sizes in readable units such as MB and GB.
+
+### Example Output
+
+```text
+Filesystem      Size  Used  Avail  Use%  Mounted on
+/dev/root         8G  3.5G   4.5G   44%  /
+```
+
+| Column | Meaning |
+|---|---|
+| `Filesystem` | Device or filesystem being reported |
+| `Size` | Total filesystem capacity |
+| `Used` | Space currently used |
+| `Avail` | Space available for use |
+| `Use%` | Percentage of space used |
+| `Mounted on` | Directory where the filesystem is accessible |
+
+To check the filesystem containing a specific directory, run:
+
+```bash
+df -h /var/log
+```
+
+This is useful when an application fails to write logs or create files because a filesystem is running out of space.
+
+
+---
+
+
+## `du` - Identify Large Files and Directories
+
+While `df` shows filesystem usage, `du` estimates how much disk space individual files and directories consume.
+
+```bash
+du -sh *
+```
+
+Here:
+
+- `-s` displays a summary for each specified item.
+- `-h` displays sizes in a human-readable format.
+- `*` matches non-hidden files and directories in the current directory.
+
+### Example Output
+
+```text
+4.0K    ai.txt
+12K     devops
+4.0K    error.log
+```
+
+In this example, the `devops` directory uses more space than the other listed items.
+
+To check the size of a specific directory:
+
+```bash
+du -sh /var/log
+```
+
+To list the sizes of immediate subdirectories in a directory:
+
+```bash
+du -h --max-depth=1 /var/log
+```
+
+**Practical tip:** If `df -h` shows that a disk is nearly full, use `du` to investigate which directories are consuming the most space. Remember that `du -sh *` does not include hidden entries matched by the shell's `*` pattern.
+
+
+---
+
+
+## `top` - Monitor Running Processes in Real Time
+
+The `top` command provides a continuously updating view of running processes and system resource usage.
+
+```bash
+top
+```
+
+It displays information such as:
+
+- CPU utilization
+- Memory and swap usage
+- Running processes
+- CPU and memory consumption by individual processes
+- Process IDs (PIDs)
+
+### Useful Keys in `top`
+
+| Key | Action |
+|---|---|
+| `q` | Exit `top` |
+| `P` | Sort processes by CPU usage |
+| `M` | Sort processes by memory usage |
+| `1` | Show CPU usage for individual logical CPUs |
+
+Key behavior can vary slightly across versions and configurations.
+
+**When to use it:** If an application is slow, use `top` to identify processes consuming unusually high CPU or memory.
+
+Unlike commands that produce a single report, `top` is an interactive monitor. For automated or periodic reporting, commands such as `vmstat` may be more convenient.
+
+
+---
+
+
+## `vmstat` - Monitor System Performance
+
+The `vmstat` command reports statistics related to processes, memory, paging, block I/O, and CPU activity.
+
+```bash
+vmstat
+```
+
+To monitor performance at two-second intervals:
+
+```bash
+vmstat 2
+```
+
+Press `Ctrl + C` to stop continuous monitoring.
+
+**Note:** The first report commonly represents averages since system startup, while subsequent reports represent activity during the preceding interval.
+
+### Important Columns
+
+| Column | Section | Meaning |
+|---|---|---|
+| `r` | Processes | Processes waiting to run on the CPU |
+| `b` | Processes | Processes blocked while waiting for resources, often I/O |
+| `free` | Memory | Unused memory |
+| `si` | Swap | Memory swapped in from disk per second |
+| `so` | Swap | Memory swapped out to disk per second |
+| `bi` | I/O | Blocks received from block devices per second |
+| `bo` | I/O | Blocks sent to block devices per second |
+| `us` | CPU | CPU time spent running user-space code |
+| `sy` | CPU | CPU time spent running kernel code |
+| `id` | CPU | Percentage of CPU time spent idle |
+| `wa` | CPU | Percentage of CPU time spent waiting for I/O |
+
+The exact units and some columns depend on the operating system and `vmstat` implementation.
+
+### Understanding CPU Idle Time
+
+The `id` column shows the percentage of CPU time spent idle. A lower value means the CPU is spending more time doing work or waiting for I/O.
+
+| Idle (`id`) | Interpretation |
+|---:|---|
+| `99` | CPU is mostly idle |
+| `80` | CPU is idle 80% of the time |
+| `10` | CPU is busy for most of the interval |
+| `5` | CPU has very little idle time |
+
+For example, if `id` is `10`, the CPU is idle 10% of the time. The remaining 90% is accounted for by other CPU activity categories, including user, system, and I/O wait.
+
+**Don't rely on `id` alone.** A high `wa` value may indicate that processes are spending substantial time waiting for I/O. A low `id` value suggests heavy CPU activity, but you should also check process-level usage and the workload before concluding that the CPU is the bottleneck.
+
+
+---
+
+
+## Quick Reference
+
+| Command | Purpose |
+|---|---|
+| `free -h` | Check RAM and swap usage |
+| `df -h` | Check filesystem capacity and available space |
+| `du -sh *` | Estimate the size of files and directories |
+| `top` | Monitor processes and resource usage interactively |
+| `vmstat` | View system performance statistics |
+| `vmstat 2` | Observe performance statistics at two-second intervals |
+
+
+---
+
+
+## Summary
+
+- Use `free -h` to understand memory usage, paying particular attention to the `available` column.
+- Use `df -h` to check filesystem capacity and `du` to investigate where space is being consumed.
+- Use `top` to identify processes consuming significant CPU or memory.
+- Use `vmstat 2` to observe performance trends over time.
+- High CPU usage, low available memory, heavy swapping, and high I/O wait can all contribute to poor performance. Interpret these metrics together when troubleshooting Linux servers.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

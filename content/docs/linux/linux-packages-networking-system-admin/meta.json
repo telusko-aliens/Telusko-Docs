@@ -1,0 +1,15 @@
+{
+    "title": "Linux Packages, Networking & System Administration",
+    "pages": [
+        "package-management.mdx",
+        "zip-and-unzip-files.mdx",
+        "links-and-inodes.mdx",
+        "network-commands.mdx",
+        "network-debugging.mdx",
+        "process-management.mdx",
+        "system-resources.mdx",
+        "help-commands.mdx",
+        "awk-commands.mdx",
+        "service-management.mdx"
+    ]
+}
