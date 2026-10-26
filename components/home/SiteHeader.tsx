@@ -161,7 +161,6 @@ export function SiteHeader({ navTopics, tree, promoSlot }: SiteHeaderProps) {
             <div className="hidden items-center gap-3 lg:flex">
               <ThemeToggleBox />
               <GithubIconButton className="rounded-xl border-2 px-3 py-2" iconClassName="h-5 w-5" />
-              <GetStartedCta />
             </div>
 
             <button
