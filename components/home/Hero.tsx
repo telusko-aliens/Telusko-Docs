@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import { GetStartedCta } from './GetStartedCta';
 import { HeroGlow } from './HeroGlow';
 import { HeroReveal } from './HeroReveal';
 import { HeroSearchTrigger } from './HeroSearchTrigger';
@@ -38,7 +39,19 @@ export function Hero() {
           Clear explanations, practical examples, and real code, for beginners and experienced developers alike.
         </p>
 
-        <HeroSearchTrigger />
+        <div className="home-hero-reveal relative flex w-full max-w-2xl items-stretch gap-2 sm:gap-3">
+          <div
+            className="home-hero-search-bar relative flex min-w-0 flex-1 items-center rounded-2xl border p-1 backdrop-blur-md"
+            style={{ background: 'var(--home-surface)' }}
+          >
+            <span
+              aria-hidden="true"
+              className="home-hero-search-ambient-glow pointer-events-none absolute left-1/2 top-1/2 h-24 w-[90%] -translate-x-1/2 -translate-y-1/2 sm:h-32"
+            />
+            <HeroSearchTrigger />
+          </div>
+          <GetStartedCta size="hero" className="shrink-0" />
+        </div>
       </div>
 
       <HeroReveal />

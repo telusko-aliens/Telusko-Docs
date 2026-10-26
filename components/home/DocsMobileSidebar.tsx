@@ -15,7 +15,6 @@ import {
 } from 'fumadocs-ui/components/layout/sidebar';
 import { ThemeToggle } from 'fumadocs-ui/components/layout/theme-toggle';
 import { TreeContextProvider } from 'fumadocs-ui/contexts/tree';
-import { GetStartedCta } from './GetStartedCta';
 import { TeluskoLearnCta } from './TeluskoLearnCta';
 
 interface DocsMobileSidebarProps {
@@ -57,7 +56,6 @@ export function DocsMobileSidebar({ tree }: DocsMobileSidebarProps) {
               <SidebarPageTree />
             </SidebarViewport>
             <SidebarFooter>
-              <GetStartedCta size="lg" className="mb-3 flex w-full justify-center" />
               <TeluskoLearnCta className="flex w-full justify-center" />
             </SidebarFooter>
           </SidebarContentMobile>

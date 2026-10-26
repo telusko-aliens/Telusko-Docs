@@ -5,7 +5,7 @@ export interface FooterLink {
 
 export const FOOTER_LEARN_LINKS: FooterLink[] = [
   { label: 'Courses', href: 'https://learn.telusko.com/allcourses' },
-  { label: 'Docs', href: '/docs' },
+  { label: 'Webinars', href: 'https://learn.telusko.com/webinar' },
   { label: 'AI Alien Coach', href: 'https://aliencoach.com/' },
 ];
 

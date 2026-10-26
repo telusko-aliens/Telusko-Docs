@@ -81,7 +81,7 @@ export function SpineStrip({ spine }: { spine: SpineLink }) {
       href={spine.href}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
-      className="home-spine relative flex items-center justify-between overflow-hidden py-8 pl-6 pr-8 lg:flex-1 lg:px-0 lg:py-12"
+      className="home-spine relative flex items-center justify-between overflow-hidden py-5 pl-6 pr-8 sm:py-8 lg:flex-1 lg:px-0 lg:py-12"
       style={{ background: spine.color }}
     >
       <span className="whitespace-nowrap text-xl font-medium text-[#0E0E0E] sm:text-2xl lg:hidden">

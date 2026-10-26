@@ -141,10 +141,25 @@ html:has(.home-shell) {
   border: 1px solid var(--home-surface-border);
 }
 
-.home-shell .home-hero-search-glow {
-  box-shadow:
-    0 0 0 4px rgba(184, 217, 78, 0.18),
-    0 10px 30px -10px rgba(184, 217, 78, 0.5);
+.home-shell .home-hero-search-ambient-glow {
+  background: radial-gradient(ellipse at center, rgba(184, 217, 78, 0.35) 0%, rgba(184, 217, 78, 0.12) 45%, transparent 75%);
+  filter: blur(32px);
+}
+
+.dark .home-shell .home-hero-search-ambient-glow {
+  background: radial-gradient(ellipse at center, rgba(184, 217, 78, 0.16) 0%, rgba(184, 217, 78, 0.05) 45%, transparent 70%);
+}
+
+.home-shell .home-hero-search-bar {
+  border-color: var(--home-border);
+}
+
+.dark .home-shell .home-hero-search-bar {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.home-shell .home-hero-search-bar:hover {
+  background: var(--home-surface-strong) !important;
 }
 
 .home-shell .home-no-scrollbar {
