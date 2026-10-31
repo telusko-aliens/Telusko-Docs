@@ -1,0 +1,213 @@
+---
+title: Loops in Shell Scripting
+---
+
+
+Loops allow a shell script to execute a command or a group of commands repeatedly without writing the same instructions multiple times. They are especially useful in Linux automation, where repetitive tasks such as processing files, checking services, or executing commands need to be performed efficiently.
+
+Shell scripting commonly uses two types of loops:
+
+| Loop    | Purpose                                                    |
+| ------- | ---------------------------------------------------------- |
+| `for`   | Repeats commands over a defined range or a list of values. |
+| `while` | Repeats commands as long as a condition remains true.      |
+
+
+---
+
+
+## The `for` Loop
+
+A `for` loop is useful when you know how many times a command needs to execute or want to iterate over a sequence of values.
+
+### Syntax
+
+```
+for (( initialization; condition; update ))
+do
+    # Commands to execute
+done
+```
+
+The three parts inside `(( ))` control the loop:
+
+| Part           | Purpose                                    | Example |
+| -------------- | ------------------------------------------ | ------- |
+| Initialization | Sets the starting value.                   | `i=1`   |
+| Condition      | Determines whether the loop continues.     | `i<=4`  |
+| Update         | Changes the variable after each iteration. | `i++`   |
+
+### Example: Print a Message Four Times
+
+```
+#!/bin/bash
+
+for (( i=1; i<=4; i++ ))
+do
+    echo "Focus is the key to learn any skill"
+done
+```
+
+**Output:**
+
+```
+Focus is the key to learn any skill
+Focus is the key to learn any skill
+Focus is the key to learn any skill
+Focus is the key to learn any skill
+```
+
+### How It Works
+
+1. The variable `i` starts at `1`.
+2. The condition `i<=4` is checked.
+3. If the condition is true, the loop body executes.
+4. The value of `i` increases by `1`.
+5. The condition is checked again.
+6. When `i` becomes `5`, the condition is false, and the loop stops.
+
+| Iteration | Value of `i` | Condition | Action  |
+| --------- | ------------ | --------- | ------- |
+| 1         | 1            | True      | Execute |
+| 2         | 2            | True      | Execute |
+| 3         | 3            | True      | Execute |
+| 4         | 4            | True      | Execute |
+| 5         | 5            | False     | Stop    |
+
+The loop executes four times, even though the command is written only once.
+
+
+---
+
+
+## The `while` Loop
+
+A `while` loop executes a block of commands repeatedly as long as a specified condition remains true.
+
+It is useful when the number of iterations is not known in advance and depends on a condition.
+
+### Syntax
+
+```
+while [ condition ]
+do
+    # Commands to execute
+done
+```
+
+### Example: Print Numbers from 1 to 5
+
+```
+#!/bin/bash
+
+num=1
+
+while [ "$num" -le 5 ]
+do
+    echo "$num"
+    ((num++))
+done
+```
+
+**Output:**
+
+```
+1
+2
+3
+4
+5
+```
+
+### How It Works
+
+1. The variable `num` starts at `1`.
+2. The condition `num -le 5` is checked.
+3. If true, the current value is printed.
+4. The variable increases by `1`.
+5. The condition is checked again.
+6. When `num` becomes `6`, the condition is false, and the loop terminates.
+
+| Iteration | Value of `num` | Condition | Action   |
+| --------- | -------------- | --------- | -------- |
+| 1         | 1              | True      | Prints 1 |
+| 2         | 2              | True      | Prints 2 |
+| 3         | 3              | True      | Prints 3 |
+| 4         | 4              | True      | Prints 4 |
+| 5         | 5              | True      | Prints 5 |
+| 6         | 6              | False     | Stop     |
+
+**Important:** Unlike the `for` loop, the `while` loop does not automatically update the variable. You must update it inside the loop whenever the condition depends on that variable.
+
+
+---
+
+
+## Infinite Loops
+
+An infinite loop occurs when a loop's condition never becomes false. This can happen when the variable controlling a `while` loop is not updated correctly.
+
+### Example
+
+```
+#!/bin/bash
+
+num=1
+
+while [ "$num" -le 5 ]
+do
+    echo "$num"
+    # Missing variable update
+done
+```
+
+In this example:
+
+- `num` starts at `1`.
+- The condition `num -le 5` remains true.
+- Since `num` is never updated, the loop keeps printing `1`.
+
+The loop continues until it is stopped manually or the process is terminated.
+
+**How to stop it:** Press `Ctrl + C` in the terminal to interrupt the running script.
+
+Always ensure that a condition-based loop has a way to reach its termination condition, unless an infinite loop is intentional.
+
+
+---
+
+
+## `for` vs `while` Loop
+
+![Linux_Loops_Comparison](https://dyz1pdcuffwr5.cloudfront.net/Linux/linux_loops.png)
+
+
+---
+
+
+### Quick Syntax 
+
+| Element          | `for` Loop                          | `while` Loop                 |
+| ---------------- | ----------------------------------- | ---------------------------- |
+| Starting keyword | `for (( ... ))`                     | `while [ condition ]`        |
+| Body starts with | `do`                                | `do`                         |
+| Body ends with   | `done`                              | `done`                       |
+| Variable update  | Usually inside the loop declaration | Usually inside the loop body |
+
+
+---
+
+
+## Summary
+
+- **Loops** automate repetitive tasks by executing commands multiple times.
+- **`for` loop** is suitable when iterating over a known range, count, or list of values.
+- **`while` loop** continues executing as long as its condition remains true.
+- The `for` loop typically handles initialization, condition checking, and updating in its declaration.
+- A `while` loop requires you to manage variable updates when necessary.
+- An incorrectly managed loop can become infinite. Use `Ctrl + C` to interrupt it from the terminal.
+
+Loops are fundamental to shell scripting because they make repetitive Linux tasks easier to automate, maintain, and execute efficiently.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

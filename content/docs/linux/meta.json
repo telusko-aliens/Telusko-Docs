@@ -7,6 +7,8 @@
         "linux-fundamentals",
         "linux-search-text-processing",
         "linux-users-permissions-ownership",
-        "linux-packages-networking-system-admin"
+        "linux-packages-networking-system-admin",
+        "linux-system-architecture",
+        "bash-shell-scripting"
     ]
 }  

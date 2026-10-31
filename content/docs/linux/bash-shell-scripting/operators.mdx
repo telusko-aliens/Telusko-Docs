@@ -1,0 +1,289 @@
+---
+title: Operators in Shell Scripting
+---
+
+
+Operators help shell scripts compare values, evaluate conditions, and make decisions. They are commonly used with `if`, `else`, and `elif` statements to control how a script executes.
+
+Shell scripting mainly uses three categories of operators:
+
+1. **Numeric operators** : Compare numbers.
+2. **String operators** : Compare text values.
+3. **Logical operators** : Combine multiple conditions.
+
+
+---
+
+
+## Numeric Operators
+
+Numeric operators are used to compare integer values inside conditions.
+
+| Operator | Meaning | Example |
+|---|---|---|
+| `-eq` | Equal to | `[ "$a" -eq 10 ]` |
+| `-ne` | Not equal to | `[ "$a" -ne 10 ]` |
+| `-gt` | Greater than | `[ "$a" -gt 5 ]` |
+| `-lt` | Less than | `[ "$a" -lt 5 ]` |
+| `-ge` | Greater than or equal to | `[ "$a" -ge 90 ]` |
+| `-le` | Less than or equal to | `[ "$a" -le 50 ]` |
+
+### Example
+
+```bash
+#!/bin/bash
+
+number=10
+
+if [ "$number" -gt 5 ]; then
+    echo "Number is greater than 5"
+fi
+```
+
+**Output:**
+
+```text
+Number is greater than 5
+```
+
+Since `10` is greater than `5`, the condition evaluates to true.
+
+
+---
+
+
+## String Operators
+
+String operators are used to compare text values, such as usernames, filenames, or other input provided by users.
+
+| Operator | Meaning | Example |
+|---|---|---|
+| `=` or `==` | Equal to | `[ "$a" = "devops" ]` |
+| `!=` | Not equal to | `[ "$a" != "devops" ]` |
+| `-z` | String is empty | `[ -z "$a" ]` |
+| `-n` | String is not empty | `[ -n "$a" ]` |
+
+### Example: Comparing Strings
+
+```bash
+#!/bin/bash
+
+name="devops"
+
+if [ "$name" = "devops" ]; then
+    echo "Match"
+else
+    echo "Not matching"
+fi
+```
+
+**Output:**
+
+```text
+Match
+```
+
+### Understanding Empty and Non-Empty Strings
+
+The `-z` and `-n` operators are useful when checking whether a user has entered a value.
+
+```bash
+#!/bin/bash
+
+echo "Enter your username:"
+read name
+
+if [ -z "$name" ]; then
+    echo "Username cannot be empty"
+else
+    echo "Welcome, $name"
+fi
+```
+
+- `-z` returns true when the string is empty.
+- `-n` returns true when the string contains at least one character.
+
+### Important Points
+
+- Always quote variable expansions in string comparisons, such as `"$name"`. This helps prevent errors when a variable is empty or contains spaces.
+- String comparisons are case-sensitive. For example, `"Admin"` and `"admin"` are different strings.
+- Inside `[ ]`, both `=` and `==` can be used for string equality in Bash. Using `=` is portable across POSIX-compatible shells.
+- Do not confuse `=` in a comparison with variable assignment. Assignment uses `name="devops"`, while comparison uses `[ "$name" = "devops" ]`.
+
+
+---
+
+
+## Logical Operators
+
+Logical operators combine multiple conditions in a single decision. They are useful when a script must check more than one requirement before executing a command.
+
+| Operator | Name | Meaning |
+|---|---|---|
+| `&&` | AND | Both conditions must be true |
+| `\|\|` | OR | At least one condition must be true |
+| `!` | NOT | Reverses the result of a condition |
+
+### AND Operator (`&&`)
+
+The AND operator returns true only when **both conditions are true**.
+
+```bash
+#!/bin/bash
+
+age=19
+country="India"
+
+if [ "$age" -ge 18 ] && [ "$country" = "India" ]; then
+    echo "Eligible to vote in India"
+fi
+```
+
+**Output:**
+
+```text
+Eligible to vote in India
+```
+
+Both conditions are satisfied:
+
+- Age is at least 18 → True
+- Country is India → True
+
+Therefore, the command executes.
+
+If either condition is false, the overall result is false.
+
+### OR Operator (`||`)
+
+The OR operator returns true when **at least one condition is true**.
+
+```bash
+#!/bin/bash
+
+age=19
+country="India"
+
+if [ "$age" -gt 20 ] || [ "$country" = "India" ]; then
+    echo "Condition satisfied"
+fi
+```
+
+**Output:**
+
+```text
+Condition satisfied
+```
+
+Here:
+
+- Age is greater than 20 → False
+- Country is India → True
+
+Since at least one condition is true, the command executes.
+
+### NOT Operator (`!`)
+
+The NOT operator reverses the result of a condition:
+
+- True becomes false.
+- False becomes true.
+
+```bash
+#!/bin/bash
+
+number=5
+
+if ! [ "$number" -eq 10 ]; then
+    echo "Number is not equal to 10"
+fi
+```
+
+**Output:**
+
+```text
+Number is not equal to 10
+```
+
+The original condition is false because `5` is not equal to `10`. The `!` operator reverses the result, making it true.
+
+| Expression | Result |
+|---|---|
+| `! true` | False |
+| `! false` | True |
+
+
+![Linux_Operators_Comparison](https://dyz1pdcuffwr5.cloudfront.net/Linux/linux_operators.png)
+
+
+---
+
+
+## Practical Example: Combining Operators
+
+Let's combine string, numeric, and logical operators to create a simple access-checking script.
+
+The script grants access only when the username is `admin` and the user's age is at least 18.
+
+```bash
+#!/bin/bash
+
+echo "Enter username:"
+read user
+
+echo "Enter age:"
+read age
+
+if [ "$user" = "admin" ] && [ "$age" -ge 18 ]; then
+    echo "Access granted"
+else
+    echo "Access denied"
+fi
+```
+
+| Username | Age | Output | Reason |
+|---|---:|---|---|
+| `admin` | 19 | Access granted | Both conditions are true |
+| `Admin` | 19 | Access denied | Username comparison is case-sensitive |
+| `sushil` | 20 | Access denied | Username does not match |
+| `admin` | 15 | Access denied | Age requirement is not met |
+
+**Note:** This example assumes the user enters a valid integer for age. Input validation is needed before performing numeric comparisons on arbitrary user input.
+
+
+---
+
+
+## Quick Reference
+
+| Category | Operator | Meaning |
+|---|---|---|
+| Numeric | `-eq` | Equal to |
+| Numeric | `-ne` | Not equal to |
+| Numeric | `-gt` | Greater than |
+| Numeric | `-lt` | Less than |
+| Numeric | `-ge` | Greater than or equal to |
+| Numeric | `-le` | Less than or equal to |
+| String | `=` or `==` | Equal to |
+| String | `!=` | Not equal to |
+| String | `-z` | Empty string |
+| String | `-n` | Non-empty string |
+| Logical | `&&` | AND – both conditions must be true |
+| Logical | `\|\|` | OR – at least one condition must be true |
+| Logical | `!` | NOT – reverses the result |
+
+
+---
+
+
+## Summary
+
+- **Numeric operators** compare integer values using operators such as `-gt`, `-lt`, and `-eq`.
+- **String operators** compare text and check whether a string is empty or non-empty.
+- **Logical operators** combine conditions using AND (`&&`), OR (`||`), and NOT (`!`).
+- String comparisons are case-sensitive.
+- Quote variable expansions, especially when checking user input.
+- Use these operators with conditional statements to control the execution of shell scripts.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

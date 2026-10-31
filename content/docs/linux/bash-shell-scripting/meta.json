@@ -1,0 +1,11 @@
+{
+    "title": "Bash Shell Scripting",
+    "pages": [
+        "shell-scripting-introduction.mdx",
+        "variables-and-user-input.mdx",
+        "conditionals.mdx",
+        "operators.mdx",
+        "loops.mdx",
+        "functions.mdx"
+    ]
+}

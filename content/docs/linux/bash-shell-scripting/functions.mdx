@@ -1,0 +1,187 @@
+---
+title: Functions in Shell Scripting
+---
+
+
+Functions are reusable blocks of commands that perform a specific task. Instead of writing the same commands repeatedly throughout a script, you can group them into a function and execute that function whenever needed.
+
+Functions make shell scripts more organized, readable, and easier to maintain. They are especially useful when building automation scripts that perform multiple operations.
+
+
+## Defining a Function
+
+In Bash, you can define a function in two ways.
+
+### Syntax 1: Using the `function` Keyword
+
+```bash
+function function_name {
+    # Commands to execute
+}
+```
+
+### Syntax 2: Without the `function` Keyword
+
+```bash
+function_name() {
+    # Commands to execute
+}
+```
+
+Both syntaxes work in Bash and perform the same task. The second form is also compatible with POSIX shells, making it a better choice when portability is important.
+
+
+### Calling a Function
+
+Defining a function does not execute its commands. You must call the function by writing its name.
+
+```bash
+function_name
+```
+
+Unlike many programming languages, you do not use parentheses when calling a shell function.
+
+
+### Basic Example
+
+Let's create a function that displays a welcome message.
+
+```bash
+#!/bin/bash
+
+greet() {
+    echo "Welcome to Telusko Learning"
+}
+
+greet
+greet
+```
+
+**Output:**
+
+```text
+Welcome to Telusko Learning
+Welcome to Telusko Learning
+```
+
+**How it works:**
+
+1. `greet()` defines a function containing an `echo` command.
+2. The first `greet` call executes the function and prints the message.
+3. The second call executes the same function again.
+
+The command is written only once but can be executed multiple times.
+
+
+---
+
+
+## Practical Example: Checking and Creating a File
+
+Let's create a function that accepts a filename from the user and checks whether the file already exists.
+
+- If the file exists, display its contents.
+- If the file does not exist, create a new empty file.
+
+```bash
+#!/bin/bash
+
+file_ops() {
+    echo "Enter the file name:"
+    read fname
+
+    if [ -f "$fname" ]; then
+        echo "File already exists. Printing content:"
+        cat "$fname"
+    else
+        echo "File not found. Creating a new file."
+        touch "$fname"
+        echo "File created: $fname"
+    fi
+}
+
+file_ops
+```
+
+**Sample Execution:**
+
+*Scenario 1: File already exists*
+
+```text
+Enter the file name:
+devops.txt
+File already exists. Printing content:
+Welcome to Linux
+```
+
+*Scenario 2: File does not exist*
+
+```text
+Enter the file name:
+aliens.txt
+File not found. Creating a new file.
+File created: aliens.txt
+```
+
+**Understanding the commands:**
+
+- `read fname` accepts the filename entered by the user.
+- `-f "$fname"` checks whether the specified path refers to an existing regular file.
+- `cat "$fname"` displays the file contents.
+- `touch "$fname"` creates an empty file if it does not exist.
+
+This example combines **functions, user input, conditionals, and Linux file commands** into one reusable operation.
+
+
+---
+
+
+## Using Multiple Functions in One Script
+
+A shell script can contain multiple functions, with each function responsible for a specific task.
+
+For example, consider a script that installs and starts the Nginx web server.
+
+```bash
+#!/bin/bash
+
+install_nginx() {
+    sudo apt update
+    sudo apt install nginx -y
+}
+
+start_nginx() {
+    sudo systemctl start nginx
+    sudo systemctl enable nginx
+}
+
+install_nginx
+start_nginx
+```
+
+**Understanding the functions:**
+
+| Function | Responsibility |
+|---|---|
+| `install_nginx()` | Updates package information and installs Nginx. |
+| `start_nginx()` | Starts Nginx and enables it to start automatically at boot. |
+
+Each function handles a separate responsibility, making the script easier to understand and maintain.
+
+**Note:** This example uses `apt`, which is commonly available on Ubuntu and Debian-based distributions. The script should be run on a system where these commands and required permissions are available.
+
+
+---
+
+
+## Summary
+
+- **Functions** group commands into reusable blocks, avoiding repeated code.
+- Bash supports function definitions with or without the `function` keyword.
+- The `name() { ... }` syntax is portable across POSIX-compatible shells.
+- A function must be called by its name to execute its commands.
+- A script can contain multiple functions, each responsible for a different task.
+- Functions can combine user input, conditional statements, and Linux commands to build practical automation scripts.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>
