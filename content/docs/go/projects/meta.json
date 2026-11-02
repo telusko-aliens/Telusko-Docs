@@ -1,0 +1,10 @@
+{
+    "title": "Projects",
+    "pages": [
+        "cli-task-manager.mdx",
+        "concurrent-link-checker.mdx",
+        "file-processing-tool.mdx",
+        "rest-api-with-database.mdx",
+        "production-ready-service.mdx"
+    ]
+}

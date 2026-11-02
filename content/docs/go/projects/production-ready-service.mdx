@@ -1,0 +1,463 @@
+---
+title: "Project 5: A Production Ready Service"
+---
+
+The previous project works on your laptop. This one is about the distance between that and something you would put your name on when it is running at three in the morning.
+
+Nothing here is new material. It is the production section applied to a real service, in the order you would actually do it, with the reasoning for each piece.
+
+## What separates the two
+
+```text
+   Works locally                  Runs in production
+   ─────────────                  ──────────────────
+   starts and serves              starts, serves, and stops cleanly
+   prints to the console          structured logs a machine can query
+   crashes on a panic             recovers, logs, and keeps serving
+   fails when the DB blinks       degrades, retries, recovers
+   no idea what it is doing       metrics, traces, health endpoints
+   secrets in a file              secrets from the environment
+   "it worked for me"             reproducible builds, one artefact
+   deploy drops requests          rolling deploys nobody notices
+```
+
+## The startup path
+
+```go title="cmd/api/main.go"
+package main
+
+import (
+    "context"
+    "errors"
+    "fmt"
+    "log/slog"
+    "net/http"
+    "os"
+    "os/signal"
+    "syscall"
+    "time"
+)
+
+var (
+    version = "dev"
+    commit  = "none"
+)
+
+func main() {
+    if err := run(context.Background(), os.Args[1:], os.Stdout); err != nil {
+        fmt.Fprintf(os.Stderr, "fatal: %v\n", err)
+        os.Exit(1)
+    }
+}
+
+func run(ctx context.Context, args []string, stdout io.Writer) error {
+    ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+    defer stop()
+
+    // 1. Configuration, validated before anything else happens.
+    cfg, err := config.Load(args)
+    if err != nil {
+        return fmt.Errorf("configuration: %w", err)
+    }
+
+    // 2. Logging, so everything below is observable.
+    logger := newLogger(stdout, cfg)
+    slog.SetDefault(logger)
+
+    logger.Info("starting",
+        "version", version,
+        "commit", commit,
+        "go", runtime.Version(),
+        "env", cfg.Environment,
+    )
+
+    // 3. Dependencies, each failing fast with a clear message.
+    db, err := storage.Open(ctx, cfg.Database)
+    if err != nil {
+        return fmt.Errorf("database: %w", err)
+    }
+    defer db.Close()
+
+    tokens, err := auth.NewTokenService(cfg.JWTSecret.Reveal(), cfg.TokenTTL)
+    if err != nil {
+        return fmt.Errorf("token service: %w", err)
+    }
+
+    // 4. Construct from the inside out. Read this to understand the whole app.
+    bookmarkStore := storage.NewBookmarkStore(db)
+    userStore := storage.NewUserStore(db)
+    bookmarkSvc := service.NewBookmarkService(bookmarkStore, logger)
+    authSvc := service.NewAuthService(userStore, tokens, logger)
+    handlers := api.NewHandlers(bookmarkSvc, authSvc, tokens, logger)
+
+    // 5. Servers: the public one and the internal one.
+    app := api.New(handlers, cfg)
+
+    srv := &http.Server{
+        Addr:              cfg.Addr,
+        Handler:           app.Routes(),
+        ReadHeaderTimeout: 5 * time.Second,
+        ReadTimeout:       cfg.ReadTimeout,
+        WriteTimeout:      cfg.WriteTimeout,
+        IdleTimeout:       60 * time.Second,
+        ErrorLog:          slog.NewLogLogger(logger.Handler(), slog.LevelError),
+    }
+
+    internal := &http.Server{
+        Addr:              cfg.InternalAddr,     // localhost only
+        Handler:           internalRoutes(db),
+        ReadHeaderTimeout: 5 * time.Second,
+    }
+
+    return serve(ctx, srv, internal, app, cfg, logger)
+}
+```
+
+Three details in that function are worth pausing on.
+
+`run` takes `ctx`, `args`, and `stdout` as parameters rather than reading globals, which means an end to end test can start the whole service and capture its output.
+
+`ErrorLog` routes the HTTP server's own internal errors, such as malformed requests and TLS handshake failures, into your structured logger instead of the default one.
+
+The internal server is separate, bound to localhost, and carries metrics and pprof. Those endpoints expose a great deal about a running process and have no business on the public port.
+
+## The internal server
+
+```go
+func internalRoutes(db *pgxpool.Pool) http.Handler {
+    mux := http.NewServeMux()
+
+    mux.Handle("GET /metrics", promhttp.Handler())
+
+    // pprof, explicitly registered rather than via the default mux.
+    mux.HandleFunc("GET /debug/pprof/", pprof.Index)
+    mux.HandleFunc("GET /debug/pprof/profile", pprof.Profile)
+    mux.HandleFunc("GET /debug/pprof/heap", pprof.Handler("heap").ServeHTTP)
+    mux.HandleFunc("GET /debug/pprof/goroutine", pprof.Handler("goroutine").ServeHTTP)
+    mux.HandleFunc("GET /debug/pprof/trace", pprof.Trace)
+
+    return mux
+}
+```
+
+<Callout type="warn">
+The common shortcut is `import _ "net/http/pprof"`, which registers on `http.DefaultServeMux`. If your application also uses the default mux, you have just published heap dumps and goroutine stacks on your public interface. Registering explicitly on a separate, localhost-bound listener takes six lines and removes the risk entirely.
+</Callout>
+
+## Serving and shutting down
+
+```go
+func serve(ctx context.Context, srv, internal *http.Server, app *api.App,
+    cfg config.Config, logger *slog.Logger) error {
+
+    errCh := make(chan error, 2)
+
+    go func() {
+        logger.Info("public server listening", "addr", srv.Addr)
+        if err := srv.ListenAndServe(); err != nil &&
+            !errors.Is(err, http.ErrServerClosed) {
+            errCh <- fmt.Errorf("public server: %w", err)
+        }
+    }()
+
+    go func() {
+        logger.Info("internal server listening", "addr", internal.Addr)
+        if err := internal.ListenAndServe(); err != nil &&
+            !errors.Is(err, http.ErrServerClosed) {
+            errCh <- fmt.Errorf("internal server: %w", err)
+        }
+    }()
+
+    app.SetReady(true)
+
+    select {
+    case err := <-errCh:
+        return err
+    case <-ctx.Done():
+        logger.Info("shutdown signal received")
+    }
+
+    // 1. Fail readiness so the load balancer stops routing here.
+    app.SetReady(false)
+    logger.Info("readiness disabled, draining")
+    time.Sleep(cfg.DrainDelay)
+
+    // 2. Fresh context: the original is already cancelled.
+    shutdownCtx, cancel := context.WithTimeout(
+        context.Background(), cfg.ShutdownTimeout)
+    defer cancel()
+
+    if err := srv.Shutdown(shutdownCtx); err != nil {
+        logger.Error("public server did not drain in time", "error", err)
+        srv.Close()
+    }
+    _ = internal.Shutdown(shutdownCtx)
+
+    logger.Info("stopped")
+    return nil
+}
+```
+
+The drain delay before shutting down is the piece that turns "graceful shutdown" from a checkbox into requests that actually complete. Load balancers poll readiness on an interval, and without a wait, traffic keeps arriving after you have closed the listener.
+
+## Observability that answers questions
+
+```go title="internal/api/middleware.go"
+func Observability(logger *slog.Logger) Middleware {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            start := time.Now()
+            rec := &responseRecorder{ResponseWriter: w, status: 200}
+
+            next.ServeHTTP(rec, r)
+
+            elapsed := time.Since(start)
+            route := routePattern(r)        // the PATTERN, never the path
+
+            requestsTotal.WithLabelValues(
+                r.Method, route, strconv.Itoa(rec.status)).Inc()
+            requestDuration.WithLabelValues(r.Method, route).
+                Observe(elapsed.Seconds())
+
+            level := slog.LevelInfo
+            switch {
+            case rec.status >= 500:
+                level = slog.LevelError
+            case rec.status >= 400:
+                level = slog.LevelWarn
+            }
+
+            logger.LogAttrs(r.Context(), level, "request",
+                slog.String("request_id", RequestIDFrom(r.Context())),
+                slog.String("method", r.Method),
+                slog.String("route", route),
+                slog.Int("status", rec.status),
+                slog.Int64("duration_ms", elapsed.Milliseconds()),
+                slog.String("ip", clientIP(r)),
+            )
+        })
+    }
+}
+```
+
+Using the route pattern rather than the concrete path is the difference between a working metrics backend and one that falls over. `/bookmarks/{id}` is one time series; `/bookmarks/01HX...` is one per bookmark.
+
+## The dashboard you actually need
+
+```text
+   Rate       requests per second, by route
+   Errors     5xx rate, and 4xx rate separately
+   Duration   p50, p95, p99 latency, never the average
+   Saturation goroutine count, heap size, DB pool wait count
+
+   Alert on:
+     5xx rate above 1% for 5 minutes
+     p99 latency above 1 second for 5 minutes
+     DB pool wait count climbing
+     goroutine count climbing steadily      ← the leak detector
+     readiness failing on more than one instance
+```
+
+Goroutine count deserves its place on that list. It is the cheapest leak detector available, it costs nothing to export, and a steadily climbing line is unambiguous.
+
+## The container
+
+```dockerfile title="Dockerfile"
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
+
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+ARG TARGETOS TARGETARCH VERSION=dev COMMIT=none
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath \
+      -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT}" \
+      -o /out/api ./cmd/api
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=builder /out/api /api
+USER nonroot:nonroot
+EXPOSE 8080
+ENTRYPOINT ["/api"]
+```
+
+Roughly 12 MB, no shell, no package manager, and not running as root.
+
+## The deployment
+
+```yaml title="k8s/deployment.yaml"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bookmarks-api
+spec:
+  replicas: 3
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0          # never drop below the current capacity
+  template:
+    spec:
+      terminationGracePeriodSeconds: 60
+
+      containers:
+        - name: api
+          image: ghcr.io/example/bookmarks-api:v1.4.2
+
+          env:
+            - name: GOMEMLIMIT
+              value: "230MiB"
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: bookmarks-secrets
+                  key: database-url
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: bookmarks-secrets
+                  key: jwt-secret
+
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "1000m"
+
+          readinessProbe:
+            httpGet: { path: /ready, port: 8080 }
+            periodSeconds: 3
+            failureThreshold: 1
+
+          livenessProbe:
+            httpGet: { path: /health, port: 8080 }
+            periodSeconds: 10
+            failureThreshold: 3
+
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+```
+
+`maxUnavailable: 0` combined with graceful shutdown is what makes a deploy invisible. A new pod becomes ready before an old one starts draining, so capacity never dips.
+
+`GOMEMLIMIT` and `GOMAXPROCS` matter more than they look. Without the first, the garbage collector does not know about the container's memory limit and the pod gets OOM-killed. Without the second, the Go runtime sees the host's core count and creates far too many scheduler threads for a fractional CPU limit.
+
+`readOnlyRootFilesystem: true` works because a Go binary needs nothing writable. Very few runtimes can say that.
+
+## The migration problem
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bookmarks-migrate-v1-4-2
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: ghcr.io/example/bookmarks-api:v1.4.2
+          args: ["migrate", "up"]
+```
+
+Migrations run as a job before the deployment rolls, not on application startup. Five pods starting at once and all trying to migrate is a race, and a long migration blocks every instance from becoming ready.
+
+The rule that follows: **every migration must be compatible with the previous version of the code**, because during a rolling deploy both versions are running against the same schema. Adding a column is safe. Dropping one is a two-release operation: stop writing to it, deploy, then drop it.
+
+## The release pipeline
+
+```yaml title=".github/workflows/release.yml"
+jobs:
+  verify:
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.24', cache: true }
+
+      - run: gofmt -l . | tee /dev/stderr | (! read)
+      - run: go vet ./...
+      - uses: golangci/golangci-lint-action@v6
+      - run: go test -race -coverprofile=coverage.out ./...
+      - run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  release:
+    needs: verify
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            COMMIT=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+```
+
+Format, vet, lint, race-enabled tests, and a vulnerability scan, all before anything is published. The race detector line is the one that earns its keep most often.
+
+## Before you call it done
+
+<Steps>
+<Step>
+### Kill it while it is serving
+
+Start a slow request, send SIGTERM, and confirm the request completes. If it does not, your shutdown is decorative.
+</Step>
+<Step>
+### Stop the database while it is running
+
+Readiness should fail, liveness should not, and the service should recover when the database comes back. If the pods restart, your liveness probe is checking the wrong thing.
+</Step>
+<Step>
+### Send a malformed request to every endpoint
+
+Empty body, wrong types, a 50 MB body, missing authentication, somebody else's ID. Every one should produce a clean 4xx, never a 500 and never a panic.
+</Step>
+<Step>
+### Load test it
+
+`hey`, `vegeta`, or `k6`. Watch p99 latency, goroutine count, and the database pool wait count together. Find the point where it degrades and know what that number is before your users do.
+</Step>
+<Step>
+### Read your own logs
+
+Trigger a failure and see whether the log line tells you what went wrong, which request it was, and which user. If you would have to add logging to debug it, add that logging now.
+</Step>
+<Step>
+### Deploy twice in a row
+
+Under load. Confirm zero failed requests. That is the test that everything above actually works together.
+</Step>
+</Steps>
+
+## Where to go next
+
+You have covered the language, the standard library, concurrency, HTTP, databases, testing, and deployment. That is genuinely most of what writing Go professionally involves.
+
+The most useful next steps are all about depth rather than breadth:
+
+- **Read the standard library.** `net/http`, `io`, and `sync` are well written and heavily commented, and reading them teaches idiom faster than any tutorial.
+- **Contribute to a Go project you use.** The gap between reading code and changing it is where real understanding happens.
+- **Build something you will run for a year.** Maintenance teaches things that greenfield work cannot.
+- **Learn the runtime.** The scheduler, escape analysis, and the garbage collector are worth understanding once you are comfortable with everything above.
+
+The language is small enough that you have now seen essentially all of it. What remains is judgement, and that only comes from writing a lot of Go and living with the results.

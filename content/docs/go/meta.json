@@ -16,10 +16,10 @@
         "packages-and-modules",
         "concurrency",
         "standard-library-essentials",
-        "disabled-building-web-services",
-        "disabled-working-with-databases",
-        "disabled-testing-and-tooling",
-        "disabled-going-to-production",
-        "disabled-projects"
+        "building-web-services",
+        "working-with-databases",
+        "testing-and-tooling",
+        "going-to-production",
+        "projects"
     ]
 }

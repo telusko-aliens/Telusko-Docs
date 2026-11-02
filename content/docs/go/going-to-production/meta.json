@@ -1,0 +1,11 @@
+{
+    "title": "Going to Production",
+    "pages": [
+        "configuration-and-secrets.mdx",
+        "structured-logging-and-metrics.mdx",
+        "graceful-shutdown.mdx",
+        "building-and-cross-compiling.mdx",
+        "dockerizing-a-go-application.mdx",
+        "performance-and-reliability.mdx"
+    ]
+}

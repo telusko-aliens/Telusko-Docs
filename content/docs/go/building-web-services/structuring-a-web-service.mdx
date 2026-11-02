@@ -1,0 +1,374 @@
+---
+title: Structuring a Web Service
+---
+
+Everything in this section so far has been a piece. This page is about how the pieces fit, and specifically about the three decisions that determine whether a Go service is still pleasant to work on after a year: how dependencies are supplied, where the layers sit, and what `main` is allowed to do.
+
+## main does one job
+
+```go title="cmd/api/main.go"
+package main
+
+func main() {
+    if err := run(context.Background(), os.Args[1:], os.Stdout); err != nil {
+        fmt.Fprintf(os.Stderr, "error: %v\n", err)
+        os.Exit(1)
+    }
+}
+```
+
+That is the entire `main` function. Everything real happens in `run`, which returns an error.
+
+The reason is not aesthetics. `os.Exit` skips every deferred call, so a `main` that does real work and then exits leaves files unflushed and connections unclosed. Moving the work into a function that returns lets every `defer` fire.
+
+Taking the context, arguments, and output as parameters makes `run` testable, which is a technique worth adopting even though it looks unusual at first.
+
+```go
+func run(ctx context.Context, args []string, stdout io.Writer) error {
+    ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+    defer stop()
+
+    cfg, err := config.Load(args)
+    if err != nil {
+        return fmt.Errorf("loading config: %w", err)
+    }
+
+    logger := slog.New(slog.NewJSONHandler(stdout, &slog.HandlerOptions{
+        Level: cfg.LogLevel,
+    }))
+
+    db, err := storage.Open(ctx, cfg.DatabaseURL)
+    if err != nil {
+        return fmt.Errorf("connecting to database: %w", err)
+    }
+    defer db.Close()
+
+    // Construct from the inside out.
+    taskStore := storage.NewTaskStore(db)
+    mailer := mail.NewSMTP(cfg.SMTP)
+    taskSvc := service.NewTaskService(taskStore, mailer, logger)
+    handlers := api.NewHandlers(taskSvc, logger)
+
+    srv := &http.Server{
+        Addr:              cfg.Addr,
+        Handler:           api.Routes(handlers, cfg),
+        ReadHeaderTimeout: 5 * time.Second,
+        ReadTimeout:       15 * time.Second,
+        WriteTimeout:      15 * time.Second,
+        IdleTimeout:       60 * time.Second,
+    }
+
+    return serve(ctx, srv, logger)
+}
+```
+
+Read that top to bottom and you have the whole dependency graph of the service on one screen. That property is worth protecting.
+
+## Dependency injection, by hand
+
+Go has dependency injection frameworks. Almost nobody uses them, because passing arguments to constructors already works.
+
+```go
+// storage layer, knows SQL
+type TaskStore struct {
+    db *sql.DB
+}
+
+func NewTaskStore(db *sql.DB) *TaskStore { ... }
+
+// service layer, knows business rules
+type TaskService struct {
+    store  TaskRepository        // an interface, defined here
+    mailer Mailer                // also an interface
+    logger *slog.Logger
+}
+
+func NewTaskService(s TaskRepository, m Mailer, l *slog.Logger) *TaskService { ... }
+
+// handler layer, knows HTTP
+type Handlers struct {
+    tasks  *TaskService
+    logger *slog.Logger
+}
+
+func NewHandlers(t *TaskService, l *slog.Logger) *Handlers { ... }
+```
+
+<Callout type="warn">
+Global variables are the alternative, and they are a trap. A package level `var db *sql.DB` means tests cannot substitute anything, two instances cannot coexist, initialisation order becomes implicit, and nothing in a function signature tells you what it depends on. Pass dependencies explicitly, always.
+</Callout>
+
+## Interfaces at the consumer
+
+The service defines what it needs. It does not import the storage package's abstraction.
+
+```go title="internal/service/task.go"
+package service
+
+// Defined here, in the package that USES it.
+type TaskRepository interface {
+    Create(ctx context.Context, t *Task) error
+    Get(ctx context.Context, id string) (*Task, error)
+    List(ctx context.Context, f Filter) ([]*Task, error)
+}
+
+type Mailer interface {
+    Send(ctx context.Context, to, subject, body string) error
+}
+```
+
+`*storage.TaskStore` satisfies `TaskRepository` without either package importing the other's interface. A test passes a fake with three methods. The database can be swapped for an in-memory store by changing one line in `run`.
+
+This is the design rule from the interfaces section, and it is the single most valuable structural habit in Go.
+
+## The layers, and what each may know
+
+```text
+   handler   →  service   →  repository  →  database
+      │            │             │
+      └────────────┴─────────────┴──►  model
+
+   handler:     HTTP only. Decode, call the service, encode the response.
+                Never writes SQL. Never contains business rules.
+
+   service:     Business rules only. Never sees http.Request.
+                Never writes SQL. Coordinates repositories.
+
+   repository:  Data access only. Never contains business rules.
+                Returns domain types, not database rows.
+
+   model:       Types and their own invariants. Depends on nothing.
+```
+
+The test for whether the boundaries hold: could you add a gRPC interface alongside the HTTP one without touching the service layer? If yes, the layering is real. If the service takes an `*http.Request` anywhere, it is not.
+
+## Routes in one function
+
+```go title="internal/api/routes.go"
+package api
+
+func Routes(h *Handlers, cfg config.Config) http.Handler {
+    mux := http.NewServeMux()
+
+    // Public
+    mux.HandleFunc("GET /health", h.Health)
+    mux.HandleFunc("GET /ready", h.Ready)
+    mux.HandleFunc("POST /auth/login", h.Login)
+
+    // Authenticated API
+    api := http.NewServeMux()
+    api.HandleFunc("GET /tasks", h.ListTasks)
+    api.HandleFunc("POST /tasks", h.CreateTask)
+    api.HandleFunc("GET /tasks/{id}", h.GetTask)
+    api.HandleFunc("PATCH /tasks/{id}", h.UpdateTask)
+    api.HandleFunc("DELETE /tasks/{id}", h.DeleteTask)
+
+    mux.Handle("/api/v1/", RequireAuth(h.verifyToken)(
+        http.StripPrefix("/api/v1", api),
+    ))
+
+    // Static assets
+    mux.Handle("/static/", http.StripPrefix("/static/",
+        http.FileServer(http.FS(staticFS))))
+
+    return Chain(mux,
+        RequestID,
+        Logging,
+        Recovery,
+        SecureHeaders,
+        CORS(cfg.AllowedOrigins),
+        Timeout(cfg.RequestTimeout),
+    )
+}
+```
+
+One function, one place to read the entire API surface. When someone asks "what endpoints does this service have", the answer is a single file.
+
+## Health and readiness, separately
+
+```go
+// Liveness: is the process alive? Never checks dependencies.
+func (h *Handlers) Health(w http.ResponseWriter, r *http.Request) {
+    WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// Readiness: can this instance serve traffic right now?
+func (h *Handlers) Ready(w http.ResponseWriter, r *http.Request) {
+    ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+    defer cancel()
+
+    if err := h.db.PingContext(ctx); err != nil {
+        WriteJSON(w, http.StatusServiceUnavailable, map[string]string{
+            "status": "database unavailable",
+        })
+        return
+    }
+
+    WriteJSON(w, http.StatusOK, map[string]string{"status": "ready"})
+}
+```
+
+<Callout type="warn">
+Keeping these separate matters in Kubernetes. A failing **liveness** probe restarts the pod. A failing **readiness** probe just stops routing traffic to it. If liveness checks the database, a brief database blip restarts every pod at once, turning a recoverable incident into an outage.
+</Callout>
+
+## Configuration in one place
+
+```go title="internal/config/config.go"
+package config
+
+type Config struct {
+    Addr           string
+    DatabaseURL    string
+    LogLevel       slog.Level
+    RequestTimeout time.Duration
+    AllowedOrigins []string
+    Environment    string
+}
+
+func Load(args []string) (Config, error) {
+    cfg := Config{
+        Addr:           ":8080",
+        LogLevel:       slog.LevelInfo,
+        RequestTimeout: 30 * time.Second,
+        Environment:    "development",
+    }
+
+    // Environment variables first.
+    if v := os.Getenv("ADDR"); v != "" {
+        cfg.Addr = v
+    }
+    cfg.DatabaseURL = os.Getenv("DATABASE_URL")
+    if v := os.Getenv("ALLOWED_ORIGINS"); v != "" {
+        cfg.AllowedOrigins = strings.Split(v, ",")
+    }
+
+    // Flags override environment variables.
+    fs := flag.NewFlagSet("api", flag.ContinueOnError)
+    fs.StringVar(&cfg.Addr, "addr", cfg.Addr, "listen address")
+    fs.DurationVar(&cfg.RequestTimeout, "timeout", cfg.RequestTimeout, "request timeout")
+    if err := fs.Parse(args); err != nil {
+        return cfg, err
+    }
+
+    // Validate, and fail loudly.
+    var errs []error
+    if cfg.DatabaseURL == "" {
+        errs = append(errs, errors.New("DATABASE_URL is required"))
+    }
+    if cfg.Environment == "production" && len(cfg.AllowedOrigins) == 0 {
+        errs = append(errs, errors.New("ALLOWED_ORIGINS is required in production"))
+    }
+
+    return cfg, errors.Join(errs...)
+}
+```
+
+Validating at startup means a misconfigured deployment fails immediately with a clear message, instead of failing on the first request that happens to need the missing setting.
+
+## Serving, with shutdown
+
+```go
+func serve(ctx context.Context, srv *http.Server, logger *slog.Logger) error {
+    errCh := make(chan error, 1)
+
+    go func() {
+        logger.Info("server starting", "addr", srv.Addr)
+        if err := srv.ListenAndServe(); err != nil &&
+            !errors.Is(err, http.ErrServerClosed) {
+            errCh <- fmt.Errorf("listen: %w", err)
+        }
+    }()
+
+    select {
+    case err := <-errCh:
+        return err                    // failed to start, report it
+    case <-ctx.Done():
+        logger.Info("shutdown signal received")
+    }
+
+    shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    if err := srv.Shutdown(shutdownCtx); err != nil {
+        logger.Error("graceful shutdown failed, forcing close", "error", err)
+        return srv.Close()
+    }
+
+    logger.Info("server stopped cleanly")
+    return nil
+}
+```
+
+The buffered error channel is what makes a startup failure visible. Without it, a port already in use produces a silent goroutine exit and a process that appears to be running but is not listening.
+
+## Testing the whole thing
+
+Because `run` takes its dependencies as parameters, a test can start the real service:
+
+```go
+func TestServiceEndToEnd(t *testing.T) {
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+
+    var out bytes.Buffer
+    args := []string{"-addr", "localhost:0"}
+
+    go func() {
+        if err := run(ctx, args, &out); err != nil {
+            t.Error(err)
+        }
+    }()
+
+    waitForReady(t, "http://localhost:8080/health")
+
+    resp, err := http.Post("http://localhost:8080/api/v1/tasks",
+        "application/json", strings.NewReader(`{"title":"test"}`))
+    // ... assertions
+}
+```
+
+The handlers, routing, middleware, encoding, and error mapping are all exercised as they will be in production.
+
+## The final layout
+
+```text
+   orders-api/
+   ├── go.mod
+   ├── Makefile
+   ├── Dockerfile
+   │
+   ├── cmd/api/main.go              main + run + serve
+   │
+   ├── internal/
+   │   ├── config/config.go         load and validate settings
+   │   ├── api/
+   │   │   ├── routes.go            every route, in one function
+   │   │   ├── handlers.go          the Handlers struct
+   │   │   ├── task.go              task handlers
+   │   │   ├── middleware.go
+   │   │   ├── json.go              WriteJSON, ReadJSON
+   │   │   └── errors.go            error to status mapping
+   │   ├── service/
+   │   │   ├── task.go              business rules
+   │   │   └── interfaces.go        what the service needs
+   │   ├── storage/
+   │   │   ├── postgres.go          connection and pool
+   │   │   └── task.go              queries
+   │   └── model/task.go            domain types
+   │
+   └── migrations/
+```
+
+## The rules, condensed
+
+1. **`main` calls `run`, and `run` returns an error.** Deferred cleanup then actually runs.
+2. **Construct dependencies in `run`, from the inside out.** No globals, no `init` magic.
+3. **Interfaces live in the package that consumes them**, sized to that need.
+4. **Handlers do HTTP, services do rules, repositories do data.** No layer reaches past its neighbour.
+5. **All routes in one function.** The API surface should be readable in one place.
+6. **Validate configuration at startup.** Fail loudly rather than on the first affected request.
+7. **Always graceful shutdown.** In-flight requests finish, connections close.
+8. **Liveness and readiness are different checks.** Do not let a database blip restart your pods.
+
+Next, let's connect this service to a real database.

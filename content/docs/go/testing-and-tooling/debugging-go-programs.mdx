@@ -1,0 +1,344 @@
+---
+title: Debugging Go Programs
+---
+
+Go's debugging story is unusually good, largely because the failure output is designed to be read. A panic gives you the exact line, the full call stack, and the state of every goroutine, without any configuration.
+
+This page covers reading that output, then the tools for when it is not enough.
+
+## Reading a panic
+
+```text
+panic: runtime error: index out of range [5] with length 3
+
+goroutine 1 [running]:
+main.processItems({0xc000014090, 0x3, 0x3})
+	/app/internal/service/process.go:42 +0x1d4
+main.handleRequest(0xc0000b4000, 0xc0000ca000)
+	/app/internal/api/handler.go:78 +0x9c
+net/http.HandlerFunc.ServeHTTP(0x0?, {0x6c4a20?, 0xc0000b4000?}, 0x0?)
+	/usr/local/go/src/net/http/server.go:2166 +0x2f
+exit status 2
+```
+
+Read it in this order:
+
+```text
+   Line 1     what went wrong
+   Line 3     which goroutine, and its state
+   Line 4-5   where it happened: function, file, line
+   Below      the call chain, most recent first
+```
+
+The top frame is where it broke. The frames below tell you how execution got there. The hex numbers after `+` are instruction offsets and you can ignore them.
+
+The bracketed state on the goroutine line is often the most informative part:
+
+```text
+   [running]                        currently executing
+   [chan receive]                   blocked receiving from a channel
+   [chan send]                      blocked sending
+   [select]                         waiting in a select
+   [semacquire]                     waiting on a mutex or WaitGroup
+   [IO wait]                        waiting on network or disk
+   [sleep]                          in time.Sleep
+   [runnable]                       ready, waiting for a CPU
+```
+
+A goroutine stuck in `[chan send]` for a long time means nobody is receiving, which is the signature of a leak.
+
+## Deadlocks
+
+```text
+fatal error: all goroutines are asleep - deadlock!
+
+goroutine 1 [chan receive]:
+main.main()
+	/app/main.go:12 +0x5c
+```
+
+Go detects the case where every goroutine is blocked and reports it immediately. The state tells you what each one was waiting for.
+
+This detector only fires when the **whole** program is stuck. A single goroutine blocked forever while others keep working is a leak, and it produces no error at all.
+
+## Dumping every goroutine
+
+When a program hangs but is not fully deadlocked, ask it what everyone is doing.
+
+Send `SIGQUIT`, which is Ctrl+Backslash in a terminal:
+
+```bash
+kill -QUIT <pid>
+```
+
+That prints a stack trace for every live goroutine and exits.
+
+From inside the program, without exiting:
+
+```go
+import "runtime/pprof"
+
+pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)   // aggregated
+pprof.Lookup("goroutine").WriteTo(os.Stdout, 2)   // full stacks
+```
+
+Or over HTTP, which is the version you want in production:
+
+```bash
+curl http://localhost:6060/debug/pprof/goroutine?debug=2
+```
+
+Ten thousand goroutines all showing the same stack is a leak, and that stack is the line that created them.
+
+## print debugging, done well
+
+There is no shame in this and every Go developer does it. Doing it well means using the right verb:
+
+```go
+fmt.Printf("user: %+v\n", user)        // field names, the everyday choice
+fmt.Printf("user: %#v\n", user)        // valid Go syntax, for exact structure
+fmt.Printf("type: %T\n", value)        // what is this actually
+fmt.Printf("input: %q\n", s)           // quoted, reveals whitespace
+fmt.Printf("bytes: %x\n", data)        // hex
+```
+
+`%q` deserves emphasis. It is the difference between a mystery and an answer:
+
+```go
+fmt.Printf("got %s\n", input)     // got admin      ← looks correct
+fmt.Printf("got %q\n", input)     // got "admin "   ← there it is
+```
+
+Print to standard error so the output is not mixed into your program's real output:
+
+```go
+fmt.Fprintf(os.Stderr, "DEBUG: %+v\n", value)
+```
+
+And print where you are, not just what:
+
+```go
+slog.Debug("processing item",
+    "index", i,
+    "id", item.ID,
+    "status", item.Status,
+)
+```
+
+## Structured logging with slog
+
+`log/slog` arrived in Go 1.21 and replaced the ad hoc logging every project used to write for itself.
+
+```go
+import "log/slog"
+
+logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+    Level:     slog.LevelDebug,
+    AddSource: true,          // include file and line
+}))
+slog.SetDefault(logger)
+
+slog.Info("server started", "addr", ":8080", "env", "production")
+slog.Error("query failed", "error", err, "query", name, "duration", elapsed)
+```
+
+```json
+{"time":"2026-08-08T10:30:00Z","level":"INFO","source":{"file":"main.go","line":42},"msg":"server started","addr":":8080","env":"production"}
+```
+
+Key and value pairs rather than formatted strings means logs are searchable. `level=ERROR AND user_id=42` is a query you can run; grepping formatted text is not.
+
+Carrying context through a request:
+
+```go
+func handler(w http.ResponseWriter, r *http.Request) {
+    log := slog.With(
+        "request_id", RequestIDFrom(r.Context()),
+        "method", r.Method,
+        "path", r.URL.Path,
+    )
+
+    log.Info("handling request")
+
+    if err := process(r.Context()); err != nil {
+        log.Error("processing failed", "error", err)
+        return
+    }
+
+    log.Info("request complete")
+}
+```
+
+Every line from that handler carries the request ID, so filtering a log aggregator by one ID gives you the complete story of one request.
+
+Turning debug logging on with an environment variable, rather than a rebuild:
+
+```go
+level := slog.LevelInfo
+if os.Getenv("LOG_LEVEL") == "debug" {
+    level = slog.LevelDebug
+}
+```
+
+## Delve, the debugger
+
+```bash
+go install github.com/go-delve/delve/cmd/dlv@latest
+```
+
+```bash
+dlv debug ./cmd/api          # build and start under the debugger
+dlv test ./internal/service  # debug a test
+dlv attach <pid>             # attach to a running process
+dlv exec ./bin/api           # debug an existing binary
+```
+
+The commands you will use:
+
+```text
+   b main.go:42          set a breakpoint at a line
+   b service.Process     set one at a function
+   c                     continue
+   n                     step over
+   s                     step into
+   stepout               finish this function
+   p variable            print a value
+   locals                every local variable
+   args                  the arguments
+   bt                    the stack trace
+   goroutines            list them all
+   goroutine 5           switch to one
+   restart               start again
+   q                     quit
+```
+
+```text
+(dlv) b internal/service/order.go:87
+Breakpoint 1 set at 0x6f2a41 for order.go:87
+
+(dlv) c
+> main.PlaceOrder() ./internal/service/order.go:87
+
+(dlv) p order
+*model.Order {
+    ID: "ord_9f3",
+    UserID: "usr_12",
+    Total: 9900,
+    Status: "pending",
+}
+
+(dlv) p order.Items[0]
+model.Item {SKU: "SKU-1", Qty: 2, Price: 4950}
+
+(dlv) goroutines
+  Goroutine 1 - User: ./main.go:31 main.main
+  Goroutine 34 - User: ./worker.go:22 main.worker
+```
+
+`goroutines` followed by `goroutine <n>` is the capability that makes Delve genuinely worth learning. Inspecting the state of a specific goroutine among thousands is not something print statements can do.
+
+VS Code and GoLand both drive Delve behind their debug interfaces, so breakpoints and variable inspection work without touching the command line.
+
+## Conditional breakpoints
+
+For a loop that fails on iteration 4,982:
+
+```text
+(dlv) b process.go:42
+(dlv) condition 1 i == 4982
+(dlv) c
+```
+
+Or in code, which sometimes wins:
+
+```go
+if item.ID == "the-broken-one" {
+    runtime.Breakpoint()          // Delve stops here
+}
+```
+
+## Debugging concurrency
+
+```bash
+go test -race ./...
+go run -race main.go
+GORACE="halt_on_error=1" go test -race ./...
+```
+
+The race detector reports actual races that happened during the run, with the stacks of both accesses. It does not produce false positives, which makes every report worth investigating.
+
+For goroutine leaks:
+
+```go
+func TestNoLeaks(t *testing.T) {
+    defer goleak.VerifyNone(t)
+    // ...
+}
+```
+
+```go
+func TestMain(m *testing.M) {
+    goleak.VerifyTestMain(m)     // every test in the package
+}
+```
+
+For scheduling problems that a CPU profile cannot explain, the execution tracer:
+
+```bash
+go test -trace=trace.out ./...
+go tool trace trace.out
+```
+
+The browser view shows each goroutine on a timeline with scheduler latency, GC pauses, and blocking events. When the question is "why is this not using all my cores", nothing else answers it.
+
+## Diagnosing memory growth
+
+```bash
+curl http://localhost:6060/debug/pprof/heap > heap1.out
+# wait
+curl http://localhost:6060/debug/pprof/heap > heap2.out
+
+go tool pprof -base heap1.out heap2.out
+```
+
+The `-base` flag shows the difference between two snapshots, which is exactly what a leak looks like. Whatever grew is at the top of the list.
+
+```bash
+GODEBUG=gctrace=1 ./bin/api
+```
+
+```text
+gc 12 @2.045s 0%: 0.018+1.2+0.005 ms clock, 0.14+0.20/1.1/0+0.041 ms cpu,
+    12->12->6 MB, 13 MB goal, 8 P
+```
+
+The `12->12->6 MB` is heap size before GC, after GC, and live heap. When the live number climbs steadily across cycles, something is being retained.
+
+## Common causes, and where to look
+
+| Symptom | Likely cause | Where to look |
+| --- | --- | --- |
+| nil pointer panic | unchecked error, then used the value | the stack trace's top frame |
+| index out of range | off by one, or an empty slice | the same |
+| deadlock reported | channel with no counterpart | the goroutine states |
+| hangs, no error | a goroutine blocked forever | SIGQUIT, or the goroutine profile |
+| memory grows steadily | leaked goroutines, or retained slices | heap profile with `-base` |
+| intermittent wrong values | data race | `go test -race` |
+| slow under load | pool exhaustion or lock contention | `db.Stats()`, mutex profile |
+| test passes alone, fails in a suite | shared state between tests | `-count=1`, `-race` |
+
+## Making problems findable
+
+The best debugging is the kind you do not have to do.
+
+**Wrap errors with context.** `connection refused` is useless. `connecting to payments service at api.stripe.com:443: connection refused` is an answer.
+
+**Log the request ID everywhere.** One filter gives you the whole story of one request.
+
+**Panic on impossible states during development.** A clear crash at the moment of the bug beats corrupted data discovered three hours later.
+
+**Keep `-race` in CI.** Data races found in development are ordinary bugs. Found in production, they are unexplainable behaviour.
+
+**Never ignore an error.** The vast majority of nil pointer panics are an unchecked error two lines earlier.
+
+That completes testing and tooling. Next, let's get this code running somewhere real.

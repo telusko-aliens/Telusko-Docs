@@ -5,7 +5,7 @@
         "file-permissions-symbolic.mdx",
         "numeric-file-permissions.mdx",
         "user-management.mdx",
-        "group-managemen.mdx",
+        "group-management.mdx",
         "file-ownership-chown.mdx"
     ]
 }

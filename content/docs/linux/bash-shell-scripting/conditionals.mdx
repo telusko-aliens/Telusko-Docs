@@ -1,0 +1,182 @@
+---
+title: Conditionals in Shell Scripting
+---
+
+
+Conditionals allow a shell script to make decisions. Instead of running every command unconditionally, a script can check whether a condition is true and choose which commands to execute.
+
+Shell scripts use `if`, `else`, and `elif` to implement this decision-making.
+
+
+## The Basic `if` Statement
+
+Use `if` when commands should run only if a condition is true.
+
+### Syntax
+
+```bash
+if [ condition ]; then
+    # Commands run when the condition is true
+fi
+```
+
+- `[ condition ]` evaluates the condition. **Spaces inside the brackets are required.**
+- `then` begins the command block.
+- `fi` closes the `if` statement (`if` spelled backward).
+
+### Example
+
+```bash
+#!/bin/bash
+
+number=10
+
+if [ "$number" -gt 5 ]; then
+    echo "Number is greater than 5"
+fi
+```
+
+**Output:**
+
+```text
+Number is greater than 5
+```
+
+Because `10` is greater than `5`, the command inside the `if` block runs.
+
+
+---
+
+
+## The `if / else` Statement
+
+Use `else` to specify what should happen when the condition is false.
+
+### Syntax
+
+```bash
+if [ condition ]; then
+    # Commands if the condition is true
+else
+    # Commands if the condition is false
+fi
+```
+
+### Example
+
+```bash
+#!/bin/bash
+
+echo "Enter a number:"
+read number
+
+if [ "$number" -gt 5 ]; then
+    echo "Number is greater than 5"
+else
+    echo "Number is 5 or less"
+fi
+```
+
+- Input `7` → `Number is greater than 5`
+- Input `3` → `Number is 5 or less`
+
+Only one branch executes: either the `if` block or the `else` block.
+
+
+---
+
+
+## The `if / elif / else` Ladder
+
+When a script needs to check several conditions, use `elif` (short for “else if”).
+
+### Syntax
+
+```bash
+if [ condition1 ]; then
+    # Commands if condition1 is true
+elif [ condition2 ]; then
+    # Commands if condition2 is true
+elif [ condition3 ]; then
+    # Commands if condition3 is true
+else
+    # Commands if no condition is true
+fi
+```
+
+The script checks conditions from top to bottom. Once it finds a true condition, it executes that block and skips the remaining branches. If none match, it executes the `else` block, if one is present.
+
+### Example: Grading System
+
+```bash
+#!/bin/bash
+
+echo "Enter your marks:"
+read marks
+
+if [ "$marks" -ge 90 ]; then
+    echo "Grade A"
+elif [ "$marks" -ge 75 ]; then
+    echo "Grade B"
+elif [ "$marks" -ge 50 ]; then
+    echo "Grade C"
+else
+    echo "Fail"
+fi
+```
+
+| Marks | Output | Why |
+|---:|---|---|
+| `95` | Grade A | Meets the first condition |
+| `88` | Grade B | Below 90, but at least 75 |
+| `60` | Grade C | Below 75, but at least 50 |
+| `35` | Fail | No condition matched |
+
+**Order matters:** check higher grade thresholds first. Otherwise, a value such as `95` could match a lower threshold before the script reaches Grade A.
+
+
+---
+
+
+## Numeric Comparison Operators
+
+Use these operators inside `[ ]` to compare integer values.
+
+| Operator | Meaning | Example |
+|---|---|---|
+| `-eq` | Equal to | `[ "$a" -eq 10 ]` |
+| `-ne` | Not equal to | `[ "$a" -ne 10 ]` |
+| `-gt` | Greater than | `[ "$a" -gt 5 ]` |
+| `-lt` | Less than | `[ "$a" -lt 5 ]` |
+| `-ge` | Greater than or equal to | `[ "$a" -ge 90 ]` |
+| `-le` | Less than or equal to | `[ "$a" -le 50 ]` |
+
+
+---
+
+
+## Important Syntax Rules
+
+| Rule | Correct usage |
+|---|---|
+| Include spaces inside brackets | `[ "$x" -gt 5 ]` |
+| Put `then` after the condition | `if [ "$x" -gt 5 ]; then` |
+| Close every `if` with `fi` | Each `if` needs a matching `fi` |
+| `else` has no condition or `then` | `else` followed by commands |
+| `elif` requires a condition and `then` | `elif [ "$x" -eq 5 ]; then` |
+| Quote variable expansions | `"$number"` helps avoid errors with empty or whitespace-containing values |
+
+
+---
+
+
+## Summary
+
+- Use `if` to run commands only when a condition is true.
+- Use `else` to handle the false case.
+- Use `elif` to check multiple conditions; only the first matching branch executes.
+- Use numeric operators such as `-gt`, `-lt`, `-eq`, `-ge`, `-le`, and `-ne` for integer comparisons.
+- Spaces inside `[ ]` are mandatory, and every `if` statement must end with `fi`.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

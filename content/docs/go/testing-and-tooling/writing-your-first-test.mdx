@@ -1,0 +1,345 @@
+---
+title: Writing Your First Test
+---
+
+Go's testing story is unusual in the same way the rest of the language is: there is one way to do it, it ships with the toolchain, and there is no framework to install, no configuration file, and no annotations.
+
+```go title="math.go"
+package math
+
+func Add(a, b int) int {
+    return a + b
+}
+```
+
+```go title="math_test.go"
+package math
+
+import "testing"
+
+func TestAdd(t *testing.T) {
+    got := Add(2, 3)
+    want := 5
+
+    if got != want {
+        t.Errorf("Add(2, 3) = %d, want %d", got, want)
+    }
+}
+```
+
+```bash
+go test ./...
+```
+
+```text
+ok  	example.com/math	0.002s
+```
+
+## The rules
+
+```text
+   File name       must end in _test.go
+   Function name   must start with Test
+   Signature       func TestXxx(t *testing.T)
+   Location        the same package directory as the code
+```
+
+Files ending in `_test.go` are excluded from normal builds, so test code never ships in your binary.
+
+## Reporting failures
+
+```go
+t.Error("something is wrong")        // mark as failed, keep running
+t.Errorf("got %d, want %d", g, w)    // formatted version
+
+t.Fatal("cannot continue")           // mark as failed, stop this test
+t.Fatalf("setup failed: %v", err)
+
+t.Log("some detail")                 // only shown with -v or on failure
+t.Skip("needs a database")           // skip the rest of this test
+t.Helper()                           // report failures at the caller's line
+```
+
+The distinction between `Error` and `Fatal` matters more than it looks. `Error` records the failure and continues, so one run reports several problems. `Fatal` stops immediately, which is what you want when continuing would panic.
+
+```go
+func TestGetUser(t *testing.T) {
+    u, err := GetUser("42")
+    if err != nil {
+        t.Fatalf("GetUser: %v", err)     // Fatal, because u is nil below
+    }
+
+    if u.Name != "Shiva" {
+        t.Errorf("Name = %q, want Shiva", u.Name)      // Error, keep checking
+    }
+    if u.Email != "shiva@example.com" {
+        t.Errorf("Email = %q, want shiva@example.com", u.Email)
+    }
+}
+```
+
+## Writing a good failure message
+
+There is no assertion library in the standard library, and the convention that replaces it is a specific message format:
+
+```go
+if got != want {
+    t.Errorf("Add(2, 3) = %d, want %d", got, want)
+}
+```
+
+```text
+   what you called = what you got, want what you expected
+```
+
+That format tells you everything from the log line alone, without opening the test file. Compare it with `t.Error("test failed")`, which tells you nothing.
+
+For structs, `%+v` shows field names:
+
+```go
+if !reflect.DeepEqual(got, want) {
+    t.Errorf("Parse(%q) =\n%+v\nwant\n%+v", input, got, want)
+}
+```
+
+For anything non-trivial, `google/go-cmp` produces far better diffs:
+
+```go
+import "github.com/google/go-cmp/cmp"
+
+if diff := cmp.Diff(want, got); diff != "" {
+    t.Errorf("Parse(%q) mismatch (-want +got):\n%s", input, diff)
+}
+```
+
+```text
+   User{
+     Name: "Shiva",
+-    Age:  28,
++    Age:  29,
+     Email: "shiva@example.com",
+   }
+```
+
+That is the one testing dependency most Go teams do add, and it earns its place.
+
+## Running tests
+
+```bash
+go test ./...                    # everything
+go test ./internal/service       # one package
+go test -v ./...                 # verbose, show each test
+go test -run TestAdd ./...       # by name, regular expression
+go test -run 'TestUser/create'   # a specific subtest
+go test -race ./...              # with the race detector
+go test -count=1 ./...           # disable the result cache
+go test -short ./...             # skip tests that check testing.Short()
+go test -failfast ./...          # stop at the first failure
+go test -timeout 30s ./...       # fail tests that hang
+```
+
+`-count=1` is the documented way to bypass the test cache. Go caches results when nothing has changed, which is usually helpful and occasionally confusing when a test depends on something outside the code.
+
+## Subtests
+
+`t.Run` creates a named subtest, which gives you structure and the ability to run one piece:
+
+```go
+func TestUserService(t *testing.T) {
+    svc := newTestService(t)
+
+    t.Run("create", func(t *testing.T) {
+        u, err := svc.Create(ctx, "shiva@example.com")
+        if err != nil {
+            t.Fatalf("Create: %v", err)
+        }
+        if u.ID == "" {
+            t.Error("Create did not assign an ID")
+        }
+    })
+
+    t.Run("create duplicate", func(t *testing.T) {
+        _, err := svc.Create(ctx, "shiva@example.com")
+        if !errors.Is(err, ErrDuplicate) {
+            t.Errorf("err = %v, want ErrDuplicate", err)
+        }
+    })
+}
+```
+
+```bash
+go test -run 'TestUserService/create_duplicate' ./...
+```
+
+Spaces in a subtest name become underscores when you filter on it.
+
+## Setup and cleanup
+
+```go
+func TestWithTempFile(t *testing.T) {
+    f, err := os.CreateTemp(t.TempDir(), "test-*.txt")
+    if err != nil {
+        t.Fatal(err)
+    }
+
+    t.Cleanup(func() {
+        f.Close()
+    })
+
+    // ... the temp directory is removed automatically
+}
+```
+
+`t.TempDir()` creates a directory that is deleted when the test finishes, including on failure. `t.Cleanup` registers a function to run at the end, and it works in subtests too, which `defer` does not do as cleanly.
+
+For setup shared across a package, `TestMain`:
+
+```go
+func TestMain(m *testing.M) {
+    // before all tests
+    db := startTestDatabase()
+
+    code := m.Run()
+
+    // after all tests
+    db.Close()
+
+    os.Exit(code)
+}
+```
+
+Use it sparingly. Shared global state across tests makes them order-dependent, which is the main thing you want to avoid.
+
+## Test helpers
+
+```go
+func newTestUser(t *testing.T, email string) *User {
+    t.Helper()          // failures point at the CALLER's line
+
+    u, err := CreateUser(context.Background(), email)
+    if err != nil {
+        t.Fatalf("creating test user %q: %v", email, err)
+    }
+    return u
+}
+```
+
+`t.Helper()` is the line that makes helpers usable. Without it, every failure reports the line inside the helper, and you cannot tell which of the twenty calls failed.
+
+## Internal versus external tests
+
+Two package options for a test file in the same directory:
+
+```go
+package service          // internal: can reach unexported names
+package service_test     // external: sees only the exported API
+```
+
+Both can coexist. Use the internal form to test unexported logic directly, and the external form when you want the test to exercise the package the way a caller would.
+
+The external form has a design benefit: writing tests against your own public API quickly reveals when that API is awkward to use.
+
+## Coverage
+
+```bash
+go test -cover ./...
+```
+
+```text
+ok  example.com/internal/service    0.012s   coverage: 82.4% of statements
+```
+
+```bash
+go test -coverprofile=cover.out ./...
+go tool cover -html=cover.out          # opens an annotated view in a browser
+go tool cover -func=cover.out          # per-function summary in the terminal
+```
+
+The HTML view colours every line green or red, which makes it immediately obvious which branches are never exercised.
+
+<Callout type="warn">
+Coverage measures which lines ran, not whether the assertions were meaningful. A test that calls every function and checks nothing reports 100 percent. Use coverage to find code that is never touched, not as a target to hit. Chasing a number produces tests that exist to raise the number.
+</Callout>
+
+## Examples that are also documentation
+
+A function named `Example` runs as a test and appears in the generated documentation:
+
+```go
+func ExampleAdd() {
+    sum := Add(2, 3)
+    fmt.Println(sum)
+    // Output: 5
+}
+```
+
+The `// Output:` comment is checked. If `Add` starts returning 6, the test fails.
+
+```go
+func ExampleParseDuration_hours() {
+    d, _ := ParseDuration("2h30m")
+    fmt.Println(d)
+    // Output: 2h30m0s
+}
+```
+
+The naming convention determines where it appears on the documentation page:
+
+```text
+   ExampleFoo           attached to function Foo
+   ExampleT             attached to type T
+   ExampleT_M           attached to method M on type T
+   ExampleFoo_suffix    a second example for Foo
+```
+
+Documentation that cannot go stale, because the build fails when it does.
+
+## Fuzzing
+
+Go 1.18 added fuzzing to the standard toolchain. It generates inputs and looks for ones that crash your code or violate a property.
+
+```go
+func FuzzParseVersion(f *testing.F) {
+    // Seed inputs, which are also run as normal test cases.
+    f.Add("1.2.3")
+    f.Add("0.0.1")
+    f.Add("10.20.30")
+
+    f.Fuzz(func(t *testing.T, s string) {
+        v, err := ParseVersion(s)
+        if err != nil {
+            return          // rejecting bad input is fine
+        }
+
+        // The property: anything we parse must format back identically.
+        if got := v.String(); got != s {
+            t.Errorf("round trip: ParseVersion(%q).String() = %q", s, got)
+        }
+    })
+}
+```
+
+```bash
+go test -fuzz=FuzzParseVersion -fuzztime=30s ./...
+```
+
+When it finds a failing input, it writes it to `testdata/fuzz/` and that input becomes a permanent regression test.
+
+Fuzzing is at its best on parsers, decoders, and anything that takes untrusted input. Thirty seconds of fuzzing on a hand-written parser frequently finds a panic that months of unit tests missed.
+
+## What to test
+
+```text
+   Business logic and rules            →  always
+   Error paths, especially rare ones   →  always, this is where bugs live
+   Boundaries: empty, nil, zero, max   →  always
+   Parsers and anything with input     →  unit tests plus fuzzing
+   Concurrency                         →  with -race, and stress it
+   Simple getters and setters          →  no
+   The standard library                →  no
+   Generated code                      →  no
+```
+
+The most valuable tests are the ones covering paths that rarely run in production, because those are exactly the paths nobody has exercised by hand.
+
+Next, let's look at the test structure that dominates Go codebases.

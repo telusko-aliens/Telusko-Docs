@@ -1,0 +1,406 @@
+---
+title: Making HTTP Requests
+---
+
+```go
+resp, err := http.Get("https://api.example.com/users")
+```
+
+That line appears in every Go tutorial and it should appear in no production code. It has no timeout, no context, no retry, and it leaks a connection unless you remember to close the body. This page starts there and fixes each problem in turn.
+
+## Why the package-level functions are a trap
+
+```go
+http.Get(url)
+http.Post(url, contentType, body)
+http.PostForm(url, values)
+```
+
+All three use `http.DefaultClient`, which has **`Timeout: 0`**, meaning no timeout at all. A server that accepts your connection and then never responds holds your goroutine forever. Under load, that is how a service runs out of goroutines and file descriptors.
+
+```go
+// The minimum acceptable version
+client := &http.Client{
+    Timeout: 10 * time.Second,
+}
+```
+
+## The proper request
+
+```go
+func fetchUser(ctx context.Context, client *http.Client, id string) (*User, error) {
+    url := fmt.Sprintf("https://api.example.com/users/%s", id)
+
+    req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+    if err != nil {
+        return nil, fmt.Errorf("building request: %w", err)
+    }
+    req.Header.Set("Accept", "application/json")
+    req.Header.Set("User-Agent", "myservice/1.0")
+
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("calling user service: %w", err)
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode != http.StatusOK {
+        body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+        return nil, fmt.Errorf("user service returned %d: %s",
+            resp.StatusCode, body)
+    }
+
+    var user User
+    if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+        return nil, fmt.Errorf("decoding response: %w", err)
+    }
+
+    return &user, nil
+}
+```
+
+Five things there are load-bearing.
+
+**`NewRequestWithContext`** ties the request to the caller's cancellation. When the incoming request is abandoned, this outgoing one is abandoned too.
+
+**`defer resp.Body.Close()`** is not optional. An unclosed body holds the connection out of the pool permanently, and enough of them exhaust it.
+
+**The status check.** A 404 or a 500 is not an error from `client.Do`. `err` is only non-nil for transport failures such as a refused connection or a timeout. The HTTP status has to be checked separately, and this is the most common bug in Go HTTP client code.
+
+**Reading the error body with a limit.** Useful for diagnostics, capped so a huge error page cannot exhaust memory.
+
+**Wrapping errors with context.** `connection refused` on its own does not say which service.
+
+## Sending a body
+
+```go
+func createUser(ctx context.Context, client *http.Client, u CreateUserRequest) (*User, error) {
+    body, err := json.Marshal(u)
+    if err != nil {
+        return nil, fmt.Errorf("encoding request: %w", err)
+    }
+
+    req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+        "https://api.example.com/users", bytes.NewReader(body))
+    if err != nil {
+        return nil, err
+    }
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("creating user: %w", err)
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode != http.StatusCreated {
+        return nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
+    }
+
+    var created User
+    return &created, json.NewDecoder(resp.Body).Decode(&created)
+}
+```
+
+`bytes.NewReader` rather than `bytes.NewBuffer` matters for retries. A `Reader` can be rewound, so Go can replay the body if the connection is reset. A `Buffer` is consumed.
+
+Streaming a large body without buffering it:
+
+```go
+f, _ := os.Open("large.csv")
+defer f.Close()
+
+req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, f)
+req.Header.Set("Content-Type", "text/csv")
+```
+
+## Always drain and close the body
+
+```go
+defer resp.Body.Close()
+```
+
+That is the minimum. For connection reuse, the body should also be **drained**, because a connection with unread bytes cannot go back to the pool:
+
+```go
+defer func() {
+    io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<20))
+    resp.Body.Close()
+}()
+```
+
+When you have decoded the whole JSON document you have already drained it, so the plain `Close` is enough. The drain matters when you return early after checking the status without reading the rest.
+
+## Configuring the client properly
+
+```go
+func newHTTPClient() *http.Client {
+    transport := &http.Transport{
+        DialContext: (&net.Dialer{
+            Timeout:   5 * time.Second,
+            KeepAlive: 30 * time.Second,
+        }).DialContext,
+
+        MaxIdleConns:          100,
+        MaxIdleConnsPerHost:   10,       // default is 2, far too low
+        IdleConnTimeout:       90 * time.Second,
+        TLSHandshakeTimeout:   5 * time.Second,
+        ExpectContinueTimeout: 1 * time.Second,
+        ForceAttemptHTTP2:     true,
+    }
+
+    return &http.Client{
+        Transport: transport,
+        Timeout:   30 * time.Second,
+    }
+}
+```
+
+`MaxIdleConnsPerHost` defaulting to 2 is the setting most worth changing. A service making many concurrent calls to one upstream will open and close connections constantly, paying a TCP and TLS handshake each time, because only two can stay idle in the pool.
+
+<Callout type="warn">
+**Create one client and reuse it.** A new `http.Client` per request means a new `Transport`, a new connection pool, and no reuse at all. Store it on your service struct and pass it in. This is one of the highest-impact performance mistakes in Go HTTP code.
+</Callout>
+
+## Timeouts, in layers
+
+```go
+client := &http.Client{Timeout: 30 * time.Second}     // the whole request
+```
+
+That covers connect, redirects, headers, and reading the entire body. It is a backstop, not a strategy.
+
+Per-request control comes from the context:
+
+```go
+ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+defer cancel()
+
+req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+```
+
+The context deadline and the client timeout both apply, and the shorter one wins. Use the client timeout as a maximum and the context for what this particular call deserves.
+
+<Callout type="warn">
+`http.Client.Timeout` includes reading the body. For a download of a large file, a 30 second client timeout will abort it partway through no matter how healthy the connection is. For streaming endpoints, set the client timeout to zero and rely on context deadlines and `Transport` level timeouts instead.
+</Callout>
+
+## Retries
+
+```go
+func doWithRetry(ctx context.Context, client *http.Client,
+    newReq func() (*http.Request, error), attempts int) (*http.Response, error) {
+
+    var lastErr error
+    backoff := 200 * time.Millisecond
+
+    for i := 0; i < attempts; i++ {
+        if i > 0 {
+            jitter := time.Duration(rand.Int63n(int64(backoff / 2)))
+            select {
+            case <-time.After(backoff + jitter):
+            case <-ctx.Done():
+                return nil, ctx.Err()
+            }
+            backoff *= 2
+        }
+
+        req, err := newReq()
+        if err != nil {
+            return nil, err
+        }
+
+        resp, err := client.Do(req)
+        if err != nil {
+            lastErr = err
+            continue                     // transport failure, retry
+        }
+
+        if resp.StatusCode < 500 && resp.StatusCode != http.StatusTooManyRequests {
+            return resp, nil             // success, or a client error not worth retrying
+        }
+
+        io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<20))
+        resp.Body.Close()
+        lastErr = fmt.Errorf("status %d", resp.StatusCode)
+    }
+
+    return nil, fmt.Errorf("after %d attempts: %w", attempts, lastErr)
+}
+```
+
+Three rules embedded there.
+
+**Only retry what is safe.** GET, PUT, and DELETE are idempotent. Retrying a POST can create two orders. If you must retry a POST, use an idempotency key that the server recognises.
+
+**Do not retry 4xx.** A 400 will be a 400 again. Retry 5xx, 429, and transport failures.
+
+**Add jitter.** Without it, every client that failed at the same moment retries at the same moment, and the recovering server is knocked over again. This is the thundering herd, and the jitter is what prevents it.
+
+## A typed client
+
+The shape most services settle on:
+
+```go
+type Client struct {
+    baseURL string
+    apiKey  string
+    http    *http.Client
+}
+
+func NewClient(baseURL, apiKey string) (*Client, error) {
+    if _, err := url.Parse(baseURL); err != nil {
+        return nil, fmt.Errorf("invalid base URL: %w", err)
+    }
+
+    return &Client{
+        baseURL: strings.TrimRight(baseURL, "/"),
+        apiKey:  apiKey,
+        http: &http.Client{
+            Timeout:   30 * time.Second,
+            Transport: newTransport(),
+        },
+    }, nil
+}
+
+func (c *Client) do(ctx context.Context, method, path string,
+    body, out any) error {
+
+    var reader io.Reader
+    if body != nil {
+        data, err := json.Marshal(body)
+        if err != nil {
+            return fmt.Errorf("encoding request: %w", err)
+        }
+        reader = bytes.NewReader(data)
+    }
+
+    req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reader)
+    if err != nil {
+        return fmt.Errorf("building request: %w", err)
+    }
+
+    req.Header.Set("Authorization", "Bearer "+c.apiKey)
+    req.Header.Set("Accept", "application/json")
+    if body != nil {
+        req.Header.Set("Content-Type", "application/json")
+    }
+
+    resp, err := c.http.Do(req)
+    if err != nil {
+        return fmt.Errorf("%s %s: %w", method, path, err)
+    }
+    defer func() {
+        io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<20))
+        resp.Body.Close()
+    }()
+
+    if resp.StatusCode >= 400 {
+        var apiErr struct {
+            Message string `json:"message"`
+            Code    string `json:"code"`
+        }
+        json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&apiErr)
+
+        return &APIError{
+            StatusCode: resp.StatusCode,
+            Code:       apiErr.Code,
+            Message:    apiErr.Message,
+        }
+    }
+
+    if out != nil {
+        if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+            return fmt.Errorf("decoding response: %w", err)
+        }
+    }
+    return nil
+}
+
+// The public methods stay tiny.
+func (c *Client) GetUser(ctx context.Context, id string) (*User, error) {
+    var u User
+    if err := c.do(ctx, http.MethodGet, "/users/"+url.PathEscape(id), nil, &u); err != nil {
+        return nil, err
+    }
+    return &u, nil
+}
+
+func (c *Client) CreateUser(ctx context.Context, req CreateUserRequest) (*User, error) {
+    var u User
+    if err := c.do(ctx, http.MethodPost, "/users", req, &u); err != nil {
+        return nil, err
+    }
+    return &u, nil
+}
+```
+
+`url.PathEscape` on the ID is not decoration. Without it, an ID containing a slash changes which endpoint you call.
+
+## Concurrent requests
+
+```go
+func fetchAll(ctx context.Context, c *Client, ids []string) ([]*User, error) {
+    users := make([]*User, len(ids))
+
+    g, ctx := errgroup.WithContext(ctx)
+    g.SetLimit(10)                       // do not open 500 connections at once
+
+    for i, id := range ids {
+        g.Go(func() error {
+            u, err := c.GetUser(ctx, id)
+            if err != nil {
+                return fmt.Errorf("fetching user %s: %w", id, err)
+            }
+            users[i] = u
+            return nil
+        })
+    }
+
+    if err := g.Wait(); err != nil {
+        return nil, err
+    }
+    return users, nil
+}
+```
+
+`SetLimit` matters here. Without it, a thousand IDs means a thousand simultaneous connections, which is rude to the upstream service and likely to get you rate limited.
+
+## Testing HTTP clients
+
+`httptest.NewServer` gives you a real server on a real port, so nothing is mocked:
+
+```go
+func TestGetUser(t *testing.T) {
+    srv := httptest.NewServer(http.HandlerFunc(
+        func(w http.ResponseWriter, r *http.Request) {
+            if r.URL.Path != "/users/42" {
+                t.Errorf("path = %q, want /users/42", r.URL.Path)
+            }
+            if got := r.Header.Get("Authorization"); got != "Bearer test-key" {
+                t.Errorf("auth header = %q", got)
+            }
+
+            w.Header().Set("Content-Type", "application/json")
+            json.NewEncoder(w).Encode(User{ID: "42", Name: "Shiva"})
+        }))
+    defer srv.Close()
+
+    c, err := NewClient(srv.URL, "test-key")
+    if err != nil {
+        t.Fatal(err)
+    }
+
+    u, err := c.GetUser(context.Background(), "42")
+    if err != nil {
+        t.Fatalf("GetUser: %v", err)
+    }
+    if u.Name != "Shiva" {
+        t.Errorf("name = %q, want Shiva", u.Name)
+    }
+}
+```
+
+This exercises the real transport, real serialisation, and real header handling, which is a much stronger test than substituting a fake client.
+
+Next, let's look at rendering HTML rather than JSON.

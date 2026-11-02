@@ -1,0 +1,184 @@
+---
+title: Help Commands in Linux
+---
+
+Linux offers many commands, and memorizing every option is neither practical nor necessary. A more useful skill is knowing how to find documentation whenever you need it.
+
+Linux provides several help utilities that explain how commands work, what options they support, and how to use them correctly. In this lecture, we'll explore `man`, `info`, and `help`.
+
+
+## `man` - Manual Pages
+
+The `man` command displays a command's manual page. It typically includes the command's purpose, syntax, available options, and additional details.
+
+### Syntax
+
+```bash
+man <command>
+```
+
+### Example
+
+```bash
+man ls
+```
+
+This opens the manual page for `ls`.
+
+A typical manual page contains sections such as:
+
+- **NAME** : the command's name and a brief description.
+- **SYNOPSIS** : the command's syntax and available options.
+- **DESCRIPTION** : how the command works.
+- **OPTIONS** : supported flags and arguments.
+
+To explore other commands, try:
+
+```bash
+man grep
+man chmod
+man systemctl
+```
+
+### Useful Navigation Keys
+
+Manual pages usually open in a pager, allowing you to navigate through the documentation.
+
+| Key | Action |
+|---|---|
+| `Space` | Move down one screen |
+| `b` | Move up one screen |
+| `/keyword` | Search for a word or phrase |
+| `n` | Find the next search match |
+| `q` | Exit the manual page |
+
+**Tip:** If you need to understand an unfamiliar command or option, start with `man`.
+
+
+---
+
+
+## `info` - Structured Documentation
+
+The `info` command displays documentation in a structured format. Some GNU utilities provide extensive Info manuals with sections, navigation links, and detailed explanations.
+
+### Syntax
+
+```bash
+info <command>
+```
+
+### Examples
+
+```bash
+info coreutils
+info grep
+```
+
+The available documentation depends on your Linux distribution and installed packages. Not every command has a dedicated Info manual, so `info <command>` may not always return useful documentation.
+
+Like `man`, the Info viewer supports navigation. Press `q` to exit.
+
+**When to use it:** Use `info` when you need more detailed, organized documentation, particularly for GNU utilities.
+
+
+---
+
+
+## `help` - Shell Built-in Commands
+
+The `help` command in Bash displays documentation for commands built into the shell itself.
+
+Examples of Bash built-ins include:
+
+- `cd` : change the current directory.
+- `export` : set or export shell variables.
+- `alias` : define command shortcuts.
+- `read` : read input into a variable.
+
+### Syntax
+
+```bash
+help <command>
+```
+
+### Example: Get Help for `cd`
+
+```bash
+help cd
+```
+
+This displays information about changing directories directly in the terminal.
+
+### Why Doesn't `help ls` Work?
+
+```bash
+help ls
+```
+
+In Bash, this normally reports that no help topic exists for `ls`, because `ls` is an external executable rather than a Bash built-in.
+
+Use the manual page instead:
+
+```bash
+man ls
+```
+
+**Important:** Shell built-ins can behave differently from external commands with similar names. Use `help` for Bash built-ins and `man` for commands that provide manual pages.
+
+
+---
+
+
+## Another Useful Option: `--help`
+
+Many Linux commands support the `--help` option, which prints a short usage summary and commonly used options directly in the terminal.
+
+For example:
+
+```bash
+ls --help
+grep --help
+chmod --help
+```
+
+This is often the quickest way to check a command's syntax without opening a manual viewer.
+
+However, not every command supports `--help`, and the exact output depends on the program.
+
+---
+
+## `man` vs. `info` vs. `help` vs. `--help`
+
+![Help_Commands](https://dyz1pdcuffwr5.cloudfront.net/Linux/linux_help_commands.png)
+
+
+---
+
+
+## Quick Reference
+
+| Command | Purpose |
+|---|---|
+| `man ls` | Open the manual for `ls` |
+| `man -k network` | Search manual descriptions for a keyword |
+| `info grep` | Open the Info documentation for `grep`, if available |
+| `help cd` | Display Bash help for `cd` |
+| `help export` | Display Bash help for `export` |
+| `ls --help` | Display the command's usage summary, if supported |
+| `q` | Exit a manual or Info viewer |
+
+
+---
+
+
+## Summary
+
+- You don't need to memorize every Linux command; learn how to find reliable documentation.
+- Use `man` for detailed manual pages and `info` for structured documentation when available.
+- Use `help` for Bash built-in commands such as `cd` and `export`.
+- Use `--help` for a quick overview of a command's syntax and options.
+- In manual viewers, `/` searches for a term, `n` finds the next match, and `q` exits.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,333 @@
+---
+title: Formatting, Vetting and Linting
+---
+
+Go ended the formatting argument by removing the options. `gofmt` has no configuration file, no line width setting, and no way to express a preference. Every Go project on earth is formatted the same way, which means unfamiliar Go code reads like code you already know.
+
+That decision turned out to be more valuable than any individual formatting choice would have been.
+
+## gofmt
+
+```bash
+gofmt -l .              # list files that need formatting
+gofmt -w .              # rewrite them in place
+gofmt -d file.go        # show the diff
+```
+
+In practice you never run it manually, because your editor runs it on save. If yours does not, fixing that is the highest-value five minutes in this section.
+
+```json title=".vscode/settings.json"
+{
+  "editor.formatOnSave": true,
+  "[go]": {
+    "editor.defaultFormatter": "golang.go"
+  }
+}
+```
+
+## goimports
+
+A superset of `gofmt` that also manages the import block:
+
+```bash
+go install golang.org/x/tools/cmd/goimports@latest
+
+goimports -w .
+goimports -local github.com/yourorg -w .
+```
+
+It adds imports for packages you used, removes ones you stopped using, and groups them. The `-local` flag puts your own module's imports in a third group after the third party ones:
+
+```go
+import (
+    "context"
+    "fmt"
+
+    "github.com/google/uuid"
+
+    "github.com/yourorg/app/internal/config"
+)
+```
+
+Configure your editor to use `goimports` rather than `gofmt` and the import block maintains itself.
+
+## go vet
+
+`gofmt` handles layout. `go vet` finds code that compiles and is probably wrong.
+
+```bash
+go vet ./...
+```
+
+It runs automatically as part of `go test`, which is one more reason to have tests. The checks that catch real bugs most often:
+
+```go
+// Printf argument mismatch
+fmt.Printf("%d items", "five")
+// vet: Printf format %d has arg "five" of wrong type string
+
+// Copying a lock
+func process(mu sync.Mutex) { }
+// vet: process passes lock by value: sync.Mutex contains sync.noCopy
+
+// Unreachable code
+return x
+fmt.Println("never runs")
+// vet: unreachable code
+
+// A struct tag that will be silently ignored
+type User struct {
+    Name string `json: "name"`      // note the space
+}
+// vet: struct field tag not compatible with reflect.StructTag.Get
+
+// Ignoring the result of a pure function
+append(s, 1)
+// vet: result of append is not used
+
+// Shifting more bits than the type has
+var x int8 = 1 << 10
+// vet: 1 << 10 overflows int8
+
+// Self assignment
+x = x
+// vet: self-assignment of x to x
+```
+
+The lock-by-value check alone justifies running it. That bug only manifests under concurrency, is nearly impossible to reproduce on demand, and `vet` finds it instantly.
+
+```bash
+go vet -copylocks=false ./...          # disable one check
+go tool vet help                       # list every available check
+```
+
+## golangci-lint
+
+Beyond `vet`, the ecosystem's answer is `golangci-lint`, which runs dozens of linters in parallel with shared analysis.
+
+```bash
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+golangci-lint run
+```
+
+A configuration that is strict enough to be useful without being exhausting:
+
+```yaml title=".golangci.yml"
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck        # unchecked errors
+    - govet
+    - ineffassign     # assignments that are never used
+    - staticcheck     # a large, high-quality set of checks
+    - unused          # unused code
+    - gosimple        # simplification suggestions
+    - bodyclose       # unclosed HTTP response bodies
+    - errorlint       # wrong error comparison and wrapping
+    - gosec           # security issues
+    - misspell
+    - nilerr          # returning nil when err is not nil
+    - rowserrcheck    # missing rows.Err() after a query loop
+    - sqlclosecheck   # unclosed sql.Rows
+    - unconvert       # unnecessary type conversions
+    - revive          # style, replaces golint
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  govet:
+    enable-all: true
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec
+```
+
+Four of those linters find bugs that nothing else will:
+
+`bodyclose` catches an unclosed `resp.Body`, which leaks connections until the pool is exhausted.
+
+`rowserrcheck` catches a missing `rows.Err()`, which makes a database failure look like an empty result.
+
+`errorlint` catches `err == ErrNotFound` where `errors.Is` was needed, which silently stops working the moment someone adds a wrap.
+
+`nilerr` catches `if err != nil { return nil }`, which swallows the failure.
+
+<Callout type="info">
+`staticcheck` on its own is worth installing even if you use nothing else. It has the highest signal to noise ratio of any Go linter, it very rarely produces a false positive, and the suggestions it makes are almost always improvements.
+</Callout>
+
+## errcheck and the deliberate ignore
+
+```go
+// errcheck complains: the error is dropped
+os.Remove(tmpPath)
+
+// errcheck is satisfied, and a reader sees the decision was made
+_ = os.Remove(tmpPath)
+```
+
+Assigning to the blank identifier is how you say "I considered this and it does not matter here". Adding a short comment makes it better still:
+
+```go
+// Best effort cleanup; a failure here changes nothing.
+_ = os.Remove(tmpPath)
+```
+
+## Wiring it into CI
+
+```yaml title=".github/workflows/ci.yml"
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Check formatting
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "These files need gofmt:"
+            gofmt -l .
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+
+      - name: Test
+        run: go test -race -coverprofile=coverage.out ./...
+
+      - name: Vulnerability scan
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+```
+
+Running `-race` in CI is the highest-value line in that file. It costs a few times the CPU and it finds data races that would otherwise reach production and appear as impossible bugs.
+
+## govulncheck
+
+```bash
+go install golang.org/x/vuln/cmd/govulncheck@latest
+govulncheck ./...
+```
+
+```text
+Vulnerability #1: GO-2024-2687
+    HTTP/2 CONTINUATION flood in net/http
+  More info: https://pkg.go.dev/vuln/GO-2024-2687
+  Standard library
+    Found in: net/http@go1.21.0
+    Fixed in: net/http@go1.21.9
+    Example traces found:
+      #1: internal/api/routes.go:42:23: api.Routes calls http.ListenAndServe
+```
+
+The distinguishing feature is reachability analysis. It reports a vulnerability only when your code actually calls the affected function, which cuts the noise dramatically compared with a generic dependency scanner. A vulnerable version of a library you import but never call in the affected way produces no alert.
+
+## A Makefile
+
+Putting the commands somewhere people look:
+
+```makefile
+.PHONY: fmt vet lint test test-race cover bench check build clean
+
+fmt:
+	goimports -local github.com/yourorg -w .
+
+vet:
+	go vet ./...
+
+lint:
+	golangci-lint run
+
+test:
+	go test -short ./...
+
+test-race:
+	go test -race ./...
+
+cover:
+	go test -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out
+
+bench:
+	go test -bench=. -benchmem ./...
+
+check: fmt vet lint test-race
+
+build:
+	CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/api ./cmd/api
+
+clean:
+	rm -rf bin coverage.out
+```
+
+`make check` before pushing becomes the habit, and it catches almost everything CI would.
+
+## A pre-commit hook
+
+```bash title=".git/hooks/pre-commit"
+#!/bin/sh
+set -e
+
+if [ -n "$(gofmt -l .)" ]; then
+    echo "Unformatted files:"
+    gofmt -l .
+    echo "Run: gofmt -w ."
+    exit 1
+fi
+
+go vet ./...
+go test -short ./...
+```
+
+Keep it fast. A hook that takes thirty seconds gets bypassed with `--no-verify`, which means it is not really a hook at all.
+
+## go generate
+
+Not a linter, but part of the same toolchain habit. It runs commands specified in comments:
+
+```go
+//go:generate stringer -type=Status
+//go:generate mockgen -source=repository.go -destination=mocks/repository.go
+//go:generate sqlc generate
+```
+
+```bash
+go generate ./...
+```
+
+The convention is to commit the generated files. That way `go build` works for anyone who clones the repository, without them needing every generator installed.
+
+## The tools, ranked by value
+
+```text
+   1. gofmt on save              zero effort, ends every layout discussion
+   2. go test -race in CI        finds bugs nothing else can
+   3. go vet                     free, runs with tests, catches real errors
+   4. staticcheck                highest signal of any linter
+   5. govulncheck in CI          reachability-aware security scanning
+   6. golangci-lint              the full set, once the team agrees on config
+   7. pprof                      when something is actually slow
+```
+
+The first three take about ten minutes to set up and prevent more problems than any amount of code review.
+
+Next, let's look at what to do when something is broken and the tools have not told you why.

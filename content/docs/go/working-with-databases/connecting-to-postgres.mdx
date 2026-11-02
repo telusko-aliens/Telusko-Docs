@@ -1,0 +1,342 @@
+---
+title: Connecting to PostgreSQL
+---
+
+PostgreSQL is the default choice for Go services, and `pgx` is the default driver. This page gets a real connection working, sets up a schema, and covers the operational details that only bite you after deployment.
+
+## Getting a database running
+
+For local development, Docker Compose is the shortest path:
+
+```yaml title="docker-compose.yml"
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: appdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:
+```
+
+```bash
+docker compose up -d
+```
+
+The healthcheck matters more than it looks. Without it, your application container starts before PostgreSQL is accepting connections, and the first thing you see is a connection refused error that resolves itself on restart.
+
+## Two ways to use pgx
+
+`pgx` can be used through `database/sql` or directly. Both are legitimate and the choice is worth making deliberately.
+
+### Through database/sql
+
+```go
+import (
+    "database/sql"
+    _ "github.com/jackc/pgx/v5/stdlib"
+)
+
+db, err := sql.Open("pgx", dsn)
+```
+
+You get the standard interfaces, so any library expecting `*sql.DB` works, and swapping to another database later touches less code.
+
+### The native pgx API
+
+```go
+import "github.com/jackc/pgx/v5/pgxpool"
+
+pool, err := pgxpool.New(ctx, dsn)
+```
+
+Faster, because it skips the `database/sql` abstraction layer, and it exposes PostgreSQL features that the standard interfaces cannot express: arrays, JSONB, `COPY`, `LISTEN` and `NOTIFY`, and batched queries.
+
+<Callout type="info">
+Use `pgxpool` when you know you are staying on PostgreSQL and want the performance and the features. Use `database/sql` when you want portability, or when a library you depend on requires `*sql.DB`. Both are supported and neither is going away.
+</Callout>
+
+## The connection string
+
+```text
+postgres://user:password@host:5432/dbname?sslmode=require&pool_max_conns=25
+```
+
+The parameters worth setting:
+
+```text
+   sslmode           disable, require, verify-ca, verify-full
+   connect_timeout   seconds to wait for a connection
+   application_name  shows up in pg_stat_activity, very useful
+   search_path       schema resolution order
+   statement_timeout milliseconds before the server cancels a query
+```
+
+`application_name` costs nothing and makes `SELECT * FROM pg_stat_activity` immediately readable when you are trying to work out which service is holding a lock.
+
+<Callout type="warn">
+`sslmode=disable` is fine on localhost and unacceptable in production. `sslmode=require` encrypts but does not verify the server's certificate, so it does not protect against an active attacker. `verify-full` is the one you want for anything crossing a network you do not control.
+</Callout>
+
+## Opening a pool properly
+
+```go title="internal/storage/postgres.go"
+package storage
+
+import (
+    "context"
+    "fmt"
+    "time"
+
+    "github.com/jackc/pgx/v5/pgxpool"
+)
+
+type Config struct {
+    DSN             string
+    MaxConns        int32
+    MinConns        int32
+    MaxConnLifetime time.Duration
+    MaxConnIdleTime time.Duration
+}
+
+func Open(ctx context.Context, cfg Config) (*pgxpool.Pool, error) {
+    poolCfg, err := pgxpool.ParseConfig(cfg.DSN)
+    if err != nil {
+        return nil, fmt.Errorf("parsing database URL: %w", err)
+    }
+
+    poolCfg.MaxConns = cfg.MaxConns
+    poolCfg.MinConns = cfg.MinConns
+    poolCfg.MaxConnLifetime = cfg.MaxConnLifetime
+    poolCfg.MaxConnIdleTime = cfg.MaxConnIdleTime
+    poolCfg.HealthCheckPeriod = time.Minute
+
+    pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
+    if err != nil {
+        return nil, fmt.Errorf("creating connection pool: %w", err)
+    }
+
+    pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+    defer cancel()
+
+    if err := pool.Ping(pingCtx); err != nil {
+        pool.Close()
+        return nil, fmt.Errorf("connecting to database: %w", err)
+    }
+
+    return pool, nil
+}
+```
+
+The `Ping` with its own timeout is what turns a misconfigured DSN into an immediate, clear startup failure rather than a mystery on the first request.
+
+## Sizing the pool
+
+```text
+   MaxConns = (database max_connections - reserved) / number of instances
+```
+
+PostgreSQL defaults to 100 connections, and superuser slots plus monitoring take some of those. With four service instances, 20 each is a reasonable starting point.
+
+More connections is not faster. PostgreSQL uses a process per connection, and past a certain point the context switching costs more than the parallelism gains. The commonly cited starting formula is `(cores * 2) + effective_spindles`, which for a modern server lands somewhere between 10 and 30.
+
+<Callout type="warn">
+Connection exhaustion presents as slow requests, not as errors. Every query waits for a free connection, latency climbs, and the database looks idle. If p99 latency rises under load while the database CPU is low, check the pool before anything else.
+</Callout>
+
+For very high connection counts, put PgBouncer in front. It multiplexes many client connections onto a few server connections, and in transaction pooling mode it works well with Go services. Note that prepared statements and session-level features behave differently through it.
+
+## Schema and migrations
+
+Migrations are files, applied in order, tracked in a table.
+
+```sql title="migrations/001_create_users.up.sql"
+CREATE TABLE users (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email       TEXT NOT NULL UNIQUE,
+    name        TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_users_email ON users (email);
+```
+
+```sql title="migrations/001_create_users.down.sql"
+DROP TABLE users;
+```
+
+Two tools dominate:
+
+```bash
+go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+migrate -path migrations -database "$DATABASE_URL" up
+migrate -path migrations -database "$DATABASE_URL" down 1
+```
+
+`pressly/goose` is the other common choice and supports migrations written in Go, which is occasionally necessary for data transformations.
+
+Running them from the application, with the files embedded:
+
+```go
+//go:embed migrations/*.sql
+var migrationFS embed.FS
+
+func Migrate(dsn string) error {
+    d, err := iofs.New(migrationFS, "migrations")
+    if err != nil {
+        return fmt.Errorf("loading migrations: %w", err)
+    }
+
+    m, err := migrate.NewWithSourceInstance("iofs", d, dsn)
+    if err != nil {
+        return fmt.Errorf("creating migrator: %w", err)
+    }
+    defer m.Close()
+
+    if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+        return fmt.Errorf("running migrations: %w", err)
+    }
+    return nil
+}
+```
+
+<Callout type="warn">
+Running migrations automatically on startup is convenient for a single instance and dangerous with several. Five pods starting at once will race, and `migrate` uses an advisory lock which mostly handles it, but a long migration blocks every instance from starting. Prefer a separate job or an init container that runs migrations once before the deployment rolls.
+</Callout>
+
+Rules that save you later: migrations are append-only, never edit one that has been applied. Every migration needs a down. Test the down. Avoid anything that takes a long exclusive lock on a large table during a deployment.
+
+## PostgreSQL types worth knowing
+
+`pgx` handles PostgreSQL's richer types natively, which is one of the main reasons to use it directly.
+
+```go
+// Arrays
+var tags []string
+row.Scan(&tags)          // from TEXT[]
+
+_, err := pool.Exec(ctx,
+    `INSERT INTO posts (title, tags) VALUES ($1, $2)`,
+    title, []string{"go", "database"})
+```
+
+```go
+// JSONB
+type Metadata struct {
+    Source  string `json:"source"`
+    Version int    `json:"version"`
+}
+
+var meta Metadata
+row.Scan(&meta)          // pgx unmarshals JSONB automatically
+
+_, err := pool.Exec(ctx,
+    `INSERT INTO events (name, metadata) VALUES ($1, $2)`,
+    name, Metadata{Source: "api", Version: 2})
+```
+
+```go
+// UUID
+import "github.com/google/uuid"
+
+var id uuid.UUID
+row.Scan(&id)
+```
+
+```go
+// Nullable, with pgx's own types
+import "github.com/jackc/pgx/v5/pgtype"
+
+var bio pgtype.Text
+row.Scan(&bio)
+if bio.Valid {
+    fmt.Println(bio.String)
+}
+```
+
+## Bulk insert with COPY
+
+For loading many rows, `COPY` is an order of magnitude faster than individual inserts:
+
+```go
+func (s *Store) BulkInsertUsers(ctx context.Context, users []User) error {
+    _, err := s.pool.CopyFrom(ctx,
+        pgx.Identifier{"users"},
+        []string{"email", "name", "password_hash"},
+        pgx.CopyFromSlice(len(users), func(i int) ([]any, error) {
+            return []any{users[i].Email, users[i].Name, users[i].PasswordHash}, nil
+        }),
+    )
+    if err != nil {
+        return fmt.Errorf("bulk inserting users: %w", err)
+    }
+    return nil
+}
+```
+
+Loading a hundred thousand rows takes seconds with `COPY` and minutes with a loop of inserts.
+
+## Health checks
+
+```go
+func (s *Store) Health(ctx context.Context) error {
+    ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+    defer cancel()
+
+    if err := s.pool.Ping(ctx); err != nil {
+        return fmt.Errorf("database unreachable: %w", err)
+    }
+    return nil
+}
+
+func (s *Store) Stats() *pgxpool.Stat {
+    return s.pool.Stat()
+}
+```
+
+The pool statistics are worth exporting as metrics:
+
+```go
+stat := pool.Stat()
+stat.TotalConns()            // all connections
+stat.AcquiredConns()         // currently in use
+stat.IdleConns()
+stat.EmptyAcquireCount()     // times a caller waited for a connection
+stat.CanceledAcquireCount()
+```
+
+`EmptyAcquireCount` climbing means the pool is too small for the load. That single number answers the connection exhaustion question directly.
+
+## Query timeouts
+
+Two layers, and both are worth having:
+
+```go
+// Application side
+ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+defer cancel()
+rows, err := pool.Query(ctx, query, args...)
+```
+
+```text
+   # Server side, in the connection string
+   statement_timeout=5000
+```
+
+The application timeout cancels the query from the client. The server timeout is the backstop for when the client goes away without cancelling cleanly. Setting only one leaves a gap.
+
+Next, let's write the actual queries.

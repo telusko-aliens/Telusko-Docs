@@ -1,0 +1,11 @@
+{
+    "title": "Testing and Tooling",
+    "pages": [
+        "writing-your-first-test.mdx",
+        "table-driven-tests.mdx",
+        "test-doubles-and-interfaces.mdx",
+        "benchmarks-and-profiling.mdx",
+        "formatting-vetting-and-linting.mdx",
+        "debugging-go-programs.mdx"
+    ]
+}

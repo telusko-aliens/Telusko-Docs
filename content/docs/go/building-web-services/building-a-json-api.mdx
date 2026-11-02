@@ -1,0 +1,589 @@
+---
+title: Building a JSON API
+---
+
+This page builds a working REST API for a task list. Not fragments, the whole thing: types, storage, handlers, error mapping, validation, and routes. Every piece uses only the standard library, and by the end you will have something you could actually run.
+
+## The domain type
+
+```go title="internal/task/task.go"
+package task
+
+import (
+    "errors"
+    "fmt"
+    "strings"
+    "time"
+)
+
+type Status string
+
+const (
+    StatusTodo       Status = "todo"
+    StatusInProgress Status = "in_progress"
+    StatusDone       Status = "done"
+)
+
+func (s Status) Valid() bool {
+    switch s {
+    case StatusTodo, StatusInProgress, StatusDone:
+        return true
+    }
+    return false
+}
+
+type Task struct {
+    ID        string    `json:"id"`
+    Title     string    `json:"title"`
+    Notes     string    `json:"notes,omitempty"`
+    Status    Status    `json:"status"`
+    DueAt     *time.Time `json:"due_at,omitempty"`
+    CreatedAt time.Time `json:"created_at"`
+    UpdatedAt time.Time `json:"updated_at"`
+}
+
+var (
+    ErrNotFound = errors.New("task not found")
+)
+```
+
+`DueAt` is a pointer because a task may have no due date, and `omitempty` keeps the key out of the response when it is nil. `Status` is a named string type so the compiler catches a plain string being passed where a status belongs.
+
+## Request types, separate from the domain
+
+```go title="internal/task/requests.go"
+package task
+
+type CreateRequest struct {
+    Title string     `json:"title"`
+    Notes string     `json:"notes"`
+    DueAt *time.Time `json:"due_at"`
+}
+
+type UpdateRequest struct {
+    Title  *string    `json:"title"`
+    Notes  *string    `json:"notes"`
+    Status *Status    `json:"status"`
+    DueAt  *time.Time `json:"due_at"`
+}
+```
+
+Two things worth noticing.
+
+The request types are not the domain type. A client cannot set `ID`, `CreatedAt`, or `UpdatedAt`, because those fields do not exist on the request. This closes off a whole class of mass assignment bug.
+
+`UpdateRequest` uses pointers everywhere, so a PATCH can distinguish "set the notes to empty" from "leave the notes alone".
+
+## Validation
+
+```go title="internal/task/validate.go"
+package task
+
+type ValidationError struct {
+    Field   string `json:"field"`
+    Message string `json:"message"`
+}
+
+func (e ValidationError) Error() string {
+    return fmt.Sprintf("%s: %s", e.Field, e.Message)
+}
+
+func (r CreateRequest) Validate() error {
+    var errs []error
+
+    title := strings.TrimSpace(r.Title)
+    switch {
+    case title == "":
+        errs = append(errs, ValidationError{"title", "is required"})
+    case len(title) > 200:
+        errs = append(errs, ValidationError{"title", "must be 200 characters or fewer"})
+    }
+
+    if len(r.Notes) > 5000 {
+        errs = append(errs, ValidationError{"notes", "must be 5000 characters or fewer"})
+    }
+
+    if r.DueAt != nil && r.DueAt.Before(time.Now()) {
+        errs = append(errs, ValidationError{"due_at", "must be in the future"})
+    }
+
+    return errors.Join(errs...)
+}
+```
+
+`errors.Join` returns nil when the slice is empty, so this can be called unconditionally and the caller only checks for non-nil.
+
+## Storage behind an interface
+
+```go title="internal/task/store.go"
+package task
+
+import (
+    "context"
+    "sync"
+
+    "github.com/google/uuid"
+)
+
+type Store interface {
+    Create(ctx context.Context, t *Task) error
+    Get(ctx context.Context, id string) (*Task, error)
+    List(ctx context.Context, status Status) ([]*Task, error)
+    Update(ctx context.Context, t *Task) error
+    Delete(ctx context.Context, id string) error
+}
+
+// MemoryStore is a Store backed by a map. Suitable for tests and demos.
+type MemoryStore struct {
+    mu    sync.RWMutex
+    tasks map[string]*Task
+}
+
+func NewMemoryStore() *MemoryStore {
+    return &MemoryStore{tasks: make(map[string]*Task)}
+}
+
+func (s *MemoryStore) Create(ctx context.Context, t *Task) error {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+
+    t.ID = uuid.NewString()
+    now := time.Now().UTC()
+    t.CreatedAt, t.UpdatedAt = now, now
+    if t.Status == "" {
+        t.Status = StatusTodo
+    }
+
+    s.tasks[t.ID] = t
+    return nil
+}
+
+func (s *MemoryStore) Get(ctx context.Context, id string) (*Task, error) {
+    s.mu.RLock()
+    defer s.mu.RUnlock()
+
+    t, ok := s.tasks[id]
+    if !ok {
+        return nil, ErrNotFound
+    }
+    clone := *t
+    return &clone, nil          // a copy, so callers cannot mutate our state
+}
+
+func (s *MemoryStore) List(ctx context.Context, status Status) ([]*Task, error) {
+    s.mu.RLock()
+    defer s.mu.RUnlock()
+
+    out := make([]*Task, 0, len(s.tasks))
+    for _, t := range s.tasks {
+        if status != "" && t.Status != status {
+            continue
+        }
+        clone := *t
+        out = append(out, &clone)
+    }
+
+    slices.SortFunc(out, func(a, b *Task) int {
+        return b.CreatedAt.Compare(a.CreatedAt)     // newest first
+    })
+    return out, nil
+}
+
+func (s *MemoryStore) Update(ctx context.Context, t *Task) error {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+
+    if _, ok := s.tasks[t.ID]; !ok {
+        return ErrNotFound
+    }
+    t.UpdatedAt = time.Now().UTC()
+    s.tasks[t.ID] = t
+    return nil
+}
+
+func (s *MemoryStore) Delete(ctx context.Context, id string) error {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+
+    if _, ok := s.tasks[id]; !ok {
+        return ErrNotFound
+    }
+    delete(s.tasks, id)
+    return nil
+}
+```
+
+Returning a copy from `Get` and `List` matters. Handing out a pointer into the map lets a caller modify stored state without going through the store, which defeats the locking entirely.
+
+## The HTTP helpers
+
+```go title="internal/api/json.go"
+package api
+
+type ErrorResponse struct {
+    Error   string                 `json:"error"`
+    Details []task.ValidationError `json:"details,omitempty"`
+}
+
+func WriteJSON(w http.ResponseWriter, status int, v any) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(status)
+
+    if v == nil {
+        return
+    }
+    if err := json.NewEncoder(w).Encode(v); err != nil {
+        slog.Error("encoding response", "error", err)
+    }
+}
+
+func ReadJSON(w http.ResponseWriter, r *http.Request, dst any) error {
+    r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+    dec := json.NewDecoder(r.Body)
+    dec.DisallowUnknownFields()
+
+    if err := dec.Decode(dst); err != nil {
+        return err
+    }
+    if dec.More() {
+        return errors.New("body must contain a single JSON object")
+    }
+    return nil
+}
+```
+
+## Error mapping in one place
+
+```go title="internal/api/errors.go"
+package api
+
+func WriteError(w http.ResponseWriter, r *http.Request, err error) {
+    var (
+        status  = http.StatusInternalServerError
+        message = "internal server error"
+        details []task.ValidationError
+    )
+
+    var (
+        validationErr task.ValidationError
+        syntaxErr     *json.SyntaxError
+        typeErr       *json.UnmarshalTypeError
+        maxBytesErr   *http.MaxBytesError
+    )
+
+    switch {
+    case errors.Is(err, task.ErrNotFound):
+        status, message = http.StatusNotFound, "resource not found"
+
+    case errors.As(err, &validationErr):
+        status, message = http.StatusUnprocessableEntity, "validation failed"
+        details = collectValidationErrors(err)
+
+    case errors.As(err, &syntaxErr):
+        status = http.StatusBadRequest
+        message = fmt.Sprintf("malformed JSON at byte %d", syntaxErr.Offset)
+
+    case errors.As(err, &typeErr):
+        status = http.StatusBadRequest
+        message = fmt.Sprintf("field %q has the wrong type", typeErr.Field)
+
+    case errors.As(err, &maxBytesErr):
+        status, message = http.StatusRequestEntityTooLarge, "request body too large"
+
+    case errors.Is(err, io.EOF):
+        status, message = http.StatusBadRequest, "request body is empty"
+
+    case errors.Is(err, context.Canceled):
+        return          // the client hung up, nothing to send
+
+    case errors.Is(err, context.DeadlineExceeded):
+        status, message = http.StatusGatewayTimeout, "request timed out"
+    }
+
+    if status >= 500 {
+        slog.ErrorContext(r.Context(), "request failed",
+            "error", err, "method", r.Method, "path", r.URL.Path)
+    }
+
+    WriteJSON(w, status, ErrorResponse{Error: message, Details: details})
+}
+
+func collectValidationErrors(err error) []task.ValidationError {
+    var out []task.ValidationError
+
+    var multi interface{ Unwrap() []error }
+    if errors.As(err, &multi) {
+        for _, e := range multi.Unwrap() {
+            var v task.ValidationError
+            if errors.As(e, &v) {
+                out = append(out, v)
+            }
+        }
+        return out
+    }
+
+    var v task.ValidationError
+    if errors.As(err, &v) {
+        out = append(out, v)
+    }
+    return out
+}
+```
+
+Every handler now handles errors with one line. Internal detail goes to the log, a sanitised message goes to the client, and the status code is decided consistently.
+
+## The handlers
+
+```go title="internal/api/task.go"
+package api
+
+type TaskHandler struct {
+    store task.Store
+}
+
+func NewTaskHandler(s task.Store) *TaskHandler {
+    return &TaskHandler{store: s}
+}
+
+func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
+    var req task.CreateRequest
+    if err := ReadJSON(w, r, &req); err != nil {
+        WriteError(w, r, err)
+        return
+    }
+    if err := req.Validate(); err != nil {
+        WriteError(w, r, err)
+        return
+    }
+
+    t := &task.Task{
+        Title: strings.TrimSpace(req.Title),
+        Notes: req.Notes,
+        DueAt: req.DueAt,
+    }
+    if err := h.store.Create(r.Context(), t); err != nil {
+        WriteError(w, r, err)
+        return
+    }
+
+    w.Header().Set("Location", "/api/v1/tasks/"+t.ID)
+    WriteJSON(w, http.StatusCreated, t)
+}
+
+func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
+    status := task.Status(r.URL.Query().Get("status"))
+    if status != "" && !status.Valid() {
+        WriteError(w, r, task.ValidationError{
+            Field: "status", Message: "must be todo, in_progress or done",
+        })
+        return
+    }
+
+    tasks, err := h.store.List(r.Context(), status)
+    if err != nil {
+        WriteError(w, r, err)
+        return
+    }
+
+    WriteJSON(w, http.StatusOK, map[string]any{
+        "tasks": tasks,
+        "count": len(tasks),
+    })
+}
+
+func (h *TaskHandler) Get(w http.ResponseWriter, r *http.Request) {
+    t, err := h.store.Get(r.Context(), r.PathValue("id"))
+    if err != nil {
+        WriteError(w, r, err)
+        return
+    }
+    WriteJSON(w, http.StatusOK, t)
+}
+
+func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
+    id := r.PathValue("id")
+
+    existing, err := h.store.Get(r.Context(), id)
+    if err != nil {
+        WriteError(w, r, err)
+        return
+    }
+
+    var req task.UpdateRequest
+    if err := ReadJSON(w, r, &req); err != nil {
+        WriteError(w, r, err)
+        return
+    }
+
+    // Only apply the fields the client actually sent.
+    if req.Title != nil {
+        title := strings.TrimSpace(*req.Title)
+        if title == "" {
+            WriteError(w, r, task.ValidationError{"title", "cannot be empty"})
+            return
+        }
+        existing.Title = title
+    }
+    if req.Notes != nil {
+        existing.Notes = *req.Notes
+    }
+    if req.Status != nil {
+        if !req.Status.Valid() {
+            WriteError(w, r, task.ValidationError{
+                "status", "must be todo, in_progress or done",
+            })
+            return
+        }
+        existing.Status = *req.Status
+    }
+    if req.DueAt != nil {
+        existing.DueAt = req.DueAt
+    }
+
+    if err := h.store.Update(r.Context(), existing); err != nil {
+        WriteError(w, r, err)
+        return
+    }
+    WriteJSON(w, http.StatusOK, existing)
+}
+
+func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
+    if err := h.store.Delete(r.Context(), r.PathValue("id")); err != nil {
+        WriteError(w, r, err)
+        return
+    }
+    w.WriteHeader(http.StatusNoContent)
+}
+```
+
+Every handler follows the same shape: read, validate, act, respond. Errors go to one function. The context is threaded through every store call.
+
+## Wiring it up
+
+```go title="cmd/api/main.go"
+package main
+
+func main() {
+    if err := run(); err != nil {
+        slog.Error("fatal", "error", err)
+        os.Exit(1)
+    }
+}
+
+func run() error {
+    ctx, stop := signal.NotifyContext(context.Background(),
+        os.Interrupt, syscall.SIGTERM)
+    defer stop()
+
+    logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+        Level: slog.LevelInfo,
+    }))
+    slog.SetDefault(logger)
+
+    store := task.NewMemoryStore()
+    tasks := api.NewTaskHandler(store)
+
+    mux := http.NewServeMux()
+    mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+        api.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+    })
+
+    v1 := http.NewServeMux()
+    v1.HandleFunc("POST /tasks", tasks.Create)
+    v1.HandleFunc("GET /tasks", tasks.List)
+    v1.HandleFunc("GET /tasks/{id}", tasks.Get)
+    v1.HandleFunc("PATCH /tasks/{id}", tasks.Update)
+    v1.HandleFunc("DELETE /tasks/{id}", tasks.Delete)
+
+    mux.Handle("/api/v1/", http.StripPrefix("/api/v1", v1))
+
+    srv := &http.Server{
+        Addr:              ":8080",
+        Handler:           mux,
+        ReadHeaderTimeout: 5 * time.Second,
+        ReadTimeout:       15 * time.Second,
+        WriteTimeout:      15 * time.Second,
+        IdleTimeout:       60 * time.Second,
+    }
+
+    go func() {
+        logger.Info("listening", "addr", srv.Addr)
+        if err := srv.ListenAndServe(); err != nil &&
+            !errors.Is(err, http.ErrServerClosed) {
+            logger.Error("server error", "error", err)
+            os.Exit(1)
+        }
+    }()
+
+    <-ctx.Done()
+    logger.Info("shutting down")
+
+    shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+    return srv.Shutdown(shutdownCtx)
+}
+```
+
+## Trying it
+
+```bash
+curl -X POST localhost:8080/api/v1/tasks \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Learn Go","notes":"finish the concurrency section"}'
+```
+
+```json
+{
+  "id": "8f3c...",
+  "title": "Learn Go",
+  "notes": "finish the concurrency section",
+  "status": "todo",
+  "created_at": "2026-08-08T10:30:00Z",
+  "updated_at": "2026-08-08T10:30:00Z"
+}
+```
+
+```bash
+curl localhost:8080/api/v1/tasks
+curl localhost:8080/api/v1/tasks?status=todo
+curl -X PATCH localhost:8080/api/v1/tasks/8f3c... \
+  -H 'Content-Type: application/json' -d '{"status":"done"}'
+curl -X DELETE localhost:8080/api/v1/tasks/8f3c...
+```
+
+Validation failure:
+
+```bash
+curl -X POST localhost:8080/api/v1/tasks \
+  -H 'Content-Type: application/json' -d '{"title":""}'
+```
+
+```json
+{
+  "error": "validation failed",
+  "details": [{"field": "title", "message": "is required"}]
+}
+```
+
+## The status codes to use
+
+| Situation | Status |
+| --- | --- |
+| Read succeeded | 200 OK |
+| Resource created | 201 Created, with a Location header |
+| Succeeded, nothing to return | 204 No Content |
+| Malformed JSON or bad parameter | 400 Bad Request |
+| Not authenticated | 401 Unauthorized |
+| Authenticated but not allowed | 403 Forbidden |
+| Resource does not exist | 404 Not Found |
+| Method not allowed on this path | 405, handled automatically by ServeMux |
+| Conflicts with existing state | 409 Conflict |
+| Body too large | 413 |
+| Valid JSON, invalid values | 422 Unprocessable Entity |
+| Rate limited | 429 Too Many Requests |
+| Something broke on our side | 500 Internal Server Error |
+
+The 400 versus 422 distinction is worth keeping: 400 means the request could not be parsed, 422 means it parsed fine and the values were wrong.
+
+Next, let's add the cross-cutting concerns this API is missing, using middleware.

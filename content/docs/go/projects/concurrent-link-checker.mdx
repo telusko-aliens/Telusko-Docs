@@ -1,0 +1,501 @@
+---
+title: "Project 2: Concurrent Link Checker"
+---
+
+Give it a URL, and it crawls the page, extracts every link, and checks whether each one is alive. Sequentially, a thousand links at 200 ms each takes over three minutes. With a bounded worker pool, it takes a few seconds.
+
+This is the project where Go's concurrency stops being theory. You will use goroutines, channels, `errgroup`, context cancellation, rate limiting, and the race detector, all on a problem where the speedup is immediately visible.
+
+```bash
+$ linkcheck https://example.com --workers 20 --timeout 5s
+
+checking 47 links with 20 workers
+
+  OK   200  https://example.com/about          142ms
+  OK   200  https://example.com/docs            98ms
+  WARN 301  https://example.com/old  →  /new   210ms
+  FAIL 404  https://example.com/missing        156ms
+  FAIL  -   https://broken.invalid/            timeout
+
+47 links checked in 2.1s
+  ok: 43   redirects: 2   broken: 2
+```
+
+## Setting up
+
+```bash
+mkdir linkcheck && cd linkcheck
+go mod init example.com/linkcheck
+go get golang.org/x/net/html
+go get golang.org/x/sync/errgroup
+go get golang.org/x/time/rate
+```
+
+```text
+   linkcheck/
+   ├── go.mod
+   ├── main.go       flags, wiring, output
+   ├── extract.go    parse HTML, collect links
+   ├── check.go      check one URL
+   └── checker.go    the concurrent pool
+```
+
+## Extracting links
+
+```go title="extract.go"
+package main
+
+import (
+    "fmt"
+    "io"
+    "net/http"
+    "net/url"
+    "strings"
+
+    "golang.org/x/net/html"
+)
+
+func ExtractLinks(ctx context.Context, client *http.Client, pageURL string) ([]string, error) {
+    req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
+    if err != nil {
+        return nil, fmt.Errorf("building request: %w", err)
+    }
+    req.Header.Set("User-Agent", "linkcheck/1.0")
+
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("fetching %s: %w", pageURL, err)
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode != http.StatusOK {
+        return nil, fmt.Errorf("fetching %s: status %d", pageURL, resp.StatusCode)
+    }
+
+    base, err := url.Parse(pageURL)
+    if err != nil {
+        return nil, fmt.Errorf("parsing base URL: %w", err)
+    }
+
+    // Cap the body so a huge page cannot exhaust memory.
+    doc, err := html.Parse(io.LimitReader(resp.Body, 10<<20))
+    if err != nil {
+        return nil, fmt.Errorf("parsing HTML: %w", err)
+    }
+
+    seen := make(map[string]struct{})
+    var links []string
+
+    var walk func(*html.Node)
+    walk = func(n *html.Node) {
+        if n.Type == html.ElementNode && n.Data == "a" {
+            for _, attr := range n.Attr {
+                if attr.Key != "href" {
+                    continue
+                }
+
+                abs, ok := resolve(base, attr.Val)
+                if !ok {
+                    continue
+                }
+                if _, dup := seen[abs]; dup {
+                    continue
+                }
+                seen[abs] = struct{}{}
+                links = append(links, abs)
+            }
+        }
+
+        for c := n.FirstChild; c != nil; c = c.NextSibling {
+            walk(c)
+        }
+    }
+    walk(doc)
+
+    return links, nil
+}
+
+func resolve(base *url.URL, href string) (string, bool) {
+    href = strings.TrimSpace(href)
+    if href == "" || strings.HasPrefix(href, "#") {
+        return "", false
+    }
+
+    u, err := base.Parse(href)
+    if err != nil {
+        return "", false
+    }
+    if u.Scheme != "http" && u.Scheme != "https" {
+        return "", false          // skip mailto:, tel:, javascript:
+    }
+
+    u.Fragment = ""               // treat #section links as the same page
+    return u.String(), true
+}
+```
+
+The recursive `walk` is a closure declared with `var` first, because a `:=` declaration cannot refer to itself. That is the pattern from the recursion page.
+
+The `seen` map deduplicates as it goes, so a navigation bar repeated in the markup does not produce fifty identical checks.
+
+## Checking one link
+
+```go title="check.go"
+package main
+
+import (
+    "context"
+    "errors"
+    "net/http"
+    "time"
+)
+
+type Status int
+
+const (
+    StatusOK Status = iota
+    StatusRedirect
+    StatusBroken
+    StatusError
+)
+
+type Result struct {
+    URL        string
+    Status     Status
+    StatusCode int
+    FinalURL   string
+    Duration   time.Duration
+    Err        error
+}
+
+func Check(ctx context.Context, client *http.Client, target string) Result {
+    start := time.Now()
+
+    // HEAD first: it is cheaper and most servers support it.
+    req, err := http.NewRequestWithContext(ctx, http.MethodHead, target, nil)
+    if err != nil {
+        return Result{URL: target, Status: StatusError, Err: err,
+            Duration: time.Since(start)}
+    }
+    req.Header.Set("User-Agent", "linkcheck/1.0")
+
+    resp, err := client.Do(req)
+
+    // Some servers reject HEAD. Fall back to GET.
+    if err == nil && (resp.StatusCode == http.StatusMethodNotAllowed ||
+        resp.StatusCode == http.StatusNotImplemented) {
+        resp.Body.Close()
+
+        req, _ = http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+        req.Header.Set("User-Agent", "linkcheck/1.0")
+        resp, err = client.Do(req)
+    }
+
+    if err != nil {
+        status := StatusError
+        if errors.Is(err, context.DeadlineExceeded) {
+            err = errors.New("timeout")
+        }
+        return Result{URL: target, Status: status, Err: err,
+            Duration: time.Since(start)}
+    }
+    defer resp.Body.Close()
+
+    r := Result{
+        URL:        target,
+        StatusCode: resp.StatusCode,
+        FinalURL:   resp.Request.URL.String(),
+        Duration:   time.Since(start),
+    }
+
+    switch {
+    case resp.StatusCode >= 200 && resp.StatusCode < 300:
+        r.Status = StatusOK
+        if r.FinalURL != target {
+            r.Status = StatusRedirect     // the client followed a redirect
+        }
+    case resp.StatusCode >= 300 && resp.StatusCode < 400:
+        r.Status = StatusRedirect
+    default:
+        r.Status = StatusBroken
+    }
+
+    return r
+}
+```
+
+`resp.Request.URL` is the URL after any redirects the client followed, which is how you detect a link that still works but has moved.
+
+## The concurrent checker
+
+```go title="checker.go"
+package main
+
+import (
+    "context"
+    "net/http"
+    "time"
+
+    "golang.org/x/sync/errgroup"
+    "golang.org/x/time/rate"
+)
+
+type Checker struct {
+    client  *http.Client
+    workers int
+    limiter *rate.Limiter
+}
+
+func NewChecker(workers int, timeout time.Duration, rps float64) *Checker {
+    return &Checker{
+        client: &http.Client{
+            Timeout: timeout,
+            Transport: &http.Transport{
+                MaxIdleConns:        workers * 2,
+                MaxIdleConnsPerHost: workers,
+                IdleConnTimeout:     30 * time.Second,
+                DisableCompression:  true,     // we never read the body
+            },
+        },
+        workers: workers,
+        limiter: rate.NewLimiter(rate.Limit(rps), workers),
+    }
+}
+
+// CheckAll returns results on a channel as they arrive.
+func (c *Checker) CheckAll(ctx context.Context, urls []string) <-chan Result {
+    results := make(chan Result)
+
+    go func() {
+        defer close(results)
+
+        g, ctx := errgroup.WithContext(ctx)
+        g.SetLimit(c.workers)
+
+        for _, u := range urls {
+            g.Go(func() error {
+                // Respect the rate limit before making the request.
+                if err := c.limiter.Wait(ctx); err != nil {
+                    return err          // context cancelled
+                }
+
+                r := Check(ctx, c.client, u)
+
+                select {
+                case results <- r:
+                    return nil
+                case <-ctx.Done():
+                    return ctx.Err()
+                }
+            })
+        }
+
+        g.Wait()
+    }()
+
+    return results
+}
+```
+
+Four things are doing work here, and each prevents a specific failure.
+
+`g.SetLimit(c.workers)` bounds concurrency. Without it, a page with two thousand links opens two thousand connections at once.
+
+`MaxIdleConnsPerHost` set to the worker count means connections are reused. The default of 2 would make every worker beyond the second open a fresh TCP and TLS connection for every check.
+
+`limiter.Wait(ctx)` throttles the request rate, which is the difference between checking a site and being mistaken for an attack on it.
+
+The `select` around the send means a cancelled context does not leave workers blocked on a channel nobody is reading. That is the leak from the goroutines page, prevented.
+
+## Wiring it up
+
+```go title="main.go"
+package main
+
+import (
+    "context"
+    "flag"
+    "fmt"
+    "os"
+    "os/signal"
+    "syscall"
+    "time"
+)
+
+func main() {
+    if err := run(); err != nil {
+        fmt.Fprintln(os.Stderr, "error:", err)
+        os.Exit(1)
+    }
+}
+
+func run() error {
+    var (
+        workers = flag.Int("workers", 10, "concurrent checks")
+        timeout = flag.Duration("timeout", 10*time.Second, "per request timeout")
+        rps     = flag.Float64("rps", 20, "requests per second")
+        total   = flag.Duration("max-time", 5*time.Minute, "total time budget")
+    )
+    flag.Parse()
+
+    if flag.NArg() != 1 {
+        return fmt.Errorf("usage: linkcheck [flags] <url>")
+    }
+    target := flag.Arg(0)
+
+    ctx, stop := signal.NotifyContext(context.Background(),
+        os.Interrupt, syscall.SIGTERM)
+    defer stop()
+
+    ctx, cancel := context.WithTimeout(ctx, *total)
+    defer cancel()
+
+    checker := NewChecker(*workers, *timeout, *rps)
+
+    fmt.Printf("fetching %s\n", target)
+    links, err := ExtractLinks(ctx, checker.client, target)
+    if err != nil {
+        return err
+    }
+    if len(links) == 0 {
+        fmt.Println("no links found")
+        return nil
+    }
+
+    fmt.Printf("checking %d links with %d workers\n\n", len(links), *workers)
+    start := time.Now()
+
+    var ok, redirects, broken int
+
+    for r := range checker.CheckAll(ctx, links) {
+        switch r.Status {
+        case StatusOK:
+            ok++
+            fmt.Printf("  OK   %d  %-50s %v\n", r.StatusCode, r.URL, r.Duration.Round(time.Millisecond))
+        case StatusRedirect:
+            redirects++
+            fmt.Printf("  WARN %d  %-50s -> %s\n", r.StatusCode, r.URL, r.FinalURL)
+        case StatusBroken:
+            broken++
+            fmt.Printf("  FAIL %d  %-50s\n", r.StatusCode, r.URL)
+        case StatusError:
+            broken++
+            fmt.Printf("  FAIL  -   %-50s %v\n", r.URL, r.Err)
+        }
+    }
+
+    fmt.Printf("\n%d links checked in %v\n", len(links), time.Since(start).Round(time.Millisecond))
+    fmt.Printf("  ok: %d   redirects: %d   broken: %d\n", ok, redirects, broken)
+
+    if broken > 0 {
+        return fmt.Errorf("%d broken links", broken)     // non-zero exit for CI
+    }
+    return nil
+}
+```
+
+Returning an error when links are broken gives you a non-zero exit code, which is what makes this usable in a CI pipeline.
+
+## Seeing the difference
+
+```bash
+go run . https://example.com --workers 1
+# 47 links checked in 12.4s
+
+go run . https://example.com --workers 20
+# 47 links checked in 1.8s
+```
+
+Nearly seven times faster from one flag. The work is almost entirely waiting on the network, which is exactly where goroutines shine.
+
+Increasing workers further gives diminishing returns, because the rate limiter and the remote server both become the constraint. That plateau is worth observing directly: it is a much better lesson about concurrency than any explanation.
+
+## Checking for races
+
+```bash
+go run -race . https://example.com --workers 20
+```
+
+The counters in `run` are only touched by the single goroutine ranging over the results channel, so there is no race. If you extend this to aggregate statistics from inside the workers, the detector will tell you immediately.
+
+## Testing
+
+```go title="checker_test.go"
+func TestCheckHandlesStatuses(t *testing.T) {
+    mux := http.NewServeMux()
+    mux.HandleFunc("/ok", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+    })
+    mux.HandleFunc("/missing", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusNotFound)
+    })
+    mux.HandleFunc("/slow", func(w http.ResponseWriter, r *http.Request) {
+        time.Sleep(2 * time.Second)
+    })
+
+    srv := httptest.NewServer(mux)
+    defer srv.Close()
+
+    client := &http.Client{Timeout: 200 * time.Millisecond}
+
+    tests := []struct {
+        name string
+        path string
+        want Status
+    }{
+        {"ok", "/ok", StatusOK},
+        {"not found", "/missing", StatusBroken},
+        {"timeout", "/slow", StatusError},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            r := Check(context.Background(), client, srv.URL+tt.path)
+            if r.Status != tt.want {
+                t.Errorf("status = %v, want %v (err: %v)", r.Status, tt.want, r.Err)
+            }
+        })
+    }
+}
+
+func TestExtractLinksResolvesRelative(t *testing.T) {
+    const page = `<html><body>
+        <a href="/about">About</a>
+        <a href="https://external.example.com">External</a>
+        <a href="#section">Anchor</a>
+        <a href="mailto:a@b.com">Mail</a>
+        <a href="/about">Duplicate</a>
+    </body></html>`
+
+    srv := httptest.NewServer(http.HandlerFunc(
+        func(w http.ResponseWriter, r *http.Request) {
+            w.Header().Set("Content-Type", "text/html")
+            fmt.Fprint(w, page)
+        }))
+    defer srv.Close()
+
+    links, err := ExtractLinks(context.Background(), srv.Client(), srv.URL)
+    if err != nil {
+        t.Fatalf("ExtractLinks: %v", err)
+    }
+
+    // The anchor, the mailto, and the duplicate are all excluded.
+    if len(links) != 2 {
+        t.Fatalf("got %d links, want 2: %v", len(links), links)
+    }
+}
+```
+
+`httptest.NewServer` gives you a real server, so this exercises the real HTTP client, real redirects, and real timeouts.
+
+## Extend it
+
+- Recursive crawling with a depth limit and a visited set guarded by a mutex
+- Respect `robots.txt` before crawling
+- A `--format json` flag for machine readable output
+- Retry transient failures with exponential backoff and jitter
+- A progress bar, updated from the results loop
+- Group broken links by the page they appear on
+- A per-host rate limiter, so one slow domain does not throttle the rest
+
+Next, let's process files at scale.

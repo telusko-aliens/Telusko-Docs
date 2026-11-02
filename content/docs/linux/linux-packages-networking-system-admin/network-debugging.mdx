@@ -1,0 +1,198 @@
+---
+title: Network Debugging in Linux
+---
+
+
+When a Linux server cannot connect to an application or accept incoming requests, the first step is to inspect its network configuration and active connections.
+
+Linux provides commands to check IP addresses, identify listening ports, and investigate connection states. In this lecture, we'll focus on `ip`, `hostname`, and `ss`.
+
+## `ip a` - View Network Interfaces and IP Addresses
+
+The `ip a` command displays network interfaces and their assigned IP addresses.
+
+```bash
+ip a
+```
+
+You may see interfaces such as:
+
+![Linux_Network_Interface](https://dyz1pdcuffwr5.cloudfront.net/Linux/linux_network_interface.png)
+
+Look for the `inet` field to find an IPv4 address.
+
+Example:
+
+```text
+2: ens5: <BROADCAST,MULTICAST,UP,LOWER_UP>
+    inet 172.31.1.10/20 brd 172.31.15.255 scope global ens5
+```
+
+Here, `172.31.1.10` is the IPv4 address, and `/20` indicates the network prefix length.
+
+The interface flags `UP` and `LOWER_UP` indicate that the interface is enabled and its link is operational, respectively.
+
+**When to use it:** Check whether a network interface exists, whether it is active, and which IP address has been assigned to it.
+
+
+---
+
+
+## `hostname` - Identify the System
+
+The `hostname` command displays the current system's hostname.
+
+```bash
+hostname
+```
+
+This is useful when managing multiple Linux servers because it helps you identify which machine you're connected to.
+
+### Display IP Addresses Only
+
+```bash
+hostname -I
+```
+
+This displays the system's assigned IP addresses without the detailed interface information shown by `ip a`.
+
+**Note:** A server can have multiple IP addresses. Also, the IP addresses displayed by these commands do not necessarily include its public IP address.
+
+
+---
+
+
+## `ss` - Inspect Network Connections and Listening Ports
+
+The `ss` command, short for *socket statistics*, displays information about network sockets, including active connections and services listening for incoming connections.
+
+It is commonly used instead of the older `netstat` command.
+
+On most modern Linux distributions, `ss` is already available through the `iproute2` package. On Debian or Ubuntu, install it if necessary:
+
+```bash
+sudo apt update
+sudo apt install iproute2
+```
+
+### View TCP Connections
+
+```bash
+ss -t
+```
+
+The `-t` option selects TCP sockets. By default, `ss -t` displays established TCP connections.
+
+Example:
+
+```text
+State    Recv-Q  Send-Q  Local Address:Port  Peer Address:Port
+ESTAB    0       0       172.31.1.10:22      203.0.113.5:54321
+```
+
+This example represents an established TCP connection involving the server's SSH port (`22`) and a remote endpoint using port `54321`.
+
+- **Local Address:Port** : the local endpoint.
+- **Peer Address:Port** : the remote endpoint.
+- **ESTAB** : the TCP connection is established.
+
+The remote port is often dynamically assigned, so it may be different for each connection.
+
+### View Listening TCP and UDP Ports
+
+```bash
+ss -tuln
+```
+
+This is a useful command when checking which TCP and UDP ports are listening on a server.
+
+| Option | Meaning |
+|---|---|
+| `-t` | Display TCP sockets |
+| `-u` | Display UDP sockets |
+| `-l` | Display listening sockets |
+| `-n` | Display numeric addresses and port numbers |
+
+For example, a web server might listen on port `80` for HTTP or port `443` for HTTPS, while an SSH server commonly listens on port `22`.
+
+**Important:** A listening port indicates that a service is waiting for connections locally. It does not guarantee that clients can reach it through firewalls, security groups, routing rules, or other network restrictions.
+
+### Understand Common Socket States
+
+| State | Meaning |
+|---|---|
+| `LISTEN` | A TCP socket is waiting for incoming connections |
+| `ESTAB` | A TCP connection is established |
+| `UNCONN` | Commonly shown for UDP sockets that are not associated with a specific peer |
+
+UDP is connectionless, so its sockets do not follow the same connection lifecycle as TCP.
+
+### Check a Specific Port
+
+To check whether SSH is listening on port `22`:
+
+```bash
+ss -tln | grep ':22'
+```
+
+To check whether a TCP application is listening on port `8080`:
+
+```bash
+ss -tln | grep ':8080'
+```
+
+If a matching listening socket appears, a service is listening on that port.
+
+If no output appears, there may be no matching TCP listener. However, the service could be stopped, listening on a different address, or using UDP instead of TCP.
+
+For a clearer check of a TCP port, you can also use:
+
+```bash
+ss -ltn 'sport = :8080'
+```
+
+This filters listening TCP sockets by their local port.
+
+### View Established TCP Connections Only
+
+```bash
+ss -tn state established
+```
+
+This displays established TCP connections using numeric addresses and ports.
+
+It is useful when investigating active SSH sessions, application connections, or communication between servers.
+
+
+---
+
+
+## Quick Reference
+
+| Command | Purpose |
+|---|---|
+| `ip a` | Display network interfaces and IP addresses |
+| `hostname` | Display the system hostname |
+| `hostname -I` | Display assigned IP addresses |
+| `ss -t` | Display established TCP connections by default |
+| `ss -tuln` | Display listening TCP and UDP sockets |
+| `ss -tn state established` | Display established TCP connections |
+| `ss -tln \| grep ':22'` | Search for a TCP listener on port `22` |
+| `ss -ltn 'sport = :8080'` | Check for a TCP listener on port `8080` |
+
+
+---
+
+
+## Summary
+
+- Use `ip a` to inspect network interfaces and their IP addresses.
+- Use `hostname` to identify the Linux machine and `hostname -I` to display its assigned IP addresses.
+- Use `ss` to inspect network sockets, active TCP connections, and listening ports.
+- `LISTEN` indicates a TCP socket is waiting for connections, while `ESTAB` indicates an established TCP connection.
+- A listening port does not automatically mean it is accessible remotely; firewalls and network configuration can still block traffic.
+
+**Important tip:** If an application is not accessible on port `8080`, first use `ss -ltn` to check whether a service is listening on that port. If it is, investigate the application's bind address, firewall rules, and network access configuration next.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

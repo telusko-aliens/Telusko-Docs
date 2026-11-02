@@ -1,0 +1,369 @@
+---
+title: Transactions and Connection Pooling
+---
+
+Move money between two accounts and you have two updates that must both succeed or both fail. Halfway through is not an option. That is what a transaction is for, and Go's API for it is small enough to learn in one page.
+
+The connection pool is the other half of this topic, because a transaction holds a connection for its whole life, and that is where most database performance problems in Go services come from.
+
+## The pattern
+
+```go
+func (s *Store) Transfer(ctx context.Context, from, to string, amount int64) error {
+    tx, err := s.db.BeginTx(ctx, nil)
+    if err != nil {
+        return fmt.Errorf("beginning transaction: %w", err)
+    }
+    defer tx.Rollback()          // no-op if Commit already succeeded
+
+    var balance int64
+    err = tx.QueryRowContext(ctx,
+        `SELECT balance FROM accounts WHERE id = $1 FOR UPDATE`, from,
+    ).Scan(&balance)
+    if err != nil {
+        return fmt.Errorf("locking source account: %w", err)
+    }
+
+    if balance < amount {
+        return ErrInsufficientFunds
+    }
+
+    if _, err := tx.ExecContext(ctx,
+        `UPDATE accounts SET balance = balance - $1 WHERE id = $2`,
+        amount, from); err != nil {
+        return fmt.Errorf("debiting source: %w", err)
+    }
+
+    if _, err := tx.ExecContext(ctx,
+        `UPDATE accounts SET balance = balance + $1 WHERE id = $2`,
+        amount, to); err != nil {
+        return fmt.Errorf("crediting destination: %w", err)
+    }
+
+    if err := tx.Commit(); err != nil {
+        return fmt.Errorf("committing transfer: %w", err)
+    }
+    return nil
+}
+```
+
+The `defer tx.Rollback()` on the line after `BeginTx` is the whole safety mechanism. Every early return, every error path, and every panic rolls back. On the successful path, `Commit` has already finished and the rollback returns `sql.ErrTxDone`, which is ignored.
+
+The `FOR UPDATE` locks the row until the transaction ends, so two concurrent transfers from the same account cannot both read the same balance.
+
+<Callout type="warn">
+Forgetting `defer tx.Rollback()` leaves a transaction open when an error path returns early. The connection never goes back to the pool, the database holds locks, and under load the pool empties and the service stops responding. This is one of the most damaging bugs you can write in Go database code, and the deferred rollback prevents all of it.
+</Callout>
+
+## A helper to make it hard to get wrong
+
+Writing that pattern by hand every time invites mistakes. Wrap it once:
+
+```go
+func (s *Store) withTx(ctx context.Context, fn func(*sql.Tx) error) error {
+    tx, err := s.db.BeginTx(ctx, nil)
+    if err != nil {
+        return fmt.Errorf("beginning transaction: %w", err)
+    }
+
+    defer func() {
+        if p := recover(); p != nil {
+            tx.Rollback()
+            panic(p)              // roll back, then let the panic continue
+        }
+    }()
+
+    if err := fn(tx); err != nil {
+        if rbErr := tx.Rollback(); rbErr != nil &&
+            !errors.Is(rbErr, sql.ErrTxDone) {
+            return fmt.Errorf("%w (rollback failed: %v)", err, rbErr)
+        }
+        return err
+    }
+
+    if err := tx.Commit(); err != nil {
+        return fmt.Errorf("committing: %w", err)
+    }
+    return nil
+}
+```
+
+```go
+func (s *Store) CreateOrderWithItems(ctx context.Context, o *Order, items []Item) error {
+    return s.withTx(ctx, func(tx *sql.Tx) error {
+        err := tx.QueryRowContext(ctx,
+            `INSERT INTO orders (user_id, total) VALUES ($1, $2) RETURNING id`,
+            o.UserID, o.Total,
+        ).Scan(&o.ID)
+        if err != nil {
+            return fmt.Errorf("inserting order: %w", err)
+        }
+
+        for _, item := range items {
+            if _, err := tx.ExecContext(ctx,
+                `INSERT INTO order_items (order_id, sku, qty, price)
+                 VALUES ($1, $2, $3, $4)`,
+                o.ID, item.SKU, item.Qty, item.Price); err != nil {
+                return fmt.Errorf("inserting item %s: %w", item.SKU, err)
+            }
+        }
+
+        return nil
+    })
+}
+```
+
+The caller writes only the queries. Rollback, commit, and panic handling are impossible to forget.
+
+## Isolation levels
+
+```go
+tx, err := db.BeginTx(ctx, &sql.TxOptions{
+    Isolation: sql.LevelSerializable,
+    ReadOnly:  false,
+})
+```
+
+```text
+   ReadUncommitted   sees uncommitted changes. PostgreSQL treats it as ReadCommitted.
+   ReadCommitted     sees only committed data. PostgreSQL's default.
+   RepeatableRead    the same query returns the same rows throughout the transaction.
+   Serializable      as if transactions ran one after another.
+```
+
+Higher isolation means fewer anomalies and more contention. `ReadCommitted` is right for the large majority of work.
+
+`Serializable` is worth it when correctness depends on a value not changing between a read and a write, and where a `FOR UPDATE` lock would be awkward. It comes with a cost: PostgreSQL will abort transactions that would violate serialisability, returning error code 40001, and your code has to retry.
+
+```go
+func (s *Store) withRetryableTx(ctx context.Context, fn func(*sql.Tx) error) error {
+    const maxAttempts = 3
+
+    for attempt := 0; attempt < maxAttempts; attempt++ {
+        err := s.withTx(ctx, fn)
+        if err == nil {
+            return nil
+        }
+
+        var pgErr *pgconn.PgError
+        if errors.As(err, &pgErr) &&
+            (pgErr.Code == "40001" || pgErr.Code == "40P01") {
+            // serialization_failure or deadlock_detected: safe to retry
+            select {
+            case <-time.After(time.Duration(attempt+1) * 50 * time.Millisecond):
+                continue
+            case <-ctx.Done():
+                return ctx.Err()
+            }
+        }
+
+        return err
+    }
+
+    return errors.New("transaction failed after retries")
+}
+```
+
+Note that the function passed in must be safe to run more than once. Anything with a side effect outside the database, such as sending an email, does not belong inside a retryable transaction.
+
+## Read-only transactions
+
+```go
+tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+```
+
+For a report that runs several queries and needs a consistent view, a read-only transaction gives you that and tells the database it can optimise accordingly. On a replica setup, it also lets the query be routed to a follower.
+
+## Locking
+
+```go
+// Exclusive: other transactions wait
+SELECT * FROM accounts WHERE id = $1 FOR UPDATE
+
+// Fail immediately instead of waiting
+SELECT * FROM accounts WHERE id = $1 FOR UPDATE NOWAIT
+
+// Skip rows that are already locked, ideal for queue workers
+SELECT * FROM jobs WHERE status = 'pending'
+ORDER BY created_at LIMIT 10 FOR UPDATE SKIP LOCKED
+```
+
+`SKIP LOCKED` is how you build a job queue on PostgreSQL. Several workers each grab a different batch without blocking each other:
+
+```go
+func (s *Store) ClaimJobs(ctx context.Context, workerID string, n int) ([]*Job, error) {
+    const query = `
+        UPDATE jobs
+        SET status = 'running', worker_id = $1, started_at = now()
+        WHERE id IN (
+            SELECT id FROM jobs
+            WHERE status = 'pending'
+            ORDER BY created_at
+            LIMIT $2
+            FOR UPDATE SKIP LOCKED
+        )
+        RETURNING id, payload`
+
+    rows, err := s.db.QueryContext(ctx, query, workerID, n)
+    // ...
+}
+```
+
+One statement, atomically claiming a batch, with no coordination between workers.
+
+### Deadlocks
+
+Two transactions each holding a lock the other wants. PostgreSQL detects it and kills one with error 40P01.
+
+Preventing them is a matter of ordering. Always acquire locks in a consistent order:
+
+```go
+// Deadlocks: transfer(A,B) and transfer(B,A) can lock each other out
+lock(from); lock(to)
+
+// Safe: both transactions lock the lower ID first
+first, second := from, to
+if first > second {
+    first, second = second, first
+}
+lock(first); lock(second)
+```
+
+## Pool configuration
+
+```go
+db.SetMaxOpenConns(25)
+db.SetMaxIdleConns(25)
+db.SetConnMaxLifetime(5 * time.Minute)
+db.SetConnMaxIdleTime(1 * time.Minute)
+```
+
+```text
+   MaxOpenConns      total, in use plus idle. 0 means unlimited, a poor default.
+   MaxIdleConns      kept open when unused. Default 2, which causes churn.
+   ConnMaxLifetime   recycle after this long. Important behind proxies and
+                     load balancers that drop long-lived connections.
+   ConnMaxIdleTime   close after being idle this long.
+```
+
+Sizing:
+
+```text
+   MaxOpenConns = (database max_connections - reserved) / service instances
+```
+
+PostgreSQL defaults to 100. With four instances, 20 each leaves room for migrations and monitoring.
+
+Setting `MaxIdleConns` equal to `MaxOpenConns` is almost always right. Leaving it at the default of 2 means a service running 25 concurrent queries closes 23 connections the moment the burst ends and reopens them on the next one.
+
+<Callout type="warn">
+More connections is not faster. PostgreSQL runs a process per connection, so past roughly two to four times the core count, the extra connections spend their time competing rather than working. If you need to serve more concurrency than that, add PgBouncer rather than raising the pool.
+</Callout>
+
+## Watching the pool
+
+```go
+stats := db.Stats()
+
+stats.OpenConnections     // currently open
+stats.InUse               // currently executing
+stats.Idle
+stats.WaitCount           // total times a caller had to wait
+stats.WaitDuration        // total time spent waiting
+stats.MaxIdleClosed
+stats.MaxLifetimeClosed
+```
+
+Export these as metrics:
+
+```go
+func recordPoolMetrics(db *sql.DB) {
+    ticker := time.NewTicker(10 * time.Second)
+    defer ticker.Stop()
+
+    for range ticker.C {
+        s := db.Stats()
+        poolOpen.Set(float64(s.OpenConnections))
+        poolInUse.Set(float64(s.InUse))
+        poolWaitCount.Set(float64(s.WaitCount))
+        poolWaitSeconds.Set(s.WaitDuration.Seconds())
+    }
+}
+```
+
+`WaitCount` is the number that answers the question. If it is climbing, requests are queueing for connections, and the fix is either a larger pool, faster queries, or fewer of them.
+
+<Callout type="info">
+The symptom of pool exhaustion is misleading: request latency climbs while the database itself looks idle. Every query is waiting for a connection, not for the database. Checking `WaitCount` before investigating query plans saves a lot of time.
+</Callout>
+
+## Transactions hold a connection
+
+This is the operational consequence that ties the two halves of this page together.
+
+```go
+// Bad: holds a connection for the duration of an HTTP call
+tx, _ := db.BeginTx(ctx, nil)
+defer tx.Rollback()
+
+tx.ExecContext(ctx, "UPDATE ...")
+
+resp, _ := http.Get("https://slow-api.example.com/notify")   // 2 seconds
+
+tx.Commit()
+```
+
+Two seconds with a connection held and locks taken, per request. Twenty-five concurrent requests exhaust the pool and everything stops.
+
+```go
+// Better: the transaction covers only the database work
+if err := s.withTx(ctx, func(tx *sql.Tx) error {
+    _, err := tx.ExecContext(ctx, "UPDATE ...")
+    return err
+}); err != nil {
+    return err
+}
+
+// The external call happens after the commit
+notify(ctx)
+```
+
+The rules that follow: never make a network call inside a transaction, never wait on a channel or a lock inside one, keep them short, and always give them a context deadline.
+
+## Testing transactions
+
+A transaction that is never committed is a clean way to isolate a test:
+
+```go
+func TestTransfer(t *testing.T) {
+    db := testDB(t)
+
+    tx, err := db.BeginTx(context.Background(), nil)
+    if err != nil {
+        t.Fatal(err)
+    }
+    defer tx.Rollback()          // every change is discarded
+
+    store := &Store{db: tx}      // works if Store takes an interface
+
+    // ... run assertions against real SQL
+}
+```
+
+For that to work, the store must accept something both `*sql.DB` and `*sql.Tx` satisfy:
+
+```go
+type DBTX interface {
+    ExecContext(context.Context, string, ...any) (sql.Result, error)
+    QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+    QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+type Store struct {
+    db DBTX
+}
+```
+
+That interface is worth defining anyway, because it also lets a repository method participate in a caller's transaction.
+
+Next, let's use it to build the repository layer properly.

@@ -1,0 +1,234 @@
+---
+title: Links & Inodes in Linux
+---
+
+
+## What Is an Inode?
+
+In Linux, a filesystem uses an **inode (index node)** to store information about a file or directory. Each inode has a number that identifies it within its filesystem.
+
+An inode stores metadata such as:
+
+- File type and permissions
+- Owner and group IDs
+- File size
+- Timestamps
+- References to the file's data blocks
+- Link count
+
+**An inode does not store the filename.** A directory maps filenames to inode numbers. This separation allows multiple filenames to reference the same underlying file data.
+
+### Viewing Inode Numbers
+
+Use `ls -i` to display inode numbers:
+
+```bash
+ls -li
+```
+
+Example output:
+
+```text
+105012 -rw-r--r-- 1 ubuntu ubuntu 120 Oct 20 10:30 telusko.txt
+105019 -rw-r--r-- 1 ubuntu ubuntu 250 Oct 20 10:32 shell.txt
+```
+
+The first column contains the inode number.
+
+**Note:** Inode numbers are unique within a filesystem, not necessarily across the entire Linux system. Two files on different filesystems can have the same inode number.
+
+
+---
+
+
+## What Are Links in Linux?
+
+A link provides another way to access a file. Linux supports two main types:
+
+![Linux_Links](https://dyz1pdcuffwr5.cloudfront.net/Linux/linux_links.png)
+
+
+---
+
+
+## 1. Hard Links
+
+A hard link creates another name for the same underlying file data. Both names refer to the **same inode**, so they share the same content and metadata stored in that inode.
+
+### Creating a Hard Link
+
+Suppose `telusko.txt` already exists. Create a hard link with:
+
+```bash
+ln telusko.txt teluskoai.txt
+```
+
+Here:
+
+- `telusko.txt` is the existing file.
+- `teluskoai.txt` is the new hard link.
+
+Both filenames now refer to the same file data.
+
+### Verify the Inode Number
+
+```bash
+ls -li telusko.txt teluskoai.txt
+```
+
+Example output:
+
+```text
+105012 -rw-r--r-- 2 ubuntu ubuntu 120 Oct 20 10:30 telusko.txt
+105012 -rw-r--r-- 2 ubuntu ubuntu 120 Oct 20 10:30 teluskoai.txt
+```
+
+Notice two important details:
+
+- Both filenames have the same inode number: `105012`.
+- The link count is `2`, meaning two hard links refer to that inode.
+
+### Changes Are Visible Through Both Names
+
+If you modify the file through either name, reading it through the other name shows the same updated content.
+
+For example:
+
+```bash
+echo "Linux is powerful" >> telusko.txt
+cat teluskoai.txt
+```
+
+The new line appears because both names access the same underlying file.
+
+### Deleting One Name Does Not Delete the Data Immediately
+
+```bash
+rm telusko.txt
+cat teluskoai.txt
+```
+
+The content remains accessible through `teluskoai.txt`.
+
+Removing one hard link removes only that directory entry. The filesystem can reclaim the file's data when no hard links remain and no process is still holding the file open.
+
+### Limitations of Hard Links
+
+- Hard links generally cannot be created for directories by ordinary users.
+- They cannot cross filesystem boundaries.
+- They refer to the same inode rather than to a pathname, so renaming or removing one filename does not invalidate the other.
+
+
+
+---
+
+
+## 2. Symbolic Links (Soft Links)
+
+A **symbolic link**, also called a *soft link*, is a separate filesystem object that stores the path to another file or directory.
+
+Unlike a hard link, it has its own inode. When you access the symbolic link, Linux follows the stored path to locate the target.
+
+### Creating a Symbolic Link
+
+Suppose `shell.txt` exists. Create a symbolic link using `ln -s`:
+
+```bash
+ln -s shell.txt shellai.txt
+```
+
+Here:
+
+- `shell.txt` is the target.
+- `shellai.txt` is the symbolic link.
+- `-s` tells `ln` to create a symbolic link.
+
+### Verify the Link
+
+```bash
+ls -li shell.txt shellai.txt
+```
+
+Example output:
+
+```text
+105019 -rw-r--r-- 1 ubuntu ubuntu 250 Oct 20 10:32 shell.txt
+105025 lrwxrwxrwx 1 ubuntu ubuntu   9 Oct 20 10:35 shellai.txt -> shell.txt
+```
+
+The inode numbers differ because the link and target are separate filesystem objects.
+
+The `l` at the beginning of the symbolic link's permission string indicates a symbolic link. The arrow shows the stored target path.
+
+### Changes to the Target Are Visible Through the Link
+
+```bash
+echo "Learning Linux links" >> shell.txt
+cat shellai.txt
+```
+
+The updated content is visible through `shellai.txt` because the link resolves to `shell.txt`.
+
+### What Happens When the Target Is Deleted?
+
+```bash
+rm shell.txt
+cat shellai.txt
+```
+
+The symbolic link remains, but its target path no longer resolves. This is called a **broken** or *dangling symbolic link*.
+
+The link itself can still be listed and removed:
+
+```bash
+ls -l shellai.txt
+rm shellai.txt
+```
+
+Removing a symbolic link does not delete its target.
+
+### Advantages of Symbolic Links
+
+- Can point to files or directories.
+- Can reference targets on another filesystem.
+- Can refer to a target using a pathname.
+- Remain useful when you want a convenient alternate path to a file or directory.
+
+
+---
+
+
+![Linux_Hard_and_Symbolic_Links](https://dyz1pdcuffwr5.cloudfront.net/Linux/linux_hard_symbolic_link.png)
+
+
+---
+
+
+## Quick Reference
+
+| Command | Purpose |
+|---|---|
+| `ls -li` | List files with inode numbers |
+| `ln original.txt hard.txt` | Create a hard link |
+| `ln -s original.txt soft.txt` | Create a symbolic link |
+| `ls -l soft.txt` | View a symbolic link and its target path |
+| `readlink soft.txt` | Display the path stored in a symbolic link |
+| `rm hard.txt` | Remove one hard-link directory entry |
+| `rm soft.txt` | Remove the symbolic link, not its target |
+
+
+---
+
+
+## Summary
+
+- An inode stores file metadata and references to data; it does not store the filename.
+- A directory associates filenames with inode numbers.
+- Hard links share an inode and provide multiple names for the same underlying file.
+- Symbolic links have their own inode and store a path to a target.
+- Removing one hard link does not remove the data if other references remain.
+- A symbolic link can become broken when its target path no longer resolves.
+- Use `ln` for hard links, `ln -s` for symbolic links, and `ls -li` to inspect inode numbers.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

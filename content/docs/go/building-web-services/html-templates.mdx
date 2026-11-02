@@ -1,0 +1,432 @@
+---
+title: HTML Templates
+---
+
+Go has two template packages with an almost identical API and one enormous difference.
+
+```go
+import "text/template"     // generic text, no escaping
+import "html/template"     // HTML, escapes everything automatically
+```
+
+For anything a browser will render, use `html/template`. It is not a convenience wrapper. It parses the template, understands where each value lands in the HTML structure, and applies context-appropriate escaping. That single behaviour eliminates most cross-site scripting bugs by construction.
+
+## A first template
+
+```html title="templates/hello.html"
+<!DOCTYPE html>
+<html>
+<body>
+    <h1>Hello, {{.Name}}</h1>
+    <p>You have {{.Count}} new messages.</p>
+</body>
+</html>
+```
+
+```go
+tmpl := template.Must(template.ParseFiles("templates/hello.html"))
+
+data := struct {
+    Name  string
+    Count int
+}{Name: "Shiva", Count: 3}
+
+tmpl.Execute(os.Stdout, data)
+```
+
+`{{.}}` is the data you passed in. `{{.Name}}` is a field on it. `template.Must` panics on a parse error, which is correct at startup because a broken template is a bug, not a runtime condition.
+
+## Automatic contextual escaping
+
+This is the part worth understanding properly.
+
+```go
+data := map[string]string{
+    "Comment": `<script>alert('xss')</script>`,
+}
+```
+
+```html
+<p>{{.Comment}}</p>
+```
+
+```html
+<p>&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;</p>
+```
+
+The script is displayed as text, not executed. And the escaping changes depending on where the value appears:
+
+```html
+<p>{{.Value}}</p>                        HTML escaping
+<a href="{{.Value}}">link</a>            URL escaping
+<script>var x = {{.Value}};</script>     JavaScript escaping
+<div style="color: {{.Value}}">          CSS escaping
+<div data-x="{{.Value}}">                attribute escaping
+```
+
+`html/template` parses the HTML to know which context each action sits in and applies the right escaping for each. No other mainstream template engine does this by default.
+
+<Callout type="warn">
+The escape hatches, `template.HTML`, `template.JS`, `template.URL`, and `template.CSS`, mark a value as pre-trusted and skip escaping entirely.
+
+```go
+Content: template.HTML(userInput)     // an XSS vulnerability
+```
+
+Only ever use them on content you generated yourself, such as Markdown you rendered and sanitised. Never on anything a user supplied. Searching a codebase for `template.HTML` is a reasonable first step in a security review.
+</Callout>
+
+## The template language
+
+### Values and fields
+
+```html
+{{.}}                    the whole data value
+{{.Name}}                a field
+{{.User.Address.City}}   nested
+{{.Items}}               a slice
+{{index .Items 0}}       one element
+{{len .Items}}
+{{.Method}}              calls a method with no arguments
+```
+
+### Conditions
+
+```html
+{{if .User}}
+    <p>Welcome back, {{.User.Name}}</p>
+{{else if .Guest}}
+    <p>Browsing as a guest</p>
+{{else}}
+    <a href="/login">Sign in</a>
+{{end}}
+
+{{if and .LoggedIn .IsAdmin}}  ... {{end}}
+{{if or .IsOwner .IsAdmin}}    ... {{end}}
+{{if not .Disabled}}           ... {{end}}
+{{if eq .Status "active"}}     ... {{end}}
+{{if gt .Count 10}}            ... {{end}}
+```
+
+Empty values are false: `false`, `0`, `""`, a nil pointer, and any empty array, slice, or map.
+
+### Loops
+
+```html
+{{range .Tasks}}
+    <li>{{.Title}} - {{.Status}}</li>
+{{else}}
+    <li>No tasks yet</li>
+{{end}}
+```
+
+The `{{else}}` on a `range` runs when the collection is empty, which saves a separate length check.
+
+Inside the loop, `.` is the current element. To reach the outer data, use `$`:
+
+```html
+{{range .Tasks}}
+    <li>{{.Title}} (user: {{$.CurrentUser.Name}})</li>
+{{end}}
+```
+
+With the index:
+
+```html
+{{range $i, $task := .Tasks}}
+    <li>{{$i}}: {{$task.Title}}</li>
+{{end}}
+```
+
+### Variables and with
+
+```html
+{{$name := .User.Name}}
+<p>Hello {{$name}}</p>
+
+{{with .User.Profile}}
+    <p>{{.Bio}}</p>          {{/* . is now .User.Profile */}}
+{{else}}
+    <p>No profile yet</p>
+{{end}}
+```
+
+`with` rebinds the dot and skips the block entirely when the value is empty, which removes a nil check and a level of nesting.
+
+### Whitespace and comments
+
+```html
+{{- if .Show -}}
+    trimmed on both sides
+{{- end -}}
+
+{{/* this comment is not rendered */}}
+```
+
+## Layouts with define and template
+
+Real sites have a shared layout. Go handles this with named templates:
+
+```html title="templates/layout.html"
+{{define "layout"}}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{.Title}}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        {{template "content" .}}
+    </main>
+    {{template "footer" .}}
+</body>
+</html>
+{{end}}
+
+{{define "nav"}}
+<nav>
+    <a href="/">Home</a>
+    {{if .User}}
+        <a href="/logout">Sign out</a>
+    {{else}}
+        <a href="/login">Sign in</a>
+    {{end}}
+</nav>
+{{end}}
+
+{{define "footer"}}
+<footer><p>&copy; 2026</p></footer>
+{{end}}
+```
+
+```html title="templates/tasks.html"
+{{define "content"}}
+<h1>Your Tasks</h1>
+<ul>
+    {{range .Tasks}}
+        <li class="{{.Status}}">{{.Title}}</li>
+    {{else}}
+        <li>Nothing to do</li>
+    {{end}}
+</ul>
+{{end}}
+```
+
+```go
+tmpl := template.Must(template.ParseFiles(
+    "templates/layout.html",
+    "templates/tasks.html",
+))
+
+tmpl.ExecuteTemplate(w, "layout", data)
+```
+
+## Custom functions
+
+```go
+funcs := template.FuncMap{
+    "formatDate": func(t time.Time) string {
+        return t.Format("2 Jan 2006")
+    },
+    "timeAgo": func(t time.Time) string {
+        d := time.Since(t)
+        switch {
+        case d < time.Minute:
+            return "just now"
+        case d < time.Hour:
+            return fmt.Sprintf("%d minutes ago", int(d.Minutes()))
+        case d < 24*time.Hour:
+            return fmt.Sprintf("%d hours ago", int(d.Hours()))
+        default:
+            return t.Format("2 Jan 2006")
+        }
+    },
+    "money": func(paise int64) string {
+        return fmt.Sprintf("%d.%02d", paise/100, paise%100)
+    },
+    "truncate": func(n int, s string) string {
+        r := []rune(s)
+        if len(r) <= n {
+            return s
+        }
+        return string(r[:n]) + "..."
+    },
+}
+
+tmpl := template.Must(
+    template.New("layout.html").Funcs(funcs).ParseFiles(
+        "templates/layout.html",
+        "templates/tasks.html",
+    ),
+)
+```
+
+```html
+<p>Created {{timeAgo .CreatedAt}}</p>
+<p>Total: {{money .TotalPaise}}</p>
+<p>{{truncate 100 .Description}}</p>
+```
+
+`Funcs` must be called before `ParseFiles`, because parsing needs to know which function names are valid.
+
+Note the argument order on `truncate`. Putting the value last makes it work with a pipeline:
+
+```html
+{{.Description | truncate 100}}
+```
+
+## Parsing once, at startup
+
+<Callout type="warn">
+Parsing templates inside a handler re-reads and re-parses the files on every request. It is dramatically slower and it hides parse errors until a user hits that page. Parse once at startup, where `template.Must` turns a broken template into an immediate crash.
+</Callout>
+
+```go
+type Templates struct {
+    templates map[string]*template.Template
+}
+
+func LoadTemplates(dir string, funcs template.FuncMap) (*Templates, error) {
+    t := &Templates{templates: make(map[string]*template.Template)}
+
+    pages, err := filepath.Glob(filepath.Join(dir, "pages", "*.html"))
+    if err != nil {
+        return nil, err
+    }
+
+    for _, page := range pages {
+        name := filepath.Base(page)
+
+        files := []string{
+            filepath.Join(dir, "layout.html"),
+            page,
+        }
+
+        tmpl, err := template.New(name).Funcs(funcs).ParseFiles(files...)
+        if err != nil {
+            return nil, fmt.Errorf("parsing %s: %w", name, err)
+        }
+        t.templates[name] = tmpl
+    }
+
+    return t, nil
+}
+```
+
+## Rendering safely
+
+Writing directly to the `ResponseWriter` has a subtle problem: if the template fails halfway through, the status is already 200 and half a page has been sent. Render into a buffer first:
+
+```go
+func (t *Templates) Render(w http.ResponseWriter, status int,
+    page string, data any) {
+
+    tmpl, ok := t.templates[page]
+    if !ok {
+        slog.Error("template not found", "page", page)
+        http.Error(w, "internal error", http.StatusInternalServerError)
+        return
+    }
+
+    var buf bytes.Buffer
+    if err := tmpl.ExecuteTemplate(&buf, "layout", data); err != nil {
+        slog.Error("rendering template", "page", page, "error", err)
+        http.Error(w, "internal error", http.StatusInternalServerError)
+        return
+    }
+
+    w.Header().Set("Content-Type", "text/html; charset=utf-8")
+    w.WriteHeader(status)
+    buf.WriteTo(w)
+}
+```
+
+Now a template error produces a clean 500 rather than a truncated page with a 200.
+
+## Embedding templates in the binary
+
+```go
+//go:embed templates
+var templateFS embed.FS
+
+tmpl := template.Must(
+    template.New("layout.html").Funcs(funcs).ParseFS(templateFS,
+        "templates/layout.html",
+        "templates/pages/*.html",
+    ),
+)
+```
+
+Templates become part of the compiled binary, so deployment stays a single file with no directory to copy alongside it.
+
+For development, a small flag lets you reload from disk instead:
+
+```go
+func loadTemplates(dev bool) (*template.Template, error) {
+    if dev {
+        return template.New("").Funcs(funcs).ParseGlob("templates/**/*.html")
+    }
+    return template.New("").Funcs(funcs).ParseFS(templateFS, "templates/**/*.html")
+}
+```
+
+## A complete handler
+
+```go
+type PageData struct {
+    Title string
+    User  *User
+    Tasks []Task
+    Flash string
+}
+
+func (h *Handler) TaskList(w http.ResponseWriter, r *http.Request) {
+    user, _ := UserFrom(r.Context())
+
+    tasks, err := h.store.List(r.Context(), "")
+    if err != nil {
+        slog.ErrorContext(r.Context(), "listing tasks", "error", err)
+        h.templates.Render(w, http.StatusInternalServerError, "error.html",
+            PageData{Title: "Error"})
+        return
+    }
+
+    h.templates.Render(w, http.StatusOK, "tasks.html", PageData{
+        Title: "Your Tasks",
+        User:  user,
+        Tasks: tasks,
+    })
+}
+```
+
+## Forms and CSRF
+
+`html/template` protects against XSS. It does nothing about cross-site request forgery, which needs a token:
+
+```html
+<form method="POST" action="/tasks">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <input type="text" name="title" required maxlength="200">
+    <button type="submit">Add task</button>
+</form>
+```
+
+```go
+if err := r.ParseForm(); err != nil {
+    http.Error(w, "bad form", http.StatusBadRequest)
+    return
+}
+
+if !validCSRF(r.FormValue("csrf_token"), r) {
+    http.Error(w, "invalid token", http.StatusForbidden)
+    return
+}
+
+title := strings.TrimSpace(r.FormValue("title"))
+```
+
+`github.com/gorilla/csrf` handles the token generation and validation, and it is one of the few dependencies genuinely worth adding for a server-rendered Go application.
+
+Next, let's assemble everything from this section into a service structure that holds up as it grows.

@@ -1,0 +1,118 @@
+---
+title: Linux System Architecture
+---
+
+Linux is organized into layers that work together to let users and applications interact with computer hardware safely and efficiently. Understanding these layers helps explain what happens when you run a command, launch an application, or access a file.
+
+
+## The Four Layers of Linux
+
+![Linux_Layers](https://dyz1pdcuffwr5.cloudfront.net/Linux/linux_layers.png)
+
+Each layer has a distinct responsibility. Applications request services from the operating system, and the kernel manages access to hardware resources.
+
+### 1. User and Application Layer
+
+This is where users interact with the Linux system. It includes:
+
+- **Terminal applications** - provide an interface for entering commands.
+- **Text editors** - such as `vi` and `nano`.
+- **Graphical applications** - such as web browsers and file managers.
+
+Applications do not normally access hardware directly. They request operating system services through interfaces provided by the kernel.
+
+### 2. Shell - The Command Interpreter
+
+The **shell** is a program that interprets commands and provides an interface between the user and the operating system.
+
+Common Linux shells include:
+
+- `bash` - Bourne Again Shell
+- `zsh` - Z Shell
+- `sh` - a shell interface commonly associated with POSIX
+
+When you enter a command, the shell interprets it and performs the appropriate action. For external programs, it typically starts a process. That program may then request kernel services through **system calls**.
+
+The shell also supports features such as variables, pipes, redirection, and scripting.
+
+**Important distinction:** The shell does not convert every command directly into a system call. It interprets commands, while programs use system calls to request services from the kernel.
+
+### 3. Kernel - The Core of Linux
+
+The **kernel** is the central component of the operating system. It manages system resources and provides essential services to applications.
+
+| Responsibility | What the kernel does |
+|---|---|
+| Process management | Schedules processes and manages their execution |
+| Memory management | Allocates and manages memory |
+| File systems | Provides access to files and storage |
+| Device drivers | Communicates with hardware devices |
+| Networking | Handles network protocols and communication |
+
+Applications request kernel services through **system calls**, such as those used to read files, create processes, or communicate over a network.
+
+The kernel operates with privileged access to hardware, while ordinary applications run with restricted permissions.
+
+### 4. Hardware Layer
+
+The hardware layer consists of the physical components of a computer, including:
+
+- **CPU** - executes instructions.
+- **RAM** - stores data and instructions used by running programs.
+- **Storage devices** - retain files and application data.
+- **Network devices** - provide network connectivity.
+
+The kernel manages access to these resources through device drivers and other hardware-specific mechanisms.
+
+
+---
+
+
+## How the Layers Work Together
+
+Consider what happens when you run `ls` to list files in a directory:
+
+```text
+You enter: ls
+      │
+      ▼
+Terminal passes input to the shell
+      │
+      ▼
+Shell interprets and starts ls
+      │
+      ▼
+ls requests file information through system calls
+      │
+      ▼
+Kernel accesses the file system
+      │
+      ▼
+Results return to ls
+      │
+      ▼
+Terminal displays the output
+```
+
+The shell starts the `ls` program, and `ls` requests the necessary information from the kernel. The kernel handles access to the file system and returns the results, which are displayed in the terminal.
+
+
+---
+
+
+![Linux_Architecture](https://dyz1pdcuffwr5.cloudfront.net/Linux/linux_architecture.png)
+
+
+---
+
+
+## Summary
+
+- Linux can be understood through four layers: **User/Application → Shell → Kernel → Hardware**.
+- The shell interprets commands and launches programs; it does not directly manage hardware.
+- The kernel manages processes, memory, file systems, devices, and networking.
+- Applications request kernel services through system calls.
+- The kernel manages hardware access, helping provide security, stability, and efficient resource use.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,282 @@
+---
+title: Service Management in Linux with systemctl
+---
+
+
+Linux servers run many applications in the background, such as web servers, databases, SSH, and Docker. These applications often need to start automatically, restart after configuration changes, or stop when they are no longer required.
+
+Linux provides `systemctl` to manage these services.
+
+## What Is a Service in Linux?
+
+A **service** is a program that runs in the background to provide a particular function. Such programs are often called *daemons*.
+
+Common examples include:
+
+- **SSH**: allows remote access to a Linux server.
+- **Apache and Nginx**: serve web pages and application traffic.
+- **Docker**: manages containers.
+- **Jenkins**: supports automation and CI/CD workflows.
+
+Services can run without requiring a user to keep a terminal window open.
+
+
+---
+
+
+## What Is `systemctl`?
+
+`systemctl` is the command-line utility used to manage services and other units controlled by **systemd**, the system and service manager used by many modern Linux distributions.
+
+With `systemctl`, you can start, stop, restart, inspect, and configure services to start automatically during system boot.
+
+### Basic Syntax
+
+```bash
+sudo systemctl <action> <service-name>
+```
+
+The action specifies what you want to do, while the service name identifies the service.
+
+
+---
+
+
+## Common `systemctl` Commands
+
+### Check Service Status
+
+```bash
+systemctl status apache2
+```
+
+Displays the service's current state, recent log messages, and other useful information.
+
+Common states include:
+
+- `active (running)` : the service is running.
+- `inactive (dead)` : the service is not currently running.
+- `failed` : the service failed to start or encountered a failure.
+
+Press `q` to exit the status view.
+
+### Start a Service
+
+```bash
+sudo systemctl start apache2
+```
+
+Starts the Apache web server immediately.
+
+### Stop a Service
+
+```bash
+sudo systemctl stop apache2
+```
+
+Stops the running service. Applications depending on that service may become unavailable.
+
+### Restart a Service
+
+```bash
+sudo systemctl restart apache2
+```
+
+Stops and starts the service again. Use this when a service needs a full restart after a configuration change or update.
+
+### Reload a Service
+
+Some services support reloading their configuration without a full restart.
+
+```bash
+sudo systemctl reload apache2
+```
+
+A reload asks the service to apply its configuration again, usually without terminating its existing process. Not every service supports this operation.
+
+### Enable a Service at Boot
+
+```bash
+sudo systemctl enable apache2
+```
+
+Configures the service to start automatically during system boot.
+
+**Important:** `enable` does not necessarily start the service immediately.
+
+To enable and start it in one command:
+
+```bash
+sudo systemctl enable --now apache2
+```
+
+### Disable Automatic Startup
+
+```bash
+sudo systemctl disable apache2
+```
+
+Prevents the service from being automatically started through its usual boot configuration. It does not stop a service that is already running.
+
+To disable and stop it together:
+
+```bash
+sudo systemctl disable --now apache2
+```
+
+
+---
+
+
+## List Services
+
+To list service units currently loaded into systemd:
+
+```bash
+systemctl list-units --type=service
+```
+
+By default, this lists loaded service units that are active, activating, or failed.
+
+To include inactive service units as well:
+
+```bash
+systemctl list-units --type=service --all
+```
+
+To list service unit files and their boot-enablement status:
+
+```bash
+systemctl list-unit-files --type=service
+```
+
+These commands answer different questions:
+
+- `list-units` shows the current state of loaded service units.
+- `list-unit-files` shows installed service unit files and whether they are enabled, disabled, or in another installation state.
+
+
+---
+
+
+## Practical Example: Manage Apache
+
+Let's install Apache on an Ubuntu server and configure it to start automatically.
+
+### Step 1: Update the Package Index
+
+```bash
+sudo apt update
+```
+
+### Step 2: Install Apache
+
+```bash
+sudo apt install apache2 -y
+```
+
+The `-y` option automatically confirms installation prompts.
+
+### Step 3: Start Apache
+
+```bash
+sudo systemctl start apache2
+```
+
+### Step 4: Verify Its Status
+
+```bash
+systemctl status apache2
+```
+
+Look for `active (running)` to confirm that systemd reports Apache as running.
+
+### Step 5: Enable Startup on Boot
+
+```bash
+sudo systemctl enable apache2
+```
+
+Apache is now configured to start automatically during system boot.
+
+### Step 6: Test the Web Server
+
+```bash
+curl http://localhost
+```
+
+This sends an HTTP request to the local machine. If Apache is serving its default page, you should see HTML in the response.
+
+**Distribution note:** On Ubuntu and Debian, the Apache service is usually named `apache2`. On Amazon Linux and many RHEL-based distributions, it is usually named `httpd`.
+
+
+---
+
+
+## Common DevOps Examples
+
+The service name depends on the software package and Linux distribution.
+
+```bash
+# Docker
+sudo systemctl start docker
+sudo systemctl enable docker
+systemctl status docker
+
+# Jenkins
+sudo systemctl start jenkins
+sudo systemctl enable jenkins
+systemctl status jenkins
+
+# Nginx
+sudo systemctl start nginx
+sudo systemctl enable nginx
+systemctl status nginx
+```
+
+For SSH, the service name also varies by distribution. Ubuntu commonly uses `ssh`, while Amazon Linux and many RHEL-based systems use `sshd`.
+
+```bash
+systemctl status ssh
+systemctl status sshd
+```
+
+Use the service name appropriate for your system.
+
+**Caution:** Avoid restarting or stopping SSH on a remote server unless you have confirmed the configuration is valid and have a recovery method. An SSH service problem can lock you out of the machine.
+
+
+---
+
+
+## Quick Reference
+
+| Command | Purpose |
+|---|---|
+| `systemctl status <service>` | Check service status |
+| `sudo systemctl start <service>` | Start a service |
+| `sudo systemctl stop <service>` | Stop a service |
+| `sudo systemctl restart <service>` | Restart a service |
+| `sudo systemctl reload <service>` | Reload configuration if supported |
+| `sudo systemctl enable <service>` | Enable automatic startup |
+| `sudo systemctl disable <service>` | Disable automatic startup |
+| `sudo systemctl enable --now <service>` | Enable and start a service |
+| `sudo systemctl disable --now <service>` | Disable and stop a service |
+| `systemctl list-units --type=service --all` | List loaded service units, including inactive ones |
+| `systemctl list-unit-files --type=service` | View service unit files and enablement status |
+
+
+---
+
+
+## Summary
+
+- A service is a background program that provides functionality to a Linux system.
+- `systemctl` manages services through systemd.
+- Use `start`, `stop`, `restart`, and `reload` to control a service's runtime behavior.
+- Use `enable` and `disable` to control automatic startup during boot.
+- **Starting a service and enabling it are different operations.** A service can be running but disabled for automatic startup, or enabled but currently stopped.
+- If a service fails to start, begin with `systemctl status <service>` to inspect its state and recent logs.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

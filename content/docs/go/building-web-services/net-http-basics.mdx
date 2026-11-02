@@ -1,0 +1,327 @@
+---
+title: net/http Basics
+---
+
+```go
+package main
+
+import (
+    "fmt"
+    "net/http"
+)
+
+func main() {
+    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+        fmt.Fprintln(w, "Hello from Go")
+    })
+
+    http.ListenAndServe(":8080", nil)
+}
+```
+
+Fourteen lines, no dependencies, and a production-capable HTTP server. Every request is handled in its own goroutine, TLS is supported, HTTP/2 is negotiated automatically, and the whole thing compiles into one binary.
+
+This is the reason Go took over backend infrastructure, and it is worth understanding properly before reaching for a framework.
+
+## The two types you need
+
+Everything in `net/http` revolves around these:
+
+```go
+type Handler interface {
+    ServeHTTP(ResponseWriter, *Request)
+}
+
+type HandlerFunc func(ResponseWriter, *Request)
+
+func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *Request) {
+    f(w, r)
+}
+```
+
+`Handler` is a one-method interface. `HandlerFunc` is a named function type with a method that calls itself, which is what lets a plain function satisfy the interface. That five line trick, from the interfaces section, is the whole adapter.
+
+```go
+// These are equivalent
+http.Handle("/a", http.HandlerFunc(myFunc))
+http.HandleFunc("/a", myFunc)
+```
+
+## The request
+
+```go
+func handler(w http.ResponseWriter, r *http.Request) {
+    r.Method              // "GET", "POST", ...
+    r.URL.Path            // "/users/42"
+    r.URL.Query()         // parsed query parameters
+    r.Header              // request headers
+    r.Body                // an io.ReadCloser
+    r.Context()           // cancelled when the client disconnects
+    r.RemoteAddr          // "203.0.113.5:54321"
+    r.Host
+}
+```
+
+```go
+// Query parameters
+limit := r.URL.Query().Get("limit")            // "" if absent
+values := r.URL.Query()["tags"]                // repeated parameters
+
+// Headers, case insensitive
+auth := r.Header.Get("Authorization")
+contentType := r.Header.Get("Content-Type")
+
+// Form data, for application/x-www-form-urlencoded
+if err := r.ParseForm(); err != nil {
+    http.Error(w, "bad form", http.StatusBadRequest)
+    return
+}
+name := r.FormValue("name")
+```
+
+<Callout type="warn">
+Always limit the request body. Without a cap, a client can stream gigabytes and exhaust your memory:
+
+```go
+r.Body = http.MaxBytesReader(w, r.Body, 1<<20)     // 1 MB
+```
+
+`MaxBytesReader` also sends a 413 response automatically when the limit is exceeded, which is why it takes the `ResponseWriter`.
+</Callout>
+
+## The response
+
+```go
+func handler(w http.ResponseWriter, r *http.Request) {
+    // Headers must be set BEFORE WriteHeader or Write
+    w.Header().Set("Content-Type", "application/json")
+    w.Header().Set("Cache-Control", "no-store")
+
+    w.WriteHeader(http.StatusCreated)          // optional, defaults to 200
+
+    w.Write([]byte(`{"status":"ok"}`))
+}
+```
+
+The order is fixed and the reason is that headers are sent with the status line. Once anything has been written, the headers are gone.
+
+```go
+// Wrong: the header is ignored
+w.Write([]byte("data"))
+w.Header().Set("Content-Type", "text/plain")
+
+// Wrong: only the first status is used, and the second logs a warning
+w.WriteHeader(http.StatusOK)
+w.WriteHeader(http.StatusInternalServerError)
+```
+
+The convenience helpers:
+
+```go
+http.Error(w, "not found", http.StatusNotFound)
+http.Redirect(w, r, "/new-path", http.StatusMovedPermanently)
+http.NotFound(w, r)
+http.ServeFile(w, r, "./static/index.html")
+```
+
+Use the named status constants rather than the numbers. `http.StatusUnprocessableEntity` says more than `422`.
+
+## Do not use the default server
+
+```go
+http.ListenAndServe(":8080", nil)
+```
+
+That works for examples and is unsuitable for production, because it has **no timeouts**. A client that opens a connection and sends nothing holds it forever, and enough of those exhaust the server.
+
+```go
+srv := &http.Server{
+    Addr:              ":8080",
+    Handler:           mux,
+    ReadHeaderTimeout: 5 * time.Second,
+    ReadTimeout:       15 * time.Second,
+    WriteTimeout:      15 * time.Second,
+    IdleTimeout:       60 * time.Second,
+    MaxHeaderBytes:    1 << 20,
+}
+
+if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+    log.Fatalf("server failed: %v", err)
+}
+```
+
+```text
+   ReadHeaderTimeout   how long to wait for the request headers
+                       the most important one, it stops slowloris attacks
+
+   ReadTimeout         headers plus body
+   WriteTimeout        from the end of the headers to the end of the response
+   IdleTimeout         how long a keep-alive connection may sit unused
+   MaxHeaderBytes      cap on header size
+```
+
+<Callout type="warn">
+`WriteTimeout` covers the whole response, so a long-running stream or a large file download will be cut off by it. For those endpoints, set `WriteTimeout` to zero and enforce a per-request deadline with a context instead.
+</Callout>
+
+The default global handlers have a related problem. `http.HandleFunc` registers on `http.DefaultServeMux`, which is a package level variable that any imported library can also register on. That is how `net/http/pprof` exposes profiling endpoints by being imported, which is convenient and also means an unexpected dependency can expose routes you did not intend. Create your own mux.
+
+## Graceful shutdown
+
+```go
+func main() {
+    ctx, stop := signal.NotifyContext(context.Background(),
+        os.Interrupt, syscall.SIGTERM)
+    defer stop()
+
+    srv := &http.Server{Addr: ":8080", Handler: routes()}
+
+    go func() {
+        if err := srv.ListenAndServe(); err != nil &&
+            !errors.Is(err, http.ErrServerClosed) {
+            slog.Error("server error", "error", err)
+            os.Exit(1)
+        }
+    }()
+
+    slog.Info("listening", "addr", srv.Addr)
+    <-ctx.Done()
+
+    slog.Info("shutting down")
+    shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    if err := srv.Shutdown(shutdownCtx); err != nil {
+        slog.Error("forced shutdown", "error", err)
+        srv.Close()
+    }
+}
+```
+
+`Shutdown` stops accepting new connections and waits for in-flight requests to finish. Without it, a deployment drops every request that was mid-flight, which shows up as intermittent 502s during rolling updates.
+
+Note that `ListenAndServe` returns `http.ErrServerClosed` on a clean shutdown, so treating every non-nil error as a failure means logging an error every time you deploy.
+
+## Serving files
+
+```go
+mux := http.NewServeMux()
+mux.Handle("/static/", http.StripPrefix("/static/",
+    http.FileServer(http.Dir("./public"))))
+```
+
+`StripPrefix` is required, otherwise `FileServer` looks for `./public/static/style.css` when the request is for `/static/style.css`.
+
+Serving from an embedded filesystem removes the deployment dependency entirely:
+
+```go
+//go:embed public
+var publicFS embed.FS
+
+sub, _ := fs.Sub(publicFS, "public")
+mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(sub))))
+```
+
+<Callout type="warn">
+`http.Dir` will serve any file under the directory it is given, including `.env` and `.git`. Never point it at a directory containing secrets, and never build a path from user input without validating it. `http.FS` over an embedded filesystem avoids the problem entirely because only what you embedded exists.
+</Callout>
+
+## TLS
+
+```go
+srv.ListenAndServeTLS("cert.pem", "key.pem")
+```
+
+In production the TLS termination usually happens at a load balancer or reverse proxy. When Go handles it directly, `autocert` from `golang.org/x/crypto` will obtain and renew Let's Encrypt certificates automatically:
+
+```go
+m := &autocert.Manager{
+    Cache:      autocert.DirCache("certs"),
+    Prompt:     autocert.AcceptTOS,
+    HostPolicy: autocert.HostWhitelist("example.com"),
+}
+
+srv := &http.Server{
+    Addr:      ":443",
+    Handler:   mux,
+    TLSConfig: m.TLSConfig(),
+}
+srv.ListenAndServeTLS("", "")
+```
+
+## A minimal but correct server
+
+Everything on this page, in the shape you would actually deploy:
+
+```go
+package main
+
+import (
+    "context"
+    "errors"
+    "log/slog"
+    "net/http"
+    "os"
+    "os/signal"
+    "syscall"
+    "time"
+)
+
+func main() {
+    if err := run(); err != nil {
+        slog.Error("fatal", "error", err)
+        os.Exit(1)
+    }
+}
+
+func run() error {
+    ctx, stop := signal.NotifyContext(context.Background(),
+        os.Interrupt, syscall.SIGTERM)
+    defer stop()
+
+    mux := http.NewServeMux()
+
+    mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+        w.Write([]byte("ok"))
+    })
+
+    mux.HandleFunc("GET /hello/{name}", func(w http.ResponseWriter, r *http.Request) {
+        name := r.PathValue("name")
+        w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+        fmt.Fprintf(w, "Hello, %s\n", name)
+    })
+
+    srv := &http.Server{
+        Addr:              ":8080",
+        Handler:           mux,
+        ReadHeaderTimeout: 5 * time.Second,
+        ReadTimeout:       15 * time.Second,
+        WriteTimeout:      15 * time.Second,
+        IdleTimeout:       60 * time.Second,
+    }
+
+    errCh := make(chan error, 1)
+    go func() {
+        slog.Info("listening", "addr", srv.Addr)
+        if err := srv.ListenAndServe(); err != nil &&
+            !errors.Is(err, http.ErrServerClosed) {
+            errCh <- err
+        }
+    }()
+
+    select {
+    case err := <-errCh:
+        return err
+    case <-ctx.Done():
+    }
+
+    shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+    return srv.Shutdown(shutdownCtx)
+}
+```
+
+Own mux, real timeouts, signal handling, graceful shutdown, and startup errors surfaced rather than swallowed. That is the baseline every Go service should start from.
+
+Next, let's look at routing properly, including what Go 1.22 added to the standard mux.

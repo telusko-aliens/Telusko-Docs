@@ -1,0 +1,311 @@
+---
+title: Handlers and Routing
+---
+
+For most of Go's life, the standard router could not match on HTTP method or extract path parameters. Every real project reached for `chi`, `gorilla/mux`, or `gin` on day one, and every tutorial started with a `go get`.
+
+Go 1.22 changed that. `http.ServeMux` now understands methods and wildcards, which covers what the large majority of services actually need.
+
+## The modern ServeMux
+
+```go
+mux := http.NewServeMux()
+
+mux.HandleFunc("GET /users", listUsers)
+mux.HandleFunc("POST /users", createUser)
+mux.HandleFunc("GET /users/{id}", getUser)
+mux.HandleFunc("PUT /users/{id}", updateUser)
+mux.HandleFunc("DELETE /users/{id}", deleteUser)
+mux.HandleFunc("GET /files/{path...}", serveFile)
+```
+
+Method matching means a POST to `/users/42` no longer reaches the GET handler, and a request with an unregistered method gets an automatic 405 with a correct `Allow` header.
+
+Path parameters come out with `PathValue`:
+
+```go
+func getUser(w http.ResponseWriter, r *http.Request) {
+    id := r.PathValue("id")
+    // ...
+}
+```
+
+The `{path...}` form is a trailing wildcard that captures the rest of the path, including slashes.
+
+## Pattern precedence
+
+Patterns are matched most specific first, not in registration order:
+
+```go
+mux.HandleFunc("GET /users/{id}", getUser)
+mux.HandleFunc("GET /users/me", getCurrentUser)     // wins for /users/me
+```
+
+The rule is that a pattern which matches a strict subset of another's paths takes precedence. That removes the classic ordering bug where a wildcard route registered first swallows every specific route after it.
+
+Conflicting patterns that neither contains the other cause a **panic at registration**, which is exactly when you want to find out:
+
+```go
+mux.HandleFunc("GET /a/{x}/c", h1)
+mux.HandleFunc("GET /a/b/{y}", h2)
+// panic: patterns conflict
+```
+
+## Trailing slashes
+
+```go
+mux.HandleFunc("/static/", fileHandler)     // matches /static/ and everything under it
+mux.HandleFunc("/about", aboutHandler)      // matches /about exactly
+```
+
+A trailing slash makes the pattern a prefix match. Without one, it is exact. `ServeMux` also redirects `/about/` to `/about` automatically, which is usually helpful and occasionally surprising.
+
+To register a pattern that must match exactly with no redirect, use `{$}`:
+
+```go
+mux.HandleFunc("GET /{$}", homeHandler)     // only "/", not everything
+```
+
+Without `{$}`, the pattern `/` is a catch-all that matches every unmatched path, which is how you write a custom 404.
+
+## Handlers as types
+
+A plain function is fine for simple handlers. When a handler needs dependencies, make it a method on a struct:
+
+```go
+type UserHandler struct {
+    service *UserService
+    logger  *slog.Logger
+}
+
+func NewUserHandler(s *UserService, l *slog.Logger) *UserHandler {
+    return &UserHandler{service: s, logger: l}
+}
+
+func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
+    users, err := h.service.List(r.Context())
+    if err != nil {
+        h.logger.ErrorContext(r.Context(), "listing users", "error", err)
+        http.Error(w, "internal error", http.StatusInternalServerError)
+        return
+    }
+    writeJSON(w, http.StatusOK, users)
+}
+
+func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
+    id := r.PathValue("id")
+    user, err := h.service.Get(r.Context(), id)
+    if errors.Is(err, ErrNotFound) {
+        http.Error(w, "not found", http.StatusNotFound)
+        return
+    }
+    if err != nil {
+        h.logger.ErrorContext(r.Context(), "getting user", "id", id, "error", err)
+        http.Error(w, "internal error", http.StatusInternalServerError)
+        return
+    }
+    writeJSON(w, http.StatusOK, user)
+}
+```
+
+```go
+h := NewUserHandler(userService, logger)
+
+mux.HandleFunc("GET /users", h.List)
+mux.HandleFunc("GET /users/{id}", h.Get)
+```
+
+Method values work directly as `HandlerFunc`, so no adapter is needed. Dependencies are explicit, nothing is global, and tests construct the handler with fakes.
+
+## The closure alternative
+
+For a handler needing one dependency, a closure is lighter:
+
+```go
+func handleGetUser(svc *UserService) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        user, err := svc.Get(r.Context(), r.PathValue("id"))
+        // ...
+    }
+}
+
+mux.HandleFunc("GET /users/{id}", handleGetUser(userService))
+```
+
+This form also gives you a place for per-handler setup that runs once at registration rather than per request:
+
+```go
+func handleReport(db *sql.DB) http.HandlerFunc {
+    tmpl := template.Must(template.ParseFiles("report.html"))   // parsed once
+
+    return func(w http.ResponseWriter, r *http.Request) {
+        data := loadReport(r.Context(), db)
+        tmpl.Execute(w, data)
+    }
+}
+```
+
+## Grouping routes
+
+`ServeMux` has no built-in grouping, and nesting muxes covers most of what you would want:
+
+```go
+func routes(h *Handlers) http.Handler {
+    mux := http.NewServeMux()
+
+    // API v1
+    v1 := http.NewServeMux()
+    v1.HandleFunc("GET /users", h.Users.List)
+    v1.HandleFunc("POST /users", h.Users.Create)
+    v1.HandleFunc("GET /orders", h.Orders.List)
+
+    mux.Handle("/api/v1/", http.StripPrefix("/api/v1", v1))
+
+    // Public
+    mux.HandleFunc("GET /health", h.Health)
+    mux.Handle("/static/", http.StripPrefix("/static/",
+        http.FileServer(http.Dir("public"))))
+
+    return mux
+}
+```
+
+Applying middleware to a group is then just wrapping that sub-mux:
+
+```go
+mux.Handle("/api/v1/", RequireAuth(http.StripPrefix("/api/v1", v1)))
+```
+
+## When to use a router library
+
+The standard mux does not do a few things, and if you need them a library is the honest answer.
+
+```text
+   ServeMux does NOT have
+   ─────────────────────
+   route groups with shared middleware, built in
+   regex or typed constraints on parameters
+   built-in middleware (logging, recovery, CORS, rate limiting)
+   route naming and reverse URL generation
+   an easy way to list all registered routes
+```
+
+`github.com/go-chi/chi/v5` is the usual choice because it stays compatible with `http.Handler` throughout, so everything you write works with the standard library too:
+
+```go
+r := chi.NewRouter()
+
+r.Use(middleware.Logger)
+r.Use(middleware.Recoverer)
+r.Use(middleware.Timeout(30 * time.Second))
+
+r.Route("/api/v1", func(r chi.Router) {
+    r.Route("/users", func(r chi.Router) {
+        r.Get("/", h.ListUsers)
+        r.Post("/", h.CreateUser)
+
+        r.Group(func(r chi.Router) {
+            r.Use(RequireAuth)
+            r.Get("/{id}", h.GetUser)
+            r.Delete("/{id}", h.DeleteUser)
+        })
+    })
+})
+```
+
+<Callout type="info">
+The distinction worth drawing: `chi` and `gorilla/mux` are routers that work with standard `http.Handler` values. `gin`, `echo`, and `fiber` are frameworks with their own context type and their own handler signature. The first group composes with the entire Go ecosystem. The second asks you to adopt its conventions everywhere. Neither is wrong, but the first is the more common choice in Go for good reasons.
+</Callout>
+
+## Helper functions worth writing once
+
+Every service ends up with these two. Writing them early keeps handlers short:
+
+```go
+func writeJSON(w http.ResponseWriter, status int, v any) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(status)
+
+    if v == nil {
+        return
+    }
+    if err := json.NewEncoder(w).Encode(v); err != nil {
+        // The status is already sent, so all we can do is log.
+        slog.Error("encoding response", "error", err)
+    }
+}
+
+func readJSON(w http.ResponseWriter, r *http.Request, dst any) error {
+    r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+    dec := json.NewDecoder(r.Body)
+    dec.DisallowUnknownFields()
+
+    if err := dec.Decode(dst); err != nil {
+        return fmt.Errorf("invalid request body: %w", err)
+    }
+
+    // Reject trailing content after the JSON document.
+    if dec.More() {
+        return errors.New("request body must contain a single JSON object")
+    }
+    return nil
+}
+```
+
+That `dec.More()` check catches a class of malformed request that would otherwise pass silently.
+
+## Testing handlers
+
+`httptest` makes this straightforward, and no server needs to start:
+
+```go
+func TestGetUser(t *testing.T) {
+    h := NewUserHandler(&fakeService{
+        user: User{ID: "42", Name: "Shiva"},
+    }, slog.Default())
+
+    mux := http.NewServeMux()
+    mux.HandleFunc("GET /users/{id}", h.Get)
+
+    req := httptest.NewRequest(http.MethodGet, "/users/42", nil)
+    rec := httptest.NewRecorder()
+
+    mux.ServeHTTP(rec, req)
+
+    if rec.Code != http.StatusOK {
+        t.Fatalf("status = %d, want 200", rec.Code)
+    }
+
+    var got User
+    if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+        t.Fatalf("decoding response: %v", err)
+    }
+    if got.Name != "Shiva" {
+        t.Errorf("name = %q, want Shiva", got.Name)
+    }
+}
+```
+
+Routing through the mux rather than calling the handler directly matters when the handler uses `PathValue`, because the mux is what populates it.
+
+## Common mistakes
+
+**Writing after the status.** Setting a header after `WriteHeader` or `Write` does nothing.
+
+**Forgetting to return after an error.** `http.Error` does not stop the function:
+
+```go
+if err != nil {
+    http.Error(w, "failed", 500)
+    return                          // without this, execution continues
+}
+```
+
+**Not limiting the body.** Every handler reading a body needs `MaxBytesReader`.
+
+**Ignoring the request context.** Every downstream call should take `r.Context()`.
+
+**Leaking internal errors.** `http.Error(w, err.Error(), 500)` sends your database error text, and possibly your connection string, to the client. Log the detail, send a generic message.
+
+Next, let's build a complete JSON API using all of this.

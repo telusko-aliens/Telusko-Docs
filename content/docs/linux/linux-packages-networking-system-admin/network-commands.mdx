@@ -1,0 +1,205 @@
+---
+title: Networking Commands in Linux
+---
+
+
+Networking commands help you troubleshoot connectivity, test web applications and APIs, and download files directly from the Linux terminal. These tasks are common when managing servers and working with DevOps tools.
+
+In this lecture, we'll cover three useful commands: `ping`, `curl`, and `wget`.
+
+
+## `ping` - Check Network Connectivity
+
+The `ping` command sends network packets to a target host and waits for replies. It helps you check whether a machine is reachable over the network.
+
+### Syntax
+
+```bash
+ping <hostname-or-IP>
+```
+
+### Example
+
+```bash
+ping google.com
+```
+
+If the target responds, you'll see output similar to this:
+
+```text
+64 bytes from ...: icmp_seq=1 ttl=116 time=12.4 ms
+64 bytes from ...: icmp_seq=2 ttl=116 time=11.8 ms
+```
+
+This output indicates that replies were received. The `time` value shows the approximate round-trip time for each packet.
+
+Press `Ctrl + C` to stop the command.
+
+### Common Use Cases
+
+- Check connectivity between Linux servers.
+- Investigate basic network connectivity problems.
+- Check whether a remote host responds to ICMP packets.
+
+**Important:** A failed `ping` does not always mean the server is down. Firewalls or network policies may block ICMP traffic even when the server's application is working.
+
+
+---
+
+
+## `curl` - Test APIs and Web Applications
+
+The `curl` command transfers data to or from a URL. It supports HTTP, HTTPS, and several other protocols, making it particularly useful for testing APIs and web applications.
+
+### Syntax
+
+```bash
+curl <URL>
+```
+
+### Example 1: Fetch a Webpage
+
+```bash
+curl https://example.com
+```
+
+This sends an HTTP request and displays the response body, which may contain HTML.
+
+### Example 2: Test an API
+
+```bash
+curl https://jsonplaceholder.typicode.com/posts/1
+```
+
+This requests a sample API endpoint and displays its JSON response.
+
+Example output:
+
+```json
+{
+  "userId": 1,
+  "id": 1,
+  "title": "sunt aut facere repellat provident",
+  "body": "quia et suscipit..."
+}
+```
+
+This is useful for checking whether an API returns data.
+
+### Example 3: View HTTP Response Headers
+
+```bash
+curl -i https://example.com
+```
+
+The `-i` option includes the HTTP response headers along with the response body.
+
+Headers contain information such as the HTTP status code and content type.
+
+Common status codes include:
+
+- `200 OK` : the request succeeded.
+- `301` or `302` : the resource has been redirected.
+- `404 Not Found` : the requested resource was not found.
+- `500 Internal Server Error` : the server encountered an error.
+
+### Example 4: Test a Local Application
+
+```bash
+curl http://localhost:8080
+```
+
+This sends a request to port `8080` on the local machine.
+
+It is useful when testing a Spring Boot application or another web service running locally.
+
+If the application is not listening on that port, the connection may be refused.
+
+**Tip:** To display only the HTTP response status code, use:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" \
+http://localhost:8080
+```
+
+This is helpful when checking an application's HTTP response without displaying the page content.
+
+
+---
+
+
+## `wget` - Download Files from the Internet
+
+The `wget` command downloads files from URLs. It is commonly used to retrieve archives, installation files, and other resources on Linux servers.
+
+### Syntax
+
+```bash
+wget <file-URL>
+```
+
+### Example: Download a File
+
+```bash
+wget https://example.com/archive.zip
+```
+
+If the URL points to a downloadable file and the request succeeds, `wget` saves it in the current directory using the filename provided by the server or URL.
+
+Verify the downloaded file with:
+
+```bash
+ls -lh
+```
+
+The `-h` option displays file sizes in a human-readable format.
+
+### Save a File with a Different Name
+
+Use the `-O` option to specify the output filename:
+
+```bash
+wget -O myfile.zip https://example.com/archive.zip
+```
+
+The downloaded content is saved as `myfile.zip`.
+
+**Note:** Always verify that a download completed successfully and came from a trusted source before using it to install software.
+
+
+---
+
+
+![Linux_curl_vs_wget](https://dyz1pdcuffwr5.cloudfront.net/Linux/linux_curl_wget.png)
+
+
+---
+
+
+## Quick Reference
+
+| Command | Purpose |
+|---|---|
+| `ping google.com` | Check whether a host responds to network packets |
+| `curl https://example.com` | Fetch a URL's response |
+| `curl -i https://example.com` | Display response headers and body |
+| `curl http://localhost:8080` | Test a local web application |
+| `wget https://example.com/archive.zip` | Download a file |
+| `wget -O file.zip <URL>` | Download and specify the output filename |
+| `Ctrl + C` | Stop a running command such as `ping` |
+
+
+---
+
+
+## Summary
+
+- **`ping`** helps investigate network reachability, but a missing reply does not necessarily mean a host is offline.
+- **`curl`** is useful for testing HTTP endpoints, inspecting responses, and troubleshooting APIs.
+- **`wget`** is commonly used to download files from remote servers.
+- Use `curl` when you need to inspect or test an API response, and `wget` when you want to download a file conveniently.
+
+These commands provide a practical starting point for troubleshooting Linux servers and checking applications in DevOps environments.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

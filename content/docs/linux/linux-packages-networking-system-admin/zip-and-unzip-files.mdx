@@ -1,0 +1,194 @@
+---
+title: Zip & Unzip Files in Linux
+---
+
+
+## Why Compress Files?
+
+In Linux, you may need to bundle multiple files before sharing them, transferring them to another server, or storing them for later use.
+
+![Linux_Zip_Benefits](https://dyz1pdcuffwr5.cloudfront.net/Linux/linux_zip_benefits.png)
+
+Linux provides the `zip` utility to create archives and `unzip` to inspect and extract them.
+
+
+---
+
+
+## Installing Zip and Unzip
+
+On Ubuntu or Debian, install the utilities using `apt`:
+
+```bash
+sudo apt update
+sudo apt install zip unzip
+```
+
+If these commands are already available on your system, you can skip installation.
+
+
+### Creating a ZIP Archive
+
+Use `zip` followed by the archive name and the files you want to include.
+
+```bash
+zip logfiles.zip app.log error.log
+```
+
+This creates `logfiles.zip` containing `app.log` and `error.log`.
+
+To include several files, simply list their names:
+
+```bash
+zip project.zip app.py config.json README.md
+```
+
+**Note:** The original files remain unchanged. The command creates a separate archive.
+
+
+### Compressing a Directory
+
+To include a directory and its contents, use the `-r` option for recursive processing:
+
+```bash
+zip -r project.zip project/
+```
+
+This archives the `project/` directory, including its subdirectories and files.
+
+
+---
+
+
+## Adding Files to an Existing ZIP Archive
+
+You can add another file to an existing archive by running `zip` with the same archive name:
+
+```bash
+zip logfiles.zip exception.log
+```
+
+If `logfiles.zip` already exists, `exception.log` is added to it.
+
+If the archive does not exist, `zip` creates a new one instead.
+
+
+---
+
+
+## Viewing Archive Contents Without Extracting
+
+Before extracting an archive, you can inspect its contents using `unzip -l`:
+
+```bash
+unzip -l logfiles.zip
+```
+
+This displays a list of archived files, along with information such as their sizes and timestamps, without extracting them.
+
+This is useful when you want to check what an archive contains before unpacking it.
+
+
+---
+
+
+## Extracting a ZIP Archive
+
+### Extract to the Current Directory
+
+```bash
+unzip logfiles.zip
+```
+
+This extracts the archive's contents into your current working directory.
+
+If files with matching names already exist, `unzip` may ask whether you want to overwrite them.
+
+### Extract to a Specific Directory
+
+Use the `-d` option to choose the destination directory:
+
+```bash
+mkdir -p logfiles
+unzip logfiles.zip -d logfiles/
+```
+
+Here:
+
+- `mkdir -p logfiles` creates the directory if it does not already exist.
+- `unzip ... -d logfiles/` extracts the archive into that directory.
+
+This helps keep extracted files organized instead of mixing them with files in your current directory.
+
+
+---
+
+
+## Removing a File from a ZIP Archive
+
+To remove a specific file from an archive, use `zip -d`:
+
+```bash
+zip -d logfiles.zip exception.log
+```
+
+This removes `exception.log` from the archive without deleting the original file from the filesystem.
+
+Verify the change:
+
+```bash
+unzip -l logfiles.zip
+```
+
+The removed file should no longer appear in the archive listing.
+
+
+---
+
+
+## Deleting a ZIP Archive
+
+To delete the archive itself, use `rm`:
+
+```bash
+rm logfiles.zip
+```
+
+This removes `logfiles.zip` from the filesystem. It does not automatically delete any original files that were used to create the archive.
+
+**Caution:** `rm` does not normally move files to a recycle bin, so verify the filename before running it.
+
+
+---
+
+
+## Quick Reference
+
+| Command                        | Purpose                                     |
+| ------------------------------ | ------------------------------------------- |
+| `zip archive.zip file1 file2`  | Create an archive containing multiple files |
+| `zip -r archive.zip folder/`   | Archive a directory recursively             |
+| `zip archive.zip newfile`      | Add a file to an existing archive           |
+| `unzip -l archive.zip`         | List archive contents without extracting    |
+| `unzip archive.zip`            | Extract into the current directory          |
+| `unzip archive.zip -d folder/` | Extract into a specific directory           |
+| `zip -d archive.zip filename`  | Remove a file from the archive              |
+| `rm archive.zip`               | Delete the archive from the filesystem      |
+
+
+---
+
+
+## Summary
+
+- Use `zip` to create archives and `unzip` to inspect or extract them.
+- Use `zip -r` when archiving directories and their contents.
+- Use `unzip -l` to preview an archive before extracting it.
+- Use `unzip -d` to control where files are extracted.
+- Use `zip -d` to remove an entry from an archive and `rm` to delete the archive itself.
+- Creating or extracting an archive does not automatically delete the original source files.
+
+> ZIP archives are useful for packaging logs, configuration files, and project files for transfer or storage. Always inspect unfamiliar archives before extracting them, especially on shared or production systems.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

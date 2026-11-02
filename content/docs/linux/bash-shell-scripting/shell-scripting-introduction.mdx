@@ -1,0 +1,149 @@
+---
+title: Introduction to Shell Scripting
+---
+
+
+In Linux and DevOps, many tasks involve running the same commands repeatedly, such as installing software, configuring servers, or performing routine maintenance. Executing each command manually takes time and increases the chance of mistakes.
+
+**Shell scripting** helps automate these tasks by combining multiple commands into a reusable script.
+
+
+---
+
+
+## What Is a Shell Script?
+
+A shell script is a text file containing commands that a shell can execute. Commands typically run from top to bottom, and scripts can also use variables, loops, and conditional statements to handle more complex tasks.
+
+Shell scripts commonly use the .sh extension, although this extension is a convention rather than a requirement.
+
+For example, a script can combine commands to display the current directory, list its contents, and show the current user.
+
+### What is the Shell?
+
+From the Linux architecture, the **shell** is the interface between the **user** and the **kernel**. It interprets user commands and converts them into system calls for the kernel to execute. Shell scripting leverages this interface to automate tasks.
+
+
+---
+
+
+## Creating Your First Script
+
+### Step 1: Create the Script File
+
+```bash
+vi script1.sh
+```
+
+### Step 2: Add Linux Commands
+
+```bash
+pwd
+ls
+whoami
+```
+
+- These are simple commands: print working directory, list files, and display the current user.
+- Save and exit the editor (`:wq`).
+
+
+---
+
+
+## Executing a Shell Script
+
+There are **two ways** to run a shell script:
+
+### Option 1: Using the Basic Shell (`sh`)
+
+```bash
+sh script1.sh
+```
+
+- Runs the script using the **basic `sh` shell**.
+- **Does not require** execute permission on the file.
+
+### Option 2: Using the Default Shell (`./`)
+
+```bash
+./script1.sh
+```
+
+- Runs the script using the system's **default shell** (usually `bash`).
+- **Requires execute permission** — without it, you get `Permission denied`.
+
+### Granting Execute Permission
+
+```bash
+chmod u+x script1.sh
+```
+
+- Adds execute permission for the user.
+- This only needs to be done **once** per file — after that, you can execute it any number of times.
+
+### Check Default Shell
+
+```bash
+echo $SHELL
+```
+
+- Displays the default shell (e.g., `/bin/bash`).
+- When you use `./`, this is the shell that executes the script.
+
+
+---
+
+
+## The Shebang (`#!/bin/bash`)
+
+It is **highly recommended** to include a **shebang** at the very first line of every shell script:
+
+```bash
+#!/bin/bash
+```
+
+### Why?
+
+- **Specifies which shell** should be used to execute the script.
+- Provides **readability** — anyone reading the script (e.g., team members) immediately knows which shell it targets.
+- Even if you don't specify it, most Linux systems default to `bash`, but it is a **best practice** to always include it.
+
+### Example Script with Shebang
+
+```bash
+#!/bin/bash
+pwd
+ls
+whoami
+```
+
+> Even with a shebang specifying `bash`, you can still run the script with `sh script1.sh` — it will use the basic shell in that case. But using `./script1.sh` will respect the shebang.
+
+
+---
+
+
+## Quick Reference
+
+| Action                          | Command                    |
+|---------------------------------|----------------------------|
+| Create a script                 | `vi script1.sh`           |
+| Run with basic shell            | `sh script1.sh`           |
+| Run with default shell          | `./script1.sh`            |
+| Grant execute permission        | `chmod u+x script1.sh`    |
+| Check default shell             | `echo $SHELL`             |
+
+
+---
+
+
+## Summary
+
+- Shell scripting allows you to **automate multiple Linux commands** in a single file.
+- Script files use the **`.sh` extension**.
+- Use `sh script.sh` to run without permissions, or `./script.sh` to run with the default shell (requires execute permission).
+- Always include the **shebang** (`#!/bin/bash`) at the top of your scripts for clarity and best practice.
+- Grant execute permission with `chmod u+x`, this is a **one-time** setup per file.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

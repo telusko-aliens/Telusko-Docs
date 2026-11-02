@@ -1,0 +1,530 @@
+---
+title: "Project 3: File Processing Tool"
+---
+
+A tool that walks a directory tree, processes every matching file, and produces a report. The version here counts lines of code by language, but the skeleton handles anything: log analysis, duplicate detection, image resizing, checksum verification.
+
+The interesting constraint is that the input might be a single small file or forty gigabytes across two hundred thousand files. The program has to behave the same either way, which means streaming rather than loading, and bounded concurrency rather than a goroutine per file.
+
+```bash
+$ loc ./myproject --exclude vendor,node_modules
+
+LANGUAGE      FILES     CODE  COMMENTS    BLANK    TOTAL
+Go              142    18420      2103     3211    23734
+SQL              23     1840        94      219     2153
+YAML             12      430        38       61      529
+Markdown          8      920         0      184     1104
+─────────────────────────────────────────────────────────
+TOTAL           185    21610      2235     3675    27520
+
+scanned 185 files (4.2 MB) in 218ms
+```
+
+## Setting up
+
+```bash
+mkdir loc && cd loc
+go mod init example.com/loc
+go get golang.org/x/sync/errgroup
+```
+
+```text
+   loc/
+   ├── go.mod
+   ├── main.go       flags and output
+   ├── walk.go       finding files
+   ├── count.go      counting one file
+   └── report.go     aggregation and formatting
+```
+
+## Finding the files
+
+```go title="walk.go"
+package main
+
+import (
+    "io/fs"
+    "path/filepath"
+    "strings"
+)
+
+type Language struct {
+    Name         string
+    LineComment  string
+    BlockStart   string
+    BlockEnd     string
+}
+
+var languages = map[string]Language{
+    ".go":   {"Go", "//", "/*", "*/"},
+    ".js":   {"JavaScript", "//", "/*", "*/"},
+    ".ts":   {"TypeScript", "//", "/*", "*/"},
+    ".py":   {"Python", "#", `"""`, `"""`},
+    ".rs":   {"Rust", "//", "/*", "*/"},
+    ".java": {"Java", "//", "/*", "*/"},
+    ".sql":  {"SQL", "--", "/*", "*/"},
+    ".sh":   {"Shell", "#", "", ""},
+    ".yaml": {"YAML", "#", "", ""},
+    ".yml":  {"YAML", "#", "", ""},
+    ".md":   {"Markdown", "", "", ""},
+    ".html": {"HTML", "", "<!--", "-->"},
+    ".css":  {"CSS", "", "/*", "*/"},
+}
+
+type FileJob struct {
+    Path string
+    Lang Language
+    Size int64
+}
+
+type WalkOptions struct {
+    Root     string
+    Exclude  []string
+    MaxSize  int64
+    Hidden   bool
+}
+
+func FindFiles(opts WalkOptions) ([]FileJob, error) {
+    excluded := make(map[string]struct{}, len(opts.Exclude))
+    for _, e := range opts.Exclude {
+        excluded[e] = struct{}{}
+    }
+
+    var jobs []FileJob
+
+    err := filepath.WalkDir(opts.Root, func(path string, d fs.DirEntry, err error) error {
+        if err != nil {
+            return err
+        }
+
+        name := d.Name()
+
+        if d.IsDir() {
+            if _, skip := excluded[name]; skip {
+                return filepath.SkipDir
+            }
+            if !opts.Hidden && strings.HasPrefix(name, ".") && name != "." {
+                return filepath.SkipDir
+            }
+            return nil
+        }
+
+        lang, known := languages[strings.ToLower(filepath.Ext(name))]
+        if !known {
+            return nil
+        }
+
+        info, err := d.Info()
+        if err != nil {
+            return nil          // the file vanished between listing and stat
+        }
+        if opts.MaxSize > 0 && info.Size() > opts.MaxSize {
+            return nil
+        }
+
+        jobs = append(jobs, FileJob{Path: path, Lang: lang, Size: info.Size()})
+        return nil
+    })
+
+    return jobs, err
+}
+```
+
+`filepath.SkipDir` is the part that makes this fast on a real project. Returning it from a directory prevents descending into it at all, so `node_modules` costs nothing rather than being walked and filtered.
+
+Returning `nil` from the `d.Info()` error is deliberate. On a large tree, files disappear while you are walking it, and aborting the whole scan for one missing file is the wrong behaviour.
+
+## Counting one file
+
+```go title="count.go"
+package main
+
+import (
+    "bufio"
+    "fmt"
+    "os"
+    "strings"
+)
+
+type Counts struct {
+    Files    int
+    Code     int
+    Comments int
+    Blank    int
+    Bytes    int64
+}
+
+func (c Counts) Total() int { return c.Code + c.Comments + c.Blank }
+
+func (c *Counts) Add(o Counts) {
+    c.Files += o.Files
+    c.Code += o.Code
+    c.Comments += o.Comments
+    c.Blank += o.Blank
+    c.Bytes += o.Bytes
+}
+
+func CountFile(job FileJob) (Counts, error) {
+    f, err := os.Open(job.Path)
+    if err != nil {
+        return Counts{}, fmt.Errorf("opening %s: %w", job.Path, err)
+    }
+    defer f.Close()
+
+    counts := Counts{Files: 1, Bytes: job.Size}
+
+    scanner := bufio.NewScanner(f)
+    scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)   // allow 1 MB lines
+
+    inBlock := false
+
+    for scanner.Scan() {
+        line := strings.TrimSpace(scanner.Text())
+
+        switch {
+        case line == "":
+            counts.Blank++
+
+        case inBlock:
+            counts.Comments++
+            if job.Lang.BlockEnd != "" && strings.Contains(line, job.Lang.BlockEnd) {
+                inBlock = false
+            }
+
+        case job.Lang.BlockStart != "" && strings.HasPrefix(line, job.Lang.BlockStart):
+            counts.Comments++
+            if !strings.Contains(line[len(job.Lang.BlockStart):], job.Lang.BlockEnd) {
+                inBlock = true
+            }
+
+        case job.Lang.LineComment != "" && strings.HasPrefix(line, job.Lang.LineComment):
+            counts.Comments++
+
+        default:
+            counts.Code++
+        }
+    }
+
+    if err := scanner.Err(); err != nil {
+        return Counts{}, fmt.Errorf("reading %s: %w", job.Path, err)
+    }
+
+    return counts, nil
+}
+```
+
+`bufio.Scanner` streams the file line by line, so a two gigabyte log file uses a fixed amount of memory rather than two gigabytes.
+
+The `scanner.Buffer` call raises the maximum line length from the default 64 KB. Minified JavaScript and single-line JSON regularly exceed it, and without this the scan stops silently at the first long line.
+
+`scanner.Err()` after the loop is the check people forget. `Scan` returns false at the end of input **and** on error, so without this a read failure looks like a complete file.
+
+## Processing concurrently
+
+```go title="main.go"
+func processAll(ctx context.Context, jobs []FileJob, workers int) (map[string]*Counts, []error) {
+    var (
+        mu      sync.Mutex
+        byLang  = make(map[string]*Counts)
+        errs    []error
+    )
+
+    g, ctx := errgroup.WithContext(ctx)
+    g.SetLimit(workers)
+
+    for _, job := range jobs {
+        g.Go(func() error {
+            select {
+            case <-ctx.Done():
+                return ctx.Err()
+            default:
+            }
+
+            counts, err := CountFile(job)
+
+            mu.Lock()
+            defer mu.Unlock()
+
+            if err != nil {
+                errs = append(errs, err)
+                return nil          // one bad file must not stop the scan
+            }
+
+            c, ok := byLang[job.Lang.Name]
+            if !ok {
+                c = &Counts{}
+                byLang[job.Lang.Name] = c
+            }
+            c.Add(counts)
+
+            return nil
+        })
+    }
+
+    _ = g.Wait()
+    return byLang, errs
+}
+```
+
+Returning `nil` from the worker on a file error is a deliberate policy choice. Returning the error would cancel the group and abandon the scan, which is wrong for a reporting tool: one unreadable file should be noted, not fatal.
+
+<Callout type="warn">
+The mutex protects both the map and the error slice. Without it, `go test -race` reports a data race immediately, and in production you would get the runtime's "concurrent map writes" crash. Every shared value touched by workers needs synchronisation, and the race detector is how you find the ones you missed.
+</Callout>
+
+### Is the concurrency worth it?
+
+For this workload it depends entirely on the storage.
+
+```text
+   SSD, many small files      →  large win, the syscalls parallelise
+   Spinning disk              →  little or no win, seeking dominates
+   Network filesystem         →  very large win, latency is the cost
+   A few enormous files       →  no win, one file is one goroutine
+```
+
+A reasonable default is `runtime.NumCPU()` for CPU-bound counting and higher for I/O-bound reading. Measure on your own machine before assuming.
+
+## The report
+
+```go title="report.go"
+package main
+
+import (
+    "fmt"
+    "io"
+    "os"
+    "slices"
+    "text/tabwriter"
+)
+
+func PrintReport(w io.Writer, byLang map[string]*Counts, elapsed time.Duration) {
+    type row struct {
+        Lang string
+        C    *Counts
+    }
+
+    rows := make([]row, 0, len(byLang))
+    var total Counts
+
+    for lang, c := range byLang {
+        rows = append(rows, row{lang, c})
+        total.Add(*c)
+    }
+
+    // Most code first, alphabetical for ties.
+    slices.SortFunc(rows, func(a, b row) int {
+        return cmp.Or(
+            cmp.Compare(b.C.Code, a.C.Code),
+            cmp.Compare(a.Lang, b.Lang),
+        )
+    })
+
+    tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', tabwriter.AlignRight)
+
+    fmt.Fprintln(tw, "LANGUAGE\tFILES\tCODE\tCOMMENTS\tBLANK\tTOTAL\t")
+    for _, r := range rows {
+        fmt.Fprintf(tw, "%s\t%d\t%d\t%d\t%d\t%d\t\n",
+            r.Lang, r.C.Files, r.C.Code, r.C.Comments, r.C.Blank, r.C.Total())
+    }
+    fmt.Fprintln(tw, "\t\t\t\t\t\t")
+    fmt.Fprintf(tw, "TOTAL\t%d\t%d\t%d\t%d\t%d\t\n",
+        total.Files, total.Code, total.Comments, total.Blank, total.Total())
+
+    tw.Flush()
+
+    fmt.Fprintf(w, "\nscanned %d files (%s) in %v\n",
+        total.Files, humanBytes(total.Bytes), elapsed.Round(time.Millisecond))
+}
+
+func humanBytes(n int64) string {
+    const unit = 1024
+    if n < unit {
+        return fmt.Sprintf("%d B", n)
+    }
+    div, exp := int64(unit), 0
+    for m := n / unit; m >= unit; m /= unit {
+        div *= unit
+        exp++
+    }
+    return fmt.Sprintf("%.1f %cB", float64(n)/float64(div), "KMGTPE"[exp])
+}
+```
+
+Writing to an `io.Writer` rather than `os.Stdout` means the report can be tested by passing a `bytes.Buffer`, and redirected to a file with no code change.
+
+## Wiring it up
+
+```go title="main.go"
+func main() {
+    if err := run(); err != nil {
+        fmt.Fprintln(os.Stderr, "error:", err)
+        os.Exit(1)
+    }
+}
+
+func run() error {
+    var (
+        exclude = flag.String("exclude", "vendor,node_modules,.git,dist,build",
+            "comma separated directory names to skip")
+        workers = flag.Int("workers", runtime.NumCPU(), "concurrent file readers")
+        maxSize = flag.Int64("max-size", 10<<20, "skip files larger than this")
+        hidden  = flag.Bool("hidden", false, "include hidden directories")
+        asJSON  = flag.Bool("json", false, "output JSON")
+    )
+    flag.Parse()
+
+    root := "."
+    if flag.NArg() > 0 {
+        root = flag.Arg(0)
+    }
+
+    ctx, stop := signal.NotifyContext(context.Background(),
+        os.Interrupt, syscall.SIGTERM)
+    defer stop()
+
+    start := time.Now()
+
+    jobs, err := FindFiles(WalkOptions{
+        Root:    root,
+        Exclude: strings.Split(*exclude, ","),
+        MaxSize: *maxSize,
+        Hidden:  *hidden,
+    })
+    if err != nil {
+        return fmt.Errorf("scanning %s: %w", root, err)
+    }
+    if len(jobs) == 0 {
+        fmt.Println("no matching files found")
+        return nil
+    }
+
+    byLang, errs := processAll(ctx, jobs, *workers)
+
+    if *asJSON {
+        return json.NewEncoder(os.Stdout).Encode(byLang)
+    }
+
+    PrintReport(os.Stdout, byLang, time.Since(start))
+
+    for _, err := range errs {
+        fmt.Fprintln(os.Stderr, "warning:", err)
+    }
+    return nil
+}
+```
+
+Errors go to stderr and the report goes to stdout, so `loc . > report.txt` produces a clean file while still showing you the warnings.
+
+## Testing
+
+```go title="count_test.go"
+func TestCountFile(t *testing.T) {
+    tests := []struct {
+        name    string
+        ext     string
+        content string
+        want    Counts
+    }{
+        {
+            name: "go with comments",
+            ext:  ".go",
+            content: `package main
+
+// A line comment
+func main() {
+	println("hi")
+}
+
+/* a block
+   comment */
+`,
+            want: Counts{Files: 1, Code: 4, Comments: 3, Blank: 3},
+        },
+        {
+            name:    "empty file",
+            ext:     ".go",
+            content: "",
+            want:    Counts{Files: 1},
+        },
+        {
+            name:    "only blank lines",
+            ext:     ".go",
+            content: "\n\n\n",
+            want:    Counts{Files: 1, Blank: 3},
+        },
+        {
+            name:    "shell has no block comments",
+            ext:     ".sh",
+            content: "#!/bin/sh\n# comment\necho hi\n",
+            want:    Counts{Files: 1, Code: 2, Comments: 1},
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            dir := t.TempDir()
+            path := filepath.Join(dir, "file"+tt.ext)
+
+            if err := os.WriteFile(path, []byte(tt.content), 0o644); err != nil {
+                t.Fatal(err)
+            }
+
+            job := FileJob{Path: path, Lang: languages[tt.ext]}
+            got, err := CountFile(job)
+            if err != nil {
+                t.Fatalf("CountFile: %v", err)
+            }
+
+            got.Bytes = 0     // not part of what we are asserting
+            if diff := cmp.Diff(tt.want, got); diff != "" {
+                t.Errorf("mismatch (-want +got):\n%s", diff)
+            }
+        })
+    }
+}
+```
+
+`t.TempDir()` gives each case its own directory, removed automatically, so the cases are independent and can run in parallel.
+
+## Benchmarking it
+
+```go
+func BenchmarkCountFile(b *testing.B) {
+    dir := b.TempDir()
+    path := filepath.Join(dir, "big.go")
+
+    var sb strings.Builder
+    for i := 0; i < 10000; i++ {
+        sb.WriteString("func f() { return }\n// a comment\n\n")
+    }
+    os.WriteFile(path, []byte(sb.String()), 0o644)
+
+    job := FileJob{Path: path, Lang: languages[".go"]}
+
+    b.ResetTimer()
+    for i := 0; i < b.N; i++ {
+        if _, err := CountFile(job); err != nil {
+            b.Fatal(err)
+        }
+    }
+}
+```
+
+```bash
+go test -bench=. -benchmem
+```
+
+Watching `allocs/op` here is instructive. `scanner.Text()` allocates a string per line, and switching to `scanner.Bytes()` with `bytes.TrimSpace` removes that allocation entirely, which on a large tree is a measurable difference.
+
+## Extend it
+
+- Detect language from a shebang line when there is no extension
+- Respect `.gitignore` patterns
+- Compare two directories and report the difference
+- Count per-file and show the largest files
+- Cache results by file modification time, so a rescan only reads changed files
+- Stream results as they arrive rather than aggregating first, for a progress display
+- Add a git mode that counts only tracked files
+
+Next, let's build the API this course has been leading toward.

@@ -1,0 +1,416 @@
+---
+title: Table Driven Tests
+---
+
+Open any file in the Go standard library ending in `_test.go` and you will find the same shape: a slice of test cases, and a loop that runs them. It is the dominant testing style in Go, and once you have written a few you stop writing tests any other way.
+
+## The problem it solves
+
+```go
+func TestIsValidEmail(t *testing.T) {
+    if !IsValidEmail("a@b.com") {
+        t.Error("a@b.com should be valid")
+    }
+    if IsValidEmail("") {
+        t.Error("empty string should be invalid")
+    }
+    if IsValidEmail("no-at-sign") {
+        t.Error("no-at-sign should be invalid")
+    }
+    if IsValidEmail("@nolocal.com") {
+        t.Error("@nolocal.com should be invalid")
+    }
+}
+```
+
+Four cases, four near-identical blocks, and adding a fifth means copying and editing a block you might get slightly wrong. The table version removes the repetition entirely.
+
+## The shape
+
+```go
+func TestIsValidEmail(t *testing.T) {
+    tests := []struct {
+        name  string
+        input string
+        want  bool
+    }{
+        {"simple", "a@b.com", true},
+        {"subdomain", "user@mail.example.com", true},
+        {"plus addressing", "user+tag@example.com", true},
+        {"empty", "", false},
+        {"no at sign", "notanemail", false},
+        {"no local part", "@example.com", false},
+        {"no domain", "user@", false},
+        {"two at signs", "a@b@c.com", false},
+        {"spaces", "user name@example.com", false},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got := IsValidEmail(tt.input)
+            if got != tt.want {
+                t.Errorf("IsValidEmail(%q) = %v, want %v", tt.input, got, tt.want)
+            }
+        })
+    }
+}
+```
+
+Adding a case is one line. The assertion logic exists once. And `t.Run` gives every case its own name in the output:
+
+```text
+--- FAIL: TestIsValidEmail (0.00s)
+    --- FAIL: TestIsValidEmail/two_at_signs (0.00s)
+        email_test.go:28: IsValidEmail("a@b@c.com") = true, want false
+```
+
+You know instantly which case failed and what it was.
+
+## Anonymous struct or named type
+
+The anonymous struct is the common form, since the shape exists only inside this function:
+
+```go
+tests := []struct {
+    name string
+    // ...
+}{
+    // ...
+}
+```
+
+A named type is worth it when several test functions share the shape:
+
+```go
+type parseCase struct {
+    name    string
+    input   string
+    want    Config
+    wantErr error
+}
+```
+
+## Testing errors
+
+Test cases that fail are usually the ones worth the most, so the table needs a way to express expected failure:
+
+```go
+func TestParsePort(t *testing.T) {
+    tests := []struct {
+        name    string
+        input   string
+        want    int
+        wantErr bool
+    }{
+        {"valid", "8080", 8080, false},
+        {"minimum", "1", 1, false},
+        {"maximum", "65535", 65535, false},
+        {"zero", "0", 0, true},
+        {"negative", "-1", 0, true},
+        {"too large", "70000", 0, true},
+        {"not a number", "abc", 0, true},
+        {"empty", "", 0, true},
+        {"whitespace", " 80 ", 0, true},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got, err := ParsePort(tt.input)
+
+            if (err != nil) != tt.wantErr {
+                t.Fatalf("ParsePort(%q) error = %v, wantErr %v",
+                    tt.input, err, tt.wantErr)
+            }
+            if err != nil {
+                return          // we expected an error, nothing more to check
+            }
+            if got != tt.want {
+                t.Errorf("ParsePort(%q) = %d, want %d", tt.input, got, tt.want)
+            }
+        })
+    }
+}
+```
+
+A boolean only tells you that something failed. When the specific error matters, hold the sentinel:
+
+```go
+tests := []struct {
+    name    string
+    input   string
+    want    int
+    wantErr error
+}{
+    {"valid", "8080", 8080, nil},
+    {"out of range", "70000", 0, ErrPortRange},
+    {"not a number", "abc", 0, ErrPortSyntax},
+}
+
+for _, tt := range tests {
+    t.Run(tt.name, func(t *testing.T) {
+        got, err := ParsePort(tt.input)
+
+        if !errors.Is(err, tt.wantErr) {
+            t.Fatalf("error = %v, want %v", err, tt.wantErr)
+        }
+        if got != tt.want {
+            t.Errorf("got %d, want %d", got, tt.want)
+        }
+    })
+}
+```
+
+`errors.Is` handles the nil case correctly, so one comparison covers both success and failure.
+
+## Comparing complex values
+
+`==` does not work on structs containing slices or maps. `cmp.Diff` does, and its output is far more useful:
+
+```go
+func TestParseConfig(t *testing.T) {
+    tests := []struct {
+        name  string
+        input string
+        want  Config
+    }{
+        {
+            name:  "full config",
+            input: "host=localhost\nport=8080\ntags=a,b,c",
+            want: Config{
+                Host: "localhost",
+                Port: 8080,
+                Tags: []string{"a", "b", "c"},
+            },
+        },
+        {
+            name:  "defaults applied",
+            input: "host=example.com",
+            want: Config{
+                Host: "example.com",
+                Port: 80,
+                Tags: nil,
+            },
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got, err := ParseConfig(tt.input)
+            if err != nil {
+                t.Fatalf("ParseConfig: %v", err)
+            }
+
+            if diff := cmp.Diff(tt.want, got); diff != "" {
+                t.Errorf("ParseConfig() mismatch (-want +got):\n%s", diff)
+            }
+        })
+    }
+}
+```
+
+```text
+ParseConfig() mismatch (-want +got):
+  main.Config{
+    Host: "localhost",
+-   Port: 8080,
++   Port: 80,
+    Tags: []string{"a", "b", "c"},
+  }
+```
+
+`cmp` can ignore fields that vary, such as timestamps and generated IDs:
+
+```go
+opts := cmp.Options{
+    cmpopts.IgnoreFields(User{}, "ID", "CreatedAt"),
+    cmpopts.EquateApproxTime(time.Second),
+}
+
+if diff := cmp.Diff(tt.want, got, opts); diff != "" {
+    t.Errorf("mismatch (-want +got):\n%s", diff)
+}
+```
+
+## Cases with setup
+
+When a case needs a specific starting state, put a function in the table:
+
+```go
+func TestWithdraw(t *testing.T) {
+    tests := []struct {
+        name    string
+        setup   func(*Account)
+        amount  int64
+        want    int64
+        wantErr error
+    }{
+        {
+            name:   "sufficient funds",
+            setup:  func(a *Account) { a.balance = 10000 },
+            amount: 3000,
+            want:   7000,
+        },
+        {
+            name:    "insufficient funds",
+            setup:   func(a *Account) { a.balance = 1000 },
+            amount:  3000,
+            wantErr: ErrInsufficientFunds,
+        },
+        {
+            name:    "frozen account",
+            setup:   func(a *Account) { a.balance = 10000; a.frozen = true },
+            amount:  1000,
+            wantErr: ErrAccountFrozen,
+        },
+        {
+            name:    "negative amount",
+            setup:   func(a *Account) { a.balance = 10000 },
+            amount:  -100,
+            wantErr: ErrInvalidAmount,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            acc := &Account{}
+            tt.setup(acc)
+
+            err := acc.Withdraw(tt.amount)
+
+            if !errors.Is(err, tt.wantErr) {
+                t.Fatalf("Withdraw(%d) error = %v, want %v",
+                    tt.amount, err, tt.wantErr)
+            }
+            if tt.wantErr == nil && acc.balance != tt.want {
+                t.Errorf("balance = %d, want %d", acc.balance, tt.want)
+            }
+        })
+    }
+}
+```
+
+## Running cases in parallel
+
+```go
+for _, tt := range tests {
+    t.Run(tt.name, func(t *testing.T) {
+        t.Parallel()
+
+        got := Process(tt.input)
+        if got != tt.want {
+            t.Errorf("got %v, want %v", got, tt.want)
+        }
+    })
+}
+```
+
+`t.Parallel()` signals that the subtest can run alongside others. The parent test pauses until every parallel subtest completes.
+
+<Callout type="info">
+Before Go 1.22, this pattern needed `tt := tt` at the top of the loop body, because the loop variable was shared and every parallel subtest would see the last case. Go 1.22 gives each iteration its own variable, so the workaround is no longer required. You will still see it in older code, and it does no harm.
+</Callout>
+
+Only use `t.Parallel()` when the cases genuinely share nothing. Tests writing to the same file, the same database table, or the same global variable will fail intermittently, which is worse than being slow.
+
+## Testing HTTP handlers with a table
+
+The pattern works especially well for handlers, where the axes are request and expected response:
+
+```go
+func TestCreateTaskHandler(t *testing.T) {
+    tests := []struct {
+        name       string
+        body       string
+        wantStatus int
+        wantBody   string
+    }{
+        {
+            name:       "valid",
+            body:       `{"title":"Learn Go"}`,
+            wantStatus: http.StatusCreated,
+        },
+        {
+            name:       "empty title",
+            body:       `{"title":""}`,
+            wantStatus: http.StatusUnprocessableEntity,
+            wantBody:   "title",
+        },
+        {
+            name:       "malformed json",
+            body:       `{"title":`,
+            wantStatus: http.StatusBadRequest,
+        },
+        {
+            name:       "unknown field",
+            body:       `{"title":"x","nope":1}`,
+            wantStatus: http.StatusBadRequest,
+        },
+        {
+            name:       "empty body",
+            body:       ``,
+            wantStatus: http.StatusBadRequest,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            h := NewTaskHandler(newFakeStore())
+
+            req := httptest.NewRequest(http.MethodPost, "/tasks",
+                strings.NewReader(tt.body))
+            req.Header.Set("Content-Type", "application/json")
+            rec := httptest.NewRecorder()
+
+            h.Create(rec, req)
+
+            if rec.Code != tt.wantStatus {
+                t.Errorf("status = %d, want %d\nbody: %s",
+                    rec.Code, tt.wantStatus, rec.Body.String())
+            }
+            if tt.wantBody != "" && !strings.Contains(rec.Body.String(), tt.wantBody) {
+                t.Errorf("body = %q, want it to contain %q",
+                    rec.Body.String(), tt.wantBody)
+            }
+        })
+    }
+}
+```
+
+Five error paths covered in a table that took a minute to write. Testing those by hand is where people give up and leave them untested.
+
+## When a table is the wrong choice
+
+Not everything fits, and forcing it produces worse tests than a plain function.
+
+**Sequential workflows.** When each step depends on the previous one, a table of independent cases does not model it. Write the sequence out.
+
+**Cases needing wildly different assertions.** If half your table entries need a field that the others ignore, and the loop body is full of `if tt.checkX != nil`, the cases are not the same test.
+
+**One or two cases.** A table for two inputs is more code than two assertions.
+
+```go
+// A table would add nothing here
+func TestNewClientRequiresURL(t *testing.T) {
+    _, err := NewClient("")
+    if err == nil {
+        t.Error("expected an error for an empty URL")
+    }
+}
+```
+
+## Choosing the cases
+
+The table makes cases cheap, so cover the boundaries that hand-written tests skip:
+
+```text
+   the empty value        "", 0, nil, empty slice
+   exactly at the limit   min, max, and one either side
+   the happy path         at least two distinct valid inputs
+   every error branch     one case per error return
+   unusual but valid      unicode, very long strings, negative numbers
+   the case that broke    every bug becomes a permanent row
+```
+
+That last one is the habit worth building. When a bug is found, add the failing input as a case before fixing it. The table grows into a record of everything that has ever gone wrong, and none of it can come back silently.
+
+Next, let's look at faking the dependencies these tests need.

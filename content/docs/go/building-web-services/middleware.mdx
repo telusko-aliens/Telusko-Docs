@@ -1,0 +1,418 @@
+---
+title: Middleware
+---
+
+Logging, authentication, request IDs, panic recovery, CORS, rate limiting. Every one of these has to happen on most requests, and none of them belong inside a handler that is trying to create a task.
+
+Middleware is how Go handles that, and the entire concept is one function signature:
+
+```go
+func(http.Handler) http.Handler
+```
+
+Take a handler, return a handler that wraps it. Nothing else is involved, no framework, no registration system, no annotations.
+
+## The shape
+
+```go
+func Logging(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        start := time.Now()
+
+        next.ServeHTTP(w, r)          // call the wrapped handler
+
+        slog.Info("request",
+            "method", r.Method,
+            "path", r.URL.Path,
+            "duration", time.Since(start),
+        )
+    })
+}
+```
+
+```go
+mux := http.NewServeMux()
+mux.HandleFunc("GET /users", listUsers)
+
+handler := Logging(mux)
+http.ListenAndServe(":8080", handler)
+```
+
+Code before `next.ServeHTTP` runs on the way in. Code after runs on the way out. That is the whole model.
+
+```text
+   request  →  Logging  →  Auth  →  RateLimit  →  handler
+                  │         │          │            │
+   response ←─────┴─────────┴──────────┴────────────┘
+```
+
+## Chaining
+
+Wrapping by hand nests inside out and reads backwards:
+
+```go
+handler := Logging(Recovery(RequestID(Auth(mux))))
+```
+
+A tiny helper fixes the ordering:
+
+```go
+type Middleware func(http.Handler) http.Handler
+
+func Chain(h http.Handler, middlewares ...Middleware) http.Handler {
+    // Apply in reverse so the first listed runs first.
+    for i := len(middlewares) - 1; i >= 0; i-- {
+        h = middlewares[i](h)
+    }
+    return h
+}
+```
+
+```go
+handler := Chain(mux,
+    RequestID,        // runs first
+    Logging,
+    Recovery,
+    Timeout(30*time.Second),
+    CORS,
+)                     // the handler runs last
+```
+
+Order matters. `RequestID` goes first so everything downstream can log it. `Recovery` must be outside anything that might panic. `Timeout` should be outside the work it bounds.
+
+## Middleware with configuration
+
+When middleware needs parameters, return the middleware from a function:
+
+```go
+func Timeout(d time.Duration) Middleware {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            ctx, cancel := context.WithTimeout(r.Context(), d)
+            defer cancel()
+
+            next.ServeHTTP(w, r.WithContext(ctx))
+        })
+    }
+}
+```
+
+```go
+handler := Chain(mux, Timeout(30*time.Second))
+```
+
+This is the closure pattern from the functions section, and it is why middleware composes so cleanly in Go.
+
+## The middleware you will actually write
+
+### Request ID
+
+```go
+type contextKey string
+
+const requestIDKey contextKey = "request_id"
+
+func RequestID(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        id := r.Header.Get("X-Request-ID")
+        if id == "" {
+            id = uuid.NewString()
+        }
+
+        ctx := context.WithValue(r.Context(), requestIDKey, id)
+        w.Header().Set("X-Request-ID", id)
+
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+
+func RequestIDFrom(ctx context.Context) string {
+    id, _ := ctx.Value(requestIDKey).(string)
+    return id
+}
+```
+
+Accepting an inbound `X-Request-ID` lets a trace follow a request across several services, which is the point.
+
+### Panic recovery
+
+```go
+func Recovery(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        defer func() {
+            if rec := recover(); rec != nil {
+                slog.ErrorContext(r.Context(), "panic recovered",
+                    "panic", rec,
+                    "method", r.Method,
+                    "path", r.URL.Path,
+                    "stack", string(debug.Stack()),
+                )
+
+                w.Header().Set("Connection", "close")
+                http.Error(w, "internal server error",
+                    http.StatusInternalServerError)
+            }
+        }()
+
+        next.ServeHTTP(w, r)
+    })
+}
+```
+
+`net/http` already recovers panics so one bad handler cannot kill the process. What it does not do is log usefully or send a proper response, which is what this adds.
+
+### Logging with the status code
+
+`http.ResponseWriter` has no way to read back the status that was written, so capture it by wrapping:
+
+```go
+type responseRecorder struct {
+    http.ResponseWriter
+    status int
+    bytes  int
+}
+
+func (r *responseRecorder) WriteHeader(status int) {
+    r.status = status
+    r.ResponseWriter.WriteHeader(status)
+}
+
+func (r *responseRecorder) Write(b []byte) (int, error) {
+    if r.status == 0 {
+        r.status = http.StatusOK      // Write implies 200 if nothing was set
+    }
+    n, err := r.ResponseWriter.Write(b)
+    r.bytes += n
+    return n, err
+}
+
+func Logging(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        start := time.Now()
+        rec := &responseRecorder{ResponseWriter: w, status: http.StatusOK}
+
+        next.ServeHTTP(rec, r)
+
+        level := slog.LevelInfo
+        if rec.status >= 500 {
+            level = slog.LevelError
+        } else if rec.status >= 400 {
+            level = slog.LevelWarn
+        }
+
+        slog.LogAttrs(r.Context(), level, "request",
+            slog.String("method", r.Method),
+            slog.String("path", r.URL.Path),
+            slog.Int("status", rec.status),
+            slog.Int("bytes", rec.bytes),
+            slog.Duration("duration", time.Since(start)),
+            slog.String("request_id", RequestIDFrom(r.Context())),
+        )
+    })
+}
+```
+
+<Callout type="warn">
+Wrapping `ResponseWriter` hides the optional interfaces the real one implements. A handler that needs `http.Flusher` for streaming, or `http.Hijacker` for WebSockets, will stop working. Implement the ones you need:
+
+```go
+func (r *responseRecorder) Flush() {
+    if f, ok := r.ResponseWriter.(http.Flusher); ok {
+        f.Flush()
+    }
+}
+```
+</Callout>
+
+### Authentication
+
+```go
+type userKey struct{}
+
+func RequireAuth(verify func(string) (*User, error)) Middleware {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            header := r.Header.Get("Authorization")
+            token := strings.TrimPrefix(header, "Bearer ")
+
+            if token == "" || token == header {
+                w.Header().Set("WWW-Authenticate", `Bearer realm="api"`)
+                http.Error(w, "authentication required", http.StatusUnauthorized)
+                return                          // do NOT call next
+            }
+
+            user, err := verify(token)
+            if err != nil {
+                http.Error(w, "invalid token", http.StatusUnauthorized)
+                return
+            }
+
+            ctx := context.WithValue(r.Context(), userKey{}, user)
+            next.ServeHTTP(w, r.WithContext(ctx))
+        })
+    }
+}
+
+func UserFrom(ctx context.Context) (*User, bool) {
+    u, ok := ctx.Value(userKey{}).(*User)
+    return u, ok
+}
+```
+
+The `return` after writing the 401 is essential. Middleware that rejects a request must not call `next`, and forgetting that turns an auth check into a logging statement.
+
+Note `userKey{}` as an empty struct type rather than a string constant. It costs no memory and cannot collide with any other package's key.
+
+### CORS
+
+```go
+func CORS(allowedOrigins []string) Middleware {
+    allowed := make(map[string]bool, len(allowedOrigins))
+    for _, o := range allowedOrigins {
+        allowed[o] = true
+    }
+
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            origin := r.Header.Get("Origin")
+
+            if origin != "" && allowed[origin] {
+                w.Header().Set("Access-Control-Allow-Origin", origin)
+                w.Header().Set("Access-Control-Allow-Credentials", "true")
+                w.Header().Add("Vary", "Origin")
+            }
+
+            if r.Method == http.MethodOptions {
+                w.Header().Set("Access-Control-Allow-Methods",
+                    "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+                w.Header().Set("Access-Control-Allow-Headers",
+                    "Content-Type, Authorization")
+                w.Header().Set("Access-Control-Max-Age", "86400")
+                w.WriteHeader(http.StatusNoContent)
+                return
+            }
+
+            next.ServeHTTP(w, r)
+        })
+    }
+}
+```
+
+<Callout type="warn">
+Never combine `Access-Control-Allow-Origin: *` with `Access-Control-Allow-Credentials: true`. Browsers reject the combination, and the reason they reject it is that it would let any site read authenticated responses. Echo back a specific allowed origin instead, as above, and remember the `Vary: Origin` header so caches do not serve one origin's response to another.
+</Callout>
+
+### Rate limiting
+
+```go
+import "golang.org/x/time/rate"
+
+func RateLimit(rps float64, burst int) Middleware {
+    var (
+        mu       sync.Mutex
+        limiters = make(map[string]*rate.Limiter)
+    )
+
+    // Evict idle entries so the map does not grow without bound.
+    go func() {
+        for range time.Tick(time.Minute) {
+            mu.Lock()
+            limiters = make(map[string]*rate.Limiter)
+            mu.Unlock()
+        }
+    }()
+
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+
+            mu.Lock()
+            lim, ok := limiters[ip]
+            if !ok {
+                lim = rate.NewLimiter(rate.Limit(rps), burst)
+                limiters[ip] = lim
+            }
+            mu.Unlock()
+
+            if !lim.Allow() {
+                w.Header().Set("Retry-After", "1")
+                http.Error(w, "too many requests", http.StatusTooManyRequests)
+                return
+            }
+
+            next.ServeHTTP(w, r)
+        })
+    }
+}
+```
+
+This is per-instance, in-memory rate limiting. Behind a load balancer with several instances, each one applies its own limit, so the effective rate is the limit times the instance count. Distributed rate limiting needs a shared store such as Redis.
+
+### Security headers
+
+```go
+func SecureHeaders(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("X-Content-Type-Options", "nosniff")
+        w.Header().Set("X-Frame-Options", "DENY")
+        w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+        w.Header().Set("Content-Security-Policy", "default-src 'self'")
+
+        if r.TLS != nil {
+            w.Header().Set("Strict-Transport-Security",
+                "max-age=31536000; includeSubDomains")
+        }
+
+        next.ServeHTTP(w, r)
+    })
+}
+```
+
+## Applying to some routes only
+
+Wrap a sub-mux rather than the whole thing:
+
+```go
+func routes(h *Handlers) http.Handler {
+    mux := http.NewServeMux()
+
+    // Public
+    mux.HandleFunc("GET /health", h.Health)
+    mux.HandleFunc("POST /login", h.Login)
+
+    // Authenticated
+    api := http.NewServeMux()
+    api.HandleFunc("GET /tasks", h.ListTasks)
+    api.HandleFunc("POST /tasks", h.CreateTask)
+
+    mux.Handle("/api/", RequireAuth(verify)(
+        http.StripPrefix("/api", api),
+    ))
+
+    // Global middleware, outermost
+    return Chain(mux,
+        RequestID,
+        Logging,
+        Recovery,
+        SecureHeaders,
+    )
+}
+```
+
+## Ordering, and why it matters
+
+```text
+   RequestID       first, so everything downstream can log it
+   Logging         wraps everything, sees the final status
+   Recovery        outside anything that might panic
+   SecureHeaders   before the response is written
+   CORS            before auth, so preflight requests are not rejected
+   RateLimit       before expensive work
+   Timeout         outside the work it bounds
+   Auth            last of the cross-cutting concerns
+   handler         innermost
+```
+
+Two orderings people get wrong. CORS after auth means browsers get a 401 on the preflight OPTIONS request, which they cannot authenticate, so the real request never happens. Recovery inside logging means a panic is recovered but never logged with the request details.
+
+Next, let's look at the other side of HTTP, calling services rather than serving them.

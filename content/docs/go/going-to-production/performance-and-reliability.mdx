@@ -1,0 +1,409 @@
+---
+title: Performance and Reliability
+---
+
+A service that is fast on a quiet afternoon and falls over during a traffic spike is not a fast service. This page is about the second property: staying up, staying predictable, and degrading in a way you chose rather than a way you discovered.
+
+Most of it comes down to bounding things. Every queue, every pool, every retry, and every request needs a limit, because the alternative to a limit you picked is a limit your memory picked for you.
+
+## Timeouts, everywhere
+
+An operation with no timeout is an operation that can hang forever, and one hung operation holding a connection is how a service stops responding.
+
+```go
+// HTTP server
+srv := &http.Server{
+    ReadHeaderTimeout: 5 * time.Second,
+    ReadTimeout:       15 * time.Second,
+    WriteTimeout:      15 * time.Second,
+    IdleTimeout:       60 * time.Second,
+}
+
+// HTTP client
+client := &http.Client{Timeout: 30 * time.Second}
+
+// Per request
+ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+defer cancel()
+
+// Database
+db.SetConnMaxLifetime(5 * time.Minute)
+// plus statement_timeout in the connection string
+```
+
+Give each downstream call a budget proportional to what it should take, and keep the sum under the incoming request's own deadline.
+
+```text
+   incoming request budget        30s
+     └── database query            2s
+     └── payment API call         10s
+     └── notification call         3s
+     └── everything else          15s of headroom
+```
+
+## Bound every queue
+
+```go
+// Unbounded. Under load, memory grows until the process dies.
+jobs := make(chan Job)
+go func() {
+    for {
+        jobs <- fetchJob()
+    }
+}()
+
+// Bounded. Backpressure reaches the producer.
+jobs := make(chan Job, 1000)
+```
+
+A bounded queue means the producer blocks when consumers fall behind. That is not a failure, it is the system telling you the truth about its capacity. An unbounded queue hides the same information until memory runs out.
+
+Where blocking is not acceptable, shed load explicitly:
+
+```go
+select {
+case jobs <- job:
+    accepted.Inc()
+default:
+    dropped.Inc()
+    return ErrOverloaded          // a fast 503 beats a slow timeout
+}
+```
+
+## Bound concurrency
+
+```go
+// Unbounded: 10,000 items means 10,000 simultaneous connections
+for _, item := range items {
+    go process(item)
+}
+
+// Bounded
+g, ctx := errgroup.WithContext(ctx)
+g.SetLimit(20)
+
+for _, item := range items {
+    g.Go(func() error {
+        return process(ctx, item)
+    })
+}
+if err := g.Wait(); err != nil {
+    return err
+}
+```
+
+The right limit depends on what the work waits for: roughly the core count for CPU-bound work, much higher for network-bound work, and matched to the connection pool for database work.
+
+## Retries, done carefully
+
+```go
+func retry(ctx context.Context, attempts int, fn func() error) error {
+    var lastErr error
+    backoff := 100 * time.Millisecond
+
+    for i := 0; i < attempts; i++ {
+        if i > 0 {
+            jitter := time.Duration(rand.Int63n(int64(backoff)))
+            select {
+            case <-time.After(backoff + jitter):
+            case <-ctx.Done():
+                return ctx.Err()
+            }
+            backoff = min(backoff*2, 10*time.Second)
+        }
+
+        err := fn()
+        if err == nil {
+            return nil
+        }
+        if !isRetryable(err) {
+            return err                    // a 400 will be a 400 again
+        }
+        lastErr = err
+    }
+
+    return fmt.Errorf("after %d attempts: %w", attempts, lastErr)
+}
+```
+
+Four rules, and skipping any one of them makes things worse rather than better.
+
+**Only retry idempotent operations.** Retrying a POST can create two orders. Use an idempotency key if you must.
+
+**Only retry transient failures.** 5xx, 429, timeouts, and connection failures. Never 4xx.
+
+**Always back off exponentially.** Immediate retries turn a struggling service into a failing one.
+
+**Always add jitter.** Without it, every client that failed at the same moment retries at the same moment. That synchronised wave is the thundering herd, and it repeatedly knocks over a service that was about to recover.
+
+<Callout type="warn">
+Retries multiply load exactly when the system can least handle it. Three retries across three service hops is 27 requests for one user action. Cap total attempts, respect the incoming deadline, and consider a circuit breaker so a failing dependency stops receiving traffic entirely.
+</Callout>
+
+## Circuit breakers
+
+```go
+type CircuitBreaker struct {
+    mu           sync.Mutex
+    failures     int
+    lastFailure  time.Time
+    state        State           // closed, open, half-open
+    threshold    int
+    resetTimeout time.Duration
+}
+
+func (cb *CircuitBreaker) Do(fn func() error) error {
+    cb.mu.Lock()
+    if cb.state == StateOpen {
+        if time.Since(cb.lastFailure) < cb.resetTimeout {
+            cb.mu.Unlock()
+            return ErrCircuitOpen          // fail fast, do not even try
+        }
+        cb.state = StateHalfOpen           // allow one probe
+    }
+    cb.mu.Unlock()
+
+    err := fn()
+
+    cb.mu.Lock()
+    defer cb.mu.Unlock()
+
+    if err != nil {
+        cb.failures++
+        cb.lastFailure = time.Now()
+        if cb.failures >= cb.threshold {
+            cb.state = StateOpen
+        }
+        return err
+    }
+
+    cb.failures = 0
+    cb.state = StateClosed
+    return nil
+}
+```
+
+```text
+   CLOSED     normal. count failures.
+      │
+      │  failures reach the threshold
+      ▼
+   OPEN       fail immediately without calling. no load on the sick service.
+      │
+      │  reset timeout elapses
+      ▼
+   HALF-OPEN  allow one request through
+      │
+      ├── succeeds → CLOSED
+      └── fails    → OPEN
+```
+
+The value is not protecting yourself, it is protecting the dependency. A service returning errors under load recovers much faster when the traffic stops arriving.
+
+`sony/gobreaker` is a solid implementation if you would rather not write your own.
+
+## Graceful degradation
+
+Decide in advance what happens when a dependency is unavailable.
+
+```go
+func (s *Service) GetProfile(ctx context.Context, id string) (*Profile, error) {
+    // Essential: no user, no response.
+    user, err := s.users.Get(ctx, id)
+    if err != nil {
+        return nil, fmt.Errorf("loading user: %w", err)
+    }
+
+    p := &Profile{User: user}
+
+    // Optional: degrade rather than fail.
+    recCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+    defer cancel()
+
+    recs, err := s.recommendations.For(recCtx, id)
+    if err != nil {
+        s.logger.WarnContext(ctx, "recommendations unavailable", "error", err)
+        p.Recommendations = s.popularFallback()
+    } else {
+        p.Recommendations = recs
+    }
+
+    return p, nil
+}
+```
+
+Classify every dependency as essential or optional, and give the optional ones a short deadline and a fallback. A page that loads without the recommendation carousel is a far better outcome than a page that does not load.
+
+## Memory
+
+```go
+// Preallocate when the size is known
+results := make([]Result, 0, len(items))
+
+// Reuse buffers rather than allocating per iteration
+buf := make([]byte, 0, 4096)
+for _, item := range items {
+    buf = buf[:0]
+    buf = encode(buf, item)
+}
+
+// Clone when keeping a small piece of something large
+header := bytes.Clone(largeBuffer[:64])
+
+// Cap request bodies
+r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+// Cap response reads
+data, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
+```
+
+Those last two are memory exhaustion protection, not optimisation. Without them, one client can send an unbounded stream and take the process down.
+
+Tell the garbage collector about the container limit:
+
+```bash
+GOMEMLIMIT=230MiB          # about 90% of the container's memory limit
+GOGC=100                   # the default, collect when the heap doubles
+```
+
+`GOMEMLIMIT` is a soft limit. As the heap approaches it, the collector runs more aggressively. Without it, Go happily grows past the container limit and gets OOM-killed with no warning.
+
+## Caching
+
+```go
+type Cache struct {
+    mu      sync.RWMutex
+    entries map[string]entry
+    ttl     time.Duration
+    maxSize int
+}
+
+func (c *Cache) Get(key string) ([]byte, bool) {
+    c.mu.RLock()
+    e, ok := c.entries[key]
+    c.mu.RUnlock()
+
+    if !ok || time.Now().After(e.expires) {
+        return nil, false
+    }
+    return e.value, true
+}
+
+func (c *Cache) Set(key string, value []byte) {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+
+    if len(c.entries) >= c.maxSize {
+        c.evictOldest()          // bounded, or it grows forever
+    }
+    c.entries[key] = entry{value: value, expires: time.Now().Add(c.ttl)}
+}
+```
+
+The `maxSize` check is the part people leave out, and an unbounded cache is a memory leak with a friendly name.
+
+For concurrent misses on the same key, `singleflight` collapses them into one call:
+
+```go
+import "golang.org/x/sync/singleflight"
+
+var group singleflight.Group
+
+func (s *Service) Get(ctx context.Context, key string) ([]byte, error) {
+    if v, ok := s.cache.Get(key); ok {
+        return v, nil
+    }
+
+    v, err, _ := group.Do(key, func() (any, error) {
+        data, err := s.fetchExpensive(ctx, key)
+        if err != nil {
+            return nil, err
+        }
+        s.cache.Set(key, data)
+        return data, nil
+    })
+    if err != nil {
+        return nil, err
+    }
+    return v.([]byte), nil
+}
+```
+
+A thousand simultaneous requests for a cold key produce one upstream call instead of a thousand. This is the fix for a cache stampede, and it is twenty lines.
+
+## Rate limiting
+
+```go
+import "golang.org/x/time/rate"
+
+limiter := rate.NewLimiter(rate.Limit(100), 200)     // 100/s, burst 200
+
+// Reject immediately when over the limit
+if !limiter.Allow() {
+    http.Error(w, "too many requests", http.StatusTooManyRequests)
+    return
+}
+
+// Or wait, up to the context deadline
+if err := limiter.Wait(ctx); err != nil {
+    return err
+}
+```
+
+Use `Allow` for inbound traffic, because queueing requests you cannot serve just moves the failure. Use `Wait` for outbound calls, where slowing yourself down to respect somebody's limit is exactly right.
+
+## The reliability checklist
+
+```text
+   Every external call has a timeout
+   Every queue has a bound
+   Every concurrent fan-out has a limit
+   Every retry has exponential backoff and jitter
+   Every retry is on an idempotent operation
+   Every request body has a size cap
+   Every cache has a maximum size and a TTL
+   Every dependency is classified essential or optional
+   Every optional dependency has a fallback
+   Every goroutine has a defined way to exit
+   Panics are recovered in handlers and in every goroutine
+   Shutdown drains in-flight work
+   GOMEMLIMIT and GOMAXPROCS match the container limits
+```
+
+## When performance actually matters
+
+The order to work in, which the profiling page covered and is worth repeating because it is so often done backwards:
+
+<Steps>
+<Step>
+### Measure first
+
+Without a benchmark or a profile, you are guessing, and the guess is usually wrong.
+</Step>
+<Step>
+### Fix the algorithm before the code
+
+An O(n) loop replacing an O(n squared) one beats every micro-optimisation combined. Look for nested loops over the same data and N+1 queries before anything else.
+</Step>
+<Step>
+### Reduce allocations
+
+`-benchmem` and `allocs/op`. Allocation count is the best single proxy for wasted work in Go, and reducing it usually simplifies the code.
+</Step>
+<Step>
+### Add concurrency only when it fits
+
+Independent I/O parallelises well. A tight CPU loop already using one core fully does not get faster by adding goroutines beyond the core count.
+</Step>
+<Step>
+### Stop when it is fast enough
+
+Optimised Go is less readable. Keep the maintainable version unless the numbers justify the trade, and comment why the ugly version exists.
+</Step>
+</Steps>
+
+<Callout type="info">
+In practice, the majority of Go performance problems come from four places: N+1 database queries, unbounded concurrency, missing indexes, and allocations in a hot loop. Checking those four before opening a profiler solves most cases in minutes.
+</Callout>
+
+That completes the production section. Next, let's put everything together and build five complete programs.

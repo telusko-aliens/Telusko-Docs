@@ -1,0 +1,12 @@
+{
+    "title": "Building Web Services",
+    "pages": [
+        "net-http-basics.mdx",
+        "handlers-and-routing.mdx",
+        "building-a-json-api.mdx",
+        "middleware.mdx",
+        "making-http-requests.mdx",
+        "html-templates.mdx",
+        "structuring-a-web-service.mdx"
+    ]
+}

@@ -1,0 +1,579 @@
+---
+title: "Project 1: CLI Task Manager"
+---
+
+A command line task manager that stores tasks in a JSON file. No dependencies, no database, no server. About 250 lines of Go that you will actually use.
+
+By the end you will have exercised structs, slices, JSON, file handling, flags, subcommands, error handling, and table driven tests, which is most of the first half of this course.
+
+```bash
+$ task add "Finish the Go course"
+added task 1
+
+$ task add "Review pull request" --due 2026-08-15
+added task 2
+
+$ task list
+  ID  STATUS  DUE         TITLE
+   1  todo    -           Finish the Go course
+   2  todo    2026-08-15  Review pull request
+
+$ task done 1
+task 1 marked done
+
+$ task list --status todo
+  ID  STATUS  DUE         TITLE
+   2  todo    2026-08-15  Review pull request
+```
+
+## Setting up
+
+```bash
+mkdir task && cd task
+go mod init example.com/task
+```
+
+```text
+   task/
+   ├── go.mod
+   ├── main.go        command dispatch
+   ├── task.go        the Task type
+   ├── store.go       load and save
+   └── commands.go    one function per command
+```
+
+## The type
+
+```go title="task.go"
+package main
+
+import (
+    "errors"
+    "fmt"
+    "strings"
+    "time"
+)
+
+type Status string
+
+const (
+    StatusTodo Status = "todo"
+    StatusDone Status = "done"
+)
+
+func (s Status) Valid() bool {
+    return s == StatusTodo || s == StatusDone
+}
+
+type Task struct {
+    ID        int        `json:"id"`
+    Title     string     `json:"title"`
+    Status    Status     `json:"status"`
+    DueAt     *time.Time `json:"due_at,omitempty"`
+    CreatedAt time.Time  `json:"created_at"`
+    DoneAt    *time.Time `json:"done_at,omitempty"`
+}
+
+var (
+    ErrNotFound  = errors.New("task not found")
+    ErrEmptyTitle = errors.New("title cannot be empty")
+)
+
+func (t Task) DueString() string {
+    if t.DueAt == nil {
+        return "-"
+    }
+    return t.DueAt.Format("2006-01-02")
+}
+
+func (t Task) Overdue() bool {
+    return t.DueAt != nil &&
+        t.Status == StatusTodo &&
+        t.DueAt.Before(time.Now())
+}
+
+func NewTask(id int, title string, due *time.Time) (Task, error) {
+    title = strings.TrimSpace(title)
+    if title == "" {
+        return Task{}, ErrEmptyTitle
+    }
+    if len(title) > 200 {
+        return Task{}, fmt.Errorf("title is %d characters, maximum is 200", len(title))
+    }
+
+    return Task{
+        ID:        id,
+        Title:     title,
+        Status:    StatusTodo,
+        DueAt:     due,
+        CreatedAt: time.Now(),
+    }, nil
+}
+```
+
+`DueAt` and `DoneAt` are pointers because "no due date" and "not done" are genuinely different from any timestamp value. Combined with `omitempty`, they simply do not appear in the JSON.
+
+## Storage
+
+```go title="store.go"
+package main
+
+import (
+    "encoding/json"
+    "fmt"
+    "os"
+    "path/filepath"
+    "slices"
+)
+
+type Store struct {
+    path  string
+    Tasks []Task `json:"tasks"`
+    NextID int   `json:"next_id"`
+}
+
+func storePath() (string, error) {
+    if p := os.Getenv("TASK_FILE"); p != "" {
+        return p, nil
+    }
+
+    home, err := os.UserHomeDir()
+    if err != nil {
+        return "", fmt.Errorf("finding home directory: %w", err)
+    }
+    return filepath.Join(home, ".tasks.json"), nil
+}
+
+func Load() (*Store, error) {
+    path, err := storePath()
+    if err != nil {
+        return nil, err
+    }
+
+    s := &Store{path: path, NextID: 1}
+
+    data, err := os.ReadFile(path)
+    if os.IsNotExist(err) {
+        return s, nil          // first run, an empty store is correct
+    }
+    if err != nil {
+        return nil, fmt.Errorf("reading %s: %w", path, err)
+    }
+
+    if err := json.Unmarshal(data, s); err != nil {
+        return nil, fmt.Errorf("parsing %s: %w", path, err)
+    }
+    s.path = path              // Unmarshal does not touch unexported fields
+
+    return s, nil
+}
+
+// Save writes atomically, so an interrupted write cannot corrupt the file.
+func (s *Store) Save() error {
+    data, err := json.MarshalIndent(s, "", "  ")
+    if err != nil {
+        return fmt.Errorf("encoding tasks: %w", err)
+    }
+
+    dir := filepath.Dir(s.path)
+    tmp, err := os.CreateTemp(dir, ".tasks-*.json")
+    if err != nil {
+        return fmt.Errorf("creating temp file: %w", err)
+    }
+    tmpName := tmp.Name()
+    defer os.Remove(tmpName)
+
+    if _, err := tmp.Write(data); err != nil {
+        tmp.Close()
+        return fmt.Errorf("writing temp file: %w", err)
+    }
+    if err := tmp.Close(); err != nil {
+        return fmt.Errorf("closing temp file: %w", err)
+    }
+
+    return os.Rename(tmpName, s.path)
+}
+
+func (s *Store) Add(title string, due *time.Time) (Task, error) {
+    t, err := NewTask(s.NextID, title, due)
+    if err != nil {
+        return Task{}, err
+    }
+
+    s.Tasks = append(s.Tasks, t)
+    s.NextID++
+    return t, nil
+}
+
+func (s *Store) Find(id int) (*Task, error) {
+    for i := range s.Tasks {
+        if s.Tasks[i].ID == id {
+            return &s.Tasks[i], nil     // a pointer INTO the slice, so edits stick
+        }
+    }
+    return nil, fmt.Errorf("task %d: %w", id, ErrNotFound)
+}
+
+func (s *Store) Delete(id int) error {
+    i := slices.IndexFunc(s.Tasks, func(t Task) bool { return t.ID == id })
+    if i == -1 {
+        return fmt.Errorf("task %d: %w", id, ErrNotFound)
+    }
+    s.Tasks = slices.Delete(s.Tasks, i, i+1)
+    return nil
+}
+
+func (s *Store) Filter(status Status) []Task {
+    if status == "" {
+        return slices.Clone(s.Tasks)
+    }
+
+    out := make([]Task, 0, len(s.Tasks))
+    for _, t := range s.Tasks {
+        if t.Status == status {
+            out = append(out, t)
+        }
+    }
+    return out
+}
+```
+
+Two details worth noticing.
+
+`Find` returns `&s.Tasks[i]`, a pointer into the backing array, so the caller can modify the task in place and `Save` writes the change. Returning a copy would silently discard edits.
+
+`Save` writes to a temporary file and renames, which is atomic on every major filesystem. Writing directly means an interrupted write leaves a truncated JSON file and every task is gone.
+
+## The commands
+
+```go title="commands.go"
+package main
+
+import (
+    "flag"
+    "fmt"
+    "os"
+    "strconv"
+    "strings"
+    "text/tabwriter"
+    "time"
+)
+
+func cmdAdd(args []string) error {
+    fs := flag.NewFlagSet("add", flag.ContinueOnError)
+    dueStr := fs.String("due", "", "due date as YYYY-MM-DD")
+    if err := fs.Parse(args); err != nil {
+        return err
+    }
+
+    title := strings.Join(fs.Args(), " ")
+    if title == "" {
+        return errors.New("usage: task add <title> [--due YYYY-MM-DD]")
+    }
+
+    var due *time.Time
+    if *dueStr != "" {
+        d, err := time.Parse("2006-01-02", *dueStr)
+        if err != nil {
+            return fmt.Errorf("invalid due date %q, expected YYYY-MM-DD", *dueStr)
+        }
+        due = &d
+    }
+
+    store, err := Load()
+    if err != nil {
+        return err
+    }
+
+    t, err := store.Add(title, due)
+    if err != nil {
+        return err
+    }
+    if err := store.Save(); err != nil {
+        return err
+    }
+
+    fmt.Printf("added task %d\n", t.ID)
+    return nil
+}
+
+func cmdList(args []string) error {
+    fs := flag.NewFlagSet("list", flag.ContinueOnError)
+    status := fs.String("status", "", "filter by status: todo or done")
+    if err := fs.Parse(args); err != nil {
+        return err
+    }
+
+    if *status != "" && !Status(*status).Valid() {
+        return fmt.Errorf("invalid status %q, expected todo or done", *status)
+    }
+
+    store, err := Load()
+    if err != nil {
+        return err
+    }
+
+    tasks := store.Filter(Status(*status))
+    if len(tasks) == 0 {
+        fmt.Println("no tasks")
+        return nil
+    }
+
+    w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', tabwriter.AlignRight)
+    fmt.Fprintln(w, "ID\tSTATUS\tDUE\tTITLE\t")
+
+    for _, t := range tasks {
+        marker := ""
+        if t.Overdue() {
+            marker = " (overdue)"
+        }
+        fmt.Fprintf(w, "%d\t%s\t%s\t%s%s\t\n",
+            t.ID, t.Status, t.DueString(), t.Title, marker)
+    }
+
+    return w.Flush()
+}
+
+func cmdDone(args []string) error {
+    if len(args) != 1 {
+        return errors.New("usage: task done <id>")
+    }
+
+    id, err := strconv.Atoi(args[0])
+    if err != nil {
+        return fmt.Errorf("invalid id %q: %w", args[0], err)
+    }
+
+    store, err := Load()
+    if err != nil {
+        return err
+    }
+
+    t, err := store.Find(id)
+    if err != nil {
+        return err
+    }
+    if t.Status == StatusDone {
+        return fmt.Errorf("task %d is already done", id)
+    }
+
+    now := time.Now()
+    t.Status = StatusDone
+    t.DoneAt = &now
+
+    if err := store.Save(); err != nil {
+        return err
+    }
+
+    fmt.Printf("task %d marked done\n", id)
+    return nil
+}
+
+func cmdDelete(args []string) error {
+    if len(args) != 1 {
+        return errors.New("usage: task delete <id>")
+    }
+
+    id, err := strconv.Atoi(args[0])
+    if err != nil {
+        return fmt.Errorf("invalid id %q: %w", args[0], err)
+    }
+
+    store, err := Load()
+    if err != nil {
+        return err
+    }
+    if err := store.Delete(id); err != nil {
+        return err
+    }
+    if err := store.Save(); err != nil {
+        return err
+    }
+
+    fmt.Printf("deleted task %d\n", id)
+    return nil
+}
+```
+
+`text/tabwriter` is the standard library's answer to aligned columns. It measures every cell and pads them, so the output lines up regardless of title length.
+
+## Dispatch
+
+```go title="main.go"
+package main
+
+import (
+    "errors"
+    "fmt"
+    "os"
+)
+
+const usage = `task - a small task manager
+
+usage:
+  task add <title> [--due YYYY-MM-DD]
+  task list [--status todo|done]
+  task done <id>
+  task delete <id>
+  task help
+`
+
+func main() {
+    if err := run(os.Args[1:]); err != nil {
+        fmt.Fprintln(os.Stderr, "error:", err)
+        os.Exit(1)
+    }
+}
+
+func run(args []string) error {
+    if len(args) == 0 {
+        fmt.Print(usage)
+        return nil
+    }
+
+    switch args[0] {
+    case "add":
+        return cmdAdd(args[1:])
+    case "list", "ls":
+        return cmdList(args[1:])
+    case "done":
+        return cmdDone(args[1:])
+    case "delete", "rm":
+        return cmdDelete(args[1:])
+    case "help", "-h", "--help":
+        fmt.Print(usage)
+        return nil
+    default:
+        return fmt.Errorf("unknown command %q\n\n%s", args[0], usage)
+    }
+}
+```
+
+`main` calls `run` and `run` returns an error. That pattern, from the web services section, applies just as well to a CLI: `os.Exit` skips deferred calls, so keeping it at the top of `main` means everything else can clean up properly.
+
+## Tests
+
+```go title="task_test.go"
+package main
+
+import (
+    "testing"
+    "time"
+)
+
+func TestNewTask(t *testing.T) {
+    tests := []struct {
+        name    string
+        title   string
+        wantErr bool
+    }{
+        {"simple", "Buy milk", false},
+        {"trimmed", "   Buy milk   ", false},
+        {"empty", "", true},
+        {"only whitespace", "   ", true},
+        {"too long", string(make([]byte, 201)), true},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            task, err := NewTask(1, tt.title, nil)
+
+            if (err != nil) != tt.wantErr {
+                t.Fatalf("NewTask(%q) error = %v, wantErr %v",
+                    tt.title, err, tt.wantErr)
+            }
+            if err != nil {
+                return
+            }
+            if task.Status != StatusTodo {
+                t.Errorf("status = %q, want todo", task.Status)
+            }
+        })
+    }
+}
+
+func TestOverdue(t *testing.T) {
+    past := time.Now().Add(-24 * time.Hour)
+    future := time.Now().Add(24 * time.Hour)
+
+    tests := []struct {
+        name string
+        task Task
+        want bool
+    }{
+        {"no due date", Task{Status: StatusTodo}, false},
+        {"due in the future", Task{Status: StatusTodo, DueAt: &future}, false},
+        {"due in the past", Task{Status: StatusTodo, DueAt: &past}, true},
+        {"past but done", Task{Status: StatusDone, DueAt: &past}, false},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            if got := tt.task.Overdue(); got != tt.want {
+                t.Errorf("Overdue() = %v, want %v", got, tt.want)
+            }
+        })
+    }
+}
+```
+
+```go title="store_test.go"
+func TestStoreRoundTrip(t *testing.T) {
+    t.Setenv("TASK_FILE", filepath.Join(t.TempDir(), "tasks.json"))
+
+    store, err := Load()
+    if err != nil {
+        t.Fatalf("Load: %v", err)
+    }
+
+    if _, err := store.Add("first", nil); err != nil {
+        t.Fatalf("Add: %v", err)
+    }
+    if _, err := store.Add("second", nil); err != nil {
+        t.Fatalf("Add: %v", err)
+    }
+    if err := store.Save(); err != nil {
+        t.Fatalf("Save: %v", err)
+    }
+
+    reloaded, err := Load()
+    if err != nil {
+        t.Fatalf("reload: %v", err)
+    }
+
+    if len(reloaded.Tasks) != 2 {
+        t.Fatalf("got %d tasks, want 2", len(reloaded.Tasks))
+    }
+    if reloaded.Tasks[0].Title != "first" {
+        t.Errorf("title = %q, want first", reloaded.Tasks[0].Title)
+    }
+    if reloaded.NextID != 3 {
+        t.Errorf("NextID = %d, want 3", reloaded.NextID)
+    }
+}
+```
+
+`t.Setenv` plus `t.TempDir()` gives every test an isolated store that is cleaned up automatically. That is why `storePath` reads an environment variable in the first place: testability came from a design decision, not from a test framework.
+
+## Installing it
+
+```bash
+go install .
+task add "It works"
+```
+
+`go install` puts the binary in `$GOPATH/bin`, which should be on your `PATH` from the setup page. You now have a real tool.
+
+## Extend it
+
+Each of these is a small, self-contained exercise:
+
+- `task edit <id> --title "new title"`
+- Tags, stored as `[]string`, with `task list --tag work`
+- Priority as a named type with an `iota` enum and a `String` method
+- `task stats` showing counts by status and how many are overdue
+- Colour output using ANSI codes, disabled when stdout is not a terminal
+- A `--json` flag for machine readable output
+- Sorting with `slices.SortFunc` and `cmp.Or` for tie-breaking
+
+Next, let's build something concurrent.

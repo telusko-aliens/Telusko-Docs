@@ -1,0 +1,393 @@
+---
+title: Graceful Shutdown
+---
+
+You deploy. Kubernetes sends SIGTERM to the old pod, the process exits immediately, and thirty in-flight requests die with it. Users see 502s. The deploy dashboard says success.
+
+Graceful shutdown is the difference between deployments users notice and deployments they do not, and it costs about forty lines.
+
+## What has to happen, in order
+
+```text
+   1. Signal arrives (SIGTERM)
+   2. Fail the readiness check, so the load balancer stops sending traffic
+   3. Stop accepting new connections
+   4. Let in-flight requests finish, up to a deadline
+   5. Stop background workers
+   6. Close the database, flush logs, release everything
+   7. Exit 0
+```
+
+Skipping step two is the most common omission, and it is why services still drop requests even after adding `srv.Shutdown`.
+
+## The signals
+
+```text
+   SIGTERM   what orchestrators send. catchable. this is the one.
+   SIGINT    Ctrl+C. catchable.
+   SIGKILL   cannot be caught. the process dies immediately.
+```
+
+Kubernetes sends SIGTERM, waits for `terminationGracePeriodSeconds`, then sends SIGKILL. Everything you need to do must fit inside that window.
+
+## The implementation
+
+```go
+func main() {
+    if err := run(); err != nil {
+        slog.Error("fatal", "error", err)
+        os.Exit(1)
+    }
+}
+
+func run() error {
+    ctx, stop := signal.NotifyContext(context.Background(),
+        os.Interrupt, syscall.SIGTERM)
+    defer stop()
+
+    cfg, err := config.Load(os.Args[1:])
+    if err != nil {
+        return fmt.Errorf("loading config: %w", err)
+    }
+
+    logger := newLogger(cfg)
+
+    db, err := storage.Open(ctx, cfg.Database)
+    if err != nil {
+        return fmt.Errorf("connecting to database: %w", err)
+    }
+    defer db.Close()
+
+    app := newApp(cfg, db, logger)
+
+    srv := &http.Server{
+        Addr:              cfg.Addr,
+        Handler:           app.Routes(),
+        ReadHeaderTimeout: 5 * time.Second,
+        ReadTimeout:       cfg.ReadTimeout,
+        WriteTimeout:      cfg.WriteTimeout,
+        IdleTimeout:       60 * time.Second,
+    }
+
+    // Start the server. A startup failure must be visible.
+    serverErr := make(chan error, 1)
+    go func() {
+        logger.Info("server starting", "addr", srv.Addr)
+        if err := srv.ListenAndServe(); err != nil &&
+            !errors.Is(err, http.ErrServerClosed) {
+            serverErr <- fmt.Errorf("listen: %w", err)
+        }
+    }()
+
+    // Start background workers, tied to the same context.
+    workerDone := make(chan struct{})
+    go func() {
+        defer close(workerDone)
+        app.RunWorkers(ctx)
+    }()
+
+    // Wait for either a failure or a signal.
+    select {
+    case err := <-serverErr:
+        return err
+    case <-ctx.Done():
+        logger.Info("shutdown signal received")
+    }
+
+    return shutdown(srv, app, workerDone, cfg.ShutdownTimeout, logger)
+}
+```
+
+```go
+func shutdown(srv *http.Server, app *App, workerDone <-chan struct{},
+    timeout time.Duration, logger *slog.Logger) error {
+
+    // 1. Fail readiness first, so the load balancer removes this instance.
+    app.SetReady(false)
+    logger.Info("readiness disabled, draining")
+
+    // Give the load balancer time to notice before we stop accepting.
+    time.Sleep(5 * time.Second)
+
+    // Use a fresh context: the original is already cancelled.
+    shutdownCtx, cancel := context.WithTimeout(context.Background(), timeout)
+    defer cancel()
+
+    // 2. Stop accepting, wait for in-flight requests.
+    logger.Info("shutting down http server")
+    if err := srv.Shutdown(shutdownCtx); err != nil {
+        logger.Error("graceful shutdown timed out, forcing close", "error", err)
+        srv.Close()
+    } else {
+        logger.Info("http server stopped cleanly")
+    }
+
+    // 3. Wait for background workers, which the cancelled ctx already told to stop.
+    select {
+    case <-workerDone:
+        logger.Info("workers stopped")
+    case <-shutdownCtx.Done():
+        logger.Warn("workers did not stop in time")
+    }
+
+    logger.Info("shutdown complete")
+    return nil
+}
+```
+
+<Callout type="warn">
+`srv.Shutdown` must be given a **fresh** context. Passing the one that was just cancelled by the signal means `Shutdown` returns immediately and every in-flight request is killed, which is exactly the behaviour you were trying to prevent. This is the most common bug in Go shutdown code.
+</Callout>
+
+## The readiness delay
+
+```go
+app.SetReady(false)
+time.Sleep(5 * time.Second)
+```
+
+That sleep looks wrong and it is load-bearing.
+
+Load balancers poll readiness on an interval, typically every few seconds. Between the moment you stop accepting connections and the moment the load balancer notices, it is still routing traffic to you. Failing readiness first and waiting for at least one poll interval closes that window.
+
+```text
+   t=0   SIGTERM, readiness starts returning 503
+   t=0   load balancer still sending traffic
+   t=3   load balancer's next poll sees 503, stops routing
+   t=5   we stop accepting connections
+   t=5+  drain whatever is still in flight
+```
+
+Without the delay, requests arriving between t=0 and t=3 hit a server that has already closed its listener.
+
+```go
+type App struct {
+    ready atomic.Bool
+}
+
+func (a *App) SetReady(v bool) { a.ready.Store(v) }
+
+func (a *App) Ready(w http.ResponseWriter, r *http.Request) {
+    if !a.ready.Load() {
+        http.Error(w, "shutting down", http.StatusServiceUnavailable)
+        return
+    }
+
+    ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+    defer cancel()
+
+    if err := a.db.PingContext(ctx); err != nil {
+        http.Error(w, "database unavailable", http.StatusServiceUnavailable)
+        return
+    }
+
+    w.WriteHeader(http.StatusOK)
+    w.Write([]byte("ready"))
+}
+```
+
+## Liveness is a different check
+
+```go
+// Liveness: is the process alive? Nothing else.
+func (a *App) Health(w http.ResponseWriter, r *http.Request) {
+    w.WriteHeader(http.StatusOK)
+    w.Write([]byte("ok"))
+}
+```
+
+<Callout type="warn">
+Never check dependencies in a liveness probe. A failing liveness check **restarts the pod**. If liveness pings the database, a thirty second database blip restarts every pod simultaneously, turning a recoverable incident into a full outage. Liveness answers "is this process wedged", readiness answers "should this instance receive traffic".
+</Callout>
+
+## Stopping background workers
+
+Every worker takes the context and selects on it:
+
+```go
+func (a *App) RunWorkers(ctx context.Context) {
+    var wg sync.WaitGroup
+
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        a.processQueue(ctx)
+    }()
+
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        a.cleanupExpired(ctx)
+    }()
+
+    wg.Wait()
+}
+
+func (a *App) processQueue(ctx context.Context) {
+    for {
+        select {
+        case <-ctx.Done():
+            a.logger.Info("queue worker stopping")
+            return
+
+        case job := <-a.jobs:
+            // Give the in-flight job a bounded chance to finish, using a
+            // context that is NOT already cancelled.
+            jobCtx, cancel := context.WithTimeout(
+                context.WithoutCancel(ctx), 30*time.Second)
+            a.handle(jobCtx, job)
+            cancel()
+        }
+    }
+}
+```
+
+`context.WithoutCancel`, added in Go 1.21, detaches from the parent's cancellation while keeping its values. It is exactly right here: the worker should stop taking new jobs immediately, and the job already running should be allowed to finish.
+
+A periodic worker:
+
+```go
+func (a *App) cleanupExpired(ctx context.Context) {
+    ticker := time.NewTicker(time.Hour)
+    defer ticker.Stop()
+
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case <-ticker.C:
+            if err := a.deleteExpired(ctx); err != nil {
+                a.logger.Error("cleanup failed", "error", err)
+            }
+        }
+    }
+}
+```
+
+## Timeouts that fit together
+
+```text
+   Kubernetes terminationGracePeriodSeconds   60s
+        └── readiness drain delay              5s
+        └── server shutdown timeout           30s
+        └── worker shutdown timeout           20s
+                                             ────
+                                              55s, with room to spare
+```
+
+The sum of your internal timeouts must be comfortably less than the orchestrator's grace period. Exceed it and SIGKILL arrives mid-shutdown, which defeats the whole exercise.
+
+```yaml title="deployment.yaml"
+spec:
+  template:
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: api
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]     # belt and braces on the drain window
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            periodSeconds: 3
+            failureThreshold: 1
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 3
+```
+
+## What breaks shutdown
+
+**`os.Exit` anywhere but the top of `main`.** It skips every deferred call. `log.Fatal` calls it internally, so `log.Fatal` in a handler kills the process without draining.
+
+**A worker that ignores the context.** Nothing tells it to stop, and it runs until SIGKILL.
+
+**A worker started outside the context tree.** A goroutine started with `context.Background()` never hears the signal.
+
+**No timeout on shutdown.** One slow request holds the process open forever.
+
+**Long-lived connections.** `Shutdown` waits for active requests, and a WebSocket or an SSE stream is an active request indefinitely. Close those explicitly:
+
+```go
+srv.RegisterOnShutdown(func() {
+    hub.CloseAll()          // tell websocket clients to reconnect
+})
+```
+
+## Testing it
+
+```go
+func TestGracefulShutdown(t *testing.T) {
+    ready := make(chan struct{})
+    srv := &http.Server{
+        Addr: "localhost:0",
+        Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            close(ready)
+            time.Sleep(2 * time.Second)      // a slow in-flight request
+            w.Write([]byte("finished"))
+        }),
+    }
+
+    ln, err := net.Listen("tcp", srv.Addr)
+    if err != nil {
+        t.Fatal(err)
+    }
+    go srv.Serve(ln)
+
+    // Start a request and wait until the handler has begun.
+    respCh := make(chan string, 1)
+    go func() {
+        resp, err := http.Get("http://" + ln.Addr().String())
+        if err != nil {
+            t.Error(err)
+            return
+        }
+        defer resp.Body.Close()
+        b, _ := io.ReadAll(resp.Body)
+        respCh <- string(b)
+    }()
+    <-ready
+
+    // Shut down while the request is still running.
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    if err := srv.Shutdown(ctx); err != nil {
+        t.Fatalf("Shutdown: %v", err)
+    }
+
+    // The in-flight request must have completed.
+    if got := <-respCh; got != "finished" {
+        t.Errorf("response = %q, want finished", got)
+    }
+}
+```
+
+Verifying by hand:
+
+```bash
+go run ./cmd/api &
+PID=$!
+
+curl "localhost:8080/slow" &      # a request that takes a few seconds
+sleep 1
+kill -TERM $PID                   # the curl should still complete
+```
+
+## The checklist
+
+1. `signal.NotifyContext` for SIGINT and SIGTERM
+2. Fail readiness first, then wait for the load balancer to notice
+3. `srv.Shutdown` with a **fresh** context and a real timeout
+4. Every worker selects on `ctx.Done()`
+5. In-flight work gets `context.WithoutCancel` plus its own deadline
+6. Close the database and flush logs after the server has stopped
+7. Internal timeouts sum to less than the orchestrator's grace period
+8. `os.Exit` only at the top of `main`
+
+Next, let's build the binary that all of this runs in.

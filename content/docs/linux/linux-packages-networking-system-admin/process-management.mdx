@@ -1,0 +1,235 @@
+---
+title: Process Management in Linux 
+---
+
+
+Whenever you run a command or launch an application in Linux, the operating system manages it as a **process**. Understanding how to view, monitor, and stop processes is an essential skill for Linux administration and DevOps.
+
+For example, if a Java application is running slowly or a command is taking too long, process management helps you identify the running program and take appropriate action.
+
+
+## What Is a Process?
+
+A **process** is a running instance of a program. Each process is assigned a unique **Process ID (PID)**, which Linux uses to identify and manage it.
+
+A process also has attributes such as its owner, current state, and resource usage.
+
+For example, running this command starts a process that waits for 1,000 seconds:
+
+```bash
+sleep 1000
+```
+
+The process continues running until the time expires or it is stopped.
+
+
+---
+
+
+## Viewing Running Processes with `ps`
+
+The `ps` command displays information about processes.
+
+### View Processes in the Current Terminal
+
+```bash
+ps
+```
+
+This displays processes associated with the current terminal, typically including the shell and the `ps` command itself.
+
+### View All Processes
+
+```bash
+ps -ef
+```
+
+This displays processes across the system, including those started by other users and services, subject to system visibility and permissions.
+
+Important columns include:
+
+| Column | Description |
+|---|---|
+| `UID` | User who owns the process |
+| `PID` | Process ID |
+| `PPID` | Parent Process ID |
+| `C` | Approximate CPU utilization information |
+| `STIME` | Process start time |
+| `TTY` | Controlling terminal, if any |
+| `TIME` | Accumulated CPU time |
+| `CMD` | Command that started the process |
+
+**Tip:** Use `ps -ef` when you need a system-wide process listing rather than just processes associated with your terminal.
+
+
+---
+
+
+## Finding a Specific Process
+
+When a system runs many processes, searching for a particular application is often more practical than reviewing the entire list.
+
+You can combine `ps` with `grep`:
+
+```bash
+ps -ef | grep java
+```
+
+This searches the process listing for lines containing `java`.
+
+Similarly, to search for a `sleep` process:
+
+```bash
+ps -ef | grep sleep
+```
+
+**Note:** The output may include the `grep` command itself because its command line contains the search term. Also, searching by name can match unrelated commands containing the same text.
+
+For a more convenient name-based search, you can use:
+
+```bash
+pgrep -a java
+```
+
+This displays matching process IDs and their command lines when available.
+
+
+---
+
+
+## Monitoring Processes in Real Time with `top`
+
+The `ps` command provides a snapshot, while `top` continuously refreshes process and resource information.
+
+```bash
+top
+```
+
+It displays details such as:
+
+- Process IDs and users
+- CPU and memory utilization
+- Process states
+- System-wide resource statistics
+
+### Useful Keys in `top`
+
+| Key | Action |
+|---|---|
+| `q` | Exit `top` |
+| `P` | Sort processes by CPU usage |
+| `M` | Sort processes by memory usage |
+| `1` | Show individual logical CPU statistics |
+
+**When to use it:** If a server becomes slow, use `top` to identify processes consuming unusually high CPU or memory. Investigate the process before deciding whether it should be stopped.
+
+
+---
+
+
+## Running a Process in the Background
+
+Normally, a command runs in the foreground and occupies your terminal until it finishes. You can use `&` to start a command in the background.
+
+```bash
+sleep 1000 &
+```
+
+The shell starts the command as a background job and returns the prompt, allowing you to enter other commands.
+
+You may see output similar to:
+
+```text
+[1] 2182
+```
+
+Here:
+
+- `1` is the shell's job number.
+- `2182` is the process ID in this example.
+
+The actual values will differ on your system.
+
+![Linux_Job_Commands](https://dyz1pdcuffwr5.cloudfront.net/Linux/linux_job_commands.png)
+
+**Important:** A background job is not necessarily a permanent service. It may still be associated with your terminal session, and closing the session can affect it. Long-running production applications are generally managed using service managers such as `systemd`.
+
+
+---
+
+
+## Stopping a Process with `kill`
+
+If a process is no longer needed or is causing problems, you can request that it terminate using its PID.
+
+### Step 1: Find the PID
+
+For example, start a background process:
+
+```bash
+sleep 1000 &
+```
+
+Then find it:
+
+```bash
+pgrep -a sleep
+```
+
+Suppose the output shows PID `2182`. Your actual PID will be different.
+
+### Step 2: Send a Termination Signal
+
+```bash
+kill 2182
+```
+
+By default, `kill` sends **SIGTERM (signal 15)**. This asks the process to terminate gracefully, allowing it to perform cleanup where supported.
+
+If the process has already exited, you may see an error indicating that the PID does not exist.
+
+### What If the Process Does Not Stop?
+
+As a last resort, you can send SIGKILL:
+
+```bash
+kill -9 2182
+```
+
+SIGKILL forces the kernel to terminate the process. The process cannot catch or ignore this signal and cannot perform its normal cleanup.
+
+**Best practice:** Try `kill PID` first. Use `kill -9 PID` only when a process does not respond to a normal termination request. You may need appropriate permissions to stop processes owned by other users.
+
+
+---
+
+
+## Quick Reference
+
+| Command | Purpose |
+|---|---|
+| `ps` | View processes associated with the current terminal |
+| `ps -ef` | List processes system-wide |
+| `ps -ef \| grep java` | Search the process listing for Java-related entries |
+| `pgrep -a java` | Find matching process IDs and command lines |
+| `top` | Monitor processes and resource usage interactively |
+| `sleep 1000 &` | Run a command in the background |
+| `jobs` | List jobs managed by the current shell |
+| `kill PID` | Request graceful process termination |
+| `kill -9 PID` | Force termination using SIGKILL |
+
+
+---
+
+
+## Summary
+
+- A **process** is a running instance of a program, identified by its PID.
+- Use `ps` for a process snapshot and `top` for continuous monitoring.
+- Use `pgrep` or `ps` with `grep` to find a particular process.
+- Append `&` to a command to run it in the background.
+- Use `kill PID` to request graceful termination; reserve `kill -9 PID` for cases where normal termination fails.
+- For production services, prefer service management tools such as `systemctl` instead of manually killing service processes.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

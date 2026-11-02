@@ -1,0 +1,388 @@
+---
+title: Dockerizing a Go Application
+---
+
+A Java service in a container is typically 300 MB. A Python service is 150 MB. A Go service, done properly, is 15 MB, and it can be as little as 8.
+
+That difference comes from one property: a Go binary needs nothing else to run. The container does not need a runtime, an interpreter, or a package manager, so it does not need to contain one.
+
+## The naive version, and what is wrong with it
+
+```dockerfile
+FROM golang:1.24
+WORKDIR /app
+COPY . .
+RUN go build -o api ./cmd/api
+CMD ["./api"]
+```
+
+This works and produces an 800 MB image. It contains the entire Go toolchain, the module cache, your source code, a compiler, and a shell, none of which are needed to run the binary. It also runs as root and rebuilds every dependency whenever any file changes.
+
+## The multi-stage build
+
+```dockerfile title="Dockerfile"
+# ---- build stage ----
+FROM golang:1.24-alpine AS builder
+
+# Dependencies change less often than source, so copy them first.
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+ARG VERSION=dev
+ARG COMMIT=none
+
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -trimpath \
+    -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT}" \
+    -o /out/api ./cmd/api
+
+# ---- runtime stage ----
+FROM gcr.io/distroless/static-debian12:nonroot
+
+COPY --from=builder /out/api /api
+
+USER nonroot:nonroot
+EXPOSE 8080
+
+ENTRYPOINT ["/api"]
+```
+
+```bash
+docker build -t orders-api:latest \
+  --build-arg VERSION=$(git describe --tags) \
+  --build-arg COMMIT=$(git rev-parse --short HEAD) .
+
+docker images orders-api
+# orders-api  latest  a1b2c3d4  12.4MB
+```
+
+Everything from the build stage is discarded. Only the binary survives into the final image.
+
+### The layer caching detail
+
+```dockerfile
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+```
+
+That ordering is what makes rebuilds fast. Docker caches each layer, and a layer is invalidated when its inputs change. Since `go.mod` changes far less often than your source, the dependency download stays cached across almost every build.
+
+Reverse the order and every single-character source change re-downloads every dependency.
+
+## Choosing a base image
+
+```dockerfile
+FROM scratch                                          # ~8 MB total
+FROM gcr.io/distroless/static-debian12:nonroot        # ~12 MB total
+FROM alpine:3.20                                      # ~15 MB total
+FROM debian:12-slim                                   # ~90 MB total
+```
+
+**`scratch`** is genuinely empty. Smallest possible image, and no shell, so `docker exec` cannot give you a prompt. You must add CA certificates manually if the service makes HTTPS calls:
+
+```dockerfile
+FROM scratch
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /out/api /api
+ENTRYPOINT ["/api"]
+```
+
+**`distroless/static`** is the recommended default. It has CA certificates, timezone data, `/etc/passwd` with a nonroot user, and nothing else. No shell and no package manager means a much smaller attack surface.
+
+**`alpine`** has a shell, which is useful for debugging, and a package manager, which is a liability. Note that Alpine uses musl rather than glibc, which is fine with `CGO_ENABLED=0` and a problem without it.
+
+<Callout type="warn">
+Two things trip people up with minimal base images. **HTTPS calls fail** with "certificate signed by unknown authority" because there are no CA certificates. **Timezone lookups fail** because there is no tzdata. `distroless/static` includes both. With `scratch`, copy them in, or use `import _ "time/tzdata"` to embed the timezone database in your binary.
+</Callout>
+
+## Never run as root
+
+```dockerfile
+# distroless: use the nonroot variant
+FROM gcr.io/distroless/static-debian12:nonroot
+USER nonroot:nonroot
+```
+
+```dockerfile
+# alpine: create a user
+FROM alpine:3.20
+RUN adduser -D -u 10001 appuser
+USER appuser
+```
+
+```dockerfile
+# scratch: copy a passwd file from the build stage
+FROM golang:1.24-alpine AS builder
+RUN adduser -D -u 10001 appuser
+
+FROM scratch
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /out/api /api
+USER appuser
+```
+
+A container escape as root on the host is a much worse day than a container escape as an unprivileged user. This is one line and there is no reason to skip it.
+
+## Building for multiple architectures
+
+ARM servers are cheaper on every major cloud, so multi-architecture images are worth publishing.
+
+```bash
+docker buildx create --use
+
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t registry.example.com/orders-api:v1.2.3 \
+  --push .
+```
+
+For faster cross-architecture builds, let Go do the cross compiling rather than emulating the target platform:
+
+```dockerfile
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
+
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
+```
+
+`BUILDPLATFORM` pins the build stage to the native architecture, and `TARGETOS` and `TARGETARCH` tell Go what to produce. Native compilation cross-compiling beats QEMU emulation by a very wide margin.
+
+## Health checks
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD ["/api", "healthcheck"]
+```
+
+With no shell in the image, `curl` is not available, so the binary checks itself:
+
+```go
+func main() {
+    if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+        resp, err := http.Get("http://localhost:8080/health")
+        if err != nil || resp.StatusCode != http.StatusOK {
+            os.Exit(1)
+        }
+        os.Exit(0)
+    }
+    // ... normal startup
+}
+```
+
+In Kubernetes, use the probes in the deployment manifest instead. `HEALTHCHECK` is for plain Docker and Compose.
+
+## Compose for local development
+
+```yaml title="docker-compose.yml"
+services:
+  api:
+    build:
+      context: .
+      args:
+        VERSION: dev
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://app:devpassword@postgres:5432/appdb?sslmode=disable
+      LOG_LEVEL: debug
+      ENVIRONMENT: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: appdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+```
+
+`depends_on` with `condition: service_healthy` is the part worth copying. Without it, the API starts before PostgreSQL is accepting connections and fails on its first query.
+
+## Hot reload in development
+
+```dockerfile title="Dockerfile.dev"
+FROM golang:1.24-alpine
+
+RUN go install github.com/air-verse/air@latest
+
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+
+CMD ["air", "-c", ".air.toml"]
+```
+
+```toml title=".air.toml"
+[build]
+  cmd = "go build -o ./tmp/main ./cmd/api"
+  bin = "./tmp/main"
+  include_ext = ["go", "tmpl", "html"]
+  exclude_dir = ["tmp", "vendor", "bin"]
+  delay = 200
+```
+
+```yaml
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app                # source mounted in, rebuilt on change
+```
+
+Because Go compiles in seconds, the reload loop is genuinely fast.
+
+## Keeping the build context small
+
+```text title=".dockerignore"
+.git
+.github
+bin/
+tmp/
+*.md
+.env
+.env.*
+Dockerfile*
+docker-compose*.yml
+coverage.out
+testdata/
+```
+
+Everything not excluded is sent to the Docker daemon before the build starts. A `.git` directory of a hundred megabytes makes every build slower for no reason.
+
+## Scanning the image
+
+```bash
+docker scout cves orders-api:latest
+
+trivy image orders-api:latest
+
+govulncheck ./...
+```
+
+A distroless Go image usually scans completely clean, because there is almost nothing in it to be vulnerable. That is a large part of the appeal.
+
+Run `govulncheck` in CI as well, since it checks the Go dependencies compiled into the binary, which an image scanner cannot see.
+
+## A complete CI pipeline
+
+```yaml title=".github/workflows/release.yml"
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - run: go vet ./...
+      - run: go test -race ./...
+
+      - name: Vulnerability scan
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ghcr.io/${{ github.repository }}:latest
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            COMMIT=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+```
+
+## Kubernetes resources
+
+```yaml
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "100m"
+  limits:
+    memory: "256Mi"
+    cpu: "1000m"
+```
+
+Go services idle in the tens of megabytes, so requests can be genuinely small.
+
+```yaml
+env:
+  - name: GOMEMLIMIT
+    value: "230MiB"          # about 90% of the memory limit
+  - name: GOMAXPROCS
+    valueFrom:
+      resourceFieldRef:
+        resource: limits.cpu
+```
+
+<Callout type="warn">
+Both of those matter. The Go runtime sees the **host's** CPU count, not the container's limit, so `GOMAXPROCS` defaults far too high in a container with a fractional CPU limit, causing excessive context switching. And without `GOMEMLIMIT`, the garbage collector does not know about the memory limit and the container gets OOM-killed while Go still thinks it has room. Go 1.25 makes the CPU side container-aware automatically, and `go.uber.org/automaxprocs` handles it on earlier versions.
+</Callout>
+
+## The checklist
+
+1. Multi-stage build, so the toolchain does not ship
+2. `CGO_ENABLED=0` for a static binary
+3. `COPY go.mod go.sum` before the source, for layer caching
+4. `distroless/static:nonroot` or `scratch` as the runtime base
+5. Never run as root
+6. `-ldflags="-s -w"` and `-trimpath`
+7. A `.dockerignore` file
+8. `GOMEMLIMIT` and `GOMAXPROCS` set from the container limits
+9. Scan the image and run `govulncheck` in CI
+10. Multi-architecture builds using `TARGETARCH`, not emulation
+
+Next, let's cover the performance and reliability practices that keep this running once it is deployed.

@@ -1,0 +1,435 @@
+---
+title: Structured Logging and Metrics
+---
+
+At three in the morning, the only thing standing between you and a long night is what the service wrote down while it was failing. Getting that right is not glamorous work and it pays for itself the first time you need it.
+
+Go 1.21 added `log/slog` to the standard library, which finally gave the ecosystem one answer to structured logging.
+
+## Why structured
+
+```go
+log.Printf("user %s failed login from %s: %v", email, ip, err)
+```
+
+```text
+2026/08/08 10:30:00 user shiva@example.com failed login from 203.0.113.5: invalid password
+```
+
+Human readable, and useless at scale. Finding every failed login for one user means a regular expression against unstructured text, and counting them by IP means writing a parser.
+
+```go
+slog.Warn("login failed",
+    "email", email,
+    "ip", ip,
+    "error", err,
+)
+```
+
+```json
+{"time":"2026-08-08T10:30:00Z","level":"WARN","msg":"login failed",
+ "email":"shiva@example.com","ip":"203.0.113.5","error":"invalid password"}
+```
+
+Now `level:WARN AND email:"shiva@example.com"` is a query, and counting by IP is a group-by.
+
+## Setting up slog
+
+```go
+func newLogger(cfg config.Config) *slog.Logger {
+    opts := &slog.HandlerOptions{
+        Level:     cfg.LogLevel,
+        AddSource: cfg.IsProduction(),      // file and line, useful in prod
+    }
+
+    var handler slog.Handler
+    if cfg.LogFormat == "json" {
+        handler = slog.NewJSONHandler(os.Stdout, opts)
+    } else {
+        handler = slog.NewTextHandler(os.Stdout, opts)     // readable locally
+    }
+
+    logger := slog.New(handler).With(
+        "service", "orders-api",
+        "version", buildVersion,
+        "env", cfg.Environment,
+    )
+
+    slog.SetDefault(logger)
+    return logger
+}
+```
+
+`With` attaches attributes to every line the logger produces, so the service name and version never have to be repeated.
+
+Text for local development, JSON for anywhere a log aggregator is reading.
+
+## The levels, and what belongs at each
+
+```go
+slog.Debug("cache miss", "key", key)
+slog.Info("order created", "order_id", id, "total", total)
+slog.Warn("retrying after failure", "attempt", n, "error", err)
+slog.Error("payment failed", "order_id", id, "error", err)
+```
+
+```text
+   Debug   detail you want while diagnosing. off in production.
+   Info    significant events in normal operation. startup, shutdown,
+           business events worth a record.
+   Warn    something unexpected that the service handled. a retry, a
+           fallback, a deprecated endpoint being used.
+   Error   something failed and a human may need to act.
+```
+
+<Callout type="warn">
+The most common logging mistake is `Error` for things that are not errors. A user submitting an invalid form is not an error, it is the validation working. A client disconnecting mid-request is not an error. Logging these at `Error` fills the alerting channel with noise until people stop reading it, and then a real error arrives and nobody notices.
+</Callout>
+
+## Attributes that pay for themselves
+
+Include the identifiers that let someone reconstruct what happened:
+
+```go
+slog.ErrorContext(ctx, "order processing failed",
+    "order_id", order.ID,
+    "user_id", order.UserID,
+    "amount", order.Total,
+    "attempt", attempt,
+    "duration", time.Since(start),
+    "error", err,
+)
+```
+
+Never include the things that should not leave the process:
+
+```go
+// No
+slog.Info("login", "password", password)
+slog.Debug("request", "body", string(body))
+slog.Info("config", "database_url", dsn)          // contains credentials
+slog.Info("user", "card_number", card)
+```
+
+The `Secret` type from the configuration page handles the last two structurally. For request bodies, log a hash or a size, not the content.
+
+For typed, allocation-free logging in a hot path, `LogAttrs`:
+
+```go
+slog.LogAttrs(ctx, slog.LevelInfo, "request completed",
+    slog.String("method", r.Method),
+    slog.String("path", r.URL.Path),
+    slog.Int("status", status),
+    slog.Duration("duration", elapsed),
+)
+```
+
+## Carrying context through a request
+
+```go
+func LoggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            start := time.Now()
+
+            log := logger.With(
+                "request_id", RequestIDFrom(r.Context()),
+                "method", r.Method,
+                "path", r.URL.Path,
+                "remote_ip", clientIP(r),
+            )
+
+            ctx := ContextWithLogger(r.Context(), log)
+            rec := &responseRecorder{ResponseWriter: w, status: 200}
+
+            next.ServeHTTP(rec, r.WithContext(ctx))
+
+            level := slog.LevelInfo
+            switch {
+            case rec.status >= 500:
+                level = slog.LevelError
+            case rec.status >= 400:
+                level = slog.LevelWarn
+            }
+
+            log.Log(r.Context(), level, "request completed",
+                "status", rec.status,
+                "bytes", rec.bytes,
+                "duration_ms", time.Since(start).Milliseconds(),
+            )
+        })
+    }
+}
+```
+
+```go
+type loggerKey struct{}
+
+func ContextWithLogger(ctx context.Context, l *slog.Logger) context.Context {
+    return context.WithValue(ctx, loggerKey{}, l)
+}
+
+func LoggerFrom(ctx context.Context) *slog.Logger {
+    if l, ok := ctx.Value(loggerKey{}).(*slog.Logger); ok {
+        return l
+    }
+    return slog.Default()
+}
+```
+
+Every log line from anywhere in the request now carries the request ID, method, and path, without any function taking them as parameters. Filtering by one request ID gives you the complete story.
+
+Note the fallback in `LoggerFrom`. A missing logger returns the default rather than nil, so nothing panics if the middleware was not applied.
+
+## Redacting with LogValuer
+
+```go
+type User struct {
+    ID       string
+    Email    string
+    Password string
+    APIKey   string
+}
+
+func (u User) LogValue() slog.Value {
+    return slog.GroupValue(
+        slog.String("id", u.ID),
+        slog.String("email", maskEmail(u.Email)),
+        // Password and APIKey are simply not included.
+    )
+}
+
+func maskEmail(e string) string {
+    at := strings.Index(e, "@")
+    if at <= 1 {
+        return "***"
+    }
+    return e[:1] + "***" + e[at:]
+}
+```
+
+```go
+slog.Info("user loaded", "user", user)
+// {"msg":"user loaded","user":{"id":"u1","email":"s***@example.com"}}
+```
+
+Implementing `LogValue` once means no call site can accidentally leak the password, regardless of who writes it.
+
+## Log once, at the boundary
+
+```go
+// Bad: the same failure appears three times
+func (r *Repo) Get(id string) (*Order, error) {
+    if err != nil {
+        slog.Error("query failed", "error", err)
+        return nil, err
+    }
+}
+
+func (s *Service) Get(id string) (*Order, error) {
+    o, err := s.repo.Get(id)
+    if err != nil {
+        slog.Error("service get failed", "error", err)     // again
+        return nil, err
+    }
+}
+
+func (h *Handler) Get(w, r) {
+    o, err := h.svc.Get(id)
+    if err != nil {
+        slog.Error("handler failed", "error", err)         // and again
+    }
+}
+```
+
+```go
+// Good: wrap on the way up, log once where the decision is made
+func (r *Repo) Get(id string) (*Order, error) {
+    if err != nil {
+        return nil, fmt.Errorf("querying order %s: %w", id, err)
+    }
+}
+
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
+    o, err := h.svc.Get(r.Context(), id)
+    if err != nil {
+        if errors.Is(err, ErrNotFound) {
+            http.Error(w, "not found", 404)
+            return                                  // expected, no log
+        }
+        LoggerFrom(r.Context()).Error("getting order", "error", err)
+        http.Error(w, "internal error", 500)
+        return
+    }
+}
+```
+
+One log line, with the full wrapped chain, at the point where somebody decided what to do about it.
+
+## Metrics
+
+Logs tell you what happened to one request. Metrics tell you what is happening to all of them.
+
+```bash
+go get github.com/prometheus/client_golang
+```
+
+```go
+var (
+    requestsTotal = prometheus.NewCounterVec(
+        prometheus.CounterOpts{
+            Name: "http_requests_total",
+            Help: "Total HTTP requests.",
+        },
+        []string{"method", "path", "status"},
+    )
+
+    requestDuration = prometheus.NewHistogramVec(
+        prometheus.HistogramOpts{
+            Name:    "http_request_duration_seconds",
+            Help:    "HTTP request latency.",
+            Buckets: prometheus.DefBuckets,
+        },
+        []string{"method", "path"},
+    )
+
+    dbConnsInUse = prometheus.NewGauge(
+        prometheus.GaugeOpts{
+            Name: "db_connections_in_use",
+            Help: "Database connections currently in use.",
+        },
+    )
+)
+
+func init() {
+    prometheus.MustRegister(requestsTotal, requestDuration, dbConnsInUse)
+}
+```
+
+```go
+func MetricsMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        start := time.Now()
+        rec := &responseRecorder{ResponseWriter: w, status: 200}
+
+        next.ServeHTTP(rec, r)
+
+        route := routePattern(r)      // the PATTERN, not the actual path
+        requestsTotal.WithLabelValues(
+            r.Method, route, strconv.Itoa(rec.status)).Inc()
+        requestDuration.WithLabelValues(
+            r.Method, route).Observe(time.Since(start).Seconds())
+    })
+}
+```
+
+<Callout type="warn">
+Label values must have low cardinality. Using `r.URL.Path` as a label creates a new time series for every distinct URL, so `/users/42` and `/users/43` become separate series. A million users means a million series and a dead metrics backend. Always use the route pattern, `/users/{id}`, never the concrete path. The same applies to user IDs, request IDs, and email addresses.
+</Callout>
+
+Exposing them, on a separate internal port:
+
+```go
+go func() {
+    mux := http.NewServeMux()
+    mux.Handle("/metrics", promhttp.Handler())
+    mux.Handle("/debug/pprof/", http.DefaultServeMux)
+
+    if err := http.ListenAndServe("localhost:9090", mux); err != nil {
+        slog.Error("metrics server failed", "error", err)
+    }
+}()
+```
+
+Binding to localhost keeps profiling and metrics off the public interface, which matters because pprof endpoints expose a great deal about a running process.
+
+## What to measure
+
+The four signals that answer most questions:
+
+```text
+   Latency      how long requests take, as a histogram not an average
+   Traffic      requests per second
+   Errors       the rate of failures
+   Saturation   how full the resources are: pool usage, queue depth, memory
+```
+
+Plus the ones specific to Go:
+
+```go
+prometheus.MustRegister(collectors.NewGoCollector())
+prometheus.MustRegister(collectors.NewProcessCollector(
+    collectors.ProcessCollectorOpts{}))
+```
+
+That gives you goroutine count, heap size, GC pause duration, and file descriptor usage for free. Goroutine count in particular is the single best leak indicator you can graph.
+
+And the database pool:
+
+```go
+go func() {
+    ticker := time.NewTicker(10 * time.Second)
+    defer ticker.Stop()
+
+    for range ticker.C {
+        s := db.Stats()
+        dbConnsInUse.Set(float64(s.InUse))
+        dbConnsIdle.Set(float64(s.Idle))
+        dbWaitCount.Set(float64(s.WaitCount))
+    }
+}()
+```
+
+`WaitCount` climbing means requests are queueing for a connection, which is the answer to "why did latency go up while the database looks idle".
+
+## Percentiles, not averages
+
+An average latency of 100 ms is consistent with every request taking 100 ms, and with 99 percent taking 50 ms while 1 percent takes 5 seconds. Those are very different services.
+
+```text
+   p50   the typical experience
+   p95   what a noticeably unlucky user sees
+   p99   what your worst-affected users see
+   p999  what happens during garbage collection and lock contention
+```
+
+Histograms give you these. Alert on p99, because that is where the users who churn live.
+
+## Tracing
+
+For a request crossing several services, tracing shows the whole path:
+
+```go
+import "go.opentelemetry.io/otel"
+
+func (s *Service) PlaceOrder(ctx context.Context, req Request) error {
+    ctx, span := otel.Tracer("orders").Start(ctx, "PlaceOrder")
+    defer span.End()
+
+    span.SetAttributes(
+        attribute.String("order.id", req.OrderID),
+        attribute.Int64("order.total", req.Total),
+    )
+
+    if err := s.repo.Save(ctx, order); err != nil {
+        span.RecordError(err)
+        span.SetStatus(codes.Error, "saving order")
+        return err
+    }
+    return nil
+}
+```
+
+Worth the setup once you have more than a handful of services. For a single service, good logging with a request ID answers most of the same questions.
+
+## The habits
+
+1. **Structured logging from day one.** Retrofitting it is tedious.
+2. **JSON in production, text locally.** Both from the same code path.
+3. **A request ID on every line.** One filter, one complete story.
+4. **Log once, at the boundary.** Wrap errors on the way up.
+5. **Never log secrets.** Use `LogValuer` so it cannot happen by accident.
+6. **Low cardinality metric labels.** Route patterns, never concrete paths.
+7. **Watch goroutine count.** It is the cheapest leak detector you will ever have.
+
+Next, let's make sure the service can stop as cleanly as it starts.

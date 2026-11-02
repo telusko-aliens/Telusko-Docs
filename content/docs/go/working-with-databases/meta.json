@@ -1,0 +1,10 @@
+{
+    "title": "Working with Databases",
+    "pages": [
+        "database-sql-basics.mdx",
+        "connecting-to-postgres.mdx",
+        "crud-queries.mdx",
+        "transactions-and-connection-pooling.mdx",
+        "the-repository-pattern.mdx"
+    ]
+}

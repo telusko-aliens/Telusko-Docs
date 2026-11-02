@@ -1,0 +1,459 @@
+---
+title: The Repository Pattern
+---
+
+The repository pattern arrived in Go from Java, and a fair amount of what came with it does not belong. Go does not need an interface for every repository, a unit of work object, or a generic `Repository<T>` base. What it does need is a clear boundary between the code that knows SQL and the code that knows the business.
+
+This page builds that boundary the Go way.
+
+## What a repository is for
+
+```text
+   service layer     "charge the order and mark it paid"
+        │                   knows business rules
+        │                   knows nothing about SQL
+        ▼
+   repository        "UPDATE orders SET status = 'paid' WHERE id = $1"
+        │                   knows SQL
+        │                   knows nothing about business rules
+        ▼
+   database
+```
+
+Two things follow from that split, and they are the entire value of the pattern.
+
+The service can be tested without a database. And the database can be changed, or a cache added in front of it, without touching a single business rule.
+
+## The interface lives with the consumer
+
+```go title="internal/service/order.go"
+package service
+
+// Defined HERE, in the package that uses it, sized to what it needs.
+type OrderRepository interface {
+    Create(ctx context.Context, o *Order) error
+    Get(ctx context.Context, id string) (*Order, error)
+    UpdateStatus(ctx context.Context, id string, status Status) error
+    ListByUser(ctx context.Context, userID string, f Filter) ([]*Order, error)
+}
+
+type OrderService struct {
+    repo    OrderRepository
+    payment PaymentGateway
+    logger  *slog.Logger
+}
+```
+
+```go title="internal/storage/order.go"
+package storage
+
+// Knows nothing about the service package.
+type OrderStore struct {
+    db DBTX
+}
+
+func NewOrderStore(db DBTX) *OrderStore {
+    return &OrderStore{db: db}
+}
+
+func (s *OrderStore) Create(ctx context.Context, o *Order) error { ... }
+```
+
+`*storage.OrderStore` satisfies `service.OrderRepository` implicitly. Neither package imports the other's abstraction, and `main` is the only place that knows both exist.
+
+<Callout type="warn">
+The anti-pattern is defining the interface in the storage package next to its only implementation. That inverts the dependency: now the service imports storage's interface, changing it breaks both packages, and storage has to guess what its consumers need. Go's implicit satisfaction exists specifically so you do not have to do this.
+</Callout>
+
+## Keep interfaces small, per consumer
+
+Different parts of the application need different subsets. Let each declare its own:
+
+```go
+// The reporting package only reads
+package report
+
+type OrderReader interface {
+    ListByUser(ctx context.Context, userID string, f Filter) ([]*Order, error)
+}
+```
+
+```go
+// The webhook handler only updates status
+package webhook
+
+type StatusUpdater interface {
+    UpdateStatus(ctx context.Context, id string, status Status) error
+}
+```
+
+One store satisfies all three interfaces. A test for the reporting package fakes one method, not four.
+
+## The store implementation
+
+```go title="internal/storage/order.go"
+package storage
+
+type DBTX interface {
+    ExecContext(context.Context, string, ...any) (sql.Result, error)
+    QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+    QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+type OrderStore struct {
+    db DBTX
+}
+
+func NewOrderStore(db DBTX) *OrderStore {
+    return &OrderStore{db: db}
+}
+
+// WithTx returns a store bound to the given transaction, so callers can
+// compose several repositories into one atomic operation.
+func (s *OrderStore) WithTx(tx *sql.Tx) *OrderStore {
+    return &OrderStore{db: tx}
+}
+
+func (s *OrderStore) Create(ctx context.Context, o *model.Order) error {
+    const query = `
+        INSERT INTO orders (user_id, total, status)
+        VALUES ($1, $2, $3)
+        RETURNING id, created_at, updated_at`
+
+    err := s.db.QueryRowContext(ctx, query, o.UserID, o.Total, o.Status).
+        Scan(&o.ID, &o.CreatedAt, &o.UpdatedAt)
+
+    if err != nil {
+        return translateError(err, "creating order")
+    }
+    return nil
+}
+
+func (s *OrderStore) Get(ctx context.Context, id string) (*model.Order, error) {
+    const query = `
+        SELECT id, user_id, total, status, created_at, updated_at
+        FROM orders WHERE id = $1`
+
+    var o model.Order
+    err := s.db.QueryRowContext(ctx, query, id).Scan(
+        &o.ID, &o.UserID, &o.Total, &o.Status, &o.CreatedAt, &o.UpdatedAt)
+
+    if errors.Is(err, sql.ErrNoRows) {
+        return nil, model.ErrNotFound
+    }
+    if err != nil {
+        return nil, translateError(err, "getting order")
+    }
+    return &o, nil
+}
+```
+
+The `DBTX` interface is what makes `WithTx` possible, and it is the piece most repository implementations leave out.
+
+## Translating database errors
+
+Every driver-specific error becomes a domain error at this boundary. Nothing above the repository should ever see a `pgconn.PgError`.
+
+```go title="internal/storage/errors.go"
+package storage
+
+func translateError(err error, op string) error {
+    if err == nil {
+        return nil
+    }
+
+    if errors.Is(err, sql.ErrNoRows) {
+        return model.ErrNotFound
+    }
+    if errors.Is(err, context.DeadlineExceeded) {
+        return fmt.Errorf("%s: %w", op, model.ErrTimeout)
+    }
+
+    var pgErr *pgconn.PgError
+    if errors.As(err, &pgErr) {
+        switch pgErr.Code {
+        case "23505":
+            return fmt.Errorf("%s: %w", op, model.ErrDuplicate)
+        case "23503":
+            return fmt.Errorf("%s: %w", op, model.ErrInvalidReference)
+        case "23514":
+            return fmt.Errorf("%s: %w", op, model.ErrConstraintViolated)
+        case "40001", "40P01":
+            return fmt.Errorf("%s: %w", op, model.ErrConflict)
+        }
+    }
+
+    return fmt.Errorf("%s: %w", op, err)
+}
+```
+
+The service layer now writes `errors.Is(err, model.ErrDuplicate)` without knowing that PostgreSQL calls it 23505, and swapping to MySQL means changing this one function.
+
+## Transactions across repositories
+
+The awkward case: creating an order and decrementing inventory must be atomic, and they live in different repositories.
+
+```go title="internal/storage/tx.go"
+package storage
+
+type TxManager struct {
+    db *sql.DB
+}
+
+func NewTxManager(db *sql.DB) *TxManager {
+    return &TxManager{db: db}
+}
+
+// Stores bundles every repository, bound to the same transaction.
+type Stores struct {
+    Orders    *OrderStore
+    Inventory *InventoryStore
+    Audit     *AuditStore
+}
+
+func (m *TxManager) WithTx(ctx context.Context, fn func(Stores) error) error {
+    tx, err := m.db.BeginTx(ctx, nil)
+    if err != nil {
+        return fmt.Errorf("beginning transaction: %w", err)
+    }
+
+    defer func() {
+        if p := recover(); p != nil {
+            tx.Rollback()
+            panic(p)
+        }
+    }()
+
+    stores := Stores{
+        Orders:    NewOrderStore(tx),
+        Inventory: NewInventoryStore(tx),
+        Audit:     NewAuditStore(tx),
+    }
+
+    if err := fn(stores); err != nil {
+        if rbErr := tx.Rollback(); rbErr != nil &&
+            !errors.Is(rbErr, sql.ErrTxDone) {
+            return fmt.Errorf("%w (rollback failed: %v)", err, rbErr)
+        }
+        return err
+    }
+
+    return tx.Commit()
+}
+```
+
+The service declares what it needs, as always:
+
+```go title="internal/service/order.go"
+package service
+
+type Transactor interface {
+    WithTx(ctx context.Context, fn func(storage.Stores) error) error
+}
+
+func (s *OrderService) PlaceOrder(ctx context.Context, req PlaceOrderRequest) (*Order, error) {
+    if err := req.Validate(); err != nil {
+        return nil, fmt.Errorf("invalid order: %w", err)
+    }
+
+    var order *model.Order
+
+    err := s.tx.WithTx(ctx, func(st storage.Stores) error {
+        for _, item := range req.Items {
+            if err := st.Inventory.Reserve(ctx, item.SKU, item.Qty); err != nil {
+                return fmt.Errorf("reserving %s: %w", item.SKU, err)
+            }
+        }
+
+        order = &model.Order{
+            UserID: req.UserID,
+            Total:  req.Total(),
+            Status: model.StatusPending,
+        }
+        if err := st.Orders.Create(ctx, order); err != nil {
+            return err
+        }
+
+        return st.Audit.Record(ctx, "order.created", order.ID)
+    })
+    if err != nil {
+        return nil, err
+    }
+
+    // The external call happens AFTER the commit, not inside it.
+    if err := s.payment.Charge(ctx, order.Total, req.Token); err != nil {
+        s.logger.ErrorContext(ctx, "charge failed after order creation",
+            "order_id", order.ID, "error", err)
+        return nil, fmt.Errorf("payment failed: %w", err)
+    }
+
+    return order, nil
+}
+```
+
+That last part is the important design decision. The payment call sits outside the transaction, because a network call inside one holds a database connection and locks for the duration of an external service's response time.
+
+## Testing the service without a database
+
+```go
+type fakeOrderRepo struct {
+    orders  map[string]*model.Order
+    createErr error
+}
+
+func (f *fakeOrderRepo) Create(ctx context.Context, o *model.Order) error {
+    if f.createErr != nil {
+        return f.createErr
+    }
+    o.ID = "test-order-1"
+    f.orders[o.ID] = o
+    return nil
+}
+
+func (f *fakeOrderRepo) Get(ctx context.Context, id string) (*model.Order, error) {
+    o, ok := f.orders[id]
+    if !ok {
+        return nil, model.ErrNotFound
+    }
+    return o, nil
+}
+
+// ... two more methods
+```
+
+```go
+func TestPlaceOrderRejectsInvalidRequest(t *testing.T) {
+    svc := NewOrderService(
+        &fakeOrderRepo{orders: map[string]*model.Order{}},
+        &fakePayment{},
+        slog.Default(),
+    )
+
+    _, err := svc.PlaceOrder(context.Background(), PlaceOrderRequest{})
+
+    if err == nil {
+        t.Fatal("expected an error for an empty request")
+    }
+}
+```
+
+Milliseconds instead of seconds, no Docker, no fixtures, and the test fails for exactly one reason.
+
+## Testing the repository against a real database
+
+Fakes cannot verify SQL. Repository tests need the real thing, and `testcontainers` starts one per test run:
+
+```go
+func setupDB(t *testing.T) *sql.DB {
+    t.Helper()
+
+    ctx := context.Background()
+    container, err := postgres.Run(ctx, "postgres:17-alpine",
+        postgres.WithDatabase("test"),
+        postgres.WithUsername("test"),
+        postgres.WithPassword("test"),
+        testcontainers.WithWaitStrategy(
+            wait.ForLog("database system is ready to accept connections").
+                WithOccurrence(2)),
+    )
+    if err != nil {
+        t.Fatalf("starting postgres: %v", err)
+    }
+    t.Cleanup(func() { container.Terminate(ctx) })
+
+    dsn, _ := container.ConnectionString(ctx, "sslmode=disable")
+    db, err := sql.Open("pgx", dsn)
+    if err != nil {
+        t.Fatal(err)
+    }
+    t.Cleanup(func() { db.Close() })
+
+    if err := runMigrations(dsn); err != nil {
+        t.Fatalf("running migrations: %v", err)
+    }
+    return db
+}
+
+func TestOrderStore(t *testing.T) {
+    if testing.Short() {
+        t.Skip("skipping integration test")
+    }
+
+    db := setupDB(t)
+    store := NewOrderStore(db)
+
+    t.Run("create and get", func(t *testing.T) {
+        o := &model.Order{UserID: "u1", Total: 9900, Status: model.StatusPending}
+
+        if err := store.Create(context.Background(), o); err != nil {
+            t.Fatalf("Create: %v", err)
+        }
+        if o.ID == "" {
+            t.Fatal("Create did not set the ID")
+        }
+
+        got, err := store.Get(context.Background(), o.ID)
+        if err != nil {
+            t.Fatalf("Get: %v", err)
+        }
+        if got.Total != 9900 {
+            t.Errorf("total = %d, want 9900", got.Total)
+        }
+    })
+
+    t.Run("get missing returns ErrNotFound", func(t *testing.T) {
+        _, err := store.Get(context.Background(), uuid.NewString())
+        if !errors.Is(err, model.ErrNotFound) {
+            t.Errorf("err = %v, want ErrNotFound", err)
+        }
+    })
+}
+```
+
+`testing.Short()` lets `go test -short ./...` skip these during a fast inner loop while CI runs everything.
+
+## Generating the boilerplate
+
+Writing scan code by hand for thirty tables gets old. Two tools handle it differently, and both are worth knowing about.
+
+**sqlc** generates Go from your SQL:
+
+```sql title="query.sql"
+-- name: GetOrder :one
+SELECT * FROM orders WHERE id = $1;
+
+-- name: ListOrdersByUser :many
+SELECT * FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2;
+```
+
+```bash
+sqlc generate
+```
+
+You get type safe methods with the structs and scanning written for you, and the SQL is checked against your actual schema at generation time. You keep full control of the queries.
+
+**sqlx** adds struct scanning to `database/sql` without code generation:
+
+```go
+var orders []Order
+err := db.SelectContext(ctx, &orders,
+    `SELECT id, user_id, total FROM orders WHERE user_id = $1`, userID)
+```
+
+Less machinery, less type safety, works today with no build step.
+
+<Callout type="info">
+GORM and similar full ORMs exist and are used, mostly by teams arriving from Rails or Django. The Go community leans away from them, because the query generation hides what actually runs, N+1 problems become invisible, and the reflection cost is real. `sqlc` is the current consensus for teams who want the boilerplate gone without giving up the SQL.
+</Callout>
+
+## The rules
+
+1. **The interface belongs to the consumer**, sized to what that consumer uses.
+2. **Translate database errors at the boundary.** Nothing above sees a driver type.
+3. **Return domain types**, never rows or driver structs.
+4. **Repositories contain no business rules.** No pricing, no permissions, no workflow.
+5. **Support transactions** with a `DBTX` interface and a `WithTx` constructor.
+6. **No network calls inside a transaction.** Commit first, then call out.
+7. **Fake the repository to test the service.** Use a real database to test the repository.
+
+That completes databases. Next, let's make sure all of this actually works, with tests.

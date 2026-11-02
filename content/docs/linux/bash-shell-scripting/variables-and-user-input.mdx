@@ -1,0 +1,176 @@
+---
+title: Variables and User Input
+---
+
+
+Variables make shell scripts flexible and reusable. Instead of hardcoding values into commands, you can store information in variables and use it wherever needed. You can also collect input from users to make scripts interactive.
+
+
+## What Is a Variable?
+
+A **variable** is a named value that can be stored and reused in a script.
+
+For example, instead of writing a person's name directly in multiple commands, you can store it once in a variable and reference it whenever needed.
+
+
+### Creating and Using Variables
+
+**Syntax**
+
+```bash
+variable_name=value
+```
+
+There must be **no spaces around the `=` sign**.
+
+**Example**
+
+```bash
+name=Harsh
+echo "$name"
+```
+
+Output:
+
+```text
+Harsh
+```
+
+- `name=Harsh` assigns the value `Harsh` to the variable `name`.
+- `$name` expands to the value stored in the variable.
+- `echo` displays the value.
+
+Using double quotes around variable references, such as `"$name"`, is a good habit because it preserves spaces in the value.
+
+
+---
+
+
+## Getting User Input with `read`
+
+The `read` command waits for input from the terminal and stores it in a variable.
+
+### Example: Ask for a Name
+
+```bash
+#!/bin/bash
+
+echo "Enter your name:"
+read name
+
+echo "Welcome $name to this course!"
+```
+
+Example execution:
+
+```text
+Enter your name:
+Sushant
+Welcome Sushant to this course!
+```
+
+### How It Works
+
+1. `echo` displays a prompt.
+2. `read name` waits for the user to enter text and stores it in `name`.
+3. The final `echo` uses the stored value to display a personalized message.
+
+You can also combine the prompt and input into one command using `read -p`:
+
+```bash
+read -p "Enter your name: " name
+```
+
+---
+
+
+## Using Multiple Variables
+
+A script can collect and use multiple pieces of information.
+
+```bash
+#!/bin/bash
+
+read -p "Enter your name: " name
+read -p "Enter your role: " role
+
+echo "Hello $name, you are a $role."
+```
+
+Example execution:
+
+```text
+Enter your name: Sushant
+Enter your role: Creative Head
+Hello Sushant, you are a Creative Head.
+```
+
+Each `read` command stores the user's response in its corresponding variable. You can reuse these values throughout the script.
+
+
+---
+
+
+## Common Shell Environment Variables
+
+Linux shells provide predefined variables containing useful information about the current environment. These are commonly called **environment variables** or **shell variables**, depending on how they are defined and used.
+
+| Variable | Description | Example |
+|---|---|---|
+| `$SHELL` | User's configured login shell | `/bin/bash` |
+| `$PWD` | Current working directory | `/home/ubuntu/scripts` |
+| `$HOME` | User's home directory | `/home/ubuntu` |
+| `$USER` | Username associated with the current user session | `ubuntu` |
+
+### Example
+
+```bash
+echo "$SHELL"
+echo "$PWD"
+echo "$HOME"
+echo "$USER"
+```
+
+The environment usually sets these variables automatically. However, they are not universally read-only; shell variables can generally be reassigned unless explicitly made read-only.
+
+
+---
+
+
+## Variable Naming and Usage Rules
+
+![Variables_and_their_usage](https://dyz1pdcuffwr5.cloudfront.net/Linux/linux_shell_variables.png)
+
+> Variable names can contain letters, digits, and underscores, but they cannot begin with a digit.
+
+
+---
+
+
+## Quick Reference
+
+| Syntax | Purpose |
+|---|---|
+| `name=value` | Assign a value to a variable |
+| `echo "$name"` | Display a variable's value |
+| `read name` | Read terminal input into a variable |
+| `read -p "Prompt: " name` | Display a prompt and read input |
+| `$HOME` | Access the user's home directory |
+| `$PWD` | Access the current working directory |
+| `$USER` | Access the current username |
+
+
+---
+
+
+## Summary
+
+- Variables store values that can be reused throughout a script.
+- Assign values without spaces around `=`.
+- Use `$variable_name` to access a variable's value.
+- Use `read` to collect user input and make scripts interactive.
+- Environment variables such as `$HOME` and `$USER` provide useful information about the current environment.
+- Quoting variable expansions helps preserve values containing spaces.
+
+
+Written By: <a href="https://www.linkedin.com/in/muskangarg03/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Muskan Garg <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,637 @@
+---
+title: "Project 4: REST API with a Database"
+---
+
+A bookmarking service. Users sign up, log in, save links with tags, and search them. PostgreSQL for storage, JWT for authentication, layered architecture, and tests at every level.
+
+This is the project that ties the web services, database, and testing sections together. It is longer than the previous three, and by the end you will have something with the same shape as a real production service.
+
+```bash
+$ curl -X POST localhost:8080/api/v1/auth/register \
+    -H 'Content-Type: application/json' \
+    -d '{"email":"shiva@example.com","password":"correct-horse-battery"}'
+{"id":"01HX...","email":"shiva@example.com"}
+
+$ TOKEN=$(curl -s -X POST localhost:8080/api/v1/auth/login \
+    -H 'Content-Type: application/json' \
+    -d '{"email":"shiva@example.com","password":"correct-horse-battery"}' \
+    | jq -r .access_token)
+
+$ curl -X POST localhost:8080/api/v1/bookmarks \
+    -H "Authorization: Bearer $TOKEN" \
+    -H 'Content-Type: application/json' \
+    -d '{"url":"https://go.dev","title":"The Go site","tags":["go","docs"]}'
+{"id":"01HY...","url":"https://go.dev","title":"The Go site","tags":["go","docs"]}
+
+$ curl "localhost:8080/api/v1/bookmarks?tag=go&limit=10" \
+    -H "Authorization: Bearer $TOKEN"
+```
+
+## Layout
+
+```text
+   bookmarks/
+   ├── go.mod
+   ├── Makefile
+   ├── docker-compose.yml
+   ├── migrations/
+   │   ├── 001_init.up.sql
+   │   └── 001_init.down.sql
+   ├── cmd/api/main.go
+   └── internal/
+       ├── config/config.go
+       ├── model/            domain types, no dependencies
+       ├── storage/          SQL
+       ├── service/          business rules
+       ├── auth/             hashing and tokens
+       └── api/              HTTP
+```
+
+```bash
+go get github.com/jackc/pgx/v5
+go get github.com/golang-jwt/jwt/v5
+go get golang.org/x/crypto/bcrypt
+go get github.com/google/uuid
+```
+
+## Schema
+
+```sql title="migrations/001_init.up.sql"
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE users (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email         TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE bookmarks (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    url        TEXT NOT NULL,
+    title      TEXT NOT NULL DEFAULT '',
+    notes      TEXT NOT NULL DEFAULT '',
+    tags       TEXT[] NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    UNIQUE (user_id, url)
+);
+
+CREATE INDEX idx_bookmarks_user_created ON bookmarks (user_id, created_at DESC);
+CREATE INDEX idx_bookmarks_tags ON bookmarks USING GIN (tags);
+```
+
+The GIN index on `tags` is what makes tag filtering fast. Without it, PostgreSQL scans every row of the user's bookmarks for every tag query.
+
+The `UNIQUE (user_id, url)` constraint means the database enforces "no duplicate bookmarks per user", so the application does not have to check first and race.
+
+## Domain types
+
+```go title="internal/model/bookmark.go"
+package model
+
+import (
+    "errors"
+    "net/url"
+    "strings"
+    "time"
+)
+
+var (
+    ErrNotFound   = errors.New("not found")
+    ErrDuplicate  = errors.New("already exists")
+    ErrUnauthorized = errors.New("unauthorized")
+)
+
+type Bookmark struct {
+    ID        string    `json:"id"`
+    UserID    string    `json:"-"`          // never sent to clients
+    URL       string    `json:"url"`
+    Title     string    `json:"title"`
+    Notes     string    `json:"notes,omitempty"`
+    Tags      []string  `json:"tags"`
+    CreatedAt time.Time `json:"created_at"`
+    UpdatedAt time.Time `json:"updated_at"`
+}
+
+type ValidationError struct {
+    Field   string `json:"field"`
+    Message string `json:"message"`
+}
+
+func (e ValidationError) Error() string {
+    return e.Field + ": " + e.Message
+}
+
+type CreateBookmark struct {
+    URL   string   `json:"url"`
+    Title string   `json:"title"`
+    Notes string   `json:"notes"`
+    Tags  []string `json:"tags"`
+}
+
+func (c *CreateBookmark) Normalise() {
+    c.URL = strings.TrimSpace(c.URL)
+    c.Title = strings.TrimSpace(c.Title)
+
+    seen := make(map[string]struct{}, len(c.Tags))
+    tags := make([]string, 0, len(c.Tags))
+    for _, t := range c.Tags {
+        t = strings.ToLower(strings.TrimSpace(t))
+        if t == "" {
+            continue
+        }
+        if _, dup := seen[t]; dup {
+            continue
+        }
+        seen[t] = struct{}{}
+        tags = append(tags, t)
+    }
+    c.Tags = tags
+}
+
+func (c CreateBookmark) Validate() error {
+    var errs []error
+
+    switch {
+    case c.URL == "":
+        errs = append(errs, ValidationError{"url", "is required"})
+    default:
+        u, err := url.Parse(c.URL)
+        if err != nil {
+            errs = append(errs, ValidationError{"url", "is not a valid URL"})
+        } else if u.Scheme != "http" && u.Scheme != "https" {
+            errs = append(errs, ValidationError{"url", "must be http or https"})
+        }
+    }
+
+    if len(c.Title) > 300 {
+        errs = append(errs, ValidationError{"title", "must be 300 characters or fewer"})
+    }
+    if len(c.Tags) > 20 {
+        errs = append(errs, ValidationError{"tags", "maximum of 20 tags"})
+    }
+    for _, t := range c.Tags {
+        if len(t) > 40 {
+            errs = append(errs, ValidationError{"tags", "each tag must be 40 characters or fewer"})
+            break
+        }
+    }
+
+    return errors.Join(errs...)
+}
+```
+
+`UserID` carries `json:"-"` so it can never leak into a response. That is a small habit worth applying to every internal field.
+
+`Normalise` runs before `Validate`, so trimming and deduplication happen once and every later layer sees clean data.
+
+## Authentication
+
+```go title="internal/auth/auth.go"
+package auth
+
+import (
+    "errors"
+    "fmt"
+    "time"
+
+    "github.com/golang-jwt/jwt/v5"
+    "golang.org/x/crypto/bcrypt"
+)
+
+var ErrInvalidToken = errors.New("invalid token")
+
+func HashPassword(plain string) (string, error) {
+    if len(plain) < 12 {
+        return "", errors.New("password must be at least 12 characters")
+    }
+    b, err := bcrypt.GenerateFromPassword([]byte(plain), bcrypt.DefaultCost)
+    if err != nil {
+        return "", fmt.Errorf("hashing password: %w", err)
+    }
+    return string(b), nil
+}
+
+func CheckPassword(hash, plain string) bool {
+    return bcrypt.CompareHashAndPassword([]byte(hash), []byte(plain)) == nil
+}
+
+type Claims struct {
+    UserID string `json:"uid"`
+    jwt.RegisteredClaims
+}
+
+type TokenService struct {
+    secret []byte
+    ttl    time.Duration
+    issuer string
+}
+
+func NewTokenService(secret string, ttl time.Duration) (*TokenService, error) {
+    if len(secret) < 32 {
+        return nil, errors.New("JWT secret must be at least 32 bytes")
+    }
+    return &TokenService{secret: []byte(secret), ttl: ttl, issuer: "bookmarks"}, nil
+}
+
+func (s *TokenService) Issue(userID string) (string, time.Time, error) {
+    expires := time.Now().Add(s.ttl)
+
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
+        UserID: userID,
+        RegisteredClaims: jwt.RegisteredClaims{
+            Issuer:    s.issuer,
+            Subject:   userID,
+            ExpiresAt: jwt.NewNumericDate(expires),
+            IssuedAt:  jwt.NewNumericDate(time.Now()),
+        },
+    })
+
+    signed, err := token.SignedString(s.secret)
+    if err != nil {
+        return "", time.Time{}, fmt.Errorf("signing token: %w", err)
+    }
+    return signed, expires, nil
+}
+
+func (s *TokenService) Verify(tokenString string) (string, error) {
+    var claims Claims
+
+    _, err := jwt.ParseWithClaims(tokenString, &claims,
+        func(t *jwt.Token) (any, error) {
+            if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+                return nil, fmt.Errorf("unexpected signing method %v", t.Header["alg"])
+            }
+            return s.secret, nil
+        },
+        jwt.WithIssuer(s.issuer),
+        jwt.WithExpirationRequired(),
+    )
+    if err != nil {
+        return "", fmt.Errorf("%w: %v", ErrInvalidToken, err)
+    }
+
+    return claims.UserID, nil
+}
+```
+
+<Callout type="warn">
+The signing method check inside the key function is not optional. Without it, an attacker can present a token with `alg: none` or an HMAC token signed with your public key, and some JWT libraries will accept it. Every JWT implementation guide includes this check for a reason, and skipping it has caused real breaches.
+</Callout>
+
+## Storage
+
+```go title="internal/storage/bookmark.go"
+package storage
+
+type BookmarkStore struct {
+    db *pgxpool.Pool
+}
+
+func NewBookmarkStore(db *pgxpool.Pool) *BookmarkStore {
+    return &BookmarkStore{db: db}
+}
+
+func (s *BookmarkStore) Create(ctx context.Context, b *model.Bookmark) error {
+    const query = `
+        INSERT INTO bookmarks (user_id, url, title, notes, tags)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, created_at, updated_at`
+
+    err := s.db.QueryRow(ctx, query,
+        b.UserID, b.URL, b.Title, b.Notes, b.Tags,
+    ).Scan(&b.ID, &b.CreatedAt, &b.UpdatedAt)
+
+    return translate(err, "creating bookmark")
+}
+
+type Filter struct {
+    Tag    string
+    Search string
+    Limit  int
+    Offset int
+}
+
+func (s *BookmarkStore) List(ctx context.Context, userID string, f Filter) ([]*model.Bookmark, error) {
+    conditions := []string{"user_id = $1"}
+    args := []any{userID}
+
+    if f.Tag != "" {
+        args = append(args, f.Tag)
+        conditions = append(conditions, fmt.Sprintf("$%d = ANY(tags)", len(args)))
+    }
+    if f.Search != "" {
+        args = append(args, "%"+f.Search+"%")
+        conditions = append(conditions,
+            fmt.Sprintf("(title ILIKE $%d OR url ILIKE $%d)", len(args), len(args)))
+    }
+
+    args = append(args, f.Limit, f.Offset)
+
+    query := fmt.Sprintf(`
+        SELECT id, user_id, url, title, notes, tags, created_at, updated_at
+        FROM bookmarks
+        WHERE %s
+        ORDER BY created_at DESC
+        LIMIT $%d OFFSET $%d`,
+        strings.Join(conditions, " AND "), len(args)-1, len(args))
+
+    rows, err := s.db.Query(ctx, query, args...)
+    if err != nil {
+        return nil, translate(err, "listing bookmarks")
+    }
+    defer rows.Close()
+
+    out := make([]*model.Bookmark, 0, f.Limit)
+    for rows.Next() {
+        var b model.Bookmark
+        if err := rows.Scan(&b.ID, &b.UserID, &b.URL, &b.Title,
+            &b.Notes, &b.Tags, &b.CreatedAt, &b.UpdatedAt); err != nil {
+            return nil, translate(err, "scanning bookmark")
+        }
+        out = append(out, &b)
+    }
+
+    return out, translate(rows.Err(), "iterating bookmarks")
+}
+
+func (s *BookmarkStore) Delete(ctx context.Context, userID, id string) error {
+    tag, err := s.db.Exec(ctx,
+        `DELETE FROM bookmarks WHERE id = $1 AND user_id = $2`, id, userID)
+    if err != nil {
+        return translate(err, "deleting bookmark")
+    }
+    if tag.RowsAffected() == 0 {
+        return model.ErrNotFound
+    }
+    return nil
+}
+```
+
+The `AND user_id = $2` on the delete is the authorisation check, enforced by the query rather than by a separate lookup. A user cannot delete somebody else's bookmark even if they guess the ID, and there is no window between checking and acting.
+
+```go title="internal/storage/errors.go"
+func translate(err error, op string) error {
+    if err == nil {
+        return nil
+    }
+    if errors.Is(err, pgx.ErrNoRows) {
+        return model.ErrNotFound
+    }
+
+    var pgErr *pgconn.PgError
+    if errors.As(err, &pgErr) {
+        switch pgErr.Code {
+        case "23505":
+            return fmt.Errorf("%s: %w", op, model.ErrDuplicate)
+        case "23503":
+            return fmt.Errorf("%s: %w", op, model.ErrNotFound)
+        }
+    }
+
+    return fmt.Errorf("%s: %w", op, err)
+}
+```
+
+## Service
+
+```go title="internal/service/bookmark.go"
+package service
+
+type BookmarkRepository interface {
+    Create(ctx context.Context, b *model.Bookmark) error
+    Get(ctx context.Context, userID, id string) (*model.Bookmark, error)
+    List(ctx context.Context, userID string, f storage.Filter) ([]*model.Bookmark, error)
+    Delete(ctx context.Context, userID, id string) error
+}
+
+type BookmarkService struct {
+    repo   BookmarkRepository
+    logger *slog.Logger
+}
+
+func (s *BookmarkService) Create(ctx context.Context, userID string,
+    req model.CreateBookmark) (*model.Bookmark, error) {
+
+    req.Normalise()
+    if err := req.Validate(); err != nil {
+        return nil, err
+    }
+
+    b := &model.Bookmark{
+        UserID: userID,
+        URL:    req.URL,
+        Title:  req.Title,
+        Notes:  req.Notes,
+        Tags:   req.Tags,
+    }
+
+    if b.Title == "" {
+        b.Title = b.URL          // a sensible default rather than an empty card
+    }
+
+    if err := s.repo.Create(ctx, b); err != nil {
+        return nil, err
+    }
+    return b, nil
+}
+
+func (s *BookmarkService) List(ctx context.Context, userID string,
+    f storage.Filter) ([]*model.Bookmark, error) {
+
+    // Clamp pagination so a client cannot request a million rows.
+    if f.Limit <= 0 || f.Limit > 100 {
+        f.Limit = 50
+    }
+    if f.Offset < 0 {
+        f.Offset = 0
+    }
+
+    return s.repo.List(ctx, userID, f)
+}
+```
+
+The service knows nothing about HTTP and nothing about SQL. Clamping the limit here rather than in the handler means every caller gets the protection, including a future gRPC interface.
+
+## HTTP
+
+```go title="internal/api/bookmark.go"
+func (h *Handlers) CreateBookmark(w http.ResponseWriter, r *http.Request) {
+    userID, ok := UserIDFrom(r.Context())
+    if !ok {
+        WriteError(w, r, model.ErrUnauthorized)
+        return
+    }
+
+    var req model.CreateBookmark
+    if err := ReadJSON(w, r, &req); err != nil {
+        WriteError(w, r, err)
+        return
+    }
+
+    b, err := h.bookmarks.Create(r.Context(), userID, req)
+    if err != nil {
+        WriteError(w, r, err)
+        return
+    }
+
+    w.Header().Set("Location", "/api/v1/bookmarks/"+b.ID)
+    WriteJSON(w, http.StatusCreated, b)
+}
+
+func (h *Handlers) ListBookmarks(w http.ResponseWriter, r *http.Request) {
+    userID, _ := UserIDFrom(r.Context())
+
+    q := r.URL.Query()
+    limit, _ := strconv.Atoi(q.Get("limit"))
+    offset, _ := strconv.Atoi(q.Get("offset"))
+
+    items, err := h.bookmarks.List(r.Context(), userID, storage.Filter{
+        Tag:    q.Get("tag"),
+        Search: q.Get("q"),
+        Limit:  limit,
+        Offset: offset,
+    })
+    if err != nil {
+        WriteError(w, r, err)
+        return
+    }
+
+    WriteJSON(w, http.StatusOK, map[string]any{
+        "bookmarks": items,
+        "count":     len(items),
+    })
+}
+```
+
+```go title="internal/api/routes.go"
+func Routes(h *Handlers, cfg config.Config) http.Handler {
+    mux := http.NewServeMux()
+
+    mux.HandleFunc("GET /health", h.Health)
+    mux.HandleFunc("GET /ready", h.Ready)
+    mux.HandleFunc("POST /api/v1/auth/register", h.Register)
+    mux.HandleFunc("POST /api/v1/auth/login", h.Login)
+
+    protected := http.NewServeMux()
+    protected.HandleFunc("POST /bookmarks", h.CreateBookmark)
+    protected.HandleFunc("GET /bookmarks", h.ListBookmarks)
+    protected.HandleFunc("GET /bookmarks/{id}", h.GetBookmark)
+    protected.HandleFunc("DELETE /bookmarks/{id}", h.DeleteBookmark)
+
+    mux.Handle("/api/v1/", RequireAuth(h.tokens)(
+        http.StripPrefix("/api/v1", protected),
+    ))
+
+    return Chain(mux,
+        RequestID,
+        Logging(h.logger),
+        Recovery(h.logger),
+        SecureHeaders,
+        CORS(cfg.AllowedOrigins),
+        Timeout(cfg.RequestTimeout),
+    )
+}
+```
+
+Every route in one function, with the public and protected sets visibly separate.
+
+## Testing at three levels
+
+```go
+// Unit: no dependencies at all
+func TestValidateRejectsBadURL(t *testing.T) {
+    tests := []struct {
+        name string
+        url  string
+        ok   bool
+    }{
+        {"https", "https://go.dev", true},
+        {"http", "http://go.dev", true},
+        {"empty", "", false},
+        {"ftp", "ftp://files.example.com", false},
+        {"javascript", "javascript:alert(1)", false},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := model.CreateBookmark{URL: tt.url}
+            err := c.Validate()
+            if (err == nil) != tt.ok {
+                t.Errorf("Validate(%q) err = %v, want ok=%v", tt.url, err, tt.ok)
+            }
+        })
+    }
+}
+```
+
+```go
+// Service: fake repository, still no database
+func TestCreateDefaultsTitleToURL(t *testing.T) {
+    repo := newFakeRepo()
+    svc := service.NewBookmarkService(repo, slog.Default())
+
+    b, err := svc.Create(context.Background(), "user-1",
+        model.CreateBookmark{URL: "https://go.dev"})
+    if err != nil {
+        t.Fatalf("Create: %v", err)
+    }
+
+    if b.Title != "https://go.dev" {
+        t.Errorf("title = %q, want the URL as a fallback", b.Title)
+    }
+}
+```
+
+```go
+// Integration: real PostgreSQL from testcontainers
+func TestBookmarkStore(t *testing.T) {
+    if testing.Short() {
+        t.Skip("skipping integration test")
+    }
+
+    db := setupPostgres(t)
+    store := storage.NewBookmarkStore(db)
+    userID := createTestUser(t, db)
+
+    t.Run("duplicate url is rejected", func(t *testing.T) {
+        b1 := &model.Bookmark{UserID: userID, URL: "https://go.dev"}
+        if err := store.Create(context.Background(), b1); err != nil {
+            t.Fatalf("first create: %v", err)
+        }
+
+        b2 := &model.Bookmark{UserID: userID, URL: "https://go.dev"}
+        err := store.Create(context.Background(), b2)
+        if !errors.Is(err, model.ErrDuplicate) {
+            t.Errorf("err = %v, want ErrDuplicate", err)
+        }
+    })
+}
+```
+
+Fast tests for logic, medium tests for the service, slow tests for SQL. `go test -short ./...` runs the first two in under a second, and CI runs everything.
+
+## Running it
+
+```bash
+make up          # docker compose up -d postgres
+make migrate     # apply migrations
+make run         # go run ./cmd/api
+make test        # go test -short ./...
+make test-all    # go test -race ./...
+```
+
+## Extend it
+
+- Refresh tokens with rotation and revocation
+- Full text search using PostgreSQL `tsvector`
+- Fetch the page title automatically when it is not supplied
+- Rate limiting per user rather than per IP
+- Import and export in the Netscape bookmark format
+- Cursor pagination instead of offset
+- An OpenAPI specification, generated from the routes
+
+Next, the final project: taking a service like this one all the way to a production deployment.

@@ -1,0 +1,337 @@
+---
+title: database/sql Basics
+---
+
+Go's standard library does not contain a database driver. What it contains is `database/sql`, a set of interfaces that drivers implement, plus a connection pool and a query API on top.
+
+That split explains the two-line import you see in every Go database program:
+
+```go
+import (
+    "database/sql"
+    _ "github.com/lib/pq"      // registers itself as "postgres"
+)
+```
+
+The blank import runs the driver's `init` function, which calls `sql.Register("postgres", ...)`. Your code then refers to the driver by that string and never touches the package again.
+
+## Opening
+
+```go
+db, err := sql.Open("postgres", "postgres://user:pass@localhost/mydb?sslmode=disable")
+if err != nil {
+    return fmt.Errorf("opening database: %w", err)
+}
+defer db.Close()
+
+if err := db.PingContext(ctx); err != nil {
+    return fmt.Errorf("connecting to database: %w", err)
+}
+```
+
+<Callout type="warn">
+`sql.Open` does **not** connect. It validates the driver name and the connection string format, then returns immediately. The first real connection happens on the first query. This means a completely wrong host produces no error until much later, which is why the `Ping` is not optional.
+</Callout>
+
+`*sql.DB` is not a connection. It is a pool of them, it is safe for concurrent use by many goroutines, and it should be created once and shared for the lifetime of the program.
+
+```go
+// Wrong: a new pool per request
+func handler(w http.ResponseWriter, r *http.Request) {
+    db, _ := sql.Open("postgres", dsn)
+    defer db.Close()
+}
+
+// Right: one pool, passed in
+type Store struct {
+    db *sql.DB
+}
+```
+
+## The three query methods
+
+```text
+   QueryRowContext   exactly one row expected
+   QueryContext      zero or more rows
+   ExecContext       no rows: INSERT, UPDATE, DELETE, DDL
+```
+
+Always use the `Context` variants. The non-context versions exist for compatibility and give you no way to cancel a slow query when the caller has already given up.
+
+### One row
+
+```go
+func (s *Store) GetUser(ctx context.Context, id string) (*User, error) {
+    var u User
+
+    err := s.db.QueryRowContext(ctx,
+        `SELECT id, name, email, created_at FROM users WHERE id = $1`,
+        id,
+    ).Scan(&u.ID, &u.Name, &u.Email, &u.CreatedAt)
+
+    if errors.Is(err, sql.ErrNoRows) {
+        return nil, ErrNotFound
+    }
+    if err != nil {
+        return nil, fmt.Errorf("querying user %s: %w", id, err)
+    }
+
+    return &u, nil
+}
+```
+
+`QueryRowContext` defers its error to `Scan`, which is why there is no error check before it. `sql.ErrNoRows` is the sentinel for a query that matched nothing, and translating it into your own domain error at this boundary keeps `database/sql` out of the layers above.
+
+### Many rows
+
+```go
+func (s *Store) ListUsers(ctx context.Context, limit int) ([]*User, error) {
+    rows, err := s.db.QueryContext(ctx,
+        `SELECT id, name, email, created_at
+         FROM users
+         ORDER BY created_at DESC
+         LIMIT $1`,
+        limit,
+    )
+    if err != nil {
+        return nil, fmt.Errorf("querying users: %w", err)
+    }
+    defer rows.Close()
+
+    users := make([]*User, 0, limit)
+    for rows.Next() {
+        var u User
+        if err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.CreatedAt); err != nil {
+            return nil, fmt.Errorf("scanning user: %w", err)
+        }
+        users = append(users, &u)
+    }
+
+    if err := rows.Err(); err != nil {
+        return nil, fmt.Errorf("iterating users: %w", err)
+    }
+
+    return users, nil
+}
+```
+
+Three things there are mandatory and one is easy to forget.
+
+**`defer rows.Close()`** releases the connection back to the pool. Without it, the connection is held until garbage collection, and under load the pool empties and every query blocks.
+
+**`rows.Err()` after the loop.** `rows.Next()` returns false both at the end of the results and on an error. Without this check, a network failure mid-iteration looks like a successful empty result. This is the one people forget.
+
+**Scan arguments must be pointers**, in the same order as the columns.
+
+### No rows
+
+```go
+func (s *Store) UpdateEmail(ctx context.Context, id, email string) error {
+    result, err := s.db.ExecContext(ctx,
+        `UPDATE users SET email = $1, updated_at = now() WHERE id = $2`,
+        email, id,
+    )
+    if err != nil {
+        return fmt.Errorf("updating email: %w", err)
+    }
+
+    n, err := result.RowsAffected()
+    if err != nil {
+        return fmt.Errorf("checking rows affected: %w", err)
+    }
+    if n == 0 {
+        return ErrNotFound
+    }
+
+    return nil
+}
+```
+
+Checking `RowsAffected` is how you tell "updated successfully" from "no such row", because an UPDATE matching nothing is not an error at the SQL level.
+
+## Placeholders and SQL injection
+
+```go
+// NEVER do this
+query := "SELECT * FROM users WHERE email = '" + email + "'"
+db.QueryContext(ctx, query)
+```
+
+A user whose email is `' OR '1'='1` now reads your entire users table. With a placeholder, the value is sent separately from the statement and cannot change its meaning:
+
+```go
+db.QueryContext(ctx, "SELECT * FROM users WHERE email = $1", email)
+```
+
+The placeholder syntax is driver specific:
+
+```text
+   PostgreSQL      $1, $2, $3
+   MySQL, SQLite   ?
+   SQL Server      @p1, @p2
+   Oracle          :name
+```
+
+<Callout type="warn">
+Placeholders work for **values**, never for identifiers. You cannot parameterise a table name, a column name, or the direction of an ORDER BY. When those must vary, validate against an allowlist:
+
+```go
+var allowedSort = map[string]string{
+    "name":    "name",
+    "created": "created_at",
+    "email":   "email",
+}
+
+column, ok := allowedSort[userInput]
+if !ok {
+    return nil, fmt.Errorf("invalid sort field %q", userInput)
+}
+query := fmt.Sprintf("SELECT ... ORDER BY %s", column)   // safe, from the map
+```
+</Callout>
+
+## NULL
+
+A SQL NULL cannot be scanned into a plain Go type. Scanning NULL into a `string` fails with a conversion error.
+
+```go
+var (
+    bio       sql.NullString
+    age       sql.NullInt64
+    deletedAt sql.NullTime
+    verified  sql.NullBool
+)
+
+err := row.Scan(&bio, &age, &deletedAt, &verified)
+
+if bio.Valid {
+    fmt.Println(bio.String)
+}
+```
+
+Go 1.22 added a generic version that is nicer:
+
+```go
+var bio sql.Null[string]
+if bio.Valid {
+    fmt.Println(bio.V)
+}
+```
+
+Pointers work too, and often read better in a struct:
+
+```go
+type User struct {
+    ID        string
+    Name      string
+    Bio       *string      // nil when NULL
+    DeletedAt *time.Time
+}
+
+err := row.Scan(&u.ID, &u.Name, &u.Bio, &u.DeletedAt)
+```
+
+The cleanest option, where the schema allows it, is to avoid NULL entirely with `NOT NULL DEFAULT ''` and treat the empty string as absent. Fewer nullable columns means fewer nil checks everywhere above.
+
+## Prepared statements
+
+```go
+stmt, err := db.PrepareContext(ctx,
+    `INSERT INTO events (name, payload) VALUES ($1, $2)`)
+if err != nil {
+    return err
+}
+defer stmt.Close()
+
+for _, e := range events {
+    if _, err := stmt.ExecContext(ctx, e.Name, e.Payload); err != nil {
+        return err
+    }
+}
+```
+
+Preparing once and executing many times saves the parse and plan on each call, which matters in a tight loop.
+
+For a single query it is usually not worth it. `database/sql` already prepares statements internally when a query has placeholders, so the win is smaller than it looks.
+
+<Callout type="info">
+Prepared statements are bound to a specific connection. In a pool, `stmt.ExecContext` may find that connection busy and re-prepare on another, which quietly costs you the benefit. For high-throughput inserts, a multi-row INSERT or PostgreSQL's COPY protocol beats a prepared statement in a loop by a large margin.
+</Callout>
+
+## Pool configuration
+
+```go
+db.SetMaxOpenConns(25)
+db.SetMaxIdleConns(25)
+db.SetConnMaxLifetime(5 * time.Minute)
+db.SetConnMaxIdleTime(1 * time.Minute)
+```
+
+```text
+   MaxOpenConns      total connections, in use plus idle
+                     0 means unlimited, which is a bad default
+
+   MaxIdleConns      connections kept open when not in use
+                     set equal to MaxOpenConns to avoid churn
+
+   ConnMaxLifetime   recycle connections after this long
+                     important behind a load balancer or proxy
+
+   ConnMaxIdleTime   close connections idle for this long
+```
+
+The default `MaxIdleConns` is 2, which means a service with 25 open connections closes and reopens constantly. Setting idle equal to open is the usual fix.
+
+`MaxOpenConns` should be sized against your database's connection limit divided by the number of service instances. PostgreSQL defaults to 100 total, so ten instances each opening 25 will exhaust it.
+
+The details, including monitoring the pool, are on the transactions page.
+
+## Errors worth distinguishing
+
+```go
+if errors.Is(err, sql.ErrNoRows) {
+    return ErrNotFound
+}
+```
+
+Driver specific errors need the driver's type. For `lib/pq`:
+
+```go
+var pqErr *pq.Error
+if errors.As(err, &pqErr) {
+    switch pqErr.Code {
+    case "23505":     // unique_violation
+        return ErrDuplicate
+    case "23503":     // foreign_key_violation
+        return ErrInvalidReference
+    case "23514":     // check_violation
+        return ErrConstraintFailed
+    }
+}
+```
+
+For `pgx`:
+
+```go
+var pgErr *pgconn.PgError
+if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+    return ErrDuplicate
+}
+```
+
+Translating these into your own domain errors at the repository boundary is what lets the service layer stay ignorant of which database is underneath.
+
+## Which driver
+
+| Database | Driver | Notes |
+| --- | --- | --- |
+| PostgreSQL | `github.com/jackc/pgx/v5` | the current standard, fastest |
+| PostgreSQL | `github.com/lib/pq` | older, maintenance mode |
+| MySQL | `github.com/go-sql-driver/mysql` | the standard choice |
+| SQLite | `modernc.org/sqlite` | pure Go, no cgo needed |
+| SQLite | `github.com/mattn/go-sqlite3` | cgo, more mature |
+| SQL Server | `github.com/microsoft/go-mssqldb` | official |
+
+`pgx` deserves a note. It works as a `database/sql` driver, and it also has a native API that skips the standard interfaces entirely, giving better performance and access to PostgreSQL-specific features. The next page covers both.
+
+Next, let's connect to PostgreSQL properly and set up a schema to work against.

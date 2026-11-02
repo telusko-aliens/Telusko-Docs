@@ -99,39 +99,31 @@ html:has(.home-shell) {
 
 /* Fades the left/right edges of the infinite tech marquee. */
 .home-shell .home-marquee-mask {
-  -webkit-mask-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    #000 8%,
-    #000 92%,
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    #000 8%,
-    #000 92%,
-    transparent 100%
-  );
+  -webkit-mask-image: linear-gradient(90deg,
+      transparent 0%,
+      #000 8%,
+      #000 92%,
+      transparent 100%);
+  mask-image: linear-gradient(90deg,
+      transparent 0%,
+      #000 8%,
+      #000 92%,
+      transparent 100%);
 }
 
 /* Shorter fade for the slim course-promo marquee in the header bar, which
    has far less runway than the full-bleed tech ticker. */
 .home-shell .home-promo-mask {
-  -webkit-mask-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    #000 6%,
-    #000 90%,
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    #000 6%,
-    #000 90%,
-    transparent 100%
-  );
+  -webkit-mask-image: linear-gradient(90deg,
+      transparent 0%,
+      #000 6%,
+      #000 90%,
+      transparent 100%);
+  mask-image: linear-gradient(90deg,
+      transparent 0%,
+      #000 6%,
+      #000 90%,
+      transparent 100%);
 }
 
 /* Lets course thumbnails show in full (object-contain) against a neutral
@@ -197,7 +189,7 @@ html:has(.home-shell) {
   transition: background-color 0.2s ease;
 }
 
-.home-shell .home-get-started-cta > span {
+.home-shell .home-get-started-cta>span {
   color: var(--home-bg);
   transition: color 0.2s ease;
 }
@@ -206,6 +198,6 @@ html:has(.home-shell) {
   background: var(--home-bg) !important;
 }
 
-.home-shell .home-get-started-cta:hover > span {
+.home-shell .home-get-started-cta:hover>span {
   color: var(--home-foreground-strong);
 }

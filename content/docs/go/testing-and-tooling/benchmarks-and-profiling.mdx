@@ -1,0 +1,378 @@
+---
+title: Benchmarks and Profiling
+---
+
+Guessing which part of a program is slow is almost always wrong. Go ships with the tools to stop guessing, and they are good enough that most performance work becomes mechanical: measure, find the hot spot, fix it, measure again.
+
+## Benchmarks
+
+A benchmark is a test function with a different prefix and a loop:
+
+```go title="string_test.go"
+func BenchmarkConcat(b *testing.B) {
+    for i := 0; i < b.N; i++ {
+        s := ""
+        for j := 0; j < 100; j++ {
+            s += "x"
+        }
+        _ = s
+    }
+}
+
+func BenchmarkBuilder(b *testing.B) {
+    for i := 0; i < b.N; i++ {
+        var sb strings.Builder
+        for j := 0; j < 100; j++ {
+            sb.WriteString("x")
+        }
+        _ = sb.String()
+    }
+}
+```
+
+```bash
+go test -bench=. -benchmem ./...
+```
+
+```text
+BenchmarkConcat-8      　 214003    5573 ns/op    5008 B/op    99 allocs/op
+BenchmarkBuilder-8     　1000000    1043 ns/op     248 B/op     5 allocs/op
+```
+
+Reading the columns:
+
+```text
+   -8            GOMAXPROCS, the number of cores used
+   214003        how many iterations were run
+   5573 ns/op    nanoseconds per operation
+   5008 B/op     bytes allocated per operation
+   99 allocs/op  number of allocations per operation
+```
+
+`b.N` is chosen by the framework. It starts small and increases until the benchmark runs long enough for the timing to be reliable, which is why you must never assume a specific value.
+
+Go 1.24 added a simpler loop form:
+
+```go
+func BenchmarkBuilder(b *testing.B) {
+    for b.Loop() {
+        var sb strings.Builder
+        // ...
+    }
+}
+```
+
+It handles timer management automatically and prevents the compiler from optimising the body away.
+
+## Writing a benchmark that measures the right thing
+
+**Exclude setup from the timing:**
+
+```go
+func BenchmarkProcess(b *testing.B) {
+    data := generateLargeDataset()      // not part of what we measure
+
+    b.ResetTimer()
+    for i := 0; i < b.N; i++ {
+        Process(data)
+    }
+}
+```
+
+Or pause it around per-iteration setup:
+
+```go
+for i := 0; i < b.N; i++ {
+    b.StopTimer()
+    input := freshInput()
+    b.StartTimer()
+
+    Process(input)
+}
+```
+
+**Stop the compiler eliminating your code.** If a result is unused, the compiler may remove the call entirely and report an impossibly fast benchmark:
+
+```go
+var result int      // package level, so it cannot be optimised away
+
+func BenchmarkCompute(b *testing.B) {
+    var r int
+    for i := 0; i < b.N; i++ {
+        r = Compute(42)
+    }
+    result = r
+}
+```
+
+<Callout type="warn">
+A benchmark reporting `0.25 ns/op` is not fast code, it is eliminated code. A single instruction takes roughly a third of a nanosecond, so anything doing real work cannot be that quick. When you see a suspiciously small number, assign the result to a package level variable and measure again.
+</Callout>
+
+**Benchmark a range of sizes**, because behaviour often changes with scale:
+
+```go
+func BenchmarkSort(b *testing.B) {
+    for _, size := range []int{10, 100, 1000, 10000} {
+        b.Run(fmt.Sprintf("size=%d", size), func(b *testing.B) {
+            data := randomInts(size)
+            b.ResetTimer()
+
+            for i := 0; i < b.N; i++ {
+                s := slices.Clone(data)
+                slices.Sort(s)
+            }
+        })
+    }
+}
+```
+
+**Benchmark concurrency** with the parallel form:
+
+```go
+func BenchmarkCacheParallel(b *testing.B) {
+    c := NewCache()
+
+    b.RunParallel(func(pb *testing.PB) {
+        for pb.Next() {
+            c.Get("key")
+        }
+    })
+}
+```
+
+That is how you find lock contention, which does not show up at all in a single-goroutine benchmark.
+
+## Comparing results properly
+
+A single run is noise. Run several and compare statistically:
+
+```bash
+go install golang.org/x/perf/cmd/benchstat@latest
+
+go test -bench=. -count=10 > old.txt
+# make the change
+go test -bench=. -count=10 > new.txt
+
+benchstat old.txt new.txt
+```
+
+```text
+name        old time/op    new time/op    delta
+Process-8      5.57µs ± 2%    1.04µs ± 1%   -81.32%  (p=0.000 n=10+10)
+
+name        old alloc/op   new alloc/op   delta
+Process-8      5.01kB ± 0%    0.25kB ± 0%   -95.05%  (p=0.000 n=10+10)
+```
+
+The `p` value tells you whether the difference is real. Anything above 0.05 means the change is within noise and you have not actually improved anything.
+
+## Profiling
+
+Benchmarks tell you that something is slow. Profiles tell you where.
+
+```bash
+go test -bench=BenchmarkProcess -cpuprofile=cpu.out -memprofile=mem.out
+go tool pprof cpu.out
+```
+
+```text
+(pprof) top10
+(pprof) list Process
+(pprof) web              # opens a call graph in a browser
+```
+
+`list` is the most useful command. It annotates the source line by line with where the time went:
+
+```text
+(pprof) list Process
+     .          .    45:func Process(items []Item) []Result {
+     .          .    46:    var results []Result
+  50ms      1.2s    47:    for _, item := range items {
+     .      800ms    48:        r := transform(item)
+ 150ms      150ms    49:        results = append(results, r)
+     .          .    50:    }
+```
+
+The two columns are flat time, spent in this line itself, and cumulative time, including everything it called.
+
+The web view needs graphviz installed and produces a call graph where box size shows cost, which is often the fastest way to see the shape of a problem.
+
+## The profile types
+
+```text
+   cpu          where CPU time is spent
+   heap         memory currently allocated, and total allocations
+   goroutine    stack traces of every live goroutine
+   block        where goroutines block on synchronisation
+   mutex        lock contention
+   trace        a full execution timeline
+```
+
+```bash
+go test -bench=. -cpuprofile=cpu.out
+go test -bench=. -memprofile=mem.out
+go test -bench=. -blockprofile=block.out
+go test -bench=. -mutexprofile=mutex.out
+```
+
+The goroutine profile is the one to reach for when goroutine count is climbing. It shows every live goroutine's stack, and a leak shows up as thousands of goroutines all parked on the same line.
+
+## Profiling a running server
+
+```go
+import _ "net/http/pprof"
+
+func main() {
+    // Serve profiling endpoints on a separate, internal-only port.
+    go func() {
+        log.Println(http.ListenAndServe("localhost:6060", nil))
+    }()
+
+    // ... the real server
+}
+```
+
+```bash
+go tool pprof http://localhost:6060/debug/pprof/profile?seconds=30
+go tool pprof http://localhost:6060/debug/pprof/heap
+go tool pprof http://localhost:6060/debug/pprof/goroutine
+
+curl http://localhost:6060/debug/pprof/goroutine?debug=2     # readable stacks
+```
+
+<Callout type="warn">
+The blank import registers handlers on `http.DefaultServeMux`. If your application also uses the default mux, you have just exposed profiling endpoints, and possibly your source structure and heap contents, on your public port. Always serve pprof on a separate listener bound to localhost, or behind authentication.
+</Callout>
+
+An interactive browser view, which is usually the nicest way to explore:
+
+```bash
+go tool pprof -http=:8081 cpu.out
+```
+
+That gives you a flame graph, a call graph, source annotation, and a top list in one page.
+
+## Reducing allocations
+
+Allocations are usually the first thing worth attacking, because they cost twice: the allocation itself, and the garbage collector work afterwards.
+
+```bash
+go build -gcflags="-m" ./...       # what escapes to the heap and why
+```
+
+```text
+./main.go:15:6: can inline process
+./main.go:22:10: &Result{...} escapes to heap
+./main.go:23:15: buf does not escape
+```
+
+The common fixes:
+
+```go
+// Preallocate when the size is known
+results := make([]Result, 0, len(items))
+
+// Reuse a buffer rather than allocating per iteration
+buf := make([]byte, 0, 4096)
+for _, item := range items {
+    buf = buf[:0]
+    buf = encode(buf, item)
+    write(buf)
+}
+
+// Pass small structs by value, so they can stay on the stack
+func process(p Point) float64          // no allocation
+func process(p *Point) float64         // may force a heap allocation
+
+// Avoid interface boxing in hot paths
+func sum(nums []int) int               // no boxing
+func sum(nums []any) int               // every element is boxed
+
+// strings.Builder rather than +=
+```
+
+For genuinely hot paths with large temporary buffers, `sync.Pool`:
+
+```go
+var bufPool = sync.Pool{
+    New: func() any {
+        return new(bytes.Buffer)
+    },
+}
+
+func handle(data []byte) {
+    buf := bufPool.Get().(*bytes.Buffer)
+    defer func() {
+        buf.Reset()
+        bufPool.Put(buf)
+    }()
+
+    buf.Write(data)
+    // ...
+}
+```
+
+`sync.Pool` is easy to misuse. It helps when objects are large and created frequently, and it can be slower than plain allocation for small ones. Measure before and after.
+
+## Execution traces
+
+For concurrency problems that a CPU profile cannot explain:
+
+```bash
+go test -bench=. -trace=trace.out
+go tool trace trace.out
+```
+
+The browser view shows every goroutine on a timeline, plus scheduler latency, garbage collection pauses, syscall blocking, and network wait. When the question is "why is this not using all my cores", the trace answers it and nothing else does.
+
+## Runtime memory statistics
+
+```go
+var m runtime.MemStats
+runtime.ReadMemStats(&m)
+
+m.Alloc          // currently allocated
+m.TotalAlloc     // cumulative, ever
+m.Sys            // obtained from the OS
+m.NumGC          // completed collection cycles
+m.PauseTotalNs
+```
+
+Useful as exported metrics, and `ReadMemStats` stops the world briefly, so do not call it on every request.
+
+## The order to work in
+
+<Steps>
+<Step>
+### Make it correct first
+
+A fast wrong answer is worthless, and optimised code is harder to fix. Tests before benchmarks.
+</Step>
+<Step>
+### Measure before changing anything
+
+Write a benchmark that reproduces the slow path. Without a number, you cannot tell whether your change helped.
+</Step>
+<Step>
+### Profile to find the actual hot spot
+
+It is very rarely where you expected. The most common surprises are JSON encoding, reflection, unnecessary allocations, and a mutex held too long.
+</Step>
+<Step>
+### Fix the biggest thing, then measure again
+
+A 50 percent improvement in code that accounts for 2 percent of runtime is a rounding error. Amdahl's law applies.
+</Step>
+<Step>
+### Stop when it is fast enough
+
+Optimised Go is usually less readable. Keep the version you can maintain unless the numbers justify the trade, and leave a comment explaining why the ugly version exists.
+</Step>
+</Steps>
+
+<Callout type="info">
+The single highest-value performance habit in Go is running `-benchmem` and looking at `allocs/op`. Allocation count is a proxy for a great deal of unnecessary work, it is stable across machines in a way that timing is not, and driving it down usually makes the code simpler rather than more complex.
+</Callout>
+
+Next, let's look at the tools that catch problems before you ever run the code.

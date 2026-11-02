@@ -1,0 +1,331 @@
+---
+title: Building and Cross Compiling
+---
+
+A developer on a Mac produces the Linux binary that ships to production, from the same laptop, in one command, with no toolchain to install and no container involved.
+
+```bash
+GOOS=linux GOARCH=amd64 go build -o bin/api ./cmd/api
+```
+
+That capability is unusual enough that it is worth understanding properly, because it changes what a build pipeline needs to look like.
+
+## The two variables
+
+```bash
+GOOS=linux   GOARCH=amd64 go build -o bin/api-linux-amd64
+GOOS=linux   GOARCH=arm64 go build -o bin/api-linux-arm64
+GOOS=darwin  GOARCH=arm64 go build -o bin/api-macos-arm64
+GOOS=windows GOARCH=amd64 go build -o bin/api.exe
+GOOS=freebsd GOARCH=amd64 go build -o bin/api-freebsd
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:GOOS="linux"; $env:GOARCH="amd64"; go build -o bin/api ./cmd/api
+```
+
+Every supported combination:
+
+```bash
+go tool dist list
+```
+
+The common ones:
+
+```text
+   linux/amd64      most servers
+   linux/arm64      Graviton, Ampere, Raspberry Pi 4+
+   darwin/arm64     Apple Silicon
+   darwin/amd64     Intel Macs
+   windows/amd64
+```
+
+## CGO, and why you turn it off
+
+```bash
+CGO_ENABLED=0 go build -o bin/api ./cmd/api
+```
+
+By default Go links against the system C library for a few things, notably DNS resolution and user lookup. That produces a binary depending on the glibc version of the machine that built it, which fails on a different distribution and fails in an Alpine container.
+
+`CGO_ENABLED=0` forces the pure Go implementations and produces a genuinely static binary that runs on any Linux with the same architecture, including `FROM scratch` containers.
+
+<Callout type="warn">
+Cross compiling requires `CGO_ENABLED=0` unless you have a cross-compiling C toolchain set up, which is a substantial amount of work. If your build fails with linker errors when you set `GOOS`, a cgo dependency is the reason. The most common culprits are `mattn/go-sqlite3` and some image processing libraries. `modernc.org/sqlite` is a pure Go alternative for the first.
+</Callout>
+
+## Build flags worth using
+
+```bash
+go build \
+  -ldflags="-s -w -X main.version=$(git describe --tags) -X main.commit=$(git rev-parse --short HEAD)" \
+  -trimpath \
+  -o bin/api ./cmd/api
+```
+
+```text
+   -s          strip the symbol table
+   -w          strip DWARF debug information
+   -X          set a string variable at link time
+   -trimpath   remove absolute file paths from the binary
+```
+
+`-s -w` typically reduces size by 25 to 30 percent. The cost is that stack traces lose function names, so keep them in development builds.
+
+`-trimpath` matters for two reasons: it stops your home directory appearing in stack traces, and it makes builds reproducible.
+
+## Embedding version information
+
+```go title="cmd/api/main.go"
+package main
+
+var (
+    version   = "dev"
+    commit    = "none"
+    buildTime = "unknown"
+)
+
+func main() {
+    if len(os.Args) > 1 && os.Args[1] == "version" {
+        fmt.Printf("version: %s\ncommit: %s\nbuilt: %s\ngo: %s\n",
+            version, commit, buildTime, runtime.Version())
+        return
+    }
+    // ...
+}
+```
+
+```bash
+VERSION=$(git describe --tags --always --dirty)
+COMMIT=$(git rev-parse --short HEAD)
+BUILT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+go build -ldflags="\
+  -s -w \
+  -X main.version=${VERSION} \
+  -X main.commit=${COMMIT} \
+  -X main.buildTime=${BUILT}" \
+  -o bin/api ./cmd/api
+```
+
+Go also embeds build information automatically, which covers the VCS details without any flags:
+
+```go
+import "runtime/debug"
+
+func buildInfo() {
+    info, ok := debug.ReadBuildInfo()
+    if !ok {
+        return
+    }
+
+    fmt.Println("go:", info.GoVersion)
+    fmt.Println("module:", info.Main.Path)
+
+    for _, s := range info.Settings {
+        switch s.Key {
+        case "vcs.revision", "vcs.time", "vcs.modified":
+            fmt.Printf("%s: %s\n", s.Key, s.Value)
+        }
+    }
+}
+```
+
+`vcs.modified` telling you the binary was built from a dirty working tree has saved more than one debugging session.
+
+Log it at startup:
+
+```go
+slog.Info("starting",
+    "version", version,
+    "commit", commit,
+    "go", runtime.Version(),
+)
+```
+
+## Binary size
+
+```bash
+go build -o api ./cmd/api
+ls -lh api                          # around 12 MB for a typical service
+
+go build -ldflags="-s -w" -o api ./cmd/api
+ls -lh api                          # around 8 MB
+```
+
+A hello world is roughly 2 MB, because the runtime, garbage collector, scheduler, and reflection metadata are all linked in. That is the price of needing nothing installed on the target.
+
+To find out what is taking the space:
+
+```bash
+go install github.com/Zxilly/go-size-analyzer/cmd/gsa@latest
+gsa --web api
+```
+
+The usual surprises are `net/http` for TLS support, reflection metadata from `encoding/json`, and any cloud SDK, which are frequently megabytes on their own.
+
+Compressing further with `upx` is possible and rarely worth it. A few megabytes of container image costs nothing, and compressed binaries confuse some security scanners.
+
+## Build tags
+
+Conditional compilation, for code that differs by platform or build type:
+
+```go title="storage_prod.go"
+//go:build !dev
+
+package storage
+
+func Debug() bool { return false }
+```
+
+```go title="storage_dev.go"
+//go:build dev
+
+package storage
+
+func Debug() bool { return true }
+```
+
+```bash
+go build -tags dev ./...
+```
+
+File name suffixes do the same for platforms, with no tag needed:
+
+```text
+   file_linux.go     only on Linux
+   file_windows.go   only on Windows
+   file_darwin.go    only on macOS
+   file_amd64.go     only on amd64
+   file_test.go      only in tests
+```
+
+The most common real use is excluding integration tests from the fast loop:
+
+```go title="integration_test.go"
+//go:build integration
+
+package storage_test
+
+func TestAgainstRealDatabase(t *testing.T) { ... }
+```
+
+```bash
+go test ./...                      # unit tests only
+go test -tags integration ./...    # everything
+```
+
+## The build cache
+
+```bash
+go env GOCACHE
+go clean -cache
+```
+
+Go caches compiled packages, so only what changed and what depends on it is rebuilt. The first build of a project takes a few seconds, subsequent ones are close to instant.
+
+In CI, caching this directory between runs is the single biggest build speed improvement available:
+
+```yaml
+- uses: actions/cache@v4
+  with:
+    path: |
+      ~/.cache/go-build
+      ~/go/pkg/mod
+    key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+```
+
+## Reproducible builds
+
+```bash
+CGO_ENABLED=0 \
+GOFLAGS="-trimpath" \
+go build -ldflags="-s -w -buildid=" -o api ./cmd/api
+
+sha256sum api
+```
+
+With `-trimpath` and an empty `-buildid`, the same source and the same Go version produce a byte-identical binary. That lets you verify that a released artefact came from the source it claims to.
+
+## A Makefile
+
+```makefile
+BINARY  := api
+VERSION := $(shell git describe --tags --always --dirty)
+COMMIT  := $(shell git rev-parse --short HEAD)
+BUILT   := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+
+LDFLAGS := -s -w \
+  -X main.version=$(VERSION) \
+  -X main.commit=$(COMMIT) \
+  -X main.buildTime=$(BUILT)
+
+.PHONY: build build-all clean
+
+build:
+	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" \
+	  -o bin/$(BINARY) ./cmd/api
+
+build-all:
+	@for platform in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do \
+	  os=$${platform%/*}; arch=$${platform#*/}; \
+	  ext=""; [ "$$os" = "windows" ] && ext=".exe"; \
+	  echo "building $$os/$$arch"; \
+	  CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath \
+	    -ldflags="$(LDFLAGS)" \
+	    -o bin/$(BINARY)-$$os-$$arch$$ext ./cmd/api; \
+	done
+
+clean:
+	rm -rf bin
+```
+
+```bash
+make build-all
+```
+
+```text
+bin/api-linux-amd64
+bin/api-linux-arm64
+bin/api-darwin-amd64
+bin/api-darwin-arm64
+bin/api-windows-amd64.exe
+```
+
+Five platforms from one machine in about ten seconds. There is no equivalent of this in most language ecosystems.
+
+## Releasing
+
+For anything users download, `goreleaser` handles the whole process:
+
+```yaml title=".goreleaser.yml"
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}}
+
+archives:
+  - format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+```
+
+```bash
+goreleaser release --clean
+```
+
+Cross-compiled binaries for every platform, archives, checksums, a changelog from the commit history, and a GitHub release, from one command.
+
+Next, let's put the binary in a container.

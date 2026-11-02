@@ -1,0 +1,401 @@
+---
+title: Test Doubles and Interfaces
+---
+
+Your service calls a database, a payment provider, and an email service. You want to test what happens when the payment is declined. You do not want to decline a real payment, and you certainly do not want the test to depend on a third party being up.
+
+Go's answer is not a mocking framework. It is the fact that interfaces are satisfied implicitly, which means a twenty line struct in your test file is a complete substitute for anything.
+
+## The design that makes it possible
+
+```go
+type PaymentGateway interface {
+    Charge(ctx context.Context, amount int64, token string) (string, error)
+}
+
+type OrderService struct {
+    payments PaymentGateway
+    repo     OrderRepository
+}
+
+func NewOrderService(p PaymentGateway, r OrderRepository) *OrderService {
+    return &OrderService{payments: p, repo: r}
+}
+```
+
+Because `OrderService` accepts an interface rather than constructing a `*stripe.Client` itself, a test can pass anything with a `Charge` method. Nothing in the production code exists for the benefit of tests.
+
+<Callout type="warn">
+If a type constructs its own dependencies internally, there is no seam to substitute at, and no test double will help. Accepting dependencies as constructor arguments is what makes code testable, and it is a good design regardless.
+</Callout>
+
+## The four kinds of double
+
+The terminology is used loosely, and the distinctions are worth keeping straight.
+
+```text
+   Stub    returns canned answers. no logic, no verification.
+   Fake    a real but simplified implementation. an in-memory store.
+   Mock    records calls and asserts on them. "Charge was called once."
+   Spy     wraps a real implementation and records what happened.
+```
+
+Go leans heavily toward stubs and fakes, and away from mocks. The reason is that a mock asserts on *how* your code works, so refactoring breaks the test even when the behaviour is unchanged. A fake asserts on *what* it produced.
+
+## A stub
+
+The simplest useful double. Fields hold what to return:
+
+```go
+type stubPayments struct {
+    txnID string
+    err   error
+}
+
+func (s *stubPayments) Charge(ctx context.Context, amount int64, token string) (string, error) {
+    return s.txnID, s.err
+}
+```
+
+```go
+func TestPlaceOrderHandlesDecline(t *testing.T) {
+    svc := NewOrderService(
+        &stubPayments{err: ErrCardDeclined},
+        newFakeRepo(),
+    )
+
+    _, err := svc.PlaceOrder(context.Background(), validRequest())
+
+    if !errors.Is(err, ErrCardDeclined) {
+        t.Errorf("err = %v, want ErrCardDeclined", err)
+    }
+}
+```
+
+Nine lines to test a declined payment, with no network and no test account.
+
+For a stub that needs different behaviour per call, hold a function:
+
+```go
+type stubPayments struct {
+    chargeFunc func(context.Context, int64, string) (string, error)
+}
+
+func (s *stubPayments) Charge(ctx context.Context, amount int64, token string) (string, error) {
+    return s.chargeFunc(ctx, amount, token)
+}
+```
+
+```go
+calls := 0
+stub := &stubPayments{
+    chargeFunc: func(ctx context.Context, amount int64, token string) (string, error) {
+        calls++
+        if calls < 3 {
+            return "", ErrTemporary          // fail twice, then succeed
+        }
+        return "txn_123", nil
+    },
+}
+```
+
+## A fake
+
+A fake behaves like the real thing, just simply. The in-memory store from the databases section is a fake, and it is often the most useful double you can write.
+
+```go
+type fakeOrderRepo struct {
+    mu     sync.Mutex
+    orders map[string]*Order
+    nextID int
+}
+
+func newFakeOrderRepo() *fakeOrderRepo {
+    return &fakeOrderRepo{orders: make(map[string]*Order)}
+}
+
+func (f *fakeOrderRepo) Create(ctx context.Context, o *Order) error {
+    f.mu.Lock()
+    defer f.mu.Unlock()
+
+    f.nextID++
+    o.ID = fmt.Sprintf("order-%d", f.nextID)
+    o.CreatedAt = time.Now()
+
+    clone := *o
+    f.orders[o.ID] = &clone
+    return nil
+}
+
+func (f *fakeOrderRepo) Get(ctx context.Context, id string) (*Order, error) {
+    f.mu.Lock()
+    defer f.mu.Unlock()
+
+    o, ok := f.orders[id]
+    if !ok {
+        return nil, ErrNotFound
+    }
+    clone := *o
+    return &clone, nil
+}
+```
+
+Because it actually stores things, a test can create an order and then read it back, which a stub cannot do. One fake written once serves every test in the package.
+
+## Embedding the interface for a partial double
+
+When you only care about one method, embed the interface and leave the rest nil:
+
+```go
+type partialRepo struct {
+    OrderRepository          // embedded, nil. anything else panics.
+    getFunc func(context.Context, string) (*Order, error)
+}
+
+func (p *partialRepo) Get(ctx context.Context, id string) (*Order, error) {
+    return p.getFunc(ctx, id)
+}
+```
+
+The panic on an unimplemented method is a feature. It tells you the code under test called something you did not expect, which is usually worth knowing.
+
+## When you genuinely need to verify a call
+
+Sometimes the point of the test is that something happened. Record it in the double:
+
+```go
+type recordingMailer struct {
+    mu   sync.Mutex
+    sent []sentMail
+}
+
+type sentMail struct {
+    To      string
+    Subject string
+}
+
+func (m *recordingMailer) Send(ctx context.Context, to, subject, body string) error {
+    m.mu.Lock()
+    defer m.mu.Unlock()
+    m.sent = append(m.sent, sentMail{To: to, Subject: subject})
+    return nil
+}
+
+func (m *recordingMailer) Sent() []sentMail {
+    m.mu.Lock()
+    defer m.mu.Unlock()
+    return slices.Clone(m.sent)
+}
+```
+
+```go
+func TestPlaceOrderSendsConfirmation(t *testing.T) {
+    mailer := &recordingMailer{}
+    svc := NewOrderService(&stubPayments{txnID: "t1"}, newFakeOrderRepo(), mailer)
+
+    _, err := svc.PlaceOrder(ctx, requestFor("shiva@example.com"))
+    if err != nil {
+        t.Fatalf("PlaceOrder: %v", err)
+    }
+
+    sent := mailer.Sent()
+    if len(sent) != 1 {
+        t.Fatalf("sent %d emails, want 1", len(sent))
+    }
+    if sent[0].To != "shiva@example.com" {
+        t.Errorf("to = %q, want shiva@example.com", sent[0].To)
+    }
+}
+```
+
+The mutex is not optional if the code under test might send concurrently, and the race detector will tell you if you forgot it.
+
+## Mocking frameworks
+
+Two exist and are used:
+
+```bash
+go install go.uber.org/mock/mockgen@latest
+```
+
+```go
+//go:generate mockgen -source=payment.go -destination=mocks/payment.go
+```
+
+```go
+ctrl := gomock.NewController(t)
+mockPayments := mocks.NewMockPaymentGateway(ctrl)
+
+mockPayments.EXPECT().
+    Charge(gomock.Any(), int64(9900), "tok_123").
+    Return("txn_1", nil).
+    Times(1)
+```
+
+`testify/mock` is the other common choice.
+
+<Callout type="info">
+Generated mocks are worth it for interfaces with many methods where hand-writing a fake is genuinely tedious, and for cases where the exact call arguments are the thing being tested. For a two-method interface, a hand-written stub is shorter, has no build step, and produces a clearer failure message. The Go community's default is hand-written, and it is a defensible default.
+</Callout>
+
+## Faking time
+
+```go
+type Clock interface {
+    Now() time.Time
+}
+
+type realClock struct{}
+func (realClock) Now() time.Time { return time.Now() }
+
+type fakeClock struct {
+    mu sync.Mutex
+    t  time.Time
+}
+
+func (f *fakeClock) Now() time.Time {
+    f.mu.Lock()
+    defer f.mu.Unlock()
+    return f.t
+}
+
+func (f *fakeClock) Advance(d time.Duration) {
+    f.mu.Lock()
+    defer f.mu.Unlock()
+    f.t = f.t.Add(d)
+}
+```
+
+```go
+func TestSessionExpiry(t *testing.T) {
+    clock := &fakeClock{t: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}
+    svc := NewSessionService(clock, time.Hour)
+
+    s := svc.Create("user-1")
+
+    if svc.IsExpired(s) {
+        t.Error("session should be valid immediately")
+    }
+
+    clock.Advance(90 * time.Minute)
+
+    if !svc.IsExpired(s) {
+        t.Error("session should be expired after 90 minutes")
+    }
+}
+```
+
+Ninety minutes pass instantly and the test is deterministic. Any test that would otherwise contain `time.Sleep` should probably be using a fake clock instead.
+
+## Faking HTTP
+
+For code that calls an HTTP API, `httptest.NewServer` is better than a fake client, because it exercises the real transport, real serialisation, and real header handling:
+
+```go
+func TestFetchUser(t *testing.T) {
+    srv := httptest.NewServer(http.HandlerFunc(
+        func(w http.ResponseWriter, r *http.Request) {
+            if r.URL.Path != "/users/42" {
+                t.Errorf("path = %q", r.URL.Path)
+            }
+            w.Header().Set("Content-Type", "application/json")
+            json.NewEncoder(w).Encode(User{ID: "42", Name: "Shiva"})
+        }))
+    defer srv.Close()
+
+    client := NewClient(srv.URL)
+
+    u, err := client.FetchUser(context.Background(), "42")
+    if err != nil {
+        t.Fatalf("FetchUser: %v", err)
+    }
+    if u.Name != "Shiva" {
+        t.Errorf("name = %q, want Shiva", u.Name)
+    }
+}
+```
+
+Testing the failure paths becomes easy, and those are the ones that matter:
+
+```go
+tests := []struct {
+    name    string
+    handler http.HandlerFunc
+    wantErr error
+}{
+    {
+        name: "not found",
+        handler: func(w http.ResponseWriter, r *http.Request) {
+            w.WriteHeader(http.StatusNotFound)
+        },
+        wantErr: ErrNotFound,
+    },
+    {
+        name: "server error",
+        handler: func(w http.ResponseWriter, r *http.Request) {
+            w.WriteHeader(http.StatusInternalServerError)
+        },
+        wantErr: ErrUpstream,
+    },
+    {
+        name: "malformed json",
+        handler: func(w http.ResponseWriter, r *http.Request) {
+            w.Write([]byte(`{"broken`))
+        },
+        wantErr: ErrDecode,
+    },
+    {
+        name: "timeout",
+        handler: func(w http.ResponseWriter, r *http.Request) {
+            time.Sleep(2 * time.Second)
+        },
+        wantErr: context.DeadlineExceeded,
+    },
+}
+```
+
+A round trip function is the alternative when you need to intercept at the transport level:
+
+```go
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+    return f(r)
+}
+
+client := &http.Client{
+    Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+        return &http.Response{
+            StatusCode: 200,
+            Body:       io.NopCloser(strings.NewReader(`{"name":"Shiva"}`)),
+            Header:     make(http.Header),
+        }, nil
+    }),
+}
+```
+
+Note that `roundTripFunc` is a named function type with a method, the same trick as `http.HandlerFunc`.
+
+## Choosing a double
+
+```text
+   Just need it to return something         →  stub
+   Test stores and reads back               →  fake
+   The point IS that something was called   →  recording double
+   Calling an HTTP API                      →  httptest.NewServer
+   Time dependent logic                     →  fake clock
+   Testing the repository itself            →  a real database
+   Interface has ten methods                →  consider mockgen
+```
+
+## What not to do
+
+**Do not fake what you own and can run.** Testing your own repository against a fake database tests nothing. Use a real one, from `testcontainers`.
+
+**Do not assert on internal call order** unless the order is the requirement. That is how tests become an obstacle to refactoring.
+
+**Do not build one giant configurable double** used by every test. Small purpose-built doubles per test file are clearer and fail more informatively.
+
+**Do not add an interface only for testing.** If a type has one implementation and no test needs to substitute it, the interface is noise. Add it when a test actually needs it.
+
+Next, let's look at measuring whether the code is fast, rather than only correct.
