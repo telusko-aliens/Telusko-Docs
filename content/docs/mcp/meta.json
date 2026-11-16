@@ -1,0 +1,9 @@
+{
+  "title": "MCP",
+  "icon": "Plug",
+  "pages": [
+    "getting-started.mdx",
+    "llm-apps-and-tool-calling",
+    "model-context-protocol"
+  ]
+}

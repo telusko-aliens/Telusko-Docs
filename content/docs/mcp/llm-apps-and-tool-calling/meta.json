@@ -1,0 +1,8 @@
+{
+  "title": "LLM Apps and Tool Calling",
+  "pages": [
+    "ai-applications-and-llms.mdx",
+    "building-your-first-llm-app.mdx",
+    "tool-calling-from-scratch.mdx"
+  ]
+}

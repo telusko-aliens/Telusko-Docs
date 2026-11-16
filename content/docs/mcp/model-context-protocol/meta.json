@@ -1,0 +1,10 @@
+{
+  "title": "Model Context Protocol",
+  "pages": [
+    "what-is-mcp.mdx",
+    "building-an-mcp-server-with-stdio.mdx",
+    "building-an-mcp-server-with-http.mdx",
+    "connecting-to-multiple-mcp-servers.mdx",
+    "integrating-the-github-mcp-server.mdx"
+  ]
+}

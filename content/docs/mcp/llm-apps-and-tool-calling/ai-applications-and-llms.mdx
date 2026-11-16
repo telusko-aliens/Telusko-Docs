@@ -1,0 +1,143 @@
+---
+title: AI Applications and LLMs
+description: See what changes when an application starts using a large language model, and learn the terms you need to choose a model, tokens, pricing, context window and knowledge cutoff.
+---
+
+Before any AI is involved, a typical application looks like this. A user talks to the app. The app reads and writes a database, and it calls a few third-party APIs or SDKs for things like payments or maps.
+
+In that world, the application is in full control of its data. It validates what the user sends. It decides what goes into the database and what comes out. It checks who is logged in and what they are allowed to see. Every answer the user gets was produced by code that a developer wrote and can read.
+
+That changes the moment you add a **large language model**.
+
+![Application_With_An_LLM](https://dyz1pdcuffwr5.cloudfront.net/MCP/mcp-app-with-llm.svg)
+
+## What an LLM is
+
+LLM stands for **Large Language Model**. It is a program trained on a very large amount of text, which can take text in and produce text out: an answer, a summary, a piece of code.
+
+You do not build one yourself. Companies such as OpenAI, Anthropic (Claude) and Google (Gemini) train the models and offer them through an API. Your application sends a request with some text, and the API sends the model's reply back.
+
+So the LLM becomes one more thing the app talks to, next to the database and the third-party services. The difference is that its answers are not written by your code. They are generated. That makes an LLM very flexible, and it is also the reason for most of the care you need when using one.
+
+The video uses OpenAI. To call its API you need an account on the OpenAI API platform, some credit and an API key. The video adds 5 dollars of credit, which is more than enough for everything in these docs. Some providers also offer a free tier with limits.
+
+<Callout type="info" title="The API platform is separate from the chat product">
+A ChatGPT subscription and API credit are two different things. Using the model from your own code is billed per request through the API platform, even if you already pay for the chat application.
+</Callout>
+
+## One provider, many models
+
+A provider does not have just one model. It has a list, and the models differ in ability, speed and price. The video opens OpenAI's model comparison page and puts three of them side by side.
+
+The numbers below are what that page showed when the video was recorded, in October 2026. Models and prices change often, so check the provider's own page before you decide anything.
+
+| | GPT-6 Astra | GPT-6 Sol | GPT-4o mini |
+| --- | --- | --- | --- |
+| Described as | Most capable model, for the hardest end-to-end work | Built for complex coding and agentic workflows | Fast, affordable small model for focused tasks |
+| Reasoning | Yes | Yes | No |
+| Input | Text, image | Text, image | Text, image |
+| Output | Text | Text | Text |
+| Input price, per 1M tokens | $10.00 | $2.00 | $0.15 |
+| Cached input, per 1M tokens | $1.00 | $0.20 | $0.075 |
+| Output price, per 1M tokens | $50.00 | $10.00 | $0.60 |
+| Context window | 1,050,000 | 1,050,000 | 128,000 |
+| Max output tokens | 128,000 | 128,000 | 16,384 |
+| Knowledge cutoff | Apr 30, 2026 | Apr 20, 2026 | Oct 01, 2023 |
+
+Each row is a term you will meet again and again. Take them one at a time.
+
+### Reasoning
+
+A reasoning model can think through a question in several internal steps before it answers. It is better at problems that need planning. It also uses extra tokens for that thinking, called reasoning tokens, and you pay for them. `GPT-4o mini` has no reasoning step. It answers directly.
+
+### Tokens and pricing
+
+A model does not read characters or words. A piece of software called a **tokenizer** first cuts the text into **tokens**. A token can be a whole word, a part of a word or a punctuation mark. A long or unusual word may become two or three tokens. Each model family has its own tokenizer, so the same sentence can be a different number of tokens for different models.
+
+Tokens matter because they are the unit of billing:
+
+- Everything you send is counted as **input tokens**.
+- Everything the model writes is counted as **output tokens**.
+- Output is more expensive than input, for every model in the table.
+
+Look at the spread. Output from the largest model costs 50 dollars per million tokens. From the smallest it costs 60 cents. Tutorials tend to use a small model, because for a demo the cheap one is good enough. In a product you choose per task: a large model where the quality is needed, a small one everywhere else.
+
+**Cached input** is a lower price for input the provider has seen recently, for example a long instruction that you send unchanged with every request.
+
+### Context window
+
+The model has no memory of its own between two requests. Whatever it should take into account has to be inside the request you send. That material is called the **context**.
+
+Context can be:
+
+- The earlier messages of a conversation, so that the model knows what was said before
+- A document or a PDF you want answers from
+- Data your application looked up, such as rows from a database
+
+The **context window** is the maximum number of tokens the model can handle in one request, input and output together. A window of 128,000 tokens is roughly a long book. A window of about a million tokens holds several.
+
+### Max output tokens
+
+This is the limit for a single reply. `GPT-4o mini` can write at most 16,384 tokens in one response, however large its context window is. If you need more, you have to ask for the result in parts.
+
+### Knowledge cutoff
+
+Training a model stops on a certain date. That date is its **knowledge cutoff**. The model knows nothing that happened afterwards.
+
+For `GPT-4o mini` the cutoff shown is October 1, 2023. Ask it about something from 2025 and it has two choices: say it does not know, or produce an answer that sounds right. The second one is called **hallucination**, and it is common. The model is not lying on purpose. Producing likely-sounding text is simply what it does.
+
+Inside an application, a confident wrong answer is a real problem. There are two ways out. Use a newer model, which only moves the cutoff forward. Or give the model a way to look up what it does not know. The second way is what **tools** are for, and it is where these docs are heading.
+
+## Context sets the boundary
+
+Here is an example that shows why context is so useful.
+
+Suppose you build a chatbot for the employees of your company. It should answer questions like "How many planned leaves do I have left?" or "When is the next public holiday?". The answers are in your own documents: the leave policy, the holiday list, the training material.
+
+No model was trained on those documents, and you would not want to publish confidential company data just so that a model can learn it. You do not have to. You pass the relevant document as context with the question, and tell the model to answer from that material only.
+
+Two things follow from this:
+
+- The model does not need to know your company. It needs to read well and answer from what it was given.
+- It does not need recent world knowledge either. A smaller, cheaper model can do this job.
+
+So the choice of model depends on the use case, not on which model is the newest.
+
+## The model used in these docs
+
+Everything from here on uses **`gpt-4o-mini`**, for two reasons given in the video:
+
+- Its knowledge cutoff is far in the past, which makes the cutoff problem easy to demonstrate.
+- It is cheap, so following along costs very little.
+
+You are free to use another model or another provider. The code changes in one or two lines.
+
+## Summary
+
+| Term | Meaning |
+| --- | --- |
+| LLM | A model that takes text in and generates text out, used through a provider's API |
+| Token | The unit a model reads and writes, and the unit you are billed for |
+| Input and output tokens | What you send and what the model writes. Output costs more |
+| Context | Everything you put into a request for the model to work with |
+| Context window | The maximum number of tokens one request can hold |
+| Max output tokens | The maximum length of one reply |
+| Knowledge cutoff | The date after which the model knows nothing |
+| Hallucination | A confident answer that is not true |
+
+## Try It Yourself
+
+1. Open the model comparison page of a provider of your choice and compare its largest and its smallest model. Write down price, context window and knowledge cutoff for both.
+2. Open the provider's tokenizer tool, paste a paragraph and see how many tokens it becomes. Try a very long word and a sentence in another language.
+3. With the prices in the table above, calculate the cost of a request with 2,000 input tokens and 500 output tokens for the largest and for the smallest model.
+4. Think of one application where a small, cheap model is enough, and one where you would pay for a reasoning model. Write down why.
+
+## Official references
+
+- [OpenAI: models](https://platform.openai.com/docs/models)
+- [OpenAI: pricing](https://platform.openai.com/docs/pricing)
+- [OpenAI: tokenizer](https://platform.openai.com/tokenizer)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

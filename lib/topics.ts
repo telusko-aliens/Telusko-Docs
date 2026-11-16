@@ -15,6 +15,7 @@ const TOPIC_ORDER = [
   'git',
   'linux',
   'claude-code',
+  'mcp',
   'devops',
   'maven',
   'terraform',
