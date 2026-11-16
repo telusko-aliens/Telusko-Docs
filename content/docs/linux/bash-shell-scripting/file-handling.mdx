@@ -1,0 +1,325 @@
+---
+title: File Handling in Shell Scripting
+description: Use the Bash file test operators -e, -f, -d, -r, -w, -x and -s to check files and directories before a script works on them.
+---
+
+Almost every shell script touches files and directories. It reads a config file, writes into a log folder, runs another script. And almost every script that fails in production fails for the same boring reasons: the file was not there, the folder did not exist, the script had no execute permission.
+
+A careful script checks before it acts. Does the file exist? Is it really a file, or a directory with the same name? Does it have any content? Can I run it? Bash has a set of **file test operators** for these questions. Each one gives a true or false answer, which you use inside an `if`.
+
+## The file test operators
+
+| Operator | True when | Example |
+| --- | --- | --- |
+| `-e` | The path exists, file or directory | `[ -e "file.txt" ]` |
+| `-f` | It exists and is a regular file | `[ -f "script.sh" ]` |
+| `-d` | It exists and is a directory | `[ -d "/home/user/docs" ]` |
+| `-r` | It is readable by you | `[ -r "file.txt" ]` |
+| `-w` | It is writable by you | `[ -w "file.txt" ]` |
+| `-x` | It is executable by you | `[ -x "script.sh" ]` |
+| `-s` | It exists and is **not** empty | `[ -s "log.txt" ]` |
+| `-L` | It is a symbolic link | `[ -L "linkname" ]` |
+
+A "regular file" is any normal file: a text file, a shell script, a Terraform file, an image. It is the opposite of a directory or a link.
+
+`-r`, `-w` and `-x` answer for the user who runs the script. They are the same read, write and execute permissions you set with `chmod` in [Linux File Permissions](/docs/linux/linux-users-permissions-ownership/file-permissions-symbolic).
+
+The spaces inside the brackets are part of the syntax. `[ -f "file.txt" ]` works, `[-f "file.txt"]` gives `command not found`.
+
+## Step 1: Does a file exist?
+
+The `scripts` folder from the earlier lessons has a file called `devops.txt`. Let's write a script that checks for it.
+
+```bash
+vi filescript.sh
+```
+
+```bash title="filescript.sh"
+#!/bin/bash
+
+if [ -f "devops.txt" ]
+then
+        echo "File exists"
+else
+        echo "File not found"
+fi
+```
+
+```bash
+chmod u+x filescript.sh
+./filescript.sh
+```
+
+```text
+File exists
+```
+
+## Step 2: Does a directory exist?
+
+For a directory the operator is `-d`. Create a directory to test with:
+
+```bash
+mkdir project
+```
+
+Change the script:
+
+```bash title="filescript.sh"
+#!/bin/bash
+
+if [ -d "project" ]
+then
+        echo "Directory exists"
+else
+        echo "Directory not found"
+fi
+```
+
+```bash
+./filescript.sh
+```
+
+```text
+Directory exists
+```
+
+A test that only ever says yes proves nothing. Change the name to a directory that is not there, for example `demoproject`, and run it again:
+
+```text
+Directory not found
+```
+
+Now you know both branches work.
+
+### -e, -f and -d are not the same
+
+| Path | `-e` | `-f` | `-d` |
+| --- | --- | --- | --- |
+| `devops.txt` (a file) | true | true | false |
+| `project` (a directory) | true | false | true |
+| `nothing-here` (missing) | false | false | false |
+
+Use `-e` when you only care that something with that name is there. Use `-f` or `-d` when the next command needs one specific kind, for example `cat` needs a file and `cd` needs a directory.
+
+## Step 3: Check, fix and run
+
+Now a script with a real job. It is given the name of another script and must run it safely:
+
+- If the file is not there, print an error.
+- If it is there and executable, run it.
+- If it is there but not executable, make it executable first, then run it.
+
+![File_Test_Operators_Flow](https://dyz1pdcuffwr5.cloudfront.net/Linux/sh-file-test-flow.svg)
+
+This needs an `if` inside another `if`:
+
+```bash
+vi fileops.sh
+```
+
+```bash title="fileops.sh"
+#!/bin/bash
+
+SCRIPT="run.sh"
+
+if [ -f "$SCRIPT" ]
+then
+        if [ -x "$SCRIPT" ]
+        then
+                echo "file is executable and running it ..."
+                ./"$SCRIPT"
+
+        else
+                echo "$SCRIPT is not executable hence making it executable..."
+                chmod +x "$SCRIPT"
+                echo "Now running it "
+                ./"$SCRIPT"
+        fi
+else
+        echo "ERROR : $SCRIPT is not found"
+fi
+```
+
+The outer `if` asks "is there such a file?". Only when the answer is yes does the inner `if` ask "can I execute it?". Each `if` has its own `fi`.
+
+```bash
+chmod u+x fileops.sh
+```
+
+### Case 1: the file does not exist
+
+There is no `run.sh` in the folder.
+
+```bash
+./fileops.sh
+```
+
+```text
+ERROR : run.sh is not found
+```
+
+### Case 2: the file exists and is executable
+
+`script1.sh` from an earlier lesson already has the execute permission. In `ls` output it shows in green. It holds three commands:
+
+```bash title="script1.sh"
+#!/bin/bash
+pwd
+ls
+whoami
+```
+
+Change the variable in `fileops.sh`:
+
+```bash
+SCRIPT="script1.sh"
+```
+
+```bash
+./fileops.sh
+```
+
+```text
+file is executable and running it ...
+/home/ubuntu/scripts
+add.sh      arrays.sh  devops.txt  filescript.sh  script1.sh  script5.sh
+aliens.txt  case.sh    fileops.sh  project        telusko.sh
+ubuntu
+```
+
+After the message you see the output of `script1.sh`: the current directory, the file list and the user name. Your file list will differ.
+
+### Case 3: the file exists but is not executable
+
+`script5.sh` exists but was never given the execute permission. Look at what it does:
+
+```bash
+cat script5.sh
+```
+
+```bash title="script5.sh"
+#!/bin/bash
+num=5
+if ! [ $num -eq 10 ]
+then
+        echo "Not equal to 10"
+fi
+```
+
+Set `SCRIPT="script5.sh"` and run:
+
+```bash
+./fileops.sh
+```
+
+```text
+script5.sh is not executable hence making it executable...
+Now running it
+Not equal to 10
+```
+
+The script noticed the missing permission, fixed it with `chmod +x`, and then ran the file. The last line is the output of `script5.sh` itself.
+
+## Two errors from the lecture
+
+Both of these happened while recording, and both are worth understanding.
+
+**A space after `./`.** At one point the run command was typed with a space in it:
+
+```bash
+./ fileops.sh
+```
+
+```text
+-bash: ./: Is a directory
+```
+
+The space splits the command in two. Bash now tries to execute `./`, which is the current directory, and passes `fileops.sh` to it as an argument. A directory cannot be executed, so you get this message. Write `./fileops.sh` with nothing in between.
+
+**The called script had its own problem.** With `SCRIPT="add.sh"` the output was:
+
+```text
+file is executable and running it ...
+./add.sh: line 3: +: syntax error: operand expected (error token is "+")
+SUM of 2 numbers is :
+```
+
+`fileops.sh` did its job correctly. The error comes from `add.sh`, which expects two numbers as [command line arguments](/docs/linux/bash-shell-scripting/command-line-arguments) and received none. Read the start of an error line: it names the script that failed.
+
+## Why the variable is in quotes
+
+The script writes `"$SCRIPT"` in double quotes every time. This is not decoration. If a file name contains a space and the variable is not quoted, Bash splits the name into two words:
+
+```bash
+FILE="my notes.txt"
+
+if [ -f $FILE ]
+```
+
+```text
+[: my: binary operator expected
+```
+
+With `[ -f "$FILE" ]` the name stays in one piece. Quote your variables inside `[ ]` and you avoid this whole group of errors.
+
+## Checking for content with -s
+
+A file can exist and still be empty. A backup of zero bytes or an empty report is usually a sign that something went wrong earlier. `-s` is true only when the file has content:
+
+```bash title="logcheck.sh"
+#!/bin/bash
+
+LOG="app.log"
+
+if [ -s "$LOG" ]
+then
+        echo "$LOG has content"
+else
+        echo "$LOG is empty or missing"
+fi
+```
+
+Note that `-s` is false in two situations: the file is empty, or there is no file at all. If you need to tell them apart, test `-f` first.
+
+## Turning a test around
+
+Put `!` in front to mean "not". This is the most common way to create a folder only when it is missing:
+
+```bash
+if [ ! -d "backups" ]
+then
+        mkdir backups
+fi
+```
+
+And you can require two things at once with `&&`:
+
+```bash
+if [ -f "$SCRIPT" ] && [ -x "$SCRIPT" ]
+then
+        ./"$SCRIPT"
+fi
+```
+
+<Callout type="info" title="Think before a script changes permissions">
+`fileops.sh` adds the execute permission by itself. That is a good exercise in nested conditions. In a real environment, be careful with this idea: a file without the execute permission may have been left that way on purpose. A safer script reports the problem and lets a person decide.
+</Callout>
+
+## Try It Yourself
+
+1. Create `filescript.sh` and test it with a file that exists and one that does not.
+2. Change it to use `-d` and test it with `project` and with a directory name that does not exist.
+3. Run `[ -f project ]; echo $?` and `[ -e project ]; echo $?` in the terminal. A result of `0` means true and `1` means false. Explain the difference.
+4. Create `fileops.sh` and go through all three cases: a missing file, an executable script and a script without the execute permission. Check with `ls -l` that the permission really changed.
+5. Create an empty file with `touch empty.log` and write a script that prints `EMPTY` or `HAS DATA` using `-s`. Then add a line to the file and run it again.
+6. Change `fileops.sh` so that the script name comes from `$1` instead of being written in the file.
+
+## Official references
+
+- [Bash manual: conditional expressions](https://www.gnu.org/software/bash/manual/html_node/Bash-Conditional-Expressions.html)
+- [Bash manual: conditional constructs](https://www.gnu.org/software/bash/manual/html_node/Conditional-Constructs.html)
+- [GNU coreutils: test](https://www.gnu.org/software/coreutils/manual/html_node/test-invocation.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

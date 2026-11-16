@@ -6,6 +6,15 @@
         "conditionals.mdx",
         "operators.mdx",
         "loops.mdx",
-        "functions.mdx"
+        "functions.mdx",
+        "command-line-arguments.mdx",
+        "environment-variables.mdx",
+        "arrays.mdx",
+        "case-statement.mdx",
+        "file-handling.mdx",
+        "backup-health-check-and-service-monitor.mdx",
+        "cron-jobs.mdx",
+        "service-restart-and-cleanup-scripts.mdx",
+        "monitoring-cpu-memory-disk-usage.mdx"
     ]
 }

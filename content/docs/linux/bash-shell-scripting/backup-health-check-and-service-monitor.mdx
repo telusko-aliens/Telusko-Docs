@@ -1,0 +1,289 @@
+---
+title: Auto Backup, System Health Check and Service Monitor
+description: Three small automation scripts in Bash, a timestamped backup, a system health report and a service status checker built with systemctl.
+---
+
+Until now each lesson introduced one concept and a small demo for it. From here the direction changes. We take the Linux commands and the scripting concepts you already know and put them together into scripts that do a real job. These are the kind of tasks an engineer on a server does every week:
+
+| Script | The job |
+| --- | --- |
+| `backup.sh` | Copy a project folder into a backup location, with the date and time in the name |
+| `health.sh` | Show uptime, memory and disk usage in one go |
+| `servicestatus.sh` | Tell whether a service such as Apache or Nginx is running |
+
+None of them is long. The value is that you write them once and then run them any number of times, without typing the commands again and without forgetting a step.
+
+## Script 1: Auto backup
+
+Inside the `scripts` folder there is a directory called `project` with a few files:
+
+```bash
+ls project/
+```
+
+```text
+script1.sh  script3.sh  script4.sh
+```
+
+We want a copy of this folder. And every time we take a copy, the old copies should stay, so that we can go back to any earlier version. The way to do that is to put the date and time into the name of each backup.
+
+![Timestamped_Backup_Flow](https://dyz1pdcuffwr5.cloudfront.net/Linux/sh-backup-flow.svg)
+
+```bash
+vi backup.sh
+```
+
+```bash title="backup.sh"
+#!/bin/bash
+
+DATE=$(date +%F_%H-%M-%S)
+
+mkdir -p backups
+
+cp -r project backups/project_$DATE
+
+echo "Backup created successfully: project_$DATE"
+```
+
+Four lines do the work. Take them one at a time.
+
+**The timestamp.** `$( ... )` is command substitution: Bash runs the command inside and puts its output in place. So `DATE` receives whatever `date` prints. The part after `+` tells `date` which format to use:
+
+| Code | Meaning | Example |
+| --- | --- | --- |
+| `%F` | Full date as year-month-day | `2026-05-11` |
+| `%H` | Hour, 00 to 23 | `08` |
+| `%M` | Minute | `18` |
+| `%S` | Second | `17` |
+
+Together `+%F_%H-%M-%S` gives `2026-05-11_08-18-17`. The format avoids spaces and colons on purpose, because both are awkward in file names. Starting with the year also means that `ls` lists the backups in the order they were made.
+
+**The backup folder.** `mkdir -p backups` creates the folder. The `-p` matters. A plain `mkdir backups` works the first time and fails on every later run:
+
+```text
+mkdir: cannot create directory 'backups': File exists
+```
+
+With `-p`, `mkdir` creates the folder if it is missing and does nothing if it is already there. The script can run a hundred times without an error.
+
+**The copy.** `cp -r` copies a directory with everything inside it. The `-r` stands for recursive. Without it, `cp` refuses to copy a directory. The target name is `backups/project_` followed by the timestamp.
+
+**The message.** A script that finishes without a word leaves you guessing. One line at the end tells you that it worked and what it created.
+
+Run it:
+
+```bash
+chmod u+x backup.sh
+./backup.sh
+```
+
+```text
+Backup created successfully: project_2026-05-11_08-18-17
+```
+
+Check the result:
+
+```bash
+ls backups
+```
+
+```text
+project_2026-05-11_08-18-17
+```
+
+```bash
+ls backups/project_2026-05-11_08-18-17
+```
+
+```text
+script1.sh  script3.sh  script4.sh
+```
+
+Run the script again a little later and a second folder appears next to the first. Each run is its own snapshot.
+
+<Callout type="info" title="One archive file per backup">
+Copying the folder is the simplest form of a backup. On real servers a backup is usually packed into a single compressed file, which is smaller and easier to move to another machine. You know the command from [Zip & Unzip Files in Linux](/docs/linux/linux-packages-networking-system-admin/zip-and-unzip-files):
+
+```bash
+tar -czf backups/project_$DATE.tar.gz project
+```
+</Callout>
+
+Backups that are never deleted will fill the disk one day. Cleaning up old ones is the topic of [Service Restart and Cleanup Scripts](/docs/linux/bash-shell-scripting/service-restart-and-cleanup-scripts).
+
+## Script 2: System health check
+
+When something feels slow on a server, you check three things first: how long the machine has been up and how loaded it is, how much memory is free, and how full the disk is. Those are three commands you met in [System Resource Monitoring in Linux](/docs/linux/linux-packages-networking-system-admin/system-resources). The script puts them behind one name.
+
+```bash
+vi health.sh
+```
+
+```bash title="health.sh"
+#!/bin/bash
+
+echo "System Uptime"
+uptime
+
+echo "Memory Usage"
+free -h
+
+echo "Disk Usage"
+df -h
+```
+
+Each `echo` is a heading for the command that follows. Without the headings you would get three blocks of numbers with nothing to tell them apart.
+
+```bash
+chmod u+x health.sh
+./health.sh
+```
+
+```text
+System Uptime
+ 08:22:18 up  2:10,  1 user,  load average: 0.00, 0.00, 0.00
+Memory Usage
+               total        used        free      shared  buff/cache   available
+Mem:           911Mi       376Mi       185Mi       3.0Mi       518Mi       534Mi
+Swap:             0B          0B          0B
+Disk Usage
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/root       6.8G  2.9G  3.9G  42% /
+tmpfs           456M     0  456M   0% /dev/shm
+tmpfs           183M  876K  182M   1% /run
+/dev/nvme0n1p16 881M  162M  657M  20% /boot
+/dev/nvme0n1p15 105M  6.2M   99M   6% /boot/efi
+```
+
+How to read the three parts:
+
+| Part | What to look at |
+| --- | --- |
+| `uptime` | `up 2:10` means the machine has been running for 2 hours 10 minutes. The three load averages are for the last 1, 5 and 15 minutes. Values near 0 mean the machine is idle |
+| `free -h` | The `available` column is the memory that programs can still get. It is more useful than `free`, because Linux uses spare memory for cache and gives it back when needed |
+| `df -h` | The `Use%` column of the line mounted on `/`. When it gets close to 100%, the server starts to fail in strange ways |
+
+`-h` in both commands means human readable: sizes are shown as `Mi` and `G` and not as long numbers.
+
+This report is meant for a person to read. In [Monitoring CPU, Memory and Disk Usage](/docs/linux/bash-shell-scripting/monitoring-cpu-memory-disk-usage) we take single numbers out of these commands and write them to a log file.
+
+## Script 3: Service status checker
+
+A server exists to run services: a web server, Jenkins, Docker, a database. "Is it running?" is a question you ask many times a day. In [Service Management in Linux with systemctl](/docs/linux/linux-packages-networking-system-admin/service-management) you answered it with `systemctl status`, which prints a full screen of details. A script needs something shorter: a plain yes or no.
+
+That is `systemctl is-active`:
+
+```bash
+systemctl is-active apache2
+```
+
+```text
+active
+```
+
+Add `--quiet` and it prints nothing at all. It only sets its exit status: `0` when the service is active, a non-zero number when it is not. And an exit status is exactly what `if` looks at.
+
+```bash
+vi servicestatus.sh
+```
+
+```bash title="servicestatus.sh"
+#!/bin/bash
+
+echo "Enter the Service Name: "
+read SERVICE
+
+if systemctl is-active --quiet $SERVICE
+then
+        echo " Service $SERVICE is running.. "
+else
+        echo " Service $SERVICE is not running (STOPPED)"
+fi
+```
+
+Notice that this `if` has no square brackets. In earlier lessons you wrote `if [ ... ]`. The brackets are themselves a command, one that tests a condition. `if` accepts **any** command in that place and goes to `then` when the command succeeds. Here the command is `systemctl`.
+
+The service name comes from the user through `read`, so the same script works for any service.
+
+```bash
+chmod u+x servicestatus.sh
+./servicestatus.sh
+```
+
+```text
+Enter the Service Name:
+apache2
+ Service apache2 is running..
+```
+
+```text
+Enter the Service Name:
+jenkins
+ Service jenkins is not running (STOPPED)
+```
+
+On the lecture machine Apache was running because it had been used for an earlier demo. Jenkins was not installed at all.
+
+### "Not running" can mean three things
+
+In the lecture, the first test was typed as `ngnix`, with the letters swapped:
+
+```text
+Enter the Service Name:
+ngnix
+ Service ngnix is not running (STOPPED)
+```
+
+There is no service with that name, yet the script calmly reports it as stopped. `is-active` gives the same "no" for a service that is stopped, a service that is not installed and a name with a typing mistake. Keep that in mind before you trust a "STOPPED" message.
+
+A more careful version first asks whether the service exists:
+
+```bash title="servicestatus.sh"
+#!/bin/bash
+
+read -p "Enter the Service Name: " SERVICE
+
+if ! systemctl cat "$SERVICE" > /dev/null 2>&1
+then
+        echo "Service $SERVICE does not exist on this system"
+elif systemctl is-active --quiet "$SERVICE"
+then
+        echo "Service $SERVICE is running"
+else
+        echo "Service $SERVICE is not running (STOPPED)"
+fi
+```
+
+`systemctl cat` prints the unit file of a service and fails when there is none. We are not interested in its output, only in whether it worked, so everything it prints is sent to `/dev/null`.
+
+## What these scripts have in common
+
+| Idea | Where you saw it |
+| --- | --- |
+| Store the output of a command in a variable with `$( )` | `DATE=$(date ...)` in `backup.sh` |
+| Make a script safe to run again and again | `mkdir -p` in `backup.sh` |
+| Label the output | The `echo` headings in `health.sh` |
+| Let `if` decide on the success of a command | `if systemctl is-active --quiet` in `servicestatus.sh` |
+| Print a clear message at the end | All three |
+
+All three still have to be started by hand. Making them run on their own at a fixed time is what [Scheduling Scripts with Cron Jobs](/docs/linux/bash-shell-scripting/cron-jobs) is about.
+
+## Try It Yourself
+
+1. Create a `project` folder with a few files and write `backup.sh`. Run it three times and list the `backups` folder.
+2. Remove `-p` from `mkdir`, run the script twice and read the error. Put `-p` back.
+3. Change `backup.sh` so that the folder to back up comes from `$1`, with a usage message when no argument is given.
+4. Write `health.sh` and add one more section, `Logged in Users`, using the `who` command.
+5. Write `servicestatus.sh` and try it with `ssh`, with `cron` and with a name that does not exist.
+6. Change `servicestatus.sh` to check a whole list of services stored in an [array](/docs/linux/bash-shell-scripting/arrays), with one line of output per service.
+
+## Official references
+
+- [GNU coreutils: date](https://www.gnu.org/software/coreutils/manual/html_node/date-invocation.html)
+- [GNU coreutils: cp](https://www.gnu.org/software/coreutils/manual/html_node/cp-invocation.html)
+- [systemctl manual](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html)
+- [Bash manual: command substitution](https://www.gnu.org/software/bash/manual/html_node/Command-Substitution.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

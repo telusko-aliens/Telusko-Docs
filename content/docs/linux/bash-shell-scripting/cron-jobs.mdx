@@ -1,0 +1,278 @@
+---
+title: Scheduling Scripts with Cron Jobs
+description: Run Linux commands and shell scripts automatically at fixed times with cron, read the five fields of a cron expression, and manage jobs with crontab.
+---
+
+The scripts from the last lesson take a backup, print a health report and check a service. They all share one weakness: somebody has to remember to run them. A backup that depends on a person typing `./backup.sh` every night at ten will be missed sooner or later.
+
+Linux has a built-in answer called **cron**. Cron is a time-based job scheduler. You tell it once which command to run and when, and from then on it runs the command by itself, for as long as the machine is up.
+
+Think of the alarm on your phone. You set it once for 6 AM on weekdays and it rings on its own. A cron job is an alarm for your server, and in place of a ringtone it runs a command or a script.
+
+Typical uses:
+
+- Take a backup every night
+- Check the health of the system every few minutes
+- Delete old log files once a week
+- Send a report every Monday morning
+
+## How cron works
+
+Three names come up all the time:
+
+| Name | What it is |
+| --- | --- |
+| **cron** | The service. It runs in the background all the time as a daemon, wakes up every minute and checks whether a job is due |
+| **crontab** | Short for cron table. The file that lists your jobs, one per line. It is also the name of the command you use to edit that file |
+| **cron job** | One line in the crontab: a schedule followed by a command |
+
+On Ubuntu the cron service is installed and running by default. You can confirm it with `systemctl status cron`.
+
+## The cron expression
+
+Every job starts with five fields that describe **when** it should run, followed by **what** to run:
+
+```text
+* * * * * <command or script>
+```
+
+The position of each field is fixed, and this order is the one thing you really have to memorise:
+
+![Cron_Expression_Fields](https://dyz1pdcuffwr5.cloudfront.net/Linux/sh-cron-fields.svg)
+
+| Position | Field | Allowed values |
+| --- | --- | --- |
+| 1 | Minute | 0 to 59 |
+| 2 | Hour | 0 to 23 |
+| 3 | Day of the month | 1 to 31 |
+| 4 | Month | 1 to 12 |
+| 5 | Day of the week | 0 to 6, where 0 is Sunday, 1 is Monday and 6 is Saturday |
+
+A `*` in a field means "every". So five stars mean every minute of every hour of every day of every month, on every day of the week. In short: once a minute, all year.
+
+Two things about time:
+
+- There is no AM or PM. Hours use the 24 hour clock, so 10 PM is `22` and 6 PM is `18`.
+- The whiteboard in the lecture labels the last field "Sun-Mon". The full range is Sunday (`0`) to Saturday (`6`).
+
+### Reading examples
+
+| Expression | When it runs |
+| --- | --- |
+| `* * * * * /home/ubuntu/test.sh` | Every minute |
+| `0 22 * * * /home/ubuntu/backup.sh` | Every day at 10 PM |
+| `0 10 * * 1 <script>` | Every Monday at 10 AM |
+| `0 18 * * 1-5 <script>` | Monday to Friday at 6 PM |
+
+Read the second one field by field: minute `0`, hour `22`, any day of the month, any month, any day of the week. That is the first minute of 10 PM, every day.
+
+The `0` in the minute field is important. `* 22 * * *` would not mean "at 10 PM". It would mean every minute from 10:00 PM to 10:59 PM, sixty runs in a row.
+
+### More than a single value
+
+The last example uses `1-5`, a range. There are three more symbols like it:
+
+| Symbol | Meaning | Example | When it runs |
+| --- | --- | --- | --- |
+| `*` | Every value | `* * * * *` | Every minute |
+| `-` | A range | `0 18 * * 1-5` | 6 PM, Monday to Friday |
+| `,` | A list | `0 9,18 * * *` | 9 AM and 6 PM, every day |
+| `/` | A step | `*/5 * * * *` | Every 5 minutes |
+
+A few schedules you will write again and again:
+
+| Expression | When it runs |
+| --- | --- |
+| `*/15 * * * *` | Every 15 minutes |
+| `0 * * * *` | Every hour, on the hour |
+| `0 0 * * *` | Every day at midnight |
+| `30 2 * * 0` | Every Sunday at 2:30 AM |
+| `0 0 1 * *` | At midnight on the first day of every month |
+
+## Step 1: A script to schedule
+
+To see cron at work we need a script that leaves a trace each time it runs. This one adds a line with the current date and time to a log file. Create it in the home directory:
+
+```bash
+cd ~
+vi cron-demo.sh
+```
+
+```bash title="cron-demo.sh"
+#!/bin/bash
+
+echo "Cron job executed at $(date)" >> /home/ubuntu/cron.log
+echo "Log entry added at $(date)"
+```
+
+The first line uses `>>`, which appends to the file. A single `>` would overwrite the file on every run and you would only ever see the last entry. The second line prints a message on the screen.
+
+There is no loop in this script. It runs once and stops. If it runs again and again, something outside the script is starting it.
+
+Test it by hand first:
+
+```bash
+chmod u+x cron-demo.sh
+./cron-demo.sh
+```
+
+```text
+Log entry added at Tue May 12 06:49:11 UTC 2026
+```
+
+```bash
+cat cron.log
+```
+
+```text
+Cron job executed at Tue May 12 06:49:11 UTC 2026
+```
+
+One run, one line.
+
+<Callout type="info" title="Always test by hand first">
+If a script does not work when you run it yourself, it will not work under cron either. And under cron you will not see the error. Make it work manually, then schedule it.
+</Callout>
+
+## Step 2: Schedule it with crontab -e
+
+Open your cron table for editing:
+
+```bash
+crontab -e
+```
+
+The first time, Ubuntu may ask which editor to use. Choose `nano`, the simplest one. The file opens with some comment lines that explain the format. The last comment line is a small reminder of the field order:
+
+```text
+# m h  dom mon dow   command
+```
+
+Go to the end of the file and add your job on a new line:
+
+```text
+* * * * * /home/ubuntu/cron-demo.sh
+```
+
+Five stars, so every minute, and then the script with its **full path**.
+
+Save and close. In nano that is `Ctrl + O`, then `Enter` to confirm the file name, then `Ctrl + X` to exit. Back in the terminal you see:
+
+```text
+no crontab for ubuntu - using an empty one
+crontab: installing new crontab
+```
+
+The second line is the confirmation. The job is now scheduled. You do not restart anything, cron notices the change by itself.
+
+## Step 3: Watch it run
+
+Wait a couple of minutes without touching anything, then look at the log:
+
+```bash
+cat cron.log
+```
+
+```text
+Cron job executed at Tue May 12 06:49:11 UTC 2026
+Cron job executed at Tue May 12 06:52:01 UTC 2026
+Cron job executed at Tue May 12 06:53:01 UTC 2026
+```
+
+The first line is from the manual run. The next two were added by cron, exactly one minute apart, each at second `01`. Nobody ran the script. Wait one more minute and there is one more line.
+
+To watch new lines arrive as they are written, use `tail -f cron.log` and stop it with `Ctrl + C`.
+
+## Step 4: List and remove jobs
+
+To see what is scheduled for your user:
+
+```bash
+crontab -l
+```
+
+```text
+# m h  dom mon dow   command
+* * * * * /home/ubuntu/cron-demo.sh
+```
+
+To remove the schedule:
+
+```bash
+crontab -r
+```
+
+```bash
+crontab -l
+```
+
+```text
+no crontab for ubuntu
+```
+
+<Callout type="warn" title="crontab -r removes everything">
+`crontab -r` does not remove one job. It deletes your whole cron table at once and does not ask for confirmation. On a server with twenty scheduled jobs, that is twenty jobs gone. To remove a single job, use `crontab -e` and delete only that line. The keys `e` and `r` sit next to each other on the keyboard, so type this command slowly. Keeping a copy with `crontab -l > crontab-backup.txt` before you make changes is a good habit.
+</Callout>
+
+| Command | What it does |
+| --- | --- |
+| `crontab -e` | Edit your cron table |
+| `crontab -l` | List your cron jobs |
+| `crontab -r` | Remove your whole cron table |
+| `sudo crontab -e` | Edit the cron table of root, for jobs that need root permission |
+| `sudo crontab -u raj -l` | List the jobs of another user |
+
+Each user has a separate cron table, and a job runs with the permissions of the user who owns it.
+
+## Why a job works by hand but not in cron
+
+This is the most common cron problem, and the cause is nearly always one of these.
+
+**Relative paths.** Cron does not start in your `scripts` folder. It starts in your home directory. A script that writes to `backups/` or reads `project/` will look in the wrong place. Use full paths in the crontab line, as the lecture does, and inside the script too. Or move to the right folder first:
+
+```text
+0 22 * * * cd /home/ubuntu/scripts && ./backup.sh
+```
+
+**A very small environment.** Cron does not read your `.bashrc`. The variables you exported there do not exist in a cron job, and `PATH` is much shorter than in your terminal. A command that works when you type it may be "not found" under cron. Use the full path of the command, which `which <command>` shows you.
+
+**The output is invisible.** There is no screen for a cron job to print on. The second `echo` in `cron-demo.sh` goes nowhere. To keep the output and the errors of a job, redirect both into a file:
+
+```text
+0 22 * * * /home/ubuntu/scripts/backup.sh >> /home/ubuntu/backup.log 2>&1
+```
+
+`>>` appends the normal output to the file, and `2>&1` sends the errors to the same place. When a job misbehaves, this file is the first thing to read.
+
+**No execute permission.** Cron runs the file directly, so it needs `chmod +x`, the same as when you run it with `./`.
+
+**The clock.** Cron uses the time of the server. Cloud servers normally run on UTC, as you can see in the log above. A job set for `0 22` runs at 10 PM UTC, which is 3:30 AM in India. Check with the `date` command before you choose the hour.
+
+To confirm that cron really started your job, look at the system log:
+
+```bash
+grep CRON /var/log/syslog | tail
+```
+
+<Callout type="info" title="Check your expression before you save it">
+A cron expression is easy to get wrong and nothing tells you until the job runs at the wrong time, or not at all. The site [crontab.guru](https://crontab.guru/) translates an expression into a plain sentence. Paste yours there first.
+</Callout>
+
+## Try It Yourself
+
+1. Write down the cron expression for each of these, then check them on crontab.guru: every day at 7:30 AM, every 10 minutes, every Saturday at 11 PM, and at 9 AM on the first day of every month.
+2. Create `cron-demo.sh`, run it by hand and check `cron.log`.
+3. Schedule it for every minute with `crontab -e`, wait three minutes and count the lines in `cron.log`.
+4. Change the schedule to every 2 minutes with `*/2` and confirm it with the timestamps in the log.
+5. Add `>> /home/ubuntu/cron-output.log 2>&1` to the crontab line. After the next run, check that the "Log entry added" message is now in that file.
+6. Save your jobs with `crontab -l > crontab-backup.txt`, remove them with `crontab -r`, and confirm with `crontab -l`. A minute-by-minute job should not be left running on a practice machine.
+
+## Official references
+
+- [crontab file format: man 5 crontab](https://manpages.ubuntu.com/manpages/noble/en/man5/crontab.5.html)
+- [crontab command: man 1 crontab](https://manpages.ubuntu.com/manpages/noble/en/man1/crontab.1.html)
+- [Ubuntu: cron how-to](https://help.ubuntu.com/community/CronHowto)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

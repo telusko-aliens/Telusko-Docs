@@ -1,0 +1,223 @@
+---
+title: Command Line Arguments in Shell Scripting
+description: Pass values to a Bash script at the time of running it, and read them inside the script with $0, $1, $2, $# and $*.
+---
+
+So far, every value our scripts used was either written inside the script or typed in by the user through `read`. Both have a limit. A hardcoded value means editing the script every time. A `read` prompt means somebody has to sit in front of the terminal and answer it, which does not work when the script runs from another script, a cron job or a CI pipeline.
+
+**Command line arguments** solve this. You write the values right after the script name when you run it, and the script picks them up on its own:
+
+```bash
+./telusko.sh linux devops scripting aws
+```
+
+Here `linux`, `devops`, `scripting` and `aws` are four arguments. "Argument" is only another word for the data you pass. They are called command line arguments because they come from the command line, the place where you execute the script.
+
+## How the script reads them
+
+Inside the script, Bash gives you a set of ready-made variables. You do not declare them. They are filled in automatically every time the script starts.
+
+| Symbol | Meaning |
+| --- | --- |
+| `$0` | The script name, exactly as it was typed |
+| `$1` | The first argument |
+| `$2` | The second argument |
+| `$3`, `$4` ... | The third, fourth argument and so on |
+| `$#` | The total number of arguments |
+| `$*` | All the arguments together |
+
+`$1`, `$2` and the rest are called **positional parameters**, because the value you get depends only on the position of the argument on the command line.
+
+![Shell_Command_Line_Arguments](https://dyz1pdcuffwr5.cloudfront.net/Linux/sh-command-line-arguments.svg)
+
+## Step 1: Print the arguments
+
+Create a script inside your `scripts` folder:
+
+```bash
+vi telusko.sh
+```
+
+```bash title="telusko.sh"
+#!/bin/bash
+
+echo "The Script file name : $0 "
+echo "The first arg : $1"
+echo "The second arg : $2"
+echo "All Command line args : $*"
+echo "Total number of args: $#"
+```
+
+Give it the execute permission and run it with four arguments:
+
+```bash
+chmod u+x telusko.sh
+./telusko.sh linux devops scripting aws
+```
+
+```text
+The Script file name : ./telusko.sh
+The first arg : linux
+The second arg : devops
+All Command line args : linux devops scripting aws
+Total number of args: 4
+```
+
+Read the output against the command you typed:
+
+- `$0` is `./telusko.sh`, the script itself. It includes the `./` because that is how the script was called.
+- `$1` and `$2` are `linux` and `devops`. The script never printed `$3` and `$4`, but they are still there, holding `scripting` and `aws`.
+- `$*` shows all four arguments in one line.
+- `$#` is `4`. The script name is **not** counted.
+
+Run the same script again with different words and the output changes. The script file stayed the same. That is what "dynamic" means here.
+
+## Step 2: A more realistic script
+
+Printing arguments is a demo. Let's use them for real work: a script that adds two numbers given on the command line.
+
+```bash
+vi add.sh
+```
+
+```bash title="add.sh"
+#!/bin/bash
+
+RESULT=$(($1+$2))
+
+echo "SUM of 2 numbers is : $RESULT"
+```
+
+`$(( ... ))` is arithmetic expansion, which you saw in [Operators in Shell Scripting](/docs/linux/bash-shell-scripting/operators). Bash calculates what is inside and the answer is stored in `RESULT`.
+
+```bash
+chmod u+x add.sh
+./add.sh 44 54
+```
+
+```text
+SUM of 2 numbers is : 98
+```
+
+Try `./add.sh 10 20` and you get `30`, without opening the file.
+
+## What happens when an argument is missing
+
+The lecture always passes the right number of arguments. In real use, somebody will forget one. Run `add.sh` with a single number:
+
+```bash
+./add.sh 44
+```
+
+```text
+./add.sh: line 3: 44+: syntax error: operand expected (error token is "+")
+SUM of 2 numbers is :
+```
+
+`$2` is empty, so Bash tried to calculate `44+` and failed. Two things are worth noticing. A missing argument is not an error by itself, it quietly becomes an empty string. And even after the failed calculation the script did not stop. It went on to the next line and printed a sum with nothing in it.
+
+The fix is to check `$#` at the top and stop with a clear message:
+
+```bash title="add.sh"
+#!/bin/bash
+
+if [ "$#" -ne 2 ]; then
+    echo "Usage: $0 <number1> <number2>"
+    exit 1
+fi
+
+RESULT=$(($1+$2))
+
+echo "SUM of 2 numbers is : $RESULT"
+```
+
+```bash
+./add.sh 44
+```
+
+```text
+Usage: ./add.sh <number1> <number2>
+```
+
+Notice the use of `$0` in the message. If someone renames the script, the usage line still shows the correct name. `exit 1` ends the script with a non-zero status, which tells whoever called it that something went wrong.
+
+## Arguments with spaces
+
+The shell splits the command line on spaces. If one argument contains a space, wrap it in quotes:
+
+```bash
+./telusko.sh "shell scripting" aws
+```
+
+```text
+The first arg : shell scripting
+The second arg : aws
+Total number of args: 2
+```
+
+Without the quotes, `shell` and `scripting` would be two separate arguments and the count would be `3`.
+
+## $* and $@
+
+The lecture uses `$*` for all arguments. There is a second symbol, `$@`, that you will see even more often. Without quotes, both behave the same. Inside double quotes they are different:
+
+| Form | Result for `./script.sh "shell scripting" aws` |
+| --- | --- |
+| `"$*"` | One single string: `shell scripting aws` |
+| `"$@"` | Each argument kept separate: `shell scripting` and `aws` |
+
+This matters the moment you loop over the arguments:
+
+```bash title="args-loop.sh"
+#!/bin/bash
+
+for arg in "$@"
+do
+    echo "Argument: $arg"
+done
+```
+
+```bash
+./args-loop.sh "shell scripting" aws
+```
+
+```text
+Argument: shell scripting
+Argument: aws
+```
+
+With `"$*"` the loop would run only once, with everything joined together. For printing a message, `$*` is fine. For looping or passing the arguments on to another command, use `"$@"`.
+
+<Callout type="warn" title="Beyond the ninth argument">
+`$10` does not mean the tenth argument. Bash reads it as `$1` followed by the character `0`. From the tenth argument onwards, use braces: `${10}`, `${11}` and so on.
+</Callout>
+
+## Quick reference
+
+| Symbol | Meaning | Value for `./telusko.sh linux devops scripting aws` |
+| --- | --- | --- |
+| `$0` | Script name | `./telusko.sh` |
+| `$1` | First argument | `linux` |
+| `$2` | Second argument | `devops` |
+| `$#` | Number of arguments | `4` |
+| `$*` | All arguments | `linux devops scripting aws` |
+| `"$@"` | All arguments, each one kept separate | `linux` `devops` `scripting` `aws` |
+| `${10}` | Tenth argument | empty, only four were passed |
+
+## Try It Yourself
+
+1. Create `telusko.sh` as above and run it with four arguments. Then run it with no arguments at all and see what `$1` and `$#` print.
+2. Add `$3` and `$4` to the script and confirm they print `scripting` and `aws`.
+3. Create `add.sh`, run `./add.sh 44 54`, then run it with only one number and read the error.
+4. Add the `$#` check to `add.sh` and run it again with one number. Check the exit status right after with `echo $?`.
+5. Write `greet.sh` that takes a name and a course, and prints `Welcome <name> to the <course> course`. Call it with a course name that has a space in it.
+
+## Official references
+
+- [Positional parameters](https://www.gnu.org/software/bash/manual/html_node/Positional-Parameters.html)
+- [Special parameters](https://www.gnu.org/software/bash/manual/html_node/Special-Parameters.html)
+- [Arithmetic expansion](https://www.gnu.org/software/bash/manual/html_node/Arithmetic-Expansion.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

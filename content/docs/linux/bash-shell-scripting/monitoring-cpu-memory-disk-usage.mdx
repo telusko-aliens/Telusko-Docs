@@ -1,0 +1,384 @@
+---
+title: Monitoring CPU, Memory and Disk Usage
+description: Build a Bash monitoring script that extracts CPU, memory and disk usage as single numbers with vmstat, free, df and awk, and writes a timestamped report to a log file with tee.
+---
+
+The `health.sh` script from [Auto Backup, System Health Check and Service Monitor](/docs/linux/bash-shell-scripting/backup-health-check-and-service-monitor) ran `uptime`, `free -h` and `df -h` and showed their full output. That is fine when a person reads it. It is not what you want in a log file that grows every five minutes, and a script cannot make a decision based on a table.
+
+For monitoring you want one number per question:
+
+```text
+CPU Usage : 0%
+Memory Usage : 41%
+Disk Usage : 43%
+```
+
+and you want it stored with the date and time, so that tomorrow you can see how the server was doing last night.
+
+This lesson builds that script. It is the longest one in this section, and it uses nearly everything from the Linux part: [pipes](/docs/linux/linux-search-text-processing/linux-pipes), [awk](/docs/linux/linux-packages-networking-system-admin/awk-commands), [sed](/docs/linux/linux-search-text-processing/sed-command) and the resource commands from [System Resource Monitoring in Linux](/docs/linux/linux-packages-networking-system-admin/system-resources). If any of these feels unfamiliar, read that lesson again first.
+
+<Callout type="info" title="Run the commands by hand first">
+Before you write the script, run `vmstat 1 2`, `free` and `df -h /` in the terminal and look at their output. Each line of the script picks one value out of one of these tables. If you have seen the table, the line is easy to follow.
+</Callout>
+
+## The plan
+
+The script does three things for each of CPU, memory and disk:
+
+1. Run a command that prints a table.
+2. Cut the table down to one number with a pipeline.
+3. Print the number on the screen and add it to a log file.
+
+![Monitoring_Script_Pipeline](https://dyz1pdcuffwr5.cloudfront.net/Linux/sh-monitoring-pipeline.svg)
+
+## Step 1: The log file and the header
+
+```bash
+vi health-log.sh
+```
+
+```bash title="health-log.sh"
+#!/bin/bash
+
+LOG_FILE="monitoring.log"
+
+echo "======================================"
+echo "SIMPLE MONITORING SCRIPT STARTED"
+echo "Time: $(date)"
+echo "======================================"
+
+echo "Monitoring Started - $(date)" > "$LOG_FILE"
+```
+
+The name of the log file is stored in a variable, because the script uses it on almost every line. To move the log somewhere else later, for example to `/var/log/monitoring.log`, you change one line.
+
+The four `echo` lines are a header for the screen. `$(date)` puts the current date and time into the text. In any kind of logging the time is the most important piece of information: a CPU value means nothing if you do not know when it was measured.
+
+The last line writes the first entry into the log file. Look at the `>`:
+
+| Symbol | What it does |
+| --- | --- |
+| `>` | Creates the file if it is missing. If it exists, its old content is **replaced** |
+| `>>` | Creates the file if it is missing. If it exists, the new text is **added at the end** |
+
+So every run of this script starts with an empty log and the file always holds only the latest report. Whether that is what you want is discussed further down.
+
+## Step 2: Screen and file together with tee
+
+For the rest of the script, every line should appear on the screen **and** go into the log file. Writing each `echo` twice would work, but there is a command for exactly this: `tee`. It takes what comes in through a pipe, prints it on the screen and writes it to a file as well.
+
+```bash
+echo "" | tee -a "$LOG_FILE"
+echo "SYSTEM HEALTH CHECK" | tee -a "$LOG_FILE"
+
+echo "--------------------------------------" | tee -a "$LOG_FILE"
+```
+
+The `-a` means append. It is essential here:
+
+| Command | Effect on the log file |
+| --- | --- |
+| `tee "$LOG_FILE"` | Overwrites the file every time. Only the last line would survive |
+| `tee -a "$LOG_FILE"` | Adds the line at the end |
+
+The `echo ""` prints an empty line. It is only there to make the report easier to read, both on screen and in the file.
+
+## Step 3: CPU usage
+
+```bash
+#CPU USAGE REPORT
+
+CPU=$(vmstat 1 2 | tail -1 | awk '{print 100 - $15}')
+echo "CPU Usage : $CPU%" | tee -a "$LOG_FILE"
+```
+
+A line starting with `#` is a comment. Bash ignores it. It is a note for whoever reads the script.
+
+The second line is a pipeline of three commands inside `$( )`, so its final output lands in the variable `CPU`. Take the commands one at a time.
+
+**`vmstat 1 2`** reports system activity. The two numbers mean: wait 1 second between reports, and print 2 reports.
+
+```text
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 0  0      0 189440  30128 500448    0    0    12     9   42   61  1  0 99  0  0  0
+ 0  0      0 189440  30128 500448    0    0     0     0   35   50  0  0 100  0  0  0
+```
+
+Why two reports? The first line of numbers is an average since the machine was started. Only the second one shows what is happening right now, measured over the last second.
+
+**`tail -1`** keeps only the last line, which is that second, current report.
+
+**`awk '{print 100 - $15}'`** takes the 15th column of that line and subtracts it from 100. Count the columns in the header: the 15th is `id`, the **idle** percentage, the share of time the CPU had nothing to do.
+
+There is no column that directly says "CPU used". But used and idle together make 100, so:
+
+```text
+CPU used = 100 - idle
+```
+
+An idle value of 100 gives a usage of 0%. An idle value of 35 gives 65%.
+
+## Step 4: Memory usage
+
+```bash
+#MEMORY USAGE
+
+MEM=$(free | grep Mem | awk '{printf "%.0f", $3/$2 * 100}')
+echo "Memory Usage : $MEM%" | tee -a "$LOG_FILE"
+```
+
+**`free`** without `-h` prints plain numbers in kibibytes, which is what a calculation needs:
+
+```text
+               total        used        free      shared  buff/cache   available
+Mem:          933612      385048      189440        3092      530576      548564
+Swap:              0           0           0
+```
+
+**`grep Mem`** keeps the `Mem:` line and drops the header and the swap line.
+
+**`awk`** then calculates on that line. Column 1 is the label `Mem:`, column 2 is the total and column 3 is the used memory:
+
+```text
+used / total * 100  =  385048 / 933612 * 100  =  41.24...
+```
+
+`printf "%.0f"` prints the result with no digits after the decimal point, so `41.24` becomes `41`.
+
+### The 0% from the lecture
+
+The script on screen in the lecture has the formula inside double quotes:
+
+```bash
+MEM=$(free | grep Mem | awk '{printf "%.0f", "$3/$2 * 100"}')
+```
+
+and the result on that run was:
+
+```text
+Mememory Usage : 0%
+```
+
+A server with a logged-in user and a running web server is never at 0% memory. The quotes are the reason. Inside `awk`, anything in double quotes is a piece of text. So `awk` did not calculate anything. It was handed the text `$3/$2 * 100`, was asked to print it as a number, and text that does not start with a digit counts as `0`.
+
+Remove the quotes around the formula, as in the version above, and `awk` treats `$3` and `$2` as columns again. The same machine then reports about 41%.
+
+This is a good example of why a monitoring script must be checked against a number you can verify by hand. The script ran without an error message, and the output looked tidy. It was only wrong. The word "Mememory" in the label was a typing slip in the same line.
+
+## Step 5: Disk usage
+
+```bash
+#DISK USAGE
+
+DISK=$(df -h / | awk 'NR==2 {print $5}' | sed 's/%//')
+echo "Disk Usage : $DISK%" | tee -a "$LOG_FILE"
+```
+
+**`df -h /`** shows the disk that holds the root directory `/`. Giving the path limits the output to that one file system:
+
+```text
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/root       6.8G  2.9G  3.9G  43% /
+```
+
+**`awk 'NR==2 {print $5}'`**: `NR` is the number of the line that `awk` is working on. `NR==2` means "only on line 2", which skips the header. From that line it prints column 5, the `Use%` value: `43%`.
+
+**`sed 's/%//'`** substitutes the `%` sign with nothing, which leaves `43`.
+
+Why remove the sign when the `echo` in the next line adds it back? As the lecture says, the output looks the same either way. The point is what is stored in the variable. `43` is a number that a script can compare. `43%` is a piece of text. The next section depends on this.
+
+## Step 6: The footer
+
+```bash
+echo "" | tee -a "$LOG_FILE"
+
+echo "Monitoring Completed at $(date)" | tee -a "$LOG_FILE"
+
+echo "======================================" | tee -a "$LOG_FILE"
+
+echo "Script finished successfully!"
+
+echo "Report saved in: $LOG_FILE"
+```
+
+The last two lines have no `tee`. They are a message for the person at the terminal and do not need to be in the log.
+
+## The complete script
+
+```bash title="health-log.sh"
+#!/bin/bash
+
+LOG_FILE="monitoring.log"
+
+echo "======================================"
+echo "SIMPLE MONITORING SCRIPT STARTED"
+echo "Time: $(date)"
+echo "======================================"
+
+echo "Monitoring Started - $(date)" > "$LOG_FILE"
+
+echo "" | tee -a "$LOG_FILE"
+echo "SYSTEM HEALTH CHECK" | tee -a "$LOG_FILE"
+
+echo "--------------------------------------" | tee -a "$LOG_FILE"
+
+#CPU USAGE REPORT
+
+CPU=$(vmstat 1 2 | tail -1 | awk '{print 100 - $15}')
+echo "CPU Usage : $CPU%" | tee -a "$LOG_FILE"
+
+#MEMORY USAGE
+
+MEM=$(free | grep Mem | awk '{printf "%.0f", $3/$2 * 100}')
+echo "Memory Usage : $MEM%" | tee -a "$LOG_FILE"
+
+#DISK USAGE
+
+DISK=$(df -h / | awk 'NR==2 {print $5}' | sed 's/%//')
+echo "Disk Usage : $DISK%" | tee -a "$LOG_FILE"
+
+echo "" | tee -a "$LOG_FILE"
+
+echo "Monitoring Completed at $(date)" | tee -a "$LOG_FILE"
+
+echo "======================================" | tee -a "$LOG_FILE"
+
+echo "Script finished successfully!"
+
+echo "Report saved in: $LOG_FILE"
+```
+
+## Run it
+
+```bash
+chmod 755 health-log.sh
+./health-log.sh
+```
+
+```text
+======================================
+SIMPLE MONITORING SCRIPT STARTED
+Time: Wed May 13 09:55:24 UTC 2026
+======================================
+
+SYSTEM HEALTH CHECK
+--------------------------------------
+CPU Usage : 0%
+Memory Usage : 41%
+Disk Usage : 43%
+
+Monitoring Completed at Wed May 13 09:55:25 UTC 2026
+======================================
+Script finished successfully!
+Report saved in: monitoring.log
+```
+
+The lecture runs `chmod 777` here. `755` is enough for everybody to run the script and does not let other users change it. The reason is explained in [Service Restart and Cleanup Scripts](/docs/linux/bash-shell-scripting/service-restart-and-cleanup-scripts).
+
+The CPU is at 0% because the machine is doing nothing. The script needs about one second, and you can see it in the two timestamps: that is the one second pause of `vmstat 1 2`.
+
+A new file has appeared in the folder:
+
+```bash
+cat monitoring.log
+```
+
+```text
+Monitoring Started - Wed May 13 09:55:24 UTC 2026
+
+SYSTEM HEALTH CHECK
+--------------------------------------
+CPU Usage : 0%
+Memory Usage : 41%
+Disk Usage : 43%
+
+Monitoring Completed at Wed May 13 09:55:25 UTC 2026
+======================================
+```
+
+Everything that went through `tee -a` is in the file. The header and the last two messages, which used a plain `echo`, are not.
+
+## From a report to an alert
+
+The lecture stops at the report. With the three values available as plain numbers, the script can go one step further and decide by itself whether something is wrong. This is why the `%` was removed from the disk value.
+
+Add this before the footer:
+
+```bash
+THRESHOLD=80
+
+if [ "$DISK" -gt "$THRESHOLD" ]
+then
+        echo "WARNING: Disk usage is above $THRESHOLD%" | tee -a "$LOG_FILE"
+fi
+
+if [ "$MEM" -gt "$THRESHOLD" ]
+then
+        echo "WARNING: Memory usage is above $THRESHOLD%" | tee -a "$LOG_FILE"
+fi
+```
+
+`-gt` is the "greater than" operator from [Operators in Shell Scripting](/docs/linux/bash-shell-scripting/operators). It compares whole numbers only. With the `%` still attached, the comparison would fail with `integer expression expected`.
+
+## Keeping a history
+
+Because of the `>` in the first log line, each run wipes the previous report. For a script that you run by hand now and then, that is fine. For monitoring it defeats the purpose, since the interesting question is usually "what did it look like an hour ago".
+
+Change that one symbol to `>>`:
+
+```bash
+echo "Monitoring Started - $(date)" >> "$LOG_FILE"
+```
+
+Every run now adds a new block under the old ones. Then let [cron](/docs/linux/bash-shell-scripting/cron-jobs) run the script, for example every five minutes:
+
+```text
+*/5 * * * * /home/ubuntu/scripts/health-log.sh > /dev/null 2>&1
+```
+
+For cron, set the log file to a full path inside the script, such as `LOG_FILE="/home/ubuntu/monitoring.log"`. Otherwise the file is created wherever cron happens to start. The `> /dev/null 2>&1` throws away the screen output, which nobody would see anyway. The log file is still written by `tee`.
+
+<Callout type="warn" title="A log that only grows">
+A log that is appended to every five minutes never stops growing. Left alone, the monitoring script itself fills the disk it is watching. Clean it up from time to time, with a script like the one in [Service Restart and Cleanup Scripts](/docs/linux/bash-shell-scripting/service-restart-and-cleanup-scripts) or with the `logrotate` tool that comes with Ubuntu.
+</Callout>
+
+## Two details worth knowing
+
+**Used memory and available memory.** The script calculates `used / total`. Linux also uses spare memory as a cache for files, and it gives that memory back the moment a program needs it. So a low "free" value is not a problem by itself. What tells you whether the machine is short of memory is the `available` column, the 7th one. To report the share of memory that is really taken:
+
+```bash
+MEM=$(free | awk '/^Mem:/ {printf "%.0f", ($2-$7)/$2 * 100}')
+```
+
+This version also shows that `awk` can pick the line by itself with `/^Mem:/`, which makes the separate `grep` unnecessary.
+
+**Column 15 of vmstat.** `$15` is the idle column in the standard layout of `vmstat` on Ubuntu. Run `vmstat 1 2` on your machine and count the columns once, to confirm that the 15th is the one under `id`. If a different version of the tool arranges the columns differently, the script would silently read the wrong value.
+
+## What you have built
+
+This script is a small version of what monitoring tools such as Prometheus, Grafana and CloudWatch do on a larger scale: collect a few numbers at regular intervals, store them with a timestamp, and raise an alert when a limit is crossed. You will work with those tools later. When you do, you will already know what they are doing underneath, because you have written it yourself in forty lines of Bash.
+
+Linux commands and shell scripting belong together. The commands do the work and the script decides when, in which order and what to do with the result. The way to get good at both is the same: type the commands, break the scripts, read the errors and fix them.
+
+## Try It Yourself
+
+1. Run `vmstat 1 2`, `free` and `df -h /` by hand. In each output, find the value that the script extracts.
+2. Run each pipeline alone in the terminal, for example `vmstat 1 2 | tail -1 | awk '{print 100 - $15}'`, and compare the result with the table you just looked at.
+3. Create `health-log.sh`, run it and compare the screen output with `cat monitoring.log`. Which lines are missing in the file, and why?
+4. Put the double quotes back around the memory formula and run the script. Confirm that it reports 0%, then remove them again.
+5. Change `>` to `>>`, run the script three times and check that the log now holds three reports.
+6. Add the threshold check. Set `THRESHOLD=10` to force a warning and see it appear on screen and in the log.
+7. Schedule the script with cron for every 2 minutes with a full path for the log file. After ten minutes, count the reports with `grep -c "Monitoring Started" /home/ubuntu/monitoring.log`. Remove the cron job when you are done.
+
+## Official references
+
+- [vmstat manual](https://manpages.ubuntu.com/manpages/noble/en/man8/vmstat.8.html)
+- [free manual](https://manpages.ubuntu.com/manpages/noble/en/man1/free.1.html)
+- [GNU coreutils: df](https://www.gnu.org/software/coreutils/manual/html_node/df-invocation.html)
+- [GNU coreutils: tee](https://www.gnu.org/software/coreutils/manual/html_node/tee-invocation.html)
+- [GNU awk user's guide](https://www.gnu.org/software/gawk/manual/gawk.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,253 @@
+---
+title: Arrays in Shell Scripting
+description: Store many values in a single Bash variable, read them by index, count them, and loop over all of them with a for loop.
+---
+
+A normal variable holds one value. That is fine for one name or one number. But automation scripts usually deal with a group of things: a list of servers to deploy to, a list of services to check, a list of files to back up. Creating `server1`, `server2`, `server3` as three separate variables works for three servers and becomes unmanageable at thirty.
+
+An **array** is one variable that holds many values. Every programming language has the concept, and Bash has it too.
+
+## Creating an array
+
+Write the values inside parentheses, separated by spaces:
+
+```bash
+car=("BMW" "Audi" "Tesla")
+```
+
+Three rules to remember:
+
+- No space around `=`, the same as for any variable.
+- The values are separated by **spaces**, not commas. `("BMW", "Audi")` would store `BMW,` with the comma as part of the value.
+- Put each value in quotes. It is required as soon as a value contains a space, and it is a good habit in every other case.
+
+You can try all the commands of this section directly in the terminal. No script is needed yet.
+
+## Reading from an array
+
+Each value in an array has a position number, called its **index**. The index starts at **0**, not at 1.
+
+![Bash_Array_Index](https://dyz1pdcuffwr5.cloudfront.net/Linux/sh-array-index.svg)
+
+To read a value, use `${name[index]}`:
+
+```bash
+echo ${car[0]}
+echo ${car[1]}
+echo ${car[2]}
+```
+
+```text
+BMW
+Audi
+Tesla
+```
+
+In the lecture, `${car[1]}` is typed while talking about the "first" element, and the output is `Audi`. That is the index rule in action: index `1` is the **second** value. The first value is always at index `0`.
+
+### All the values
+
+Use `@` in place of the index:
+
+```bash
+echo ${car[@]}
+```
+
+```text
+BMW Audi Tesla
+```
+
+### How many values
+
+Add a `#` before the name:
+
+```bash
+echo ${#car[@]}
+```
+
+```text
+3
+```
+
+### Why the curly braces matter
+
+With arrays the braces are not optional. See what happens without them:
+
+```bash
+echo $car[1]
+```
+
+```text
+BMW[1]
+```
+
+Bash read `$car` alone, which gives the first value, and then printed `[1]` as plain text. Always write `${car[1]}`.
+
+Asking for an index that does not exist is not an error. It gives an empty value:
+
+```bash
+echo ${car[5]}
+```
+
+```text
+
+```
+
+## Looping over an array
+
+Reading values one by one with their index is fine for three values. The real strength of an array is that a loop can walk through all of it, however long it is. You have already seen the `for` loop in [Loops in Shell Scripting](/docs/linux/bash-shell-scripting/loops). Here it gets a list to work on.
+
+```bash
+vi arrays.sh
+```
+
+```bash title="arrays.sh"
+#!/bin/bash
+
+cars=("BMW" "Audi" "Tesla")
+
+for car in ${cars[@]}
+
+do
+        echo $car
+done
+```
+
+```bash
+chmod u+x arrays.sh
+./arrays.sh
+```
+
+```text
+BMW
+Audi
+Tesla
+```
+
+What happens step by step:
+
+1. `${cars[@]}` expands to all the values: `BMW Audi Tesla`.
+2. The loop takes the first value, `BMW`, and stores it in the variable `car`.
+3. The commands between `do` and `done` run. Here it is only an `echo`, but it can be any work you want to do with that value.
+4. The loop goes back, takes the next value, `Audi`, puts it in `car` and runs the body again.
+5. The same for `Tesla`. When no values are left, the loop ends.
+
+Note the two names: `cars` is the array, `car` is the single value of the current round. Any names work, but plural for the array and singular for the loop variable makes a script easy to read.
+
+## A DevOps example
+
+Replace the cars with something you would really loop over, a list of servers:
+
+```bash title="arrays.sh"
+#!/bin/bash
+
+servers=("server1" "server2" "server3")
+
+for server in ${servers[@]}
+
+do
+        echo "App Deployed on $server"
+done
+```
+
+```bash
+./arrays.sh
+```
+
+```text
+App Deployed on server1
+App Deployed on server2
+App Deployed on server3
+```
+
+The script only prints a message, but the shape is the same as a real deployment script. Replace the `echo` with an `ssh` or `scp` command and the same loop does the job on every server. To add a fourth server, you add one word to the array. Nothing else in the script changes.
+
+## Quote the array in a loop
+
+The lecture writes `${cars[@]}` without quotes. It works there because none of the values contains a space. Try a value that does:
+
+```bash title="quotes.sh"
+#!/bin/bash
+
+servers=("web server" "db server")
+
+for server in ${servers[@]}
+do
+        echo "Checking $server"
+done
+```
+
+```text
+Checking web
+Checking server
+Checking db
+Checking server
+```
+
+Four rounds for two values. Without quotes, Bash splits every value again at the spaces. Put the whole expansion in double quotes and each value stays in one piece:
+
+```bash
+for server in "${servers[@]}"
+```
+
+```text
+Checking web server
+Checking db server
+```
+
+Make `"${array[@]}"` with the quotes your default. It is always correct, with or without spaces in the values.
+
+## Changing an array
+
+The lecture creates arrays and reads them. In real scripts you will also need to change them:
+
+```bash
+car=("BMW" "Audi" "Tesla")
+
+car+=("Kia")          # add a value at the end
+car[1]="Volvo"        # replace the value at index 1
+
+echo ${car[@]}
+echo ${#car[@]}
+```
+
+```text
+BMW Volvo Tesla Kia
+4
+```
+
+## Quick reference
+
+| Syntax | Meaning | Result for `car=("BMW" "Audi" "Tesla")` |
+| --- | --- | --- |
+| `${car[0]}` | First value | `BMW` |
+| `${car[1]}` | Second value | `Audi` |
+| `${car[-1]}` | Last value | `Tesla` |
+| `${car[@]}` | All values | `BMW Audi Tesla` |
+| `${#car[@]}` | Number of values | `3` |
+| `${!car[@]}` | All the indexes | `0 1 2` |
+| `car+=("Kia")` | Add a value at the end | |
+| `car[1]="Volvo"` | Replace one value | |
+| `unset car[1]` | Remove one value | |
+
+<Callout type="info" title="Arrays need Bash">
+Arrays are a Bash feature. The plain `sh` shell does not have them. If you run the script as `sh arrays.sh`, you get `Syntax error: "(" unexpected` on Ubuntu, even though the first line says `#!/bin/bash`. Run it as `./arrays.sh` or `bash arrays.sh`.
+</Callout>
+
+## Try It Yourself
+
+1. In the terminal, create `car=("BMW" "Audi" "Tesla")` and print the first value, the last value, all values and the count.
+2. Run `echo $car[1]` and `echo ${car[1]}` and explain the difference in the output.
+3. Create `arrays.sh` with the `servers` array and the loop. Add a fourth server and run it again.
+4. Change one server name to `"web server"` and run the loop with and without quotes around `${servers[@]}`.
+5. Write `services.sh` with an array `("nginx" "ssh" "cron")` that prints `Checking <service>` for each one. You will turn this into a real status check in the automation lessons.
+
+## Official references
+
+- [Bash manual: arrays](https://www.gnu.org/software/bash/manual/html_node/Arrays.html)
+- [Bash manual: looping constructs](https://www.gnu.org/software/bash/manual/html_node/Looping-Constructs.html)
+- [Bash manual: shell parameter expansion](https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

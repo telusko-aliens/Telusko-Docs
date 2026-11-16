@@ -1,0 +1,355 @@
+---
+title: Service Restart and Cleanup Scripts
+description: Write a Bash script that restarts a service when it is down, and a cleanup script that deletes backup files older than seven days with find.
+---
+
+The scripts in [Auto Backup, System Health Check and Service Monitor](/docs/linux/bash-shell-scripting/backup-health-check-and-service-monitor) could look at a system and report. `servicestatus.sh` told us that a service was down, and then left the repair to us.
+
+In this lesson the scripts start to **act** on what they find:
+
+| Script | The job |
+| --- | --- |
+| `service-restart.sh` | Check a service, and restart it if it is not running |
+| `auto-clean.sh` | Delete backup files that are older than seven days |
+
+Both are small. Both are also the kind of script that runs unattended from a [cron job](/docs/linux/bash-shell-scripting/cron-jobs), which is where they become useful.
+
+## Script 1: Restart a service when it is down
+
+The idea in plain words: if the service is **not** active, restart it and say so. Otherwise say that everything is fine.
+
+![Service_Auto_Restart_Flow](https://dyz1pdcuffwr5.cloudfront.net/Linux/sh-service-restart-flow.svg)
+
+```bash
+vi service-restart.sh
+```
+
+```bash title="service-restart.sh"
+#!/bin/bash
+
+SERVICE="nginx"
+
+if ! systemctl is-active --quiet $SERVICE
+then
+        echo " $SERVICE is not running. Restarting the service..."
+        sudo systemctl restart $SERVICE
+        echo " $SERVICE is restarted.."
+else
+        echo "$SERVICE is running fine..."
+fi
+```
+
+The service name is stored in a variable at the top, so there is one place to change it. You could also take it from `read` or from a command line argument, as in earlier lessons.
+
+### The ! in the condition
+
+You know `systemctl is-active --quiet` from the last lesson: it succeeds when the service is active and fails when it is not.
+
+The `!` in front turns the answer around. It is the "not" operator.
+
+| Service state | `systemctl is-active --quiet` | With `!` in front | Branch that runs |
+| --- | --- | --- | --- |
+| Running | true | false | `else`: "is running fine" |
+| Stopped | false | true | `then`: restart it |
+
+So `if ! systemctl is-active ...` reads as "if the service is not active". The work that matters, the restart, sits in the `then` branch, right under the condition.
+
+The restart needs `sudo`, because starting and stopping services is an administrator task.
+
+```bash
+chmod 777 service-restart.sh
+```
+
+`chmod 777` is what the lecture uses here. It gives read, write and execute permission to the owner, the group and everybody else. There is a note on this further down.
+
+### First run: a missing name in the output
+
+The lecture starts with `SERVICE="apache2"`, which was running on that machine:
+
+```bash
+./service-restart.sh
+```
+
+```text
+ is running fine...
+```
+
+The message is there, but the service name is missing. The line in the script was:
+
+```bash
+echo "$Service is running fine..."
+```
+
+The variable was created as `SERVICE`, in capital letters. The `echo` used `$Service`. For Bash these are two different variables, because variable names are **case sensitive**. `$Service` was never given a value, so it is empty, and Bash prints an empty string without any warning.
+
+The fix is to write `$SERVICE`, exactly as the variable was created. The script shown above already has it, and you will see the name appear in the next runs.
+
+<Callout type="info" title="Let Bash catch this for you">
+Add `set -u` as the second line of a script. Bash then stops with an error such as `Service: unbound variable` whenever a variable is used that was never set. A typing mistake in a name becomes visible on the first run.
+</Callout>
+
+### Second run: the restart fails
+
+Next the variable is changed to `nginx`, which was installed but stopped:
+
+```bash
+./service-restart.sh
+```
+
+```text
+ nginx is not running. Restarting the service...
+Job for nginx.service failed because the control process exited with error code.
+See "systemctl status nginx.service" and "journalctl -xeu nginx.service" for details.
+ nginx is restarted..
+```
+
+Read the three parts carefully. The script found that Nginx was down. It tried to restart it. The restart **failed**, and that is the red message from `systemctl` in the middle. And then the script printed "nginx is restarted" all the same.
+
+Why did the restart fail? Apache was still running on this machine. Apache and Nginx are both web servers and both want port 80. A port can be used by only one program at a time, so Nginx could not start.
+
+The lecture frees the port by stopping Apache:
+
+```bash
+sudo systemctl stop apache2
+sudo systemctl disable apache2
+```
+
+`stop` ends it now. `disable` makes sure it does not come back after a reboot.
+
+```bash
+./service-restart.sh
+```
+
+```text
+ nginx is not running. Restarting the service...
+ nginx is restarted..
+```
+
+No error this time. Run it once more:
+
+```bash
+./service-restart.sh
+```
+
+```text
+nginx is running fine...
+```
+
+The service is up, so the script leaves it alone. That is the behaviour we want: it acts only when something is wrong.
+
+### Make the script tell the truth
+
+The failed run showed a real weakness. The script announced success after a command that failed. If this script runs from cron at night and writes to a log, the log will say "restarted" while the website is down.
+
+The fix is to check whether the restart worked before printing the message. `if` can test the restart command directly:
+
+```bash title="service-restart.sh"
+#!/bin/bash
+
+SERVICE="nginx"
+
+if ! systemctl is-active --quiet "$SERVICE"
+then
+        echo "$SERVICE is not running. Restarting the service..."
+
+        if sudo systemctl restart "$SERVICE"
+        then
+                echo "$SERVICE is restarted."
+        else
+                echo "ERROR: could not restart $SERVICE. Check: systemctl status $SERVICE"
+                exit 1
+        fi
+else
+        echo "$SERVICE is running fine."
+fi
+```
+
+Now the message matches what happened, and `exit 1` tells the caller that the script did not succeed.
+
+When a restart fails, these commands show the reason. The error message itself points to them:
+
+```bash
+systemctl status nginx
+journalctl -xeu nginx.service
+sudo ss -tulpn | grep :80
+```
+
+The last one lists which program is holding port 80.
+
+### Running it every few minutes
+
+A restart script is only useful when it runs regularly. A cron entry that checks every five minutes:
+
+```text
+*/5 * * * * /home/ubuntu/scripts/service-restart.sh >> /home/ubuntu/service-restart.log 2>&1
+```
+
+One detail: the script calls `sudo`, and under cron nobody is there to type a password. Put the entry in the cron table of root with `sudo crontab -e`. The script then already runs as root and the `sudo` inside it needs no password.
+
+<Callout type="info" title="systemd can restart services too">
+For a service that should always be running, systemd has this built in. A line `Restart=on-failure` in the unit file makes systemd restart the service whenever it crashes. A script like ours is still worth writing: it teaches the pattern of check, act and report, and it is the right tool when you want to do more than restart, for example write a log entry or send an alert.
+</Callout>
+
+## Script 2: Clean up old backups
+
+`backup.sh` creates a new backup on every run and never removes one. Schedule it for every night and after a year there are 365 of them. Sooner or later the disk is full, and a full disk stops a server just as surely as a crashed service.
+
+The rule we want: keep the recent backups, delete everything older than seven days.
+
+You met the `find` command in [find Command](/docs/linux/linux-search-text-processing/find-command). It can search by name, and it can also search by age and delete what it finds.
+
+```bash
+vi auto-clean.sh
+```
+
+```bash title="auto-clean.sh"
+#!/bin/bash
+
+find backups/ -type f -mtime +7 -delete
+
+echo "Old backups (older than 7 days) deleted successfully!"
+```
+
+One command does the whole job. Read it from left to right:
+
+| Part | Meaning |
+| --- | --- |
+| `find backups/` | Search inside the `backups` directory, including everything below it |
+| `-type f` | Only regular files. Directories are not touched |
+| `-mtime +7` | Only files that were last modified more than 7 days ago |
+| `-delete` | Delete each file that matches |
+
+Change the number to change the rule: `+2` for older than two days, `+30` for older than a month.
+
+In the lecture the option was first typed as `-type -f`. The value is a plain `f` with no dash. With the dash, `find` stops with an error about an unknown argument to `-type`.
+
+```bash
+chmod 777 auto-clean.sh
+./auto-clean.sh
+```
+
+```text
+Old backups (older than 7 days) deleted successfully!
+```
+
+```bash
+ls backups
+```
+
+```text
+project_2026-05-11_08-18-17
+```
+
+The backup from the earlier lesson is still there, and that is correct for two reasons. It was created only a short while ago, so it is not older than seven days. And it is a **directory**, while `-type f` looks at files only.
+
+### What -mtime +7 really counts
+
+`-mtime` works in whole 24 hour periods, and any fraction is dropped. `+7` means "more than 7", so a file is matched only when it is at least 8 full days old. A file that is 7 days and 20 hours old still counts as 7 and stays. For a cleanup rule this difference rarely matters, but it explains why a file you expected to be deleted is sometimes still there the next day.
+
+### See it work
+
+On a fresh practice machine nothing is seven days old, so the script has nothing to delete and you cannot tell whether it works. Create a test file and give it an old date with `touch -d`:
+
+```bash
+touch backups/new.tar.gz
+touch -d "10 days ago" backups/old.tar.gz
+ls -l backups
+```
+
+Both files are listed, and `old.tar.gz` shows a date ten days back.
+
+```bash
+./auto-clean.sh
+ls backups
+```
+
+`old.tar.gz` is gone. `new.tar.gz` and the project folder are still there.
+
+### Look before you delete
+
+`-delete` does not ask and there is no recycle bin. Before you put a new `find ... -delete` command into a script, run it once **without** `-delete`:
+
+```bash
+find backups/ -type f -mtime +7
+```
+
+Now `find` only prints the files it would remove. When the list is what you expect, add `-delete`.
+
+<Callout type="warn" title="Three things to know about find -delete">
+- Use a full path such as `/home/ubuntu/scripts/backups/`. The relative `backups/` works only when the script is started from the `scripts` folder. Under cron it is not.
+- Keep `-delete` as the last option. `find` handles its options from left to right, so `find backups/ -delete -type f -mtime +7` would delete everything first and check the conditions afterwards.
+- The message at the end is printed even when `find` deleted nothing or failed. It tells you the script finished, not how many files were removed.
+</Callout>
+
+### Folders and archives
+
+`backup.sh` from the earlier lesson creates folders, not files. With `-type f`, the cleanup script would remove old files inside those folders and leave the empty folders behind.
+
+This is one more reason to pack each backup into a single archive, as suggested in that lesson:
+
+```bash
+tar -czf backups/project_$DATE.tar.gz project
+```
+
+Every backup is then one file, and `find backups/ -type f -mtime +7 -delete` removes it in one clean step.
+
+A version of the cleanup script that reports what it does:
+
+```bash title="auto-clean.sh"
+#!/bin/bash
+
+BACKUP_DIR="/home/ubuntu/scripts/backups"
+DAYS=7
+
+if [ ! -d "$BACKUP_DIR" ]
+then
+        echo "ERROR: $BACKUP_DIR not found"
+        exit 1
+fi
+
+COUNT=$(find "$BACKUP_DIR" -type f -mtime +$DAYS | wc -l)
+
+find "$BACKUP_DIR" -type f -mtime +$DAYS -delete
+
+echo "Deleted $COUNT backup file(s) older than $DAYS days"
+```
+
+It uses a file test from [File Handling in Shell Scripting](/docs/linux/bash-shell-scripting/file-handling), counts the matching files first and prints a number that means something.
+
+## A note on chmod 777
+
+Until now the scripts were made executable with `chmod u+x`, for the owner only. In this lesson the lecture uses `chmod 777`, so that any user on the system can run the script.
+
+Look at what `777` gives away. From [Linux Numeric Permissions](/docs/linux/linux-users-permissions-ownership/numeric-file-permissions): the digit 7 is read + write + execute. The third 7 gives **write** permission to every user on the machine. Anybody can change the script. If root runs that script from cron, anybody can make root execute whatever they like.
+
+Giving everybody the right to run a script does not need write permission:
+
+| Mode | Owner | Group | Others | Use it for |
+| --- | --- | --- | --- | --- |
+| `700` or `u+x` | rwx | none | none | A script only you run |
+| `755` | rwx | r-x | r-x | A script everybody may run, only you may change |
+| `777` | rwx | rwx | rwx | Avoid it, everybody may change the file |
+
+```bash
+chmod 755 service-restart.sh auto-clean.sh
+```
+
+## Try It Yourself
+
+1. Install Nginx with `sudo apt install nginx -y`, stop it with `sudo systemctl stop nginx`, and run `service-restart.sh`. Run it a second time and compare the two outputs.
+2. Change one `$SERVICE` in the script to `$Service` and see the empty name. Then add `set -u` and run it again.
+3. Start Apache and stop Nginx, then run the lecture version of the script and the improved version. Compare what each one reports about the failed restart.
+4. Create `auto-clean.sh`. Make test files with `touch -d "10 days ago"` and `touch -d "3 days ago"`, and confirm that only the older one is deleted.
+5. Run the `find` command without `-delete` first and read the list it prints.
+6. Schedule `auto-clean.sh` for 1 AM every day in your crontab, using full paths, and check the entry with `crontab -l`.
+
+## Official references
+
+- [systemctl manual](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html)
+- [systemd.service: Restart option](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html)
+- [GNU findutils: age ranges](https://www.gnu.org/software/findutils/manual/html_node/find_html/Age-Ranges.html)
+- [GNU findutils: delete files](https://www.gnu.org/software/findutils/manual/html_node/find_html/Delete-Files.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

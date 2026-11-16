@@ -1,0 +1,257 @@
+---
+title: Environment Variables in Linux
+description: Create your own environment variables with export, make them permanent for one user with ~/.bashrc, and make them available to every user with /etc/profile.
+---
+
+In [Variables and User Input](/docs/linux/bash-shell-scripting/variables-and-user-input) we printed a few variables that we never created ourselves, such as `$HOME`, `$USER` and `$SHELL`. Linux had already set them for us. These are **environment variables**: named values that live in your session and can be read by any script, application or command you start from it.
+
+Two built-in ones, just to recall:
+
+```bash
+echo $PATH
+echo $SHELL
+```
+
+```text
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games
+/bin/bash
+```
+
+You are not limited to the built-in ones. You can add your own, and that is how most tools on a server are configured: where Java is installed, which environment an application runs in, which region a cloud CLI should talk to.
+
+The question to answer each time is: **how long should the variable live, and who should see it?**
+
+| Where you set it | How long it lives | Who can use it |
+| --- | --- | --- |
+| `export` in the terminal | Until this terminal session ends | Only this session |
+| `~/.bashrc` | Permanent | Only this user |
+| `/etc/profile` | Permanent | Every user on the system |
+
+![Environment_Variable_Scopes](https://dyz1pdcuffwr5.cloudfront.net/Linux/sh-environment-variable-scopes.svg)
+
+## Temporary variables with export
+
+The `export` command creates an environment variable for the current terminal session.
+
+```bash
+export name=harsh
+export role=GM
+```
+
+```bash
+echo $name
+echo $role
+```
+
+```text
+harsh
+GM
+```
+
+There is no space around `=`, the same rule as for any shell variable.
+
+These variables are temporary. The Linux machine can stay up for months, but the variable belongs to your terminal session, not to the machine. To see this, close the session and connect again:
+
+```bash
+exit
+```
+
+```bash
+ssh -i "your-key.pem" ubuntu@<public-ip>
+```
+
+```bash
+echo $name
+echo $role
+```
+
+```text
+
+
+```
+
+Two empty lines. The new session knows nothing about `name` and `role`.
+
+### What export really does
+
+Without `export`, a variable is visible only inside the shell where you created it. A script you start from that shell is a separate process, and it does not get the variable.
+
+```bash title="show.sh"
+#!/bin/bash
+
+echo "Name inside the script: $name"
+```
+
+```bash
+name=harsh
+./show.sh
+```
+
+```text
+Name inside the script:
+```
+
+```bash
+export name=harsh
+./show.sh
+```
+
+```text
+Name inside the script: harsh
+```
+
+That is the difference between a plain **shell variable** and an **environment variable**. `export` marks the variable so that it is passed on to every program started from this shell.
+
+## Permanent variables for one user: ~/.bashrc
+
+If a variable should be there every time you log in, put it in a file that Bash reads on its own. For a single user that file is `.bashrc` in the home directory. The dot at the start makes it a hidden file, so use `ls -a` to see it.
+
+Go to the home directory and open it:
+
+```bash
+cd ~
+vi .bashrc
+```
+
+The file already has a lot of content. Do not change any of it. Go to the very end and add your lines:
+
+```bash title="~/.bashrc"
+export name=sushil
+export role=CreativeHead
+```
+
+Save the file. Bash only reads `.bashrc` when a new shell starts, so the session you are in does not know about the change yet. Load the file by hand with `source`:
+
+```bash
+source .bashrc
+```
+
+```bash
+echo $name
+echo $role
+```
+
+```text
+sushil
+CreativeHead
+```
+
+Now `exit`, connect again, and run `echo $name` once more. You still get `sushil`. The variable has survived a new session, because `.bashrc` runs every time this user opens a shell.
+
+### The mistake from the lecture
+
+The first attempt in the lecture had a space in the value:
+
+```bash title="~/.bashrc"
+name=sushil
+role=Creative Head
+```
+
+```bash
+source .bashrc
+```
+
+```text
+Head: command not found
+```
+
+Bash splits a line on spaces. It read `role=Creative` as a temporary variable and then tried to run a command called `Head`. The lecture fixed it by removing the space. If you do want a value with a space, put it in quotes:
+
+```bash
+export role="Creative Head"
+```
+
+<Callout type="info" title="Add export in .bashrc too">
+The lecture writes `name=sushil` in `.bashrc` without the word `export`. `echo $name` still works, because `echo` runs inside the same shell. But a script started from that shell will not see the variable, exactly as shown in the `show.sh` example above. Write `export name=sushil` so that the value reaches your scripts and applications as well.
+</Callout>
+
+## Permanent variables for all users: /etc/profile
+
+Linux is a multi-user system. `.bashrc` belongs to one user, here `ubuntu`. A variable set there is not visible to another user such as `raj` or `siddharth`.
+
+For a variable that every user, script and application on the machine should get, the lecture uses `/etc/profile`. You have seen `/etc` before: it is where system-wide configuration lives.
+
+A realistic example is `JAVA_HOME`, which tools like Maven, Jenkins and Tomcat read to find the Java installation.
+
+The file belongs to root, so open it with `sudo`:
+
+```bash
+sudo vi /etc/profile
+```
+
+In the lecture the file was first opened without `sudo`, and `vi` showed:
+
+```text
+W10: Warning: Changing a readonly file
+```
+
+You can type, but you cannot save. Quit with `:q!` and open the file again with `sudo`.
+
+Add this as the last line:
+
+```bash title="/etc/profile"
+export JAVA_HOME=/usr/lib/jvm/java-17
+```
+
+Save, then load the file and check:
+
+```bash
+source /etc/profile
+echo $JAVA_HOME
+```
+
+```text
+/usr/lib/jvm/java-17
+```
+
+From now on, every user who logs in to this machine gets `JAVA_HOME`.
+
+<Callout type="warn" title="Use the real path on your machine">
+`/usr/lib/jvm/java-17` is the example path from the lecture. On Ubuntu, the package `openjdk-17-jdk` installs to `/usr/lib/jvm/java-17-openjdk-amd64`. Check with `ls /usr/lib/jvm/` and use the folder that actually exists, otherwise tools that read `JAVA_HOME` will fail to start.
+</Callout>
+
+### A cleaner place: /etc/profile.d
+
+Look at the end of `/etc/profile` and you will find a loop that runs every `.sh` file inside `/etc/profile.d/`. So instead of editing `/etc/profile` itself, which a system update may replace, you can add a small file of your own:
+
+```bash
+echo 'export JAVA_HOME=/usr/lib/jvm/java-17' | sudo tee /etc/profile.d/java.sh
+```
+
+It has the same effect, and removing the variable later is as simple as deleting that one file.
+
+## Useful commands
+
+| Command | What it does |
+| --- | --- |
+| `export NAME=value` | Create an environment variable for this session |
+| `echo $NAME` | Print one variable |
+| `printenv` | List all environment variables |
+| `printenv NAME` | Print one environment variable, empty if it is not exported |
+| `env` | Also lists all environment variables |
+| `unset NAME` | Remove a variable from the current session |
+| `source file` | Run a file in the current shell so its variables take effect now |
+
+By convention, environment variables are written in capital letters, like `JAVA_HOME` and `PATH`. The lecture uses lowercase `name` and `role` to keep the demo simple. For your own variables, capital letters make it clear at a glance that a name is an environment variable and not a local one inside a script.
+
+<Callout type="warn" title="Secrets do not belong here">
+`/etc/profile` and `/etc/profile.d/` are readable by every user on the machine. Do not put passwords, API keys or tokens in them.
+</Callout>
+
+## Try It Yourself
+
+1. Run `export course=devops`, print it, then `exit`, reconnect and print it again.
+2. Create `show.sh` that prints `$course`. Run it once after `course=devops` and once after `export course=devops`. Compare the output.
+3. Add `export role="Creative Head"` at the end of `~/.bashrc`, run `source ~/.bashrc`, reconnect and confirm the value is still there.
+4. Add `JAVA_HOME` through a file in `/etc/profile.d/`, log out and in again, and check it with `printenv JAVA_HOME`.
+5. Run `printenv | wc -l` to count how many environment variables your session has, then remove `course` with `unset course` and confirm it is gone.
+
+## Official references
+
+- [Bash manual: environment](https://www.gnu.org/software/bash/manual/html_node/Environment.html)
+- [Bash manual: startup files](https://www.gnu.org/software/bash/manual/html_node/Bash-Startup-Files.html)
+- [Ubuntu: environment variables](https://help.ubuntu.com/community/EnvironmentVariables)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

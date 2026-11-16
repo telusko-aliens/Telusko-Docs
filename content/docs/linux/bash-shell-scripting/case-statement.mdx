@@ -1,0 +1,301 @@
+---
+title: Case Statement in Shell Scripting
+description: Replace long if-elif chains with the Bash case statement, match a value against several patterns, and handle everything else with a default branch.
+---
+
+In [Conditionals in Shell Scripting](/docs/linux/bash-shell-scripting/conditionals) you learned to make a script choose between paths. `if` and `else` are perfect for a yes or no question. But many decisions are not yes or no. They are "which one of these": start, stop or restart. Dev, test or prod. With `if` you would write a chain like this:
+
+```bash
+if [ "$option" = "start" ]; then
+    echo "Starting server"
+elif [ "$option" = "stop" ]; then
+    echo "Stopping the server"
+elif [ "$option" = "restart" ]; then
+    echo "Restarting the server"
+else
+    echo "Invalid option"
+fi
+```
+
+It works, but the same variable is compared again and again, and the reader has to go through every line to see the choices.
+
+The **case statement** is made for exactly this. You name the value once and list the choices under it. If you know the `switch` statement from Java, this is the Bash version of it.
+
+## The syntax
+
+```bash
+case $variable in
+    pattern1)
+        commands
+        ;;
+    pattern2)
+        commands
+        ;;
+    *)
+        default commands
+        ;;
+esac
+```
+
+| Part | Meaning |
+| --- | --- |
+| `case $variable in` | The value you want to check |
+| `pattern)` | One possible value. The `)` ends the pattern |
+| `;;` | End of this branch. Bash leaves the case statement here |
+| `*)` | Matches anything. This is the default branch, used when nothing above matched |
+| `esac` | End of the case statement. It is `case` written backwards, like `fi` for `if` |
+
+Bash checks the patterns from top to bottom and runs the commands of the **first** one that matches. The rest are skipped.
+
+![Bash_Case_Statement](https://dyz1pdcuffwr5.cloudfront.net/Linux/sh-case-statement.svg)
+
+## Step 1: A server control script
+
+```bash
+vi case.sh
+```
+
+```bash title="case.sh"
+#!/bin/bash
+
+echo "Enter the option:"
+
+read option
+
+case $option in
+
+start)
+        echo "Starting server"
+        ;;
+stop)
+        echo "Stopping the server"
+        ;;
+restart)
+        echo "Restarting the server"
+        ;;
+*)
+        echo "Invalid option"
+        ;;
+
+esac
+```
+
+The script only prints messages. In a real script, each branch would hold the actual command, for example `sudo systemctl start jenkins` in the `start` branch.
+
+```bash
+chmod u+x case.sh
+./case.sh
+```
+
+```text
+Enter the option:
+start
+Starting server
+```
+
+Run it again with other inputs:
+
+```text
+Enter the option:
+stop
+Stopping the server
+```
+
+```text
+Enter the option:
+juststop
+Invalid option
+```
+
+`juststop` matches none of the three patterns, so the `*)` branch runs.
+
+### The mistake from the lecture
+
+The first run in the lecture did not go as planned:
+
+```text
+Enter the option:
+start
+Invalid option
+```
+
+The line in the script was:
+
+```bash
+case option in
+```
+
+The `$` was missing. Without it, Bash does not read the variable. It compares the plain word `option` against `start`, `stop` and `restart`, and that word never matches, so every input ends up in the default branch. With `case $option in` the script works.
+
+When a case statement always goes to `*)`, check this line first.
+
+A second slip was in a pattern, typed as `retstart)`. Bash does not complain about that either, because a pattern can be any text. The script simply would never react to `restart`. Read your patterns carefully, the shell will not catch a spelling mistake for you.
+
+## Step 2: Choosing a deployment environment
+
+The same structure, with a more realistic use. The script asks where to deploy:
+
+```bash title="case.sh"
+#!/bin/bash
+
+echo "Enter the environment for deployment:"
+
+read env
+
+case $env in
+
+dev)
+        echo "Deploying to DEV"
+        ;;
+test)
+        echo "Deploying to TEST"
+        ;;
+prod)
+        echo "Deploying to PROD"
+        ;;
+*)
+        echo "Unknown environment"
+        ;;
+
+esac
+```
+
+```bash
+./case.sh
+```
+
+```text
+Enter the environment for deployment:
+prod
+Deploying to PROD
+```
+
+```text
+Enter the environment for deployment:
+dev
+Deploying to DEV
+```
+
+Deployment scripts in real projects look very much like this. One script, one argument, and the case statement picks the right servers, the right config file and the right safety checks for that environment.
+
+## Patterns can do more
+
+The lecture uses exact words as patterns. A pattern can also cover several values or a whole group of them.
+
+**Several values for one branch.** Separate them with `|`, which means "or":
+
+```bash
+case $option in
+    start|START|Start)
+        echo "Starting server"
+        ;;
+    stop|STOP|Stop)
+        echo "Stopping the server"
+        ;;
+esac
+```
+
+Patterns are case sensitive. Without this, a user who types `START` lands in the default branch.
+
+**Wildcards.** The same symbols you use with file names work here:
+
+| Pattern | Matches |
+| --- | --- |
+| `y*` | Anything that starts with `y`: `y`, `yes`, `yeah` |
+| `[0-9]` | A single digit |
+| `[yY]` | `y` or `Y` |
+| `*.log` | Anything that ends in `.log` |
+| `*` | Everything |
+
+A small confirm prompt that accepts different ways of saying yes:
+
+```bash title="confirm.sh"
+#!/bin/bash
+
+read -p "Delete old backups? (yes/no): " answer
+
+case "$answer" in
+    [yY]|[yY][eE][sS])
+        echo "Deleting..."
+        ;;
+    [nN]|[nN][oO])
+        echo "Cancelled."
+        ;;
+    *)
+        echo "Please answer yes or no."
+        exit 1
+        ;;
+esac
+```
+
+<Callout type="warn" title="Keep the default branch last">
+Bash stops at the first pattern that matches. `*)` matches everything, so if you put it first, no other branch will ever run. It always goes at the bottom.
+</Callout>
+
+## case with command line arguments
+
+Typing the answer at a prompt is fine for a demo. In automation, the choice usually comes as a [command line argument](/docs/linux/bash-shell-scripting/command-line-arguments), so that nobody has to be there to type it:
+
+```bash title="deploy.sh"
+#!/bin/bash
+
+case "$1" in
+    dev)
+        echo "Deploying to DEV"
+        ;;
+    test)
+        echo "Deploying to TEST"
+        ;;
+    prod)
+        echo "Deploying to PROD"
+        ;;
+    *)
+        echo "Usage: $0 {dev|test|prod}"
+        exit 1
+        ;;
+esac
+```
+
+```bash
+./deploy.sh prod
+```
+
+```text
+Deploying to PROD
+```
+
+```bash
+./deploy.sh
+```
+
+```text
+Usage: ./deploy.sh {dev|test|prod}
+```
+
+Many service scripts on Linux follow this exact form. The default branch doubles as the help message.
+
+## if-else or case
+
+| Use `if` when | Use `case` when |
+| --- | --- |
+| The question is yes or no | One value is compared against a list of choices |
+| You compare numbers: greater, less, between | You match words or patterns |
+| You test files: exists, is a directory, is executable | You build a menu or handle options like start, stop, restart |
+| The conditions involve different variables | Every branch looks at the same variable |
+
+## Try It Yourself
+
+1. Create the first `case.sh` and try `start`, `stop`, `restart` and a wrong word.
+2. Remove the `$` from `case $option in`, run it with `start`, and see the default branch take over. Put the `$` back.
+3. Change the script to the dev, test and prod version. Make `prod` and `production` both go to the PROD branch using `|`.
+4. Create `deploy.sh` that takes the environment from `$1`. Run it with no argument and check the exit status with `echo $?`.
+5. Write `filetype.sh` that takes a file name as `$1` and prints `Shell script` for `*.sh`, `Text file` for `*.txt`, `Log file` for `*.log` and `Unknown type` for anything else.
+
+## Official references
+
+- [Bash manual: conditional constructs](https://www.gnu.org/software/bash/manual/html_node/Conditional-Constructs.html)
+- [Bash manual: pattern matching](https://www.gnu.org/software/bash/manual/html_node/Pattern-Matching.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>
