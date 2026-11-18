@@ -1,0 +1,9 @@
+{
+  "title": "Embeddings and RAG",
+  "pages": [
+    "why-rag-and-what-are-embeddings.mdx",
+    "embeddings-and-cosine-similarity.mdx",
+    "embedding-stores.mdx",
+    "building-a-rag-pipeline.mdx"
+  ]
+}

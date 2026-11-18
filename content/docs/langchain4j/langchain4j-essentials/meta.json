@@ -1,0 +1,11 @@
+{
+  "title": "LangChain4j Essentials",
+  "pages": [
+    "chatmodel.mdx",
+    "ai-services.mdx",
+    "structured-output-with-records.mdx",
+    "chain-of-thought.mdx",
+    "chat-memory.mdx",
+    "tools-and-ai-agents.mdx"
+  ]
+}

@@ -1,0 +1,450 @@
+---
+title: Building a RAG Pipeline
+description: Build a complete Retrieval-Augmented Generation pipeline with LangChain4j, splitting a document into chunks, ingesting them into an embedding store, retrieving the relevant ones for a question and letting an AI Service answer from them.
+---
+
+Everything in this section was leading here. We learned why a model needs our documents, how [embeddings](/docs/langchain4j/embeddings-and-rag/embeddings-and-cosine-similarity) compare text by meaning, and how an [embedding store](/docs/langchain4j/embeddings-and-rag/embedding-stores) finds the right piece of text for a question.
+
+What we have not done yet is the last step: give that piece of text to a chat model and get an answer. That complete chain is **RAG**, Retrieval-Augmented Generation.
+
+Two limits of a model make it necessary:
+
+- **A training cutoff.** A model knows the world up to the day its training data ends.
+- **No private data.** Your policies, your products and your customers were never part of that training.
+
+RAG does not send the model everything you have. It sends the few pieces that matter for the question at hand. Those pieces are called **chunks**.
+
+## The pipeline
+
+On the previous page we stored facts and searched them by hand, with our own helper method and our own loop. LangChain4j has ready-made components for every one of those steps. The pipeline has two phases.
+
+![RAG_Pipeline](https://dyz1pdcuffwr5.cloudfront.net/LangChain4j/lc4j-rag-pipeline.svg)
+
+**Phase A: ingestion.** Done ahead of time, once per document.
+
+| Step | Component | What it does |
+| --- | --- | --- |
+| 1 | `Document` | Holds the source text: a policy, a manual, a set of notes |
+| 2 | `DocumentSplitter` | Cuts the document into chunks |
+| 3 | `EmbeddingModel` | Turns each chunk into an embedding |
+| 4 | `EmbeddingStore` | Saves each embedding together with its chunk |
+
+Steps 2 to 4 are run by one object, the `EmbeddingStoreIngestor`.
+
+**Phase B: retrieval and generation.** Done for every question.
+
+| Step | Component | What it does |
+| --- | --- | --- |
+| 5 | `ContentRetriever` | Embeds the question and fetches the best matching chunks from the store |
+| 6 | AI Service | Adds those chunks to the user's message |
+| 7 | `ChatModel` | Answers, using the chunks it was given |
+
+Take the retriever away and you are back to sending the question straight to the model. Everything in between is the "RA" in RAG.
+
+## Step 1: The interface
+
+```java title="App.java"
+interface PolicyAssistant {
+    @SystemMessage("Answer strictly using the provided company policy context. If unknown, say so.")
+    String chat(String userMessage);
+}
+```
+
+It is an ordinary AI Service, like the ones from part 2. The system message carries two instructions, and both matter:
+
+| Instruction | Why |
+| --- | --- |
+| Answer strictly using the provided context | The model should use our document and not its general knowledge |
+| If unknown, say so | When the document has no answer, we want "I don't know" and not an invention |
+
+## Step 2: Two models
+
+RAG needs two different models: one that chats and one that embeds.
+
+```java title="App.java"
+ChatModel chatModel = OpenAiChatModel.builder()
+        .apiKey(System.getenv("OPENAI_API_KEY"))
+        .modelName("gpt-6-sol")
+        .build();
+
+EmbeddingModel embeddingModel = OpenAiEmbeddingModel.builder()
+        .apiKey(System.getenv("OPENAI_API_KEY"))
+        .modelName("text-embedding-3-small")
+        .build();
+```
+
+| Model | Used for |
+| --- | --- |
+| `embeddingModel` | Embedding the chunks during ingestion, and embedding each question during retrieval |
+| `chatModel` | Writing the final answer |
+
+## Step 3: The document
+
+```java title="App.java"
+// 1. Private company document (can also load .txt / .pdf via FileSystemDocumentLoader)
+Document companyDoc = Document.from("""
+        Telusko Company Policy:
+        1. Refund Policy: Customers can request a full refund within 19 days of course purchase.
+        2. Leave Policy: Full-time team members receive 42 days of paid Alien Leave per year.
+        3. Support Policy: WhatsApp support is strictly for enrollment queries, not doubt solving.
+        """);
+```
+
+A `Document` is LangChain4j's wrapper for a source text. Here it is created from a text block to keep the example in one file. In a real project the text would come from files.
+
+The policy is invented, and deliberately so. "19 days" and "42 days of Alien Leave" are not facts any model could have learned. ("Aliens" is what the lecturer calls his students.) If those numbers appear in an answer, they came from this document.
+
+## Step 4: Ingestion
+
+```java title="App.java"
+// 2. PHASE A (Ingestion): Split into 300-char chunks (30 overlap) -> Embed -> Store
+EmbeddingStore<TextSegment> vectorStore = new InMemoryEmbeddingStore<>();
+
+EmbeddingStoreIngestor.builder()
+        .documentSplitter(DocumentSplitters.recursive(300, 30))
+        .embeddingModel(embeddingModel)
+        .embeddingStore(vectorStore)
+        .build()
+        .ingest(List.of(companyDoc));
+```
+
+This replaces the `saveFact` helper from the previous page. The ingestor splits the document, embeds every chunk and stores every pair, in one call to `ingest`.
+
+### Why split at all?
+
+You do not store a whole document as one entry, for two reasons. An embedding of a long text is a blur of everything in it, so it matches no specific question well. And whatever is retrieved is sent to the chat model, so retrieving a whole document would bring back the cost problem that RAG is meant to solve.
+
+### What the two numbers mean
+
+`DocumentSplitters.recursive(300, 30)`:
+
+| Argument | Value | Meaning |
+| --- | --- | --- |
+| Maximum segment size | 300 | A chunk has at most 300 characters |
+| Maximum overlap | 30 | A chunk may repeat up to 30 characters from the end of the chunk before it |
+
+**Why overlap?** A cut can land in the middle of a thought. With an overlap, the end of one chunk appears again at the start of the next, so a sentence at the border is not lost to both. The library's documentation adds a detail: only complete sentences are used for the overlap.
+
+**Why "recursive"?** A naive splitter would cut after exactly 300 characters, even in the middle of a word. The recursive splitter is smarter. According to its documentation, it first tries to split by paragraphs and fits as many paragraphs into a chunk as possible. Only if a paragraph is too long does it go one level down: to lines, then sentences, then words, and as a last resort characters.
+
+So 300 is a maximum and not a target. A paragraph of 240 characters stays together as one chunk of 240. Whenever possible, the splitter keeps units of meaning intact.
+
+## Step 5: The content retriever
+
+```java title="App.java"
+// 3. PHASE B (Retrieval): Connect Vector Store to AiServices via ContentRetriever
+ContentRetriever retriever = EmbeddingStoreContentRetriever.builder()
+        .embeddingStore(vectorStore)
+        .embeddingModel(embeddingModel)
+        .maxResults(2)
+        .minScore(0.6)
+        .build();
+```
+
+This replaces the manual search from the previous page: embedding the question, building an `EmbeddingSearchRequest`, looping over the matches. The retriever does all of it.
+
+| Setting | Meaning | Default if you leave it out |
+| --- | --- | --- |
+| `embeddingStore` | Where to search | Required |
+| `embeddingModel` | How to embed the question. It must be the model that embedded the chunks | Required |
+| `maxResults(2)` | Return at most two chunks | 3 |
+| `minScore(0.6)` | Ignore chunks with a lower score | 0 |
+
+On the previous page we asked for one result. Here we ask for two, because one question may need information from two places. The chat model receives both and decides what to use.
+
+The score is the relevance score explained on the [embedding stores page](/docs/langchain4j/embeddings-and-rag/embedding-stores), not a raw cosine similarity.
+
+## Step 6: Connect the retriever to the AI Service
+
+```java title="App.java"
+PolicyAssistant assistant = AiServices.builder(PolicyAssistant.class)
+        .chatModel(chatModel)
+        .contentRetriever(retriever)
+        .build();
+```
+
+One more line in the builder we have used since the [AI Services](/docs/langchain4j/langchain4j-essentials/ai-services) page. First it took a model, then a memory, then tools, now a retriever.
+
+We do not tell the AI Service which store to use. It knows the retriever, and the retriever knows the store.
+
+## Step 7: Ask without RAG first
+
+The question contains two requests:
+
+```java title="App.java"
+String answer = assistant.chat(
+        "I bought a course 2 weeks ago. Can I get my money back? Also, can I ask Java doubts on WhatsApp?");
+System.out.println("AI: " + answer);
+```
+
+Before running it properly, the lecture comments out the `.contentRetriever(retriever)` line. Everything else stays, including the ingestion. The store is filled, and nobody looks into it.
+
+```text
+AI: I don?t have the company?s refund or WhatsApp support policy, so I can?t confirm whether a course bought two weeks ago is refundable ... Please check the course terms or contact support for both.
+```
+
+An honest answer, and a useless one. The model has no policy and says so. It says so only because the system message told it to. Without "If unknown, say so", it might well have described a typical refund process.
+
+## Step 8: Ask with RAG
+
+Put the `.contentRetriever(retriever)` line back and run again:
+
+```text
+AI: Yes. You bought the course 14 days ago, so you can request a full refund within the 19-day refund window.
+
+No. WhatsApp support is only for enrollment queries, not Java doubts.
+```
+
+Look at what happened here:
+
+- **"19-day refund window"** is our invented number. The model could only have read it in the document.
+- **"14 days ago"**: the question said "2 weeks". The model turned that into 14 days and compared it with 19. It did not copy a sentence. It reasoned over the retrieved text.
+- **Both parts are answered**, from two different lines of the policy.
+- The question never used the words "refund" or "enrollment". It asked about "money back" and "Java doubts". The match was made by meaning.
+
+That is the difference one builder line makes.
+
+## Step 9: The same pipeline with local models
+
+Comment out the two OpenAI models and use the Ollama versions. The complete program in that final state:
+
+```java title="App.java"
+package com.telusko;
+
+import java.util.List;
+
+import dev.langchain4j.data.document.Document;
+import dev.langchain4j.data.document.splitter.DocumentSplitters;
+import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.model.ollama.OllamaChatModel;
+import dev.langchain4j.model.ollama.OllamaEmbeddingModel;
+import dev.langchain4j.rag.content.retriever.ContentRetriever;
+import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
+import dev.langchain4j.service.AiServices;
+import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.store.embedding.EmbeddingStore;
+import dev.langchain4j.store.embedding.EmbeddingStoreIngestor;
+import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
+
+public class App {
+
+    interface PolicyAssistant {
+        @SystemMessage("Answer strictly using the provided company policy context. If unknown, say so.")
+        String chat(String userMessage);
+    }
+
+    public static void main(String[] args) {
+
+        // ChatModel chatModel = OpenAiChatModel.builder()
+        //         .apiKey(System.getenv("OPENAI_API_KEY"))
+        //         .modelName("gpt-6-sol")
+        //         .build();
+
+        // EmbeddingModel embeddingModel = OpenAiEmbeddingModel.builder()
+        //         .apiKey(System.getenv("OPENAI_API_KEY"))
+        //         .modelName("text-embedding-3-small")
+        //         .build();
+
+        ChatModel chatModel = OllamaChatModel.builder()
+                .baseUrl("http://localhost:11434")
+                .modelName("gemma4:e4b") // or "gemma4:12b"
+                .build();
+
+        EmbeddingModel embeddingModel = OllamaEmbeddingModel.builder()
+                .baseUrl("http://localhost:11434")
+                .modelName("nomic-embed-text")
+                .build();
+
+        // 1. Private company document (can also load .txt / .pdf via FileSystemDocumentLoader)
+        Document companyDoc = Document.from("""
+                Telusko Company Policy:
+                1. Refund Policy: Customers can request a full refund within 19 days of course purchase.
+                2. Leave Policy: Full-time team members receive 42 days of paid Alien Leave per year.
+                3. Support Policy: WhatsApp support is strictly for enrollment queries, not doubt solving.
+                """);
+
+        // 2. PHASE A (Ingestion): Split into 300-char chunks (30 overlap) -> Embed -> Store
+        EmbeddingStore<TextSegment> vectorStore = new InMemoryEmbeddingStore<>();
+
+        EmbeddingStoreIngestor.builder()
+                .documentSplitter(DocumentSplitters.recursive(300, 30))
+                .embeddingModel(embeddingModel)
+                .embeddingStore(vectorStore)
+                .build()
+                .ingest(List.of(companyDoc));
+
+        // 3. PHASE B (Retrieval): Connect Vector Store to AiServices via ContentRetriever
+        ContentRetriever retriever = EmbeddingStoreContentRetriever.builder()
+                .embeddingStore(vectorStore)
+                .embeddingModel(embeddingModel)
+                .maxResults(2)
+                .minScore(0.6)
+                .build();
+
+        PolicyAssistant assistant = AiServices.builder(PolicyAssistant.class)
+                .chatModel(chatModel)
+                .contentRetriever(retriever)
+                .build();
+
+        String answer = assistant.chat(
+                "I bought a course 2 weeks ago. Can I get my money back? Also, can I ask Java doubts on WhatsApp?");
+        System.out.println("AI: " + answer);
+    }
+}
+```
+
+The first run takes a while, because two local models have to be loaded. Then:
+
+```text
+AI: Yes, you can request a full refund as customers can request a full refund within 19 days of course purchase.
+
+No, WhatsApp support is strictly for enrollment queries, not doubt solving.
+```
+
+Even the small local model answers both parts correctly. It stays closer to the wording of the document than the hosted model did. This is what RAG gives you: a model that knew nothing about Telusko's policy now answers questions about it, because the right text was put in front of it.
+
+<Callout type="info" title="Checked for these docs">
+The complete program was run for these docs with `gemma4:e4b` and `nomic-embed-text`. It confirmed the refund within 19 days and the WhatsApp rule. With the retriever line removed, the same model answered that it could not answer because no company policy was provided.
+</Callout>
+
+## What the model actually receives
+
+Nothing about RAG is hidden from the chat model in some special channel. The retrieved chunks are written into the user's message. LangChain4j's default template, taken from the 1.22.0 source code, is:
+
+```text
+{{userMessage}}
+
+Answer using the following information:
+{{contents}}
+```
+
+So the request for our question looks roughly like this:
+
+```text
+I bought a course 2 weeks ago. Can I get my money back? Also, can I ask Java doubts on WhatsApp?
+
+Answer using the following information:
+Telusko Company Policy:
+1. Refund Policy: Customers can request a full refund within 19 days of course purchase.
+...
+```
+
+The chat model never sees an embedding or a score. It sees a question with some text under it. Retrieval decides *which* text, and that makes retrieval the part that decides the quality of a RAG system.
+
+## Look at the chunks: an addition to the lecture
+
+The lecture explains chunking and overlap in detail. In the demo itself, though, you never see a chunk. It is worth looking, because there is a surprise.
+
+The policy text was measured for these docs. It is **290 characters** long. The splitter is set to a maximum of 300. So the whole document fits into **one chunk**:
+
+| Splitter | Chunks produced from the policy |
+| --- | --- |
+| `recursive(300, 30)` | 1 chunk of 289 characters, the entire policy |
+| `recursive(120, 30)` | 3 chunks: title with the refund line, the leave line, the support line |
+
+With the settings from the lecture, the store contains a single entry. Every question retrieves that one entry, which is the whole policy, and `maxResults(2)` has nothing to choose between. The answers are correct because the model was simply given everything. For a document this small that is perfectly fine. It just does not show retrieval selecting anything.
+
+To see the selection, make the chunks smaller:
+
+```java title="App.java"
+.documentSplitter(DocumentSplitters.recursive(120, 30))
+```
+
+and print what the retriever returns for a question, before any chat model is involved:
+
+```java title="App.java"
+import dev.langchain4j.rag.content.Content;
+import dev.langchain4j.rag.query.Query;
+
+for (Content content : retriever.retrieve(Query.from("How many days of leave do I get?"))) {
+    System.out.println(content.textSegment().text());
+    System.out.println("---");
+}
+```
+
+This was run for these docs with `nomic-embed-text`. With three chunks in the store and `maxResults(2)`:
+
+| Question | Top chunk | Second chunk |
+| --- | --- | --- |
+| The two-part question from the lesson | Refund line, score 0.807 | Support line, score 0.805 |
+| "How many days of leave do I get?" | Leave line, score 0.868 | Refund line, score 0.770 |
+
+For the two-part question the retriever picks exactly the two lines that are needed and leaves the leave policy out. For the leave question, the right line comes first by a clear margin. The final answers were still correct: 19 days for the refund, enrollment queries only on WhatsApp, and 42 days of leave. A question about a student discount, which the policy does not cover, was answered with a statement that the policy has no information about it.
+
+Now the pipeline is doing what the diagram promises.
+
+<Callout type="warn" title="Check your chunks before you tune anything else">
+When a RAG system gives poor answers, the cause is very often in the chunks: too large, too small, or cut in a bad place. Printing them takes two lines. Do it for every new kind of document before you change models or thresholds.
+</Callout>
+
+## More additions beyond the lecture
+
+**Loading a real file.** The comment in the code mentions `FileSystemDocumentLoader`. For a plain text file, this works with the dependencies we already have, and it was tried for these docs:
+
+```java
+import java.nio.file.Path;
+import dev.langchain4j.data.document.loader.FileSystemDocumentLoader;
+
+Document companyDoc = FileSystemDocumentLoader.loadDocument(Path.of("policy.txt"));
+```
+
+PDF, Word and other formats need a document parser, which LangChain4j provides as separate modules. See the RAG guide in the official documentation.
+
+**Ingestion belongs outside the request path.** Our program ingests the document every time it starts, because the store is in memory. In a real system, ingestion is a separate job that runs when documents change, and it writes to a persistent store. The part that answers questions only retrieves.
+
+**The same embedding model on both sides.** The ingestor and the retriever are given the same `embeddingModel` variable here. If chunks are embedded with one model and questions with another, retrieval returns nonsense or fails. Changing the embedding model means ingesting everything again.
+
+**The threshold may not protect you.** With `nomic-embed-text`, a question that has nothing to do with the policy, "What is the capital of France?", was tried against the single-chunk store. The policy chunk still scored 0.647, above the `minScore` of 0.6, and was retrieved. The system message is then the second line of defence: the model is told to answer only from the context and to say when it does not know. Use both, and test with questions your documents cannot answer.
+
+**RAG, memory and tools can be combined.** They are separate lines on the same builder. An assistant can have a `.chatMemory(...)`, a `.contentRetriever(...)` and `.tools(...)` at the same time.
+
+**This is the simple form.** The LangChain4j documentation calls this setup naive RAG and describes more advanced options, such as rewriting the question before searching, searching several sources and re-ranking the results. They build on exactly the parts you now know.
+
+## Mistakes made in the lecture
+
+**1. Imports that disappear on save.** The lecturer pastes all imports at the top first and then avoids saving the file, because saving would delete them. This is an editor feature, not a bug: with "organize imports on save" switched on, VS Code removes every import that is not used yet. Either add the imports after the code that uses them, or let the quick fix add them one by one.
+
+**2. Announcing one model and running another.** As in the previous lessons, there are two blocks for the models, and now two models per block. When switching to Ollama, both the chat model and the embedding model must be switched together, and the Ollama imports added.
+
+**3. The first local run seems to hang.** The chat model and the embedding model both have to be loaded. The lecturer starts the program a second time. Loading the models beforehand with `ollama run` avoids the wait.
+
+## Where you are now
+
+Look back at the path:
+
+1. A model called through the plain OpenAI SDK, with instructions, reasoning and JSON output.
+2. `ChatModel`, so that the provider is a detail.
+3. AI Services, where an interface is all you write.
+4. Records as return types, also for step-by-step solutions.
+5. Chat memory.
+6. Tools.
+7. Embeddings, an embedding store and a RAG pipeline.
+
+From step 3 onwards, every new ability was one more line on the same builder: `.chatModel`, `.chatMemory`, `.tools`, `.contentRetriever`. That is the design of LangChain4j in one sentence, and you now know what each of those lines does underneath.
+
+## Try It Yourself
+
+1. Run the pipeline without the retriever line, then with it, and compare the two answers.
+2. Ask "How many days of leave do I get?" and check that the answer says 42.
+3. Ask something the policy does not cover, such as "Do you offer a student discount?". Does the assistant say that it does not know?
+4. Remove "If unknown, say so." from the system message and ask the same question again.
+5. Print the chunks: create the splitter in a variable, call `split(companyDoc)` on it and print each segment and its length.
+6. Change the splitter to `recursive(120, 30)`, print what the retriever returns for three different questions, and check that the right lines come first.
+7. Add five more policy lines about new topics. Ask a question about one of them and confirm that only the relevant chunks are retrieved.
+8. Put the policy into a file `policy.txt` and load it with `FileSystemDocumentLoader`.
+9. Add `.chatMemory(MessageWindowChatMemory.withMaxMessages(10))` and a chat loop from the [Chat Memory](/docs/langchain4j/langchain4j-essentials/chat-memory) page, and have a conversation about the policy with follow-up questions.
+
+## Official references
+
+- [LangChain4j: RAG](https://docs.langchain4j.dev/tutorials/rag)
+- [LangChain4j: AI Services, RAG section](https://docs.langchain4j.dev/tutorials/ai-services#rag)
+- [LangChain4j: supported embedding stores](https://docs.langchain4j.dev/integrations/embedding-stores)
+- [LangChain4j: document parsers](https://docs.langchain4j.dev/category/document-parsers)
+- [LangChain4j examples on GitHub](https://github.com/langchain4j/langchain4j-examples)
+- [Source code for this lesson](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_RAG)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

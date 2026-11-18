@@ -1,0 +1,219 @@
+---
+title: Chain of Thought
+description: Ask a model for the steps that lead to an answer and not only the answer, by returning nested Java records from an AI Service, and see why the order of the fields matters.
+---
+
+A model can give you a right answer, a wrong answer that sounds right, or an honest "I don't know". From the outside, the first two look the same.
+
+For a question like "What is the capital of France?" that hardly matters. The model has seen the answer countless times. For a problem that needs several steps, such as a calculation, a single final value gives you nothing to check.
+
+## Marks for the steps
+
+Think back to a maths exam at school. You work through a problem and arrive at the wrong number. In many school systems you do not get zero for that. The teacher looks at your steps and gives marks for the ones that are correct, because the steps show how you were thinking, and they show exactly where it went wrong.
+
+We can ask a model for the same thing. Solving a problem by going through it one step after another is called **chain of thought**. The lecture calls it "chain of thoughts", and you will find both spellings. Reasoning models already work this way internally. What we want now is to **see** the steps, so that we can judge the answer and not just accept it.
+
+![Chain_Of_Thought](https://dyz1pdcuffwr5.cloudfront.net/LangChain4j/lc4j-chain-of-thought.svg)
+
+## The problem to solve
+
+```text
+How can I solve 8x + 7 = -23?
+```
+
+We want two things back: the value of `x`, and the steps that lead to it.
+
+We already have the tool for this. On the [previous page](/docs/langchain4j/langchain4j-essentials/structured-output-with-records) an AI Service returned a record. A solution with steps is just a slightly bigger record.
+
+## Step 1: Design the records
+
+Start from what one step looks like. It has an explanation of what is done, and the result of doing it:
+
+```java title="App.java"
+record Step(String explanation, String output) {}
+```
+
+A solution is a list of such steps, followed by the final answer:
+
+```java title="App.java"
+// Put List BEFORE finalAnswer so the LLM reasons step-by-step first!
+record MathSolution(List<Step> steps, String finalAnswer) {}
+```
+
+Two things are new here.
+
+**A record inside a record.** `MathSolution` contains a `List<Step>`. Structured output is not limited to flat data. LangChain4j describes the nested shape to the model and builds the whole object tree from the answer.
+
+**The order of the fields.** The comment in the code is not decoration. A model writes its answer from left to right, one token after another, and it normally writes the fields in the order in which they are described to it, which is the order of the record. With `steps` first, the model writes out its working before it reaches `finalAnswer`. The answer is then a conclusion of the steps. With `finalAnswer` first, the model would commit to a value and write the steps afterwards as a justification of it.
+
+## Step 2: Write the interface
+
+```java title="App.java"
+interface MathTutor {
+    @SystemMessage("You are a helpful math tutor. Guide the user through the solution step by step.")
+    MathSolution solve(String equation);
+}
+```
+
+Same pattern as before: a name that says what the service is, a method that says what it does, and a return type that says what you want back.
+
+## Step 3: Build, call and print
+
+```java title="App.java"
+package com.telusko;
+
+import java.util.List;
+
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.service.AiServices;
+import dev.langchain4j.service.SystemMessage;
+
+public class App {
+
+    record Step(String explanation, String output) {}
+
+    // Put List BEFORE finalAnswer so the LLM reasons step-by-step first!
+    record MathSolution(List<Step> steps, String finalAnswer) {}
+
+    interface MathTutor {
+        @SystemMessage("You are a helpful math tutor. Guide the user through the solution step by step.")
+        MathSolution solve(String equation);
+    }
+
+    public static void main(String[] args) {
+        // === OPTION A: OpenAI Cloud (gpt-6-sol) ===
+        ChatModel model = OpenAiChatModel.builder()
+                .apiKey(System.getenv("OPENAI_API_KEY"))
+                .modelName("gpt-6-sol")
+                .build();
+
+        // === OPTION B: Local Ollama (Uncomment for gemma4:e4b or gemma4:12b) ===
+        // ChatModel model = OllamaChatModel.builder()
+        //         .baseUrl("http://localhost:11434")
+        //         .modelName("gemma4:e4b") // or "gemma4:12b"
+        //         .build();
+
+        MathTutor mathTutor = AiServices.builder(MathTutor.class)
+                .chatModel(model)
+                .build();
+
+        MathSolution solution = mathTutor.solve("How can I solve 8x + 7 = -23?");
+
+        System.out.println("Steps:");
+        for (Step step : solution.steps()) {
+            System.out.println("Explanation: " + step.explanation());
+            System.out.println("Output: " + step.output());
+            System.out.println();
+        }
+
+        System.out.println("Final Answer: " + solution.finalAnswer());
+    }
+}
+```
+
+The `for` loop is plain Java over a plain list. The final answer is printed after the loop, so that the output reads the way a solution is written on paper: working first, result last.
+
+## Step 4: Run it
+
+The first step subtracts 7 from both sides and arrives at `8x = -30`. The rest of the output on the lecture's screen:
+
+```text
+Explanation: Divide both sides by 8.
+Output: x = -30/8
+
+Explanation: Simplify the fraction.
+Output: x = -15/4
+
+Final Answer: x = -15/4
+```
+
+Now check it, the way the lecturer does in his head. Move 7 to the other side: `-23 - 7 = -30`. Divide by 8: `-30/8`. Divide top and bottom by 2: `-15/4`, which is `-3.75`. Every step is right, so the answer is right.
+
+That is the gain. With only `x = -15/4` on the screen you would have to trust the model or solve the equation yourself. With the steps, you can verify each one in a few seconds, and if one of them were wrong you would see which.
+
+## Step 5: Does the system message matter?
+
+The system message says "Guide the user through the solution step by step". What happens without that sentence? The lecture shortens it:
+
+```java title="App.java"
+@SystemMessage("You are a helpful math tutor")
+```
+
+The steps are still there. Two things explain it:
+
+- The **return type** already demands steps. The model is told to fill a list of `Step` objects, and it cannot do that with a single number.
+- `gpt-6-sol` is a reasoning model. It works through problems in steps anyway.
+
+So the structure of the record is doing most of the work. The shortened message is the one that remains in the final code of the lesson. Keeping the full sentence does no harm, and with weaker models a clear instruction helps.
+
+## Step 6: Try it with a local model
+
+Switch to the Ollama block, with `gemma4:e4b`:
+
+```text
+Explanation: Divide both sides by 8 to solve for x.
+Output: x = -30 / 8
+
+Explanation: Simplify the fraction by dividing the numerator and the denominator by their greatest common divisor, which is 2.
+Output: x = -15 / 4
+
+Final Answer: x = -15/4
+```
+
+The small local model takes the same path and reaches the same answer. Its explanations are a little longer.
+
+<Callout type="info" title="Checked for these docs">
+The Ollama version was run for these docs with `gemma4:e4b`. It produced three steps, subtract 7, divide by 8, simplify, and the final answer -15/4. In that run the model wrote its maths in LaTeX notation, for example `\frac{-15}{4}`. If you want plain text, say so in the system message, for example "Write all maths as plain text".
+</Callout>
+
+## What these steps are, and what they are not
+
+Be precise about what you are looking at.
+
+| | Internal reasoning | The steps in `MathSolution` |
+| --- | --- | --- |
+| Where you met it | The `reasoning` item in [the first project](/docs/langchain4j/llm-apis-in-plain-java/first-java-project-with-the-openai-sdk), controlled by [reasoning effort](/docs/langchain4j/llm-apis-in-plain-java/instructions-and-reasoning-effort) | This page |
+| Who can see it | Usually nobody. Hosted models return it hidden or encrypted | You. It is normal data in a record |
+| What it is | The model's own working before it answers | An explanation the model writes as part of its answer |
+
+The steps you receive are generated text, like everything else a model produces. They are very useful for checking a result. They are not a recording of what happened inside the model, and a model can write convincing steps that lead to a wrong answer. That is exactly why you read them.
+
+## Not only for maths
+
+The equation is only the example. The same record shape works whenever you want to see how a result was reached:
+
+- A support assistant that lists the checks it made before it suggests a fix
+- A code reviewer that explains each finding before its verdict
+- An analysis that states its assumptions before its conclusion
+
+The lecturer's advice applies beyond code: for any complex problem, also when you are simply writing a prompt in a chat window, ask for the steps.
+
+## Mistakes made in the lecture
+
+**1. Leftovers from the previous lesson.** The new records and interface are pasted into the file from the last page. For a while the old `Event` record, the `EventExtractor` variable and the call to `extractEvent` are still there, and the editor's suggestions keep offering them. Remove every trace of the old service before you run.
+
+**2. The final answer printed first.** The first version of the print code shows the final answer and then the steps. The lecturer moves it below the loop. The order of your print statements is independent of the order of the fields in the record, so check both.
+
+**3. A missing import after switching models.** When the Ollama block is uncommented, `OllamaChatModel` has to be imported. This happens in almost every lesson. If the editor marks the class in red, use the quick fix and choose the import from `dev.langchain4j.model.ollama`.
+
+## Try It Yourself
+
+1. Run the example and verify every step of the solution by hand.
+2. Give the tutor a harder equation, for example `3(x - 4) = 2x + 9`. Count the steps and check each one.
+3. Swap the two fields of the record to `MathSolution(String finalAnswer, List<Step> steps)`. Run several problems and compare the quality of the steps and answers with the original order.
+4. Remove the system message completely. Do you still get steps?
+5. Add a field `String rule` to `Step`, meant for the rule that was applied, such as "subtract the same value from both sides". Run again and print it.
+6. Ask a word problem, for example a question about speed, distance and time. Do the steps still make sense?
+7. Write a new service that is not about maths: an interface `Debugger` that returns a record with a list of `Step` and a `String fix`, and give it a small piece of code with a bug.
+
+## Official references
+
+- [LangChain4j: structured outputs](https://docs.langchain4j.dev/tutorials/structured-outputs)
+- [LangChain4j: AI Services](https://docs.langchain4j.dev/tutorials/ai-services)
+- [OpenAI: reasoning models](https://platform.openai.com/docs/guides/reasoning)
+- [Source code for this lesson](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_Chain_of_Thoughts)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

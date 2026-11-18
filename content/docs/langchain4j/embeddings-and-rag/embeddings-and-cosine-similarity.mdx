@@ -1,0 +1,294 @@
+---
+title: Embeddings and Cosine Similarity
+description: Create embeddings in Java with LangChain4j's EmbeddingModel for OpenAI and Ollama, inspect the vectors, and compare sentences by meaning with CosineSimilarity.
+---
+
+The [previous page](/docs/langchain4j/embeddings-and-rag/why-rag-and-what-are-embeddings) was all theory: sentences become lists of numbers, and sentences with a similar meaning get similar numbers.
+
+Now we do it. We take the same three sentences, turn them into embeddings with a real model and measure how close they are. No chat model is involved on this page at all. Everything here happens before a model is ever asked a question.
+
+## Step 1: Choose an embedding model
+
+An embedding model is a different kind of model from the ones we have used so far. It does not chat and does not write. It takes text and returns numbers.
+
+| Provider | Embedding model | Dimension |
+| --- | --- | --- |
+| OpenAI | `text-embedding-3-small` | 1536 |
+| OpenAI | `text-embedding-3-large` | 3072 |
+| Ollama, local | `nomic-embed-text` | 768 |
+
+For OpenAI, the course uses the small model. It is enough for our examples and cheaper than the large one.
+
+According to OpenAI's embeddings guide, embeddings are used for search, clustering, recommendations and classification. We use them for search.
+
+<Callout type="info" title="Embeddings cost tokens too">
+Calls to a hosted embedding model are billed by input tokens, like chat requests. The price per token is much lower than for a chat model, but it is not zero, and it adds up when you embed a large set of documents.
+</Callout>
+
+## Step 2: Create the embedding model
+
+Start from an empty `main` method. Remove the old imports, so that the editor does not keep suggesting classes from earlier lessons.
+
+```java title="App.java"
+EmbeddingModel embeddingModel = OpenAiEmbeddingModel.builder()
+        .apiKey(System.getenv("OPENAI_API_KEY"))
+        .modelName("text-embedding-3-small")
+        .build();
+```
+
+This should look familiar. It is the pattern from the [ChatModel](/docs/langchain4j/langchain4j-essentials/chatmodel) page again:
+
+| Chat | Embeddings |
+| --- | --- |
+| `ChatModel`, an interface | `EmbeddingModel`, an interface |
+| `OpenAiChatModel` | `OpenAiEmbeddingModel` |
+| `OllamaChatModel` | `OllamaEmbeddingModel` |
+
+Both classes come from LangChain4j. Your code depends on the `EmbeddingModel` interface, and one line decides which provider is behind it. No new dependency is needed. The embedding classes are in the same `langchain4j-open-ai` and `langchain4j-ollama` modules as the chat classes.
+
+## Step 3: Embed three sentences
+
+```java title="App.java"
+Embedding v1 = embeddingModel.embed("What is the refund policy?").content();
+Embedding v2 = embeddingModel.embed("How can I get my money back?").content();
+Embedding v3 = embeddingModel.embed("Java garbage collection frees heap memory.").content();
+```
+
+| Part | Meaning |
+| --- | --- |
+| `embeddingModel.embed(text)` | Sends the text to the embedding model. The result is a response object |
+| `.content()` | Takes the embedding out of that response |
+| `Embedding` | LangChain4j's class for one embedding. Inside is an array of `float` |
+
+Two of the sentences are about the same thing, in different words. The third is about something else entirely.
+
+## Step 4: Look inside a vector
+
+Before comparing anything, look at what one embedding actually is:
+
+```java title="App.java"
+// 2. Inspect the raw vector inside Java
+System.out.println("Vector Dimensions : " + v1.dimension());
+System.out.println("First 5 floats    : " + Arrays.toString(Arrays.copyOf(v1.vector(), 5)));
+```
+
+```text
+Vector Dimensions : 1536
+First 5 floats    : [-0.0113220215, 0.026489258, -0.009315491, 0.012329102, -0.018814087]
+```
+
+There it is. The sentence "What is the refund policy?" is now 1536 numbers, and these are the first five. `v1.vector()` gives you the complete `float[]` if you want to print all of them.
+
+No single number means anything you could name. There is no "money axis" as in the two-dimensional picture. The meaning lies in all 1536 values together.
+
+## Step 5: Compare with cosine similarity
+
+Two embeddings are similar when the angle between them is small. LangChain4j has the calculation built in:
+
+```java title="App.java"
+double refundVsMoney = CosineSimilarity.between(v1, v2);
+double refundVsJava  = CosineSimilarity.between(v1, v3);
+
+System.out.println("Refund vs Money Back: " + refundVsMoney);
+System.out.println("Refund vs Java: " + refundVsJava);
+```
+
+```text
+Refund vs Money Back: 0.4706560940121581
+Refund vs Java: 0.0862159236366779
+```
+
+![Cosine_Similarity](https://dyz1pdcuffwr5.cloudfront.net/LangChain4j/lc4j-cosine-similarity.svg)
+
+Read the two numbers against each other:
+
+| Pair | Score | Meaning |
+| --- | --- | --- |
+| "What is the refund policy?" and "How can I get my money back?" | 0.47 | Clearly related, although they share no key word |
+| "What is the refund policy?" and "Java garbage collection frees heap memory." | 0.09 | Close to zero. Unrelated |
+
+A program that receives the question about money can now decide, with arithmetic alone, that the refund sentence is the relevant one and the Java sentence is not. This is the step that keyword search could not do.
+
+<Callout type="info" title="If you like the maths">
+Cosine similarity is the dot product of the two vectors divided by the product of their lengths. The result is 1 when they point in exactly the same direction, 0 when they are at a right angle, and -1 when they point in opposite directions. The lecturer explored the formula when he first learned it and then realised that the built-in function is all you need in practice. If you want to see it worked out, he points to the explanation in the Spring AI documentation.
+</Callout>
+
+## Step 6: What scores close to 1 look like
+
+A score of 0.47 for two sentences that "mean the same" may seem low. The lecture runs two more comparisons to give you a feeling for the scale.
+
+Replace the second sentence with a copy of the first, with a small `w` and without the question mark:
+
+```java title="App.java"
+Embedding v1 = embeddingModel.embed("What is the refund policy?").content();
+Embedding v2 = embeddingModel.embed("what is the refund policy").content();
+```
+
+```text
+Refund vs Money Back: 0.9187464051888965
+```
+
+Then make the two sentences exactly identical:
+
+```text
+Refund vs Money Back: 1.0
+```
+
+| Comparison | Score |
+| --- | --- |
+| Identical text | 1.0 |
+| Same words, a different capital letter and no question mark | 0.92 |
+| Same meaning, completely different words | 0.47 |
+| Unrelated | 0.09 |
+
+Two lessons from this table:
+
+- Only identical text scores 1. A capital letter and a question mark already move the result to 0.92. Embeddings are sensitive to everything in the text.
+- A score is useful **in comparison** with other scores. 0.47 is not a failed grade. Next to 0.09 it is a clear signal.
+
+The label in the output still says "Refund vs Money Back" during these experiments, because only the sentence was changed and not the print statement. Put the original second sentence back before you continue.
+
+## Step 7: The same with Ollama
+
+For a local embedding model, comment out the OpenAI block and use this one:
+
+```java title="App.java"
+EmbeddingModel embeddingModel = OllamaEmbeddingModel.builder()
+        .baseUrl("http://localhost:11434")
+        .modelName("nomic-embed-text")
+        .build();
+```
+
+The first run in the lecture fails, because this model has not been downloaded on that machine. An embedding model has to be pulled like any other:
+
+```bash
+ollama pull nomic-embed-text
+```
+
+It is a small download compared with a chat model. Run the program again:
+
+```text
+Vector Dimensions : 768
+First 5 floats    : [0.06992361, 0.07339112, -0.15194474, -0.027618041, 0.055489913]
+Refund vs Money Back: 0.6038266537910081
+Refund vs Java: 0.3450548489782068
+```
+
+The complete program in its final state:
+
+```java title="App.java"
+package com.telusko;
+
+import java.util.Arrays;
+
+import dev.langchain4j.data.embedding.Embedding;
+import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.model.ollama.OllamaEmbeddingModel;
+import dev.langchain4j.store.embedding.CosineSimilarity;
+
+public class App {
+
+    public static void main(String[] args) {
+
+        // EmbeddingModel embeddingModel = OpenAiEmbeddingModel.builder()
+        //         .apiKey(System.getenv("OPENAI_API_KEY"))
+        //         .modelName("text-embedding-3-small")
+        //         .build();
+
+        EmbeddingModel embeddingModel = OllamaEmbeddingModel.builder()
+                .baseUrl("http://localhost:11434")
+                .modelName("nomic-embed-text")
+                .build();
+
+        Embedding v1 = embeddingModel.embed("What is the refund policy?").content();
+        Embedding v2 = embeddingModel.embed("How can I get my money back?").content();
+        Embedding v3 = embeddingModel.embed("Java garbage collection frees heap memory.").content();
+
+        // 2. Inspect the raw vector inside Java
+        System.out.println("Vector Dimensions : " + v1.dimension());
+        System.out.println("First 5 floats    : " + Arrays.toString(Arrays.copyOf(v1.vector(), 5)));
+
+        double refundVsMoney = CosineSimilarity.between(v1, v2);
+        double refundVsJava  = CosineSimilarity.between(v1, v3);
+
+        System.out.println("Refund vs Money Back: " + refundVsMoney);
+        System.out.println("Refund vs Java: " + refundVsJava);
+    }
+}
+```
+
+<Callout type="info" title="Checked for these docs">
+The Ollama version was run for these docs with `nomic-embed-text`. It printed 768 dimensions and exactly the numbers shown above, down to the last digit: 0.6038266537910081 and 0.3450548489782068. The same local embedding model returned the same vector for the same text on a different machine. That is very different from a chat model, which words its answer differently on each run.
+</Callout>
+
+## Reading the two models side by side
+
+| | `text-embedding-3-small` | `nomic-embed-text` |
+| --- | --- | --- |
+| Dimension | 1536 | 768 |
+| Refund vs money back | 0.47 | 0.60 |
+| Refund vs Java | 0.09 | 0.35 |
+| Gap between the two | 0.38 | 0.26 |
+
+At first glance the local model looks better, because 0.60 is higher than 0.47. The lecturer warns against reading it that way, and he is right. The **unrelated** pair also scores much higher with this model, 0.35 against 0.09.
+
+What matters for search is not how high one score is. It is how clearly the relevant text stands apart from the irrelevant text. Measured that way, the OpenAI model separates these three sentences more clearly.
+
+<Callout type="warn" title="Do not compare raw scores between models">
+In the lecture, the difference in scores is put down to the number of dimensions. Treat that as a loose intuition and not as a rule. Each embedding model spreads its scores over its own range, and that depends on how the model was trained, not only on its size. The safe conclusions are these: never compare a score from one model with a score from another, and choose any threshold separately for each model, by testing it with your own texts.
+</Callout>
+
+## Which models have to match
+
+The lecture gives a rule of thumb at this point: with OpenAI chat models use OpenAI embeddings, with Ollama use an Ollama embedding model, and do not mix.
+
+As a habit that is fine. It keeps a project to one provider and one bill. It is worth being exact about what is truly required, though, because it is a different thing:
+
+| Must be the same model | Can be chosen independently |
+| --- | --- |
+| The embedding model that embeds your **documents** and the embedding model that embeds the **question** | The chat model that writes the final answer |
+
+Embeddings from two different embedding models live in two unrelated number spaces. They often do not even have the same length, 1536 against 768. Comparing a question embedded by one model with documents embedded by another gives meaningless scores, or an error. That is the mistake that really breaks a search.
+
+The chat model never sees an embedding. It receives plain text, the chunks that were found, so it can come from any provider. A local embedding model with a hosted chat model, or the other way round, is a valid combination.
+
+## The problem that is left
+
+Three sentences, two calls to `CosineSimilarity.between`, written by hand. That was fine for learning.
+
+A real company has thousands of paragraphs in PDFs, text files and spreadsheets. You cannot keep them in variables called `v1`, `v2` and `v3`, and you cannot write the comparisons one by one. The embeddings need a place to live, and something has to search them for you.
+
+That is the next page: [Embedding Stores](/docs/langchain4j/embeddings-and-rag/embedding-stores).
+
+## Mistakes and fixes
+
+| Problem | Cause | Fix |
+| --- | --- | --- |
+| The editor imports an `Embedding` or `EmbeddingModel` from `com.openai` | The OpenAI SDK is still on the classpath and has classes with the same names | Use the LangChain4j imports shown in the complete program. Removing old imports first, as the lecture does, avoids this |
+| An error that the model was not found, with Ollama | `nomic-embed-text` has not been downloaded | Run `ollama pull nomic-embed-text` |
+| A chat model name was used in the embedding builder | Chat models and embedding models are different models | Use an embedding model name, such as `text-embedding-3-small` or `nomic-embed-text` |
+| Scores differ from this page | You are using another embedding model, or the text is not exactly the same | Expected. Compare scores only within one model |
+
+## Try It Yourself
+
+1. Run the program with the model you have and note the dimension and the two scores.
+2. Print the whole vector once, with `Arrays.toString(v1.vector())`, to see how long it really is.
+3. Add a fourth sentence in another language that means "How can I get my money back?". Compare it with `v1` and `v2`.
+4. Repeat the experiment from Step 6: change one letter, then remove the question mark, then reorder the words. Watch the score.
+5. Run the program twice and compare the first five floats. Are they identical?
+6. Compare "I love dogs" with "I hate dogs". Is the score high or low? What does that tell you about what "similar" means for an embedding?
+7. Write your own method `static double cosine(float[] a, float[] b)` from the formula in the callout, and check that it gives the same result as `CosineSimilarity.between`.
+8. If you can use both models, embed the same three sentences with each and fill in the comparison table with your own numbers.
+
+## Official references
+
+- [LangChain4j: RAG, embedding and embedding model](https://docs.langchain4j.dev/tutorials/rag#embedding)
+- [LangChain4j: OpenAI embedding model](https://docs.langchain4j.dev/integrations/embedding-models/open-ai)
+- [LangChain4j: Ollama embedding model](https://docs.langchain4j.dev/integrations/embedding-models/ollama)
+- [OpenAI: embeddings](https://platform.openai.com/docs/guides/embeddings)
+- [Ollama: nomic-embed-text](https://ollama.com/library/nomic-embed-text)
+- [Source code for this lesson](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_Embedding_Demo_and_Cosine_Similarity_Part_1)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

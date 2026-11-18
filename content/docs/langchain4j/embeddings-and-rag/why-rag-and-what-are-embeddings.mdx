@@ -1,0 +1,195 @@
+---
+title: Why RAG and What Are Embeddings
+description: Understand why a model needs your documents to answer questions about your business, why keyword search cannot find them, and how embeddings turn the meaning of a sentence into numbers that can be compared.
+---
+
+Look at what the model has become over the last pages. It is a brain that can answer. It has a [memory](/docs/langchain4j/langchain4j-essentials/chat-memory). It has hands, in the form of [tools](/docs/langchain4j/langchain4j-essentials/tools-and-ai-agents).
+
+One thing is still missing, and it is something every person has run into: being asked about a subject you never studied.
+
+## The open-book test
+
+The lecturer describes it from his own side. Ask him about programming and he answers from what he knows. Ask him about history and there are two possibilities.
+
+He can answer anyway. Not knowing, and not wanting to say "I don't know", he will make something up that sounds reasonable. People do this, and so do models. For a model it is called **hallucination**.
+
+Or he can reach for a history book, find the right page, read the passage and then answer. He does not have to carry the whole subject in his head. He needs the right book, and a way to find the right page quickly.
+
+That second way is an **open-book test**. If the question is covered by one of the books, the answer is correct. If it is not, he can honestly say that it is outside what he has.
+
+A model is in the same position. It was trained on a huge amount of public text, up to a certain date. It has never seen your company's refund rules, your internal wiki or yesterday's price list. If we want correct answers about those, we have to hand it the book.
+
+## An example with a refund
+
+A website sells courses. A customer has bought one and writes into the chat:
+
+> How can I get my money back?
+
+The company has a policy document. Somewhere in it there is a sentence like this:
+
+> You can ask for a refund within 15 days of purchase.
+
+That sentence is the answer. The application has to find it and give it to the model. And here is the difficulty. Put the two sentences side by side:
+
+| | Text |
+| --- | --- |
+| What the customer wrote | How can I get my **money back**? |
+| What the policy says | You can ask for a **refund** within 15 days of purchase. |
+
+They share no important word. The customer says "money back". The document says "refund".
+
+### Why a database query does not help
+
+The traditional way to look something up is a query. In SQL you would search the text with `LIKE`:
+
+```sql
+SELECT * FROM policy WHERE content LIKE '%money%';
+```
+
+It returns nothing, because the word "money" does not appear in the policy. Keyword search matches letters. It has no idea that "money back" and "refund" are the same thing.
+
+And if the application finds nothing and still passes the question to the model, the model answers without the policy. It will describe refund steps that sound plausible and do not exist.
+
+## The solution has a name: RAG
+
+The technique that solves this is **RAG**, short for **Retrieval-Augmented Generation**.
+
+| Word | Meaning |
+| --- | --- |
+| Retrieval | Find the pieces of your documents that are relevant to the question |
+| Augmented | Add those pieces to the request |
+| Generation | Let the model write the answer, using what it was given |
+
+It is the open-book test, automated. Three ideas are needed to build it, and each one gets its own page:
+
+1. **Embeddings**, on this page and the next. A way to compare text by meaning.
+2. An **embedding store**, also called a vector store. A place to keep many embeddings and search them.
+3. The **RAG pipeline** that connects the two to a model.
+
+## Embeddings: meaning as numbers
+
+It may feel odd to talk about numbers now, when everything so far was about text. But computers only ever work with numbers. You have met one example already. On the [OpenAI setup page](/docs/langchain4j/llm-apis-in-plain-java/openai-api-key-and-models), text was cut into tokens, and each token is in fact an id number in the model's vocabulary.
+
+A token id only says *which* piece of text something is. It says nothing about what it means.
+
+An **embedding** is a different thing. It is a list of decimal numbers that represents the **meaning** of a piece of text. It is produced by an **embedding model**, a special kind of model that does not write text. Its only job is to turn text into such a list.
+
+The property that makes embeddings useful:
+
+> Texts with similar meanings get similar numbers.
+
+### Seeing it in two dimensions
+
+To make this visible, imagine an embedding with only two numbers. Two numbers are a point on a graph. Let one axis stand for "how much is this about technology" and the other for "how much is this about money".
+
+![Embedding_Space](https://dyz1pdcuffwr5.cloudfront.net/LangChain4j/lc4j-embedding-space.svg)
+
+These are the points from the lecture's slide:
+
+| Phrase | Embedding | Where it lands |
+| --- | --- | --- |
+| "Refund policy" | `[0.15, 0.88]` | High on the money axis |
+| "Get money back" | `[0.21, 0.84]` | Right next to it |
+| "Java Garbage Collection" | `[0.92, 0.12]` | Far along the tech axis |
+| "Spring Boot" | `[0.86, 0.08]` | Right next to that one |
+| "Masala Dosa" | `[0.08, 0.09]` | About neither |
+
+"Refund policy" and "Get money back" have no word in common, and they sit side by side. The two Java phrases form their own group in another corner. Position follows meaning, not spelling.
+
+The values in this table are made up for the picture, as the lecturer says himself. The principle is exactly how real embeddings behave.
+
+### Real embeddings have many more numbers
+
+Two numbers cannot hold the meaning of a sentence. Real embedding models use hundreds or thousands. The count is called the **dimension** of the embedding:
+
+| Embedding model | Provider | Dimension |
+| --- | --- | --- |
+| `text-embedding-3-small` | OpenAI | 1536 |
+| `text-embedding-3-large` | OpenAI | 3072 |
+| `nomic-embed-text` | Runs locally with Ollama | 768 |
+
+Nobody can draw 1536 axes, which is why we look at two. The geometry is the same, with more axes. In Java, an embedding is simply an array of `float` values with that many entries.
+
+OpenAI's embedding models also let you ask for a shorter list of numbers than the default, at some cost in precision.
+
+### Sentences, not single words
+
+Early embedding techniques worked word by word. That runs into a problem at once:
+
+| Phrase | What "bank" means |
+| --- | --- |
+| river bank | The land at the side of a river |
+| ABC bank | A place where you deposit and withdraw money |
+
+One word, two unrelated meanings. The meaning comes from the words around it, the **context**. If each word always had the same embedding, both "banks" would land on the same point.
+
+So we do not embed words. We embed whole sentences or passages. The model reads the complete text and produces one embedding for all of it, and that embedding reflects what "bank" means *here*.
+
+## Comparing embeddings: cosine similarity
+
+Suppose every sentence of the policy has been embedded and all the points exist. A question comes in. What happens?
+
+1. The question is embedded with the same model. It becomes a point too.
+2. We look for the stored points that are **nearest** to it.
+3. The texts that belong to those points are the relevant ones.
+
+"Nearest" needs a definition. The usual one looks at the **angle** between two embeddings, seen as arrows from the origin of the graph:
+
+| Angle between the arrows | Meaning | Cosine similarity |
+| --- | --- | --- |
+| Very small. They point the same way | Very similar | Close to 1 |
+| Around a right angle | Unrelated | Close to 0 |
+| Opposite directions | Opposite | Close to -1 |
+
+The measure is called **cosine similarity**, because it is the cosine of that angle. You do not have to calculate it yourself. Libraries provide it, and you will call it in one line on the next page.
+
+### The same example as a process
+
+The lecture then walks through it as four steps:
+
+| Step | What happens |
+| --- | --- |
+| 1 | Three sentences. v1: "What is the refund policy?" v2: "How to get my money back?" v3: "Java GC frees heap memory". For keyword search nothing matches, because they share no word |
+| 2 | An embedding model turns each sentence into a list of numbers |
+| 3 | As points: v1 and v2 are close together, v3 is far away |
+| 4 | Cosine similarity confirms it with numbers: a high value for v1 against v2, a low value for v1 against v3 |
+
+The whiteboard shows example scores of 0.76 for the similar pair and 0.18 for the unrelated pair. Do not memorise them. You will measure real values with real models on the next page, and they will be different.
+
+<Callout type="info" title="About a fixed threshold such as 0.6">
+The lecture mentions that a score above about 0.6 can be treated as "near", and that RAG code usually sets such a minimum. Take it as a starting point and nothing more. Scores are not comparable between embedding models. The right threshold depends on the model and on your own texts, so it has to be found by testing.
+</Callout>
+
+## Why not send every document every time?
+
+There is a simpler idea, and it deserves an answer. Skip all of this. Put the whole policy into the system message of every request, and let the model find the relevant part.
+
+For one short document that works. It stops working as the material grows:
+
+| Problem | Why |
+| --- | --- |
+| Cost | Everything you send is billed as input tokens, on every single request |
+| Size | A model can only take in a limited amount of text. A real set of company documents does not fit |
+| Quality | A model that is given a hundred pages to answer one question can lose track of what matters, and is more likely to answer from the wrong passage |
+
+RAG avoids all three. It sends a few short, relevant pieces of text, called **chunks**, and leaves the rest where it is. And to know which chunks are relevant, we need exactly what this page introduced: embeddings and a way to compare them.
+
+## Try It Yourself
+
+1. Write down three questions a customer could ask about a refund, without using the word "refund". Would a keyword search find the policy sentence for any of them?
+2. On paper, draw two axes of your own choice, for example "food" and "sport". Place five phrases as points and group the ones that belong together.
+3. Find two more words that change meaning with context, like "bank". Write a sentence for each meaning.
+4. Ask a chat model a detailed question about a rule that only your school or company has. Does it admit that it does not know, or does it invent an answer?
+5. Take a long document and estimate how many tokens it has, using the rule from the tokens lesson. What would it cost to send it with every question, a thousand times a day?
+6. Look up the documentation of one embedding model and find its dimension.
+
+## Official references
+
+- [LangChain4j: RAG](https://docs.langchain4j.dev/tutorials/rag)
+- [OpenAI: embeddings](https://platform.openai.com/docs/guides/embeddings)
+- [Ollama: nomic-embed-text](https://ollama.com/library/nomic-embed-text)
+- [LangChain4j: supported embedding models](https://docs.langchain4j.dev/category/embedding-models)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

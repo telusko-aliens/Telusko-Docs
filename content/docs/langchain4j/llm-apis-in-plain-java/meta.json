@@ -1,0 +1,12 @@
+{
+  "title": "LLM APIs in Plain Java",
+  "pages": [
+    "introduction-to-langchain4j.mdx",
+    "openai-api-key-and-models.mdx",
+    "running-local-models-with-ollama.mdx",
+    "first-java-project-with-the-openai-sdk.mdx",
+    "using-ollama-from-java.mdx",
+    "instructions-and-reasoning-effort.mdx",
+    "structured-output-with-json-schema.mdx"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "title": "LangChain4j",
+  "icon": "Link",
+  "pages": [
+    "getting-started.mdx",
+    "llm-apis-in-plain-java",
+    "langchain4j-essentials",
+    "embeddings-and-rag"
+  ]
+}
