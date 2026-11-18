@@ -58,12 +58,88 @@ The first seven steps contain no LangChain4j code at all, and that is on purpose
 
 One small Maven project named `lc4j`, with a single class, `App.java`. Each lecture changes that class a little. There is no web framework and no database, so nothing hides the code that talks to the model.
 
-The complete source code is on GitHub. Every lecture has its own folder with the project as it looks at the end of that lecture:
+The complete source code is on GitHub:
 
 <Cards>
   <Card title="Source code for the course" href="https://github.com/telusko-aliens/LangChain4j-course" description="One standalone Maven project per lecture, ready to open in VS Code" />
   <Card title="Official LangChain4j documentation" href="https://docs.langchain4j.dev/intro" description="Tutorials and integration guides from the LangChain4j project" />
 </Cards>
+
+---
+
+## The source code, lesson by lesson
+
+The repository does not contain one project that grows. It contains **one folder per lecture**, and each folder is a complete Maven project that shows `App.java` exactly as it looks at the end of that lecture. You can open any folder by itself. You do not have to go through them in order.
+
+| Step | Lesson | Folder in the repository |
+| --- | --- | --- |
+| 4 | First Java Project with the OpenAI SDK | [`LC4JCode_Le_Java_Project_with_OpenAI_in_VS_Code`](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_Java_Project_with_OpenAI_in_VS_Code) |
+| 5 | Using Ollama from Java | [`LC4JCode_Le_with_Ollama`](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_with_Ollama) |
+| 6 | Instructions and Reasoning Effort | [`LC4JCode_Le_Reasoning_Effort_and_Instructions`](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_Reasoning_Effort_and_Instructions) |
+| 7 | Structured Output with JSON Schema | [`LC4JCode_Le_Structured_Output_for_Json`](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_Structured_Output_for_Json) |
+| 8 | ChatModel | [`LC4JCode_Le_Langchain4j_ChatModel`](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_Langchain4j_ChatModel) |
+| 9 | AI Services | [`LC4JCode_Le_Langchain4j_AiServices`](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_Langchain4j_AiServices) |
+| 10 | Structured Output with Records | [`LC4JCode_Le_Langchain4j_Structured_Output`](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_Langchain4j_Structured_Output) |
+| 11 | Chain of Thought | [`LC4JCode_Le_Chain_of_Thoughts`](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_Chain_of_Thoughts) |
+| 12 | Chat Memory | [`LC4JCode_Le_Chat_Memory`](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_Chat_Memory) |
+| 13 | Tools and AI Agents | [`LC4JCode_Le_Tools_and_AI_Agents_1`](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_Tools_and_AI_Agents_1), [`LC4JCode_Le_Tools_and_AI_Agents_2`](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_Tools_and_AI_Agents_2) |
+| 15 | Embeddings and Cosine Similarity | [`LC4JCode_Le_Embedding_Demo_and_Cosine_Similarity_Part_1`](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_Embedding_Demo_and_Cosine_Similarity_Part_1) |
+| 16 | Embedding Stores | [`LC4JCode_Le_VectorStore_or_EmbeddingStore`](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_VectorStore_or_EmbeddingStore) |
+| 17 | Building a RAG Pipeline | [`LC4JCode_Le_RAG`](https://github.com/telusko-aliens/LangChain4j-course/tree/main/LC4JCode_Le_RAG) |
+
+Steps 1 to 3 and step 14 are setup and theory, so they have no folder. Every lesson page links to its own folder at the top.
+
+Every folder has the same four parts:
+
+```text
+LC4JCode_Le_<Lecture_Name>/
+├── pom.xml                 the dependencies for that lesson
+├── .env                    a placeholder for your OpenAI API key
+├── .vscode/
+│   └── launch.json         loads .env when you run from VS Code
+└── src/main/java/com/telusko/
+    └── App.java            the code of the lesson
+```
+
+### Running a lesson from the repository
+
+<Steps>
+<Step>
+### Get the code
+
+```bash
+git clone https://github.com/telusko-aliens/LangChain4j-course.git
+```
+</Step>
+<Step>
+### Open one lesson folder
+
+Open the folder of a single lesson in VS Code, for example `LC4JCode_Le_Langchain4j_ChatModel`, and not the whole repository. The run configuration in `.vscode/launch.json` belongs to that one project. Wait until the Maven import has finished.
+</Step>
+<Step>
+### Choose OpenAI or Ollama
+
+Most `App.java` files contain two blocks, one for OpenAI and one for Ollama, with one of them commented out. Which one is active is simply how the lecture ended, so it differs from folder to folder. Uncomment the block you want and comment out the other.
+
+For OpenAI, open `.env` in that folder and replace the placeholder with your key. For Ollama, pull the models once:
+
+```bash
+ollama pull gemma4:e4b
+ollama pull nomic-embed-text
+```
+
+The second model is only needed for the embedding and RAG lessons. Some folders name `gemma4:12b`, the larger model the lecturer switched to. Change the name to a model you have.
+</Step>
+<Step>
+### Run App.java
+
+Use the **Run** link above the `main` method.
+</Step>
+</Steps>
+
+<Callout type="warn" title="The .env file in the repository is tracked by Git">
+In your own project, `.env` belongs in `.gitignore`. In the course repository it is committed on purpose, with a placeholder in it, so that every folder runs after one edit. That means Git will see your real key as a change. If you fork the repository or push your copy anywhere, do not commit that file.
+</Callout>
 
 ---
 
