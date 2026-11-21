@@ -11,7 +11,7 @@ Open any AI chat application and ask it this:
 
 > How do I deploy a Java app on AWS?
 
-The lesson does exactly that with Gemini. The answer is long and good. It names four ways to deploy, from Elastic Beanstalk to plain EC2, explains each one and ends with a comparison table.
+The lesson asks Gemini this question. The answer is long and good. It names four ways to deploy, from Elastic Beanstalk to plain EC2, explains each one and ends with a comparison table.
 
 Now ask yourself one question. **Did it deploy anything?**
 
@@ -19,7 +19,7 @@ No. It explained how *you* can do it. It generated text. To really deploy, somet
 
 ## Four levels
 
-The lesson's whiteboard shows four rows. Its caption is worth reading first:
+The lesson's whiteboard shows four rows: chatbot, tool-using assistant, AI agent and agentic workflow. Its caption is worth reading first:
 
 > A conceptual progression, not four mutually exclusive technologies.
 
@@ -32,7 +32,7 @@ Each level includes the one before it.
 | **Chatbot** | User question, LLM, answer | Answers questions from what the model learned in training | [Your First LangChain4j Application](/docs/langchain4j-one-shot/langchain4j-in-practice/your-first-langchain4j-application) |
 | **Tool-using assistant** | User question, LLM with a tool, answer | Can fetch information or perform actions through tools that you provide | [Tool Calling](/docs/langchain4j-one-shot/langchain4j-in-practice/tool-calling) and [MCP](/docs/langchain4j-one-shot/mcp-and-local-models/mcp-explained) |
 | **AI agent** | Goal, then decide, act and observe, repeated until the goal is met | Can make decisions and work toward a goal | The next lessons |
-| **Agentic AI** | Goal, coordinated steps or multiple agents, verify, result | Systems designed to coordinate these decisions and actions to complete tasks | The next lessons |
+| **Agentic workflow**, the agentic AI level | Goal, coordinated steps or multiple agents, verify, result | Systems designed to coordinate these decisions and actions to complete tasks | The next lessons |
 
 The first two rows start with a **user question**. The last two start with a **goal**. That change of word is the heart of the matter. A question wants an answer. A goal wants a result, and reaching it can take several steps that nobody listed in advance.
 

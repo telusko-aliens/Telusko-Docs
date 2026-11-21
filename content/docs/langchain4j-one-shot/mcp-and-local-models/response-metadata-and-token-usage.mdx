@@ -17,7 +17,7 @@ This information is called the **metadata** of the response. LangChain4j gives i
 
 ## Why a String is not enough
 
-`model.chat(...)` exists in several forms. The autocomplete in the lesson lists them:
+`model.chat(...)` exists in several forms. The autocomplete in the lesson lists them. A fifth form, which takes a `ChatRequest` together with extra options, is left out of this table:
 
 | Call | Returns | Contains |
 | --- | --- | --- |
@@ -26,7 +26,7 @@ This information is called the **metadata** of the response. LangChain4j gives i
 | `chat(List<ChatMessage> messages)` | `ChatResponse` | The answer and the metadata |
 | `chat(ChatRequest chatRequest)` | `ChatResponse` | The answer and the metadata |
 
-A `String` has no room for metadata. To get it, we need a `ChatResponse`. The lesson uses the last form, with a `ChatRequest` object, because a request object can also carry parameters. We will need that in Step 5.
+A `String` has no room for metadata. To get it, we need a `ChatResponse`. The lesson uses the last form, with a `ChatRequest` object, because a request object can also carry parameters. We will need that in Step 4.
 
 ![Response_Metadata](https://dyz1pdcuffwr5.cloudfront.net/LangChain4jOneShot/lc4j1s-response-metadata.svg)
 

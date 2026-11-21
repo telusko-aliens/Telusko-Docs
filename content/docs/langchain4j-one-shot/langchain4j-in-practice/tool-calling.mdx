@@ -167,7 +167,7 @@ public class CourseToolDemo {
 }
 ```
 
-The one new line is `.tools(tools)`. You pass an object, and LangChain4j finds every method in it that carries `@Tool`. For each one it builds a description from the annotation text, the method name and the parameters, and sends these descriptions to the model with every request.
+The top of this file, with the imports and the line that reads the API key, is not visible in this lesson. It is the same as in the previous lesson's project. The one new line is `.tools(tools)`. You pass an object, and LangChain4j finds every method in it that carries `@Tool`. For each one it builds a description from the annotation text, the method name and the parameters, and sends these descriptions to the model with every request.
 
 The lesson first tries the short form `AiServices.create(CourseAssistant.class)` and gets a red underline. The short form accepts an interface and a model, and nothing else. Tools, like chat memory, need the builder. The other builder options from earlier lessons can be combined with it, for example `.chatMemory(...)`.
 

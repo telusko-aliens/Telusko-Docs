@@ -19,7 +19,7 @@ The lesson has two halves:
 ![Custom_MCP_Server](https://dyz1pdcuffwr5.cloudfront.net/LangChain4jOneShot/lc4j1s-mcp-custom-server.svg)
 
 <Callout type="info" title="Follow the flow first">
-The server code is the most low-level code of this course, and the instructor says so more than once: do not get stuck on every line of syntax. Understand the five things a server has to do. They are the headings of Part 1.
+The server code is the most low-level code of this course, and the instructor says so more than once: do not get stuck on every line of syntax. Understand what a server has to do: hold some logic, open a transport, create the server object, register its tools and stay alive. Those are the steps of Part 1.
 </Callout>
 
 ## Part 1: The server
@@ -38,7 +38,7 @@ The lesson opens a prepared Maven project named `course-mcp-server-starter-java2
 
 This is the **official MCP Java SDK**. It does not come from LangChain4j or Spring AI. Any Java program can use it to become an MCP server.
 
-The value of `mcp.version` is not shown in the video. The IDE reveals that version `2.0.1` is in use, and the code below was built and run with that version:
+The `<properties>` section of the lesson's `pom.xml` is never opened in the video. The IDE reveals that version `2.0.1` of the SDK is in use. The properties below were written for these docs, and the code was built and run with them:
 
 ```xml title="pom.xml"
 <properties>
@@ -384,7 +384,7 @@ Two small differences from the file in the video, both on purpose:
 - The starter line `System.out.println("Course MCP Server Starter");` at the top of `main` is removed. The callout below explains why.
 
 <Callout type="warn" title="A stdio server must not print to standard output">
-With the stdio transport, standard output is the channel for protocol messages. Anything else printed there is mixed into the conversation between client and server. That is why the ready message in the lesson uses `System.err`, which is a separate stream.
+With the stdio transport, standard output is the channel for protocol messages. Anything else printed there is mixed into the conversation between client and server. The ready message in the lesson is printed with `System.err`, which is a separate stream and therefore safe. The video does not comment on that choice.
 
 The lesson's file still contains the starter line that prints "Course MCP Server Starter" with `System.out`. In the test for these docs the LangChain4j client coped with that extra line and the tools still worked. Other clients may be stricter. In your own stdio servers, send every log line to `System.err` or to a logger that writes there.
 </Callout>
@@ -474,7 +474,7 @@ McpTransport transport = StdioMcpTransport.builder()
         .build();
 ```
 
-Last time the command was `npx` with a Node.js package. This time it is `java -jar` with our jar. The class `StdioMcpTransport` is the same. Only the command that starts the server is different. Use the path of the jar on your own machine.
+Last time the command was `npx` with a Node.js package. This time it is `java -jar` with our jar. The class `StdioMcpTransport` is the same. Only the command that starts the server is different. Use the path of the jar on your own machine. In the video the end of this long path runs off the screen. The file name at its end is the jar that the build produced.
 
 ### Step 3: A new key, and the new assistant
 
@@ -558,7 +558,7 @@ AI Response:
 The Java course costs 3000 INR and has a duration of 3 months.
 ```
 
-The first line still says "MCP Filesystem Demo", left over from the previous lesson. The answer contains our data: 3000 INR and 3 months come from `CourseServices`, travelled through the MCP server, and were put into a sentence by the model.
+The first line still says "MCP Filesystem Demo", left over from the previous lesson. On screen, the three SLF4J warning lines appear between it and the answer. They are left out here. The answer contains our data: 3000 INR and 3 months come from `CourseServices`, travelled through the MCP server, and were put into a sentence by the model.
 
 In the video the program does not end by itself after the answer. The stop button stays red, the instructor stops the run, and the console ends with exit code 130. The same was observed in the test for these docs: after `main` had finished, the Java process stayed alive until it was stopped.
 

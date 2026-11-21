@@ -329,7 +329,7 @@ The last point of that answer expands MCP as "Model Control Protocol". That is t
 The rule from tool calling is unchanged: the model only requests. This time the execution happens in the server, and not in our own Java methods.
 
 <Callout type="info" title="Checked for these docs">
-The connection part of this lesson was run for these docs with `langchain4j-mcp` 1.18.1-beta28, Node.js 22 and a demo folder with the same two file names.
+The connection part of this lesson was run for these docs with `langchain4j-mcp` 1.18.1-beta28, Node.js 22 and a demo folder with the same two file names. Server version 2.4.0 asks for Node.js 24 and only printed a warning about the older version before it started. Use Node.js 24 or newer, as the video does.
 
 - **Version 2.4.0 of the server with `--read-only`** offered 10 tools: `read_file`, `read_text_file`, `read_media_file`, `read_multiple_files`, `list_directory`, `list_directory_with_sizes`, `directory_tree`, `search_files`, `get_file_info` and `list_allowed_directories`. Calling `list_directory` directly returned the two files. A direct call of `write_file` was refused with "Tool write_file not found".
 - **An old cached version of the server, 1.0.0**, behaved differently. It did not know the `--read-only` option, printed a warning that it could not access a directory named `--read-only`, offered 14 tools including `write_file`, and a `write_file` call really created a file in the demo folder.
@@ -339,7 +339,7 @@ The whole program was also run with a local model in place of OpenAI. For the fi
 </Callout>
 
 <Callout type="warn" title="Make sure read-only really is read-only">
-The second result above matters. `npx` keeps downloaded packages in a cache and can start an old copy without telling you. An old copy of this server silently ignores `--read-only`. To be sure, name the version in the command, for example `"@modelcontextprotocol/server-filesystem@2.4.0"`, and check which tools the server offers before you trust it with a folder. Try It Yourself number 3 shows how.
+The second result above matters. `npx` keeps downloaded packages in a cache and can start an old copy without telling you. An old copy of this server does not know `--read-only`. It prints a warning that is easy to miss and offers its write tools anyway. To be sure, name the version in the command, for example `"@modelcontextprotocol/server-filesystem@2.4.0"`, and check which tools the server offers before you trust it with a folder. Try It Yourself number 3 shows how.
 </Callout>
 
 ## Additions beyond the lesson

@@ -22,7 +22,7 @@ An **agentic workflow** moves this coordination into the framework. You say *whi
 
 ## What a workflow is
 
-A workflow describes how several agents are orchestrated: in which order they run, or whether they run together. LangChain4j has a builder for each pattern. The autocomplete on `AgenticServices` in the lesson shows them:
+A workflow describes how several agents are orchestrated: in which order they run, or whether they run together. LangChain4j has a builder for each pattern. The autocomplete on `AgenticServices` in this lesson and the two before it shows them:
 
 | Builder | Pattern |
 | --- | --- |
@@ -156,7 +156,23 @@ In the lesson's file the four manual lines are still present as comments above t
 
 ## Step 3: Run it
 
-The program prints one result: a four-week learning plan for Data Structures and Algorithms, the same topic as in the manual version. The console output of this run is not readable in the video. The instructor reads the heading aloud.
+The program prints one result, a four-week learning plan for Data Structures and Algorithms, the same topic as in the manual version:
+
+```text
+Learning plan: ### 4-Week Learning Plan for Data Structures and Algorithms
+
+**Week 1: Introduction to Data Structures**
+- Overview of Data Structures
+- Arrays and Strings
+- Linked Lists (Singly and Doubly)
+- Basic operations (insertion, deletion, traversal)
+
+**Week 2: Advanced Data Structures**
+- Stacks and Queues
+- Trees (Binary Trees, Binary Search Trees)
+- Heaps and Priority Queues
+- Basic tree operations (insertion, traversal, deletion)
+```
 
 The result is the same as before. What changed is who did the coordination.
 

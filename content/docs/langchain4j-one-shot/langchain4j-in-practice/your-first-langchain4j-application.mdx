@@ -1,6 +1,6 @@
 ---
 title: Your First LangChain4j Application
-description: See what LangChain4j is, add its Maven dependencies to a new project, create an OpenAiChatModel with a builder, and get an answer from a model in three lines of Java.
+description: See what LangChain4j is, add its Maven dependencies to a new project, create an OpenAiChatModel with a builder, and get an answer from a model with a few lines of Java.
 ---
 
 <Video id="nZRU4Htu5WQ" title="Your First LangChain4j Application" start={5702} />
@@ -28,8 +28,9 @@ The lesson starts on the official site and reads through the introduction page. 
 | | Core Java | OpenAI SDK | LangChain4j |
 | --- | --- | --- | --- |
 | You deal with HTTP and JSON | Yes | No | No |
-| Works with other providers | Rewrite everything | No, OpenAI only | Yes, change the model class |
-| Memory, tools, structured output | Build it yourself | Build it yourself | Built in |
+| Works with other providers | Rewrite everything | Built for OpenAI and services that copy its API | Yes, change the model class |
+| Structured output and tools | Build it yourself | Supported | Built in |
+| Chat memory, prompt templates, RAG | Build it yourself | Build it yourself | Built in |
 
 ## Step 1: Look at the Get Started page
 
@@ -163,7 +164,7 @@ public class Main {
 }
 ```
 
-One import, three statements.
+One import and a handful of statements.
 
 ## Step 5: Run it
 

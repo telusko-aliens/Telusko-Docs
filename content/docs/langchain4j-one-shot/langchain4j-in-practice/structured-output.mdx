@@ -15,11 +15,11 @@ Getting a model to answer in a fixed, typed shape is called **structured output*
 
 ## The idea
 
-The whiteboard in the lesson shows it in three boxes:
+The whiteboard in the lesson shows it in three stages:
 
 ![Structured_Output](https://dyz1pdcuffwr5.cloudfront.net/LangChain4jOneShot/lc4j1s-structured-output.svg)
 
-| Box | Content |
+| Stage | Content |
 | --- | --- |
 | User input | Free text |
 | LangChain4j AI Service + LLM | Maps the text to your return type |
@@ -93,10 +93,10 @@ Rahul
 [Java, Spring Boot, AWS, Docker]
 ```
 
-The first line is the record printed as a whole. The next three are its components, read with the accessor methods a record provides. `experience` is a real `int` and `skills` is a real `List<String>`. You could store the object, loop over the skills or compare the number.
+In the video the sentence is pasted into the call, and the IDE escapes the pasted quotation marks, so the string on screen looks more complicated than the one above. The call above is the intended code. The first line is the record printed as a whole. The next three are its components, read with the accessor methods a record provides. `experience` is a real `int` and `skills` is a real `List<String>`. You could store the object, loop over the skills or compare the number.
 
 <Callout type="warn" title="Look closely at the skills">
-The sentence says that Rahul "knows Spring Boot, AWS and Docker". Java is mentioned as his job, "a Java developer", and not in the list of what he knows. The result still contains `Java` as the first skill. The model made an inference, and a sensible one. But it shows what structured output is: the **shape** of the data is guaranteed, and the **content** is still the model's reading of the text. If an exact rule matters, state it in the prompt, and check the values before you rely on them.
+The sentence says that Rahul "knows Spring Boot, AWS and Docker". Java is mentioned as his job, "a Java developer", and not in the list of what he knows. The result still contains `Java` as the first skill. The model made an inference, and a sensible one. But it shows what structured output is: you decide the **shape** of the data, and the **content** is still the model's reading of the text. If an exact rule matters, state it in the prompt, and check the values before you rely on them.
 </Callout>
 
 ## Example 2: A POJO
@@ -229,12 +229,12 @@ public class LaunchMain
 ```
 
 <Callout type="warn" title="Keep the key out of the source file">
-In the video, this one class has the API key written directly into the `apiKey` string, because a new class needs a new run configuration and pasting is quicker. Do not copy that habit. A key in a source file is one commit away from being public. The code above reads it from the environment, as every other lesson does. Create a run configuration for `LaunchMain` with `OPENAI_API_KEY`, or define the variable once in your operating system.
+In the video, this one class has the API key written directly into the `apiKey` string. Do not copy that habit. A key in a source file is one commit away from being public. The code above reads it from the environment, as every other lesson does. Create a run configuration for `LaunchMain` with `OPENAI_API_KEY`, or define the variable once in your operating system.
 </Callout>
 
 ## Example 3: An enum
 
-The whiteboard has a third box that the lesson does not code: an **enum**, with the values JUNIOR, MID and SENIOR, and MID marked as the chosen one. An enum as return type turns the model into a classifier. It has to pick one of your values.
+The whiteboard shows a third kind of result that the lesson does not code: an **enum**, with the values JUNIOR, MID and SENIOR, and MID marked as the chosen one. An enum as return type turns the model into a classifier. It has to pick one of your values.
 
 ```java title="Level.java"
 package com.telusko.so;
@@ -288,9 +288,9 @@ The separate LangChain4j docs cover this in detail, including how to switch on t
 
 ## What you can and cannot rely on
 
-| You can rely on | You still have to check |
+| What you get | You still have to check |
 | --- | --- |
-| The result is an object of your type | Whether each value is correct |
+| An object of your type, or an exception if the model's reply cannot be converted | Whether each value is correct |
 | The field names are yours | Whether a field is missing. A value the model could not find arrives empty: `null` or an empty text, `0` for an `int`, an empty list |
 | Numbers are numbers, lists are lists | Whether the model added something the text did not say, as with `Java` above |
 
@@ -310,7 +310,7 @@ The record and the POJO example were run for these docs with a local model in pl
 | --- | --- | --- |
 | The method returns text with JSON in it | The return type is still `String` | Return your record or class |
 | An exception while the answer is converted | The model did not answer with the expected JSON. More likely with small models and the default mode | Use a more capable model or enable the JSON Schema mode |
-| A field of a POJO is always `null` | The class has no setter for it, or no no-argument constructor | Add both, or use a record |
+| `OutputParsingException` for a POJO | The class has no no-argument constructor, so the object cannot be created. In the test for these docs this ended in an exception. Setters are not required: a class with private fields and no setters was filled correctly | Add a no-argument constructor, or use a record |
 | An authentication error | `LaunchMain` is a new class without a run configuration that sets `OPENAI_API_KEY` | Create the configuration, or set the variable system-wide |
 | `List` cannot be resolved in the record | The import is missing | `import java.util.List;` |
 
@@ -320,7 +320,7 @@ The record and the POJO example were run for these docs with a local model in pl
 2. Run the Rahul example and check the skills. Then add "List only the skills that are named after the words 'He knows'" to the prompt and run again.
 3. Add a field `String city` to the record and run it with a sentence that names no city. What value arrives?
 4. Write the `Employee` class and its assistant, and extract an employee.
-5. Remove the setters from `Employee` and run again. What happens to the fields?
+5. Remove the setters from `Employee` and run again. Are the fields still filled? Then remove the no-argument constructor and add one with a parameter. What happens now?
 6. Add the `Level` enum and classify three different candidate descriptions.
 7. Give `extract` a sentence that has nothing to do with a candidate. Print the result and decide how your code should react.
 8. Combine two ideas: a record `CandidateReport(Candidate candidate, Level level)` returned by one method.

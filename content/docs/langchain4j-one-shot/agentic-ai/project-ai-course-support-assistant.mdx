@@ -299,7 +299,7 @@ public class McpClientConfig
 Both methods contain code from the MCP lessons: a stdio transport that runs `java -jar`, a client with a key, and a tool provider.
 
 <Callout type="info" title="Environment variable or fixed path">
-The starter project reads the jar path from an environment variable, `COURSE_MCP_JAR`, as shown above. In the video the instructor comments those lines out and writes the full path of the jar on his machine directly into `.command(...)`, to save time.
+The starter project reads the jar path from an environment variable, `COURSE_MCP_JAR`, as shown above. In the video the instructor comments those lines out and writes the full path of the jar on his machine directly into `.command(...)`.
 
 The code here keeps the environment variable. A path such as `D:\AI Basics\...` exists on one machine only, and a variable lets everyone run the same code. Set `COURSE_MCP_JAR` in the run configuration, next to `OPENAI_API_KEY`. The line that uses `jarPath` in the command is completed for these docs, because the starter's original line is not visible in the video.
 </Callout>
@@ -461,7 +461,7 @@ public class Main {
 }
 ```
 
-In the video the top of this method and the lines around the exit check are hidden. The banner, the loop, the call of `service.ask(question)`, the two output lines and the error handling are as shown on screen. The opening `try` line, the reading of the question and the exit message are completed for these docs.
+In the video the top of this method and the lines around the exit check are hidden. The banner, the loop, the call of `service.ask(question)`, the two output lines and the error handling are as shown on screen. The opening `try` line, the reading of the question, the exit check with its comment and the exit message are completed for these docs, in a way that fits every fragment that is visible.
 
 | Part | Purpose |
 | --- | --- |

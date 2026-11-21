@@ -74,7 +74,7 @@ The version is a property, which you define in the `<properties>` section of the
 ```
 
 <Callout type="warn" title="The starter version is not the plain LangChain4j version">
-The part of `pom.xml` that holds the version number is not shown in the video. The Spring Boot starters of LangChain4j are published with a version such as `1.20.0-beta30`, not `1.20.0`. A plain `1.20.0` is not found for these two artifacts. The project built for these docs used Spring Boot 4.1.3 with `1.20.0-beta30`. Check the official Spring Boot integration page for the current number.
+The part of `pom.xml` that holds the properties, with the Java version and the LangChain4j version, is not shown in the video. The values above are the ones used for these docs. The Spring Boot starters of LangChain4j are published with a version such as `1.20.0-beta30`, not `1.20.0`. A plain `1.20.0` is not found for these two artifacts. The project built for these docs used Spring Boot 4.1.3 with `1.20.0-beta30`. Check the official Spring Boot integration page for the current number.
 
 There are also two families of starters. Names with `spring-boot4-starter` are for Spring Boot 4. Names with `spring-boot-starter` are for Spring Boot 3. Use the family that matches your Spring Boot version.
 </Callout>
@@ -287,7 +287,7 @@ GET http://localhost:8080/api/explain?message=RAG in AI
 RAG stands for Retrieval-Augmented Generation. It's a method in AI where a model retrieves relevant information from a database or documents to help generate more accurate and contextually rich responses. ...
 ```
 
-Three extra characters of context changed the answer. It is a small, honest example of why prompts need context. If you want to know what Retrieval-Augmented Generation is, the separate LangChain4j docs build it step by step in [Why RAG and What Are Embeddings](/docs/langchain4j/embeddings-and-rag/why-rag-and-what-are-embeddings).
+Two extra words of context changed the answer. It is a small, honest example of why prompts need context. If you want to know what Retrieval-Augmented Generation is, the separate LangChain4j docs build it step by step in [Why RAG and What Are Embeddings](/docs/langchain4j/embeddings-and-rag/why-rag-and-what-are-embeddings).
 
 <Callout type="info" title="Checked for these docs">
 This project was built and run for these docs with Spring Boot 4.1.3, Java 21 and the two starters in version `1.20.0-beta30`. The controller and the interface are the code shown above. No OpenAI key was available, so the three `langchain4j.open-ai.chat-model` properties were pointed at a local model through its OpenAI-compatible address with the extra property `base-url`.

@@ -19,7 +19,7 @@ The tool that makes this easy is **Ollama**.
 | --- | --- |
 | A program that downloads, manages and runs models on your machine | An AI model |
 | A local server that your applications can call | An AI company such as OpenAI or Anthropic |
-| Free to use, with no API key | A cloud service that receives your prompts |
+| Free to use for local models, with no API key | A service that receives your prompts, as long as the model runs locally |
 
 Think of it as a facilitator. The model does the thinking, and Ollama loads it and serves it. It uses your own RAM, CPU and, if you have one, GPU.
 
@@ -181,9 +181,10 @@ PS C:\windows\system32> ollama stop mistral:latest
 PS C:\windows\system32> ollama list
 NAME                 ID              SIZE      MODIFIED
 mistral:latest       6577803aa9a0    4.4 GB    4 minutes ago
+...
 ```
 
-`stop` removes the model from memory. It is still on disk, which is why `ollama list` still shows it. To see which models are loaded at the moment, use `ollama ps`.
+`stop` removes the model from memory. It is still on disk, which is why `ollama list` still shows it, at the top of the instructor's longer list. To see which models are loaded at the moment, use `ollama ps`.
 
 ## Everything else stays the same
 

@@ -21,12 +21,12 @@ The lesson's whiteboard defines it in two sentences:
 
 | Stage | Example |
 | --- | --- |
-| Prompt template, written once | `Explain {{topic}} to a {{level}} developer in 3 lines.` |
+| Prompt template, written once | `Explain {{topic}} to a {{level}} developer.` |
 | Values, supplied at run time | `topic` = Spring Boot, `level` = Beginner |
 | Replace variables | Done by LangChain4j |
-| Final prompt, sent to the model | Explain Spring Boot to a beginner developer in 3 lines. |
+| Final prompt, sent to the model | Explain Spring Boot to a beginner developer. |
 
-A placeholder is a name inside double curly braces. The same template serves every topic and every level. Only the values change.
+The code of this lesson uses the same template with "in 3 lines." added at the end. A placeholder is a name inside double curly braces. The same template serves every topic and every level. Only the values change.
 
 There are two ways to use templates in LangChain4j, and this lesson shows both.
 

@@ -204,7 +204,9 @@ Run the `Main` configuration. The console fills with a long JSON document. Parts
     "mode": "standard",
     "summary": null
   },
+  ...
   "service_tier": "default",
+  ...
   "temperature": 1.0,
 ```
 
@@ -214,7 +216,7 @@ Somewhere in the middle, inside an `output` section, is the sentence we asked fo
 Java is a widely used, object-oriented programming language designed to be portable across platforms through its Java Virtual Machine...
 ```
 
-The response also contains a usage section. In the lesson it reports 40 tokens in total, input and output together. That is the number the request is billed by, as explained in [LLMs, Tokens and the Context Window](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/llms-tokens-and-the-context-window).
+The response also contains a usage section. The instructor reads out a total of 40 tokens, input and output together. Tokens are what a request is billed by, with input and output priced separately, as explained in [LLMs, Tokens and the Context Window](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/llms-tokens-and-the-context-window).
 
 It works. A Java program has called an LLM, with code that any Java developer can read.
 
