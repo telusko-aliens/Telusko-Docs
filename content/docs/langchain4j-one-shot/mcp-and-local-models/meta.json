@@ -1,0 +1,10 @@
+{
+  "title": "MCP and Local Models",
+  "pages": [
+    "mcp-explained.mdx",
+    "connecting-to-a-filesystem-mcp-server.mdx",
+    "building-your-own-mcp-server.mdx",
+    "response-metadata-and-token-usage.mdx",
+    "running-llms-locally-with-ollama.mdx"
+  ]
+}

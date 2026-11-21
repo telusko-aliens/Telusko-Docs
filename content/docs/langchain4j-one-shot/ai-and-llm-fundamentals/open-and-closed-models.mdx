@@ -1,0 +1,140 @@
+---
+title: Open and Closed Models
+description: Compare closed models that you reach through a provider's API with open-weight models that you download and run yourself, and learn how to choose between them by data, cost, control and convenience.
+---
+
+<Video id="nZRU4Htu5WQ" title="Open and Closed Models" start={3431} />
+
+---
+
+You now know how an LLM works. Before using one, there is a practical question: **where does the model run, and who controls it?**
+
+As an AI engineer you will work with two kinds of models, and this course uses both.
+
+## Closed models
+
+A closed model is developed, owned and operated by a company. You do not get the model. You get access to it.
+
+| Step | What happens |
+| --- | --- |
+| 1 | You create an account with the provider, for example OpenAI, Google or Anthropic, and create an API key |
+| 2 | Your application sends the prompt to the provider's API, with the key |
+| 3 | The provider's servers process the prompt, on their infrastructure |
+| 4 | Your application receives the response |
+
+From your side, it is an API call. Nothing is downloaded, and nothing runs on your machine. It does not matter what your application is written in. A Java application and a Python application call the same API.
+
+The video compares it to **Netflix**. You subscribe and you watch. You cannot download the film, and you certainly cannot download Netflix. The company decides the rules and can change them. With a closed model, the provider has the control, and you have none over the model itself.
+
+## Open models
+
+An open model is published so that developers can **download it and run it on their own machine or server**, within the terms of the model's licence.
+
+To run one, you use a tool such as **Ollama**. You install Ollama, download a model through it, and send prompts to it. The model then works with your own hardware, your CPU and GPU.
+
+Well-known examples are Llama, Mistral, Gemma and DeepSeek.
+
+What changes compared with a closed model:
+
+- **No API call to a provider.** The model runs where you put it.
+- **Your data stays with you.** A prompt is not sent to another company.
+- **No charge per token.** You pay for the hardware and the electricity.
+- **You can customise it,** for example by fine-tuning it on your own data.
+
+### Why "open weights" is the more exact term
+
+People often say "open source models". The video points out that this is not quite right, and uses **open weights**.
+
+With open-source software you get the source code. With most of these models you get the trained model, the weights, and that is all:
+
+| You get | You usually do not get |
+| --- | --- |
+| The trained model, ready to run | The data it was trained on |
+| The right to run it, within the licence | The code that was used to train it |
+
+So "open" here means that the weights are published, and not that everything about the model is open.
+
+<Callout type="warn" title="Free to download does not mean free of restrictions">
+Every open model comes with a licence, and the licences differ. Some models may not be used commercially, and some have other conditions. Read the licence of a model before you build a product on it.
+</Callout>
+
+## Side by side
+
+This is the comparison slide from the video:
+
+![Open_Vs_Closed_Models](https://dyz1pdcuffwr5.cloudfront.net/LangChain4jOneShot/lc4j1s-open-vs-closed.svg)
+
+| | Open models | Closed models |
+| --- | --- | --- |
+| Examples | Llama, Mistral, DeepSeek | GPT, Claude, Gemini |
+| Access | Can often be downloaded | Accessed through APIs |
+| Where it runs | Locally or on your own servers | On the provider's infrastructure |
+| Trade-off | More control and customisation | Easier to get started |
+| Infrastructure | You manage it yourself | The provider manages it |
+
+And the line under it:
+
+> Neither is better. You are trading control against convenience.
+
+### The costs are different, not absent
+
+| | Closed model | Open model |
+| --- | --- | --- |
+| What you pay for | Tokens, input and output | Hardware, power and the people who run it |
+| Cost at low usage | Low. You pay only for what you use | High. The hardware costs the same when it is idle |
+| Cost at high, steady usage | Grows with every request | Fixed once the hardware exists |
+
+A model needs serious hardware to answer quickly. Running a good model for many users means investing in GPUs. That is the price of having no token bill.
+
+## How to choose
+
+The video gives a simple decision path. Ask three questions in order:
+
+| Question | If yes |
+| --- | --- |
+| Must the data stay in your network? | Open model |
+| Is the usage volume high and steady? | Open model |
+| Do you need deep customisation, such as fine-tuning? | Open model |
+| None of these | Closed API model: fastest to start, and the provider manages it |
+
+The slide adds: any one "yes" is enough, and you can always migrate later.
+
+Typical cases for an open model are a banking application, a government system, or anything else where sensitive data must not leave the organisation. A typical case for a closed model is a team that wants to build quickly and has no wish to operate GPU servers.
+
+<Callout type="info" title="About security">
+Do not read this as "closed models are insecure". Providers publish their data and privacy terms, and many organisations use closed models for serious work. The point is about control. With a model you host yourself, the question of what happens to your data does not arise, because the data never leaves your systems.
+</Callout>
+
+<Callout type="info" title="A third option exists">
+The video describes two options: call a closed model, or run an open model yourself. In practice there is a mix of the two as well. Many companies host open-weight models and offer them through an API, so you can use an open model without owning any hardware. You then get the open model's licence and the convenience of an API, and your data does go to that host.
+</Callout>
+
+## Both in this course
+
+You will use both kinds in the lessons that follow:
+
+| Kind | Where |
+| --- | --- |
+| Closed, through an API key | From [Setup for Java AI Applications](/docs/langchain4j-one-shot/calling-llms-from-java/setup-for-java-ai-applications) onwards, with OpenAI |
+| Open, on your own machine | In [Running LLMs Locally with Ollama](/docs/langchain4j-one-shot/mcp-and-local-models/running-llms-locally-with-ollama) |
+
+The useful part is how little the Java code changes between them. An AI engineer should be comfortable with both.
+
+## Try It Yourself
+
+1. Name two closed models and two open models you have heard of, and the companies behind them.
+2. Open the page of one open model, for example on Hugging Face or in the Ollama library, and find its licence. Is commercial use allowed?
+3. For each of these, decide between open and closed and give the reason: a hospital's patient records assistant, a weekend hobby project, a product that answers a million questions a day.
+4. Look up the price per million tokens of one closed model. Estimate the monthly cost of 10,000 requests a day with about 1,000 tokens each.
+5. Explain to a colleague why "open source" is not the exact term for most downloadable models.
+
+## Official references
+
+- [Ollama: model library](https://ollama.com/search)
+- [Hugging Face: models](https://huggingface.co/models)
+- [OpenAI: pricing](https://platform.openai.com/docs/pricing)
+- [LangChain4j: supported language models](https://docs.langchain4j.dev/integrations/language-models)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

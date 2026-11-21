@@ -1,0 +1,12 @@
+{
+  "title": "LangChain4j One Shot",
+  "icon": "Rocket",
+  "pages": [
+    "getting-started.mdx",
+    "ai-and-llm-fundamentals",
+    "calling-llms-from-java",
+    "langchain4j-in-practice",
+    "mcp-and-local-models",
+    "agentic-ai"
+  ]
+}

@@ -1,0 +1,118 @@
+---
+title: NLP and How It Evolved
+description: Understand what natural language processing is, why computers need it, and how it moved from hand-written rules through statistics, machine learning and deep learning to the transformers behind today's large language models.
+---
+
+<Video id="nZRU4Htu5WQ" title="NLP and How It Evolved" start={879} />
+
+---
+
+You send a friend the message "I'm running late". Your friend understands at once that you are not out jogging. You will arrive later than planned.
+
+Send the same sentence to a computer and nothing of the sort happens. A computer does not understand words, sentences or what they mean. It is built to work with numbers, with binary data and with exact instructions. Human language is none of those.
+
+The technology that closes this gap is **Natural Language Processing**, or **NLP**. It is one of the main technologies behind applications such as ChatGPT, Gemini and Claude.
+
+## What the name means
+
+NLP is the field of AI that teaches machines to work with human language. The name has two parts.
+
+| Part | Meaning |
+| --- | --- |
+| Natural language | The languages people have developed over time and use for everyday communication: Hindi, Kannada, Tamil, Telugu, Spanish, French, English and all the others |
+| Processing | Reading and writing that language: understanding the text that comes in and producing text that goes out |
+
+A natural language is different from a programming language. Java, Python, C and C++ are languages we invented to give exact instructions to a machine. They are precise on purpose. Natural languages are not.
+
+You already use NLP every day:
+
+- Gmail suggests the next words while you write an email.
+- A voice assistant understands a spoken question.
+- A translation tool turns one language into another in an instant.
+- A chat assistant holds a conversation with you.
+
+NLP is a bridge between people and machines. With it, you can instruct a machine in your own language, and you do not have to learn the machine's language.
+
+## Why it was hard
+
+Human language is unpredictable. Take a simple wish and see how many ways there are to say it:
+
+- "I want to book a flight ticket."
+- "I need a flight ticket."
+- "I want to fly to Pune."
+
+Different words, the same intention. A system that deals with language has to handle all of them, and thousands more that nobody thought of. How NLP learned to do that is a story in five stages.
+
+![NLP_Evolution](https://dyz1pdcuffwr5.cloudfront.net/LangChain4jOneShot/lc4j1s-nlp-evolution.svg)
+
+## Stage 1: Rule-based NLP
+
+The first systems did not understand language at all. If you typed "hello" and got "Hi, how are you?", it was because a developer had written exactly that: for this input, return this output. Ask "What's your name?" and another hand-written rule answered.
+
+Every reply was coded in advance. That works for a handful of sentences and breaks down immediately afterwards. Nobody can write a rule for every way of asking for a flight ticket, and then for every other topic in the world.
+
+## Stage 2: Statistical NLP
+
+The next idea was to stop writing rules and to count. Researchers took large amounts of text and calculated which words usually appear together.
+
+That was better than hand-written rules. A system based on counting still did not understand the language or the context of a sentence.
+
+## Stage 3: Machine learning
+
+With machine learning, models were **trained** on large amounts of text. They no longer relied on rules that people had defined. They learned patterns from examples, and with more data they became better.
+
+## Stage 4: Deep learning
+
+As the amount of data kept growing, a stronger way of training was needed. Deep learning, with the [neural networks](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/ai-ml-deep-learning-and-generative-ai) from the previous page, could take in far more data and found patterns in it much better. It was a big step forward for understanding language.
+
+One weakness remained. These networks had trouble with the **relationship between words**, above all in long sentences. A word near the end of a long text often depends on a word near the beginning, and the networks of that time lost that connection.
+
+## Stage 5: Transformers
+
+In 2017 a new architecture was introduced that changed everything: the **transformer**.
+
+A transformer understands context by looking at how the words in a sentence relate to each other, and it does that far better than anything before it. How it works is the subject of [Transformers and Attention](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/transformers-and-attention).
+
+Researchers then trained transformer models on enormous amounts of text: books, websites, documentation and many other sources. Those models are what we now call **large language models**. Every LLM you use today has a transformer inside.
+
+## The whole path
+
+| Stage | How it worked | What was missing |
+| --- | --- | --- |
+| Rule-based | A developer wrote every reply by hand | Language has far too many variations |
+| Statistical | Counted which words appear together | No real understanding of meaning or context |
+| Machine learning | Learned patterns from text examples | Limited by the amount of data it could use well |
+| Deep learning | Neural networks, trained on much more data | Lost the relationship between distant words |
+| Transformers | Looks at how all words in the text relate | This is the architecture of today's LLMs |
+
+LLMs did not appear overnight. They are the result of each stage fixing a weakness of the stage before it.
+
+## What LLMs can do with language
+
+With the transformer, NLP reached a new level. One model can now:
+
+- summarise a document
+- translate between languages
+- write and explain code
+- answer questions
+- hold a conversation
+
+Before LLMs, each of these was a separate system that had to be built and trained for one task. Today one model does all of them, and it is that model we will call from Java.
+
+## Try It Yourself
+
+1. Write five different sentences that all mean "show me my order status". Then imagine writing rules for them. How many more sentences would you still miss?
+2. Find three features in applications you use that are NLP at work.
+3. Take the sentence "I saw her duck". Write down the two meanings it can have. What would a program need in order to pick the right one?
+4. Explain to someone, without notes, why counting which words appear together is not the same as understanding a sentence.
+5. Put the five stages in order from memory and name the weakness that led from each stage to the next.
+
+## Official references
+
+- [Attention Is All You Need (the 2017 transformer paper)](https://arxiv.org/abs/1706.03762)
+- [Google Machine Learning Crash Course: large language models](https://developers.google.com/machine-learning/crash-course/llm)
+- [Hugging Face LLM course: natural language processing](https://huggingface.co/learn/llm-course/chapter1/2)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

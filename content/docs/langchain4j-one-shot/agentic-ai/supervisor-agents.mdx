@@ -1,0 +1,287 @@
+---
+title: Supervisor Agents
+description: Let a model choose which agent should handle a request, with AgenticServices.supervisorBuilder, and see how the descriptions of the sub-agents guide that choice.
+---
+
+<Video id="nZRU4Htu5WQ" title="Supervisor Agents" start={16424} />
+
+---
+
+Both versions of the course application so far had one thing in common: **every agent ran, every time**.
+
+- In [Multi-Agent Systems](/docs/langchain4j-one-shot/agentic-ai/multi-agent-systems) we called the advisor and then the planner.
+- In [Agentic Workflows](/docs/langchain4j-one-shot/agentic-ai/agentic-workflows) the sequence called the advisor and then the planner.
+
+The order was fixed, by us. But students do not always ask the same kind of question:
+
+| The student says | What is needed |
+| --- | --- |
+| "I know Java. What should I learn next?" | Advice |
+| "Create a four-week learning plan for Spring Boot" | A plan. The topic is already decided, so no advice is needed |
+
+Running both agents for the second request wastes time and tokens. Something should look at the request and decide which expert handles it.
+
+That something is a **supervisor agent**. It is the first place in this course where a model decides the flow of the program.
+
+## What a supervisor does
+
+A supervisor is an agent that has other agents under it, its **sub-agents**. For each request it decides which sub-agent to call, calls it, and decides again whether more is needed or the job is done.
+
+| | Sequence | Supervisor |
+| --- | --- | --- |
+| Who decides which agents run | You, in `subAgents(...)` | A model, for each request |
+| Do all agents run? | Yes, always, in order | Only the ones the supervisor chooses. It can be one, several or all |
+| Predictability | High | Lower. The same request can be handled differently |
+| Model calls | One for each agent | One for each agent that is called, plus the supervisor's own calls to decide |
+
+![Supervisor_Agent](https://dyz1pdcuffwr5.cloudfront.net/LangChain4jOneShot/lc4j1s-supervisor.svg)
+
+The supervisor is powered by a model, like every other agent. We write no `if` statement that says "plan requests go to the planner". The model reads the request, reads what each sub-agent can do, and chooses.
+
+## Step 1: An agent that can work alone
+
+The supervisor should choose between agents that can each handle a request independently. Our existing `LearningPlanAgent` cannot. Its prompt needs `{{recommendation}}`, the output of the advisor.
+
+So the lesson adds a planner that takes the student's request directly:
+
+```java title="DirectLearningPlanAgent.java"
+package com.telusko.agentic;
+
+import dev.langchain4j.agentic.Agent;
+import dev.langchain4j.service.UserMessage;
+import dev.langchain4j.service.V;
+
+public interface DirectLearningPlanAgent
+{
+
+        @Agent(
+                description = "Creates a four-week learning plan for a requested technical topic",
+                outputKey = "directPlan"
+        )
+        @UserMessage("""
+            You are a technical learning plan creator.
+
+            Student request: {{request}}
+
+            Identify the topic and create a simple four-week
+            learning plan with one practical task each week.
+            """)
+        String createPlan(@V("request") String request);
+
+}
+```
+
+Build it like the others:
+
+```java title="Main.java"
+DirectLearningPlanAgent directPlanAgent = AgenticServices.agentBuilder(DirectLearningPlanAgent.class)
+        .chatModel(model)
+        .build();
+```
+
+## Step 2: An interface for the supervisor
+
+```java title="CourseSupportAdvisor.java"
+package com.telusko.agentic;
+
+import dev.langchain4j.agentic.Agent;
+import dev.langchain4j.service.V;
+
+public interface CourseSupportAdvisor
+{
+    @Agent
+    String handle(@V("request") String request);
+}
+```
+
+As with the workflow interface, there is no prompt. The interface only says how the supervisor is called: one request in, one answer out. The decision logic is provided by LangChain4j.
+
+## Step 3: Build the supervisor
+
+```java title="Main.java"
+CourseSupportAdvisor supervisor = AgenticServices.supervisorBuilder(CourseSupportAdvisor.class)
+        .chatModel(model)
+        .subAgents(advisorAgent, directPlanAgent)
+        .build();
+```
+
+| Call | Meaning |
+| --- | --- |
+| `supervisorBuilder(CourseSupportAdvisor.class)` | Create a supervisor that implements this interface |
+| `.chatModel(model)` | The model the supervisor uses **to decide**. A sequence needs no model. A supervisor does |
+| `.subAgents(advisorAgent, directPlanAgent)` | The agents it may choose from. The order does not define any sequence here |
+
+The old `planAgent` is left out on purpose. It depends on another agent's output, so the supervisor could not use it for a direct request.
+
+### The mistake in the lesson
+
+The first attempt passes the wrong class:
+
+```java
+CourseAdvisorAgent supervisor = AgenticServices.supervisorBuilder(CourseAdvisorAgent.class)
+```
+
+`CourseAdvisorAgent` is one of the workers. The instructor notices it when `supervisor.` offers `recommend(...)` and not `handle(...)`. The fix is to use the dedicated supervisor interface in both places: `CourseSupportAdvisor supervisor = AgenticServices.supervisorBuilder(CourseSupportAdvisor.class)`.
+
+The two names are easy to confuse: `CourseAdvisorAgent` is a sub-agent, `CourseSupportAdvisor` is the supervisor.
+
+## How does the supervisor choose?
+
+By reading the **descriptions**.
+
+| Sub-agent | Description from `@Agent` |
+| --- | --- |
+| `advisorAgent` | "Recommends the next technical course" |
+| `directPlanAgent` | "Creates a four-week learning plan for a requested technical topic" |
+
+In the first agent lesson, `description` looked like documentation. Here it is functional. The supervisor's model receives the request together with these descriptions and picks the agent that fits. The official documentation says it plainly: the supervisor relies on the descriptions of its sub-agents to decide which one to invoke, so every sub-agent should have one.
+
+A vague description leads to wrong choices. Writing good descriptions is part of programming a supervisor.
+
+## Step 4: Ask for a plan
+
+```java title="Main.java"
+String result = supervisor.handle("Create a four-week learning plan for Spring Boot");
+System.out.println("Learning plan: " + result);
+```
+
+```text
+Learning plan: ### Learning Plan for Spring Boot
+
+**Overview:**
+This four-week learning plan is designed for individuals who want to learn Spring Boot, a powerful framework for building Java-based we...
+```
+
+A four-week plan for Spring Boot, directly. There is no recommendation paragraph in front of it. The request named the topic and asked for a plan, and the supervisor gave the task to the planning agent.
+
+## Step 5: Ask for advice
+
+Change only the request:
+
+```java title="Main.java"
+String result = supervisor.handle("I know Java. What should I learn next?");
+```
+
+The middle and the end of the output in the lesson:
+
+```text
+#### Week 2: Dependency Injection and Beans
+**Objectives:**
+- Learn about Dependency Injection (DI) and the Bean Lifecycle in Spring.
+...
+### Additional Resources:
+- **Books:** "Spring in Action" by Craig Walls
+...
+This structured four-week plan will provide a solid understanding of the Spring Framework, ...
+```
+
+The answer advises the Spring Framework as the next topic, which is what was asked.
+
+<Callout type="warn" title="Look at what this second answer contains">
+The request was "What should I learn next?". The lesson expects the supervisor to delegate to the advisor, whose prompt asks for one topic and two sentences. The printed answer, however, is a complete four-week plan with weekly objectives, practical tasks and book recommendations. That is the format of the planning agent.
+
+The instructor notices it and remarks that the structure of a four-week plan is there. The console shows no line that says which agents were called, so the video cannot tell us what happened inside. The likely reading is that the supervisor called the advisor to find the topic and then also called the planner, which the lesson itself says is possible: for some questions the supervisor may decide to run several agents.
+
+This is the honest picture of a supervisor. You gain flexibility, and you give up exact control. The same request can be handled in more than one reasonable way.
+</Callout>
+
+## The complete program
+
+```java title="Main.java"
+package com.telusko.agentic;
+
+import dev.langchain4j.agentic.AgenticServices;
+import dev.langchain4j.model.openai.OpenAiChatModel;
+
+public class Main {
+    public static void main(String[] args)
+    {
+        OpenAiChatModel model = OpenAiChatModel.builder()
+                .apiKey(System.getenv("OPENAI_API_KEY"))
+                .modelName("gpt-4o-mini")
+                .build();
+
+        CourseAdvisorAgent advisorAgent = AgenticServices.agentBuilder(CourseAdvisorAgent.class)
+                .chatModel(model)
+                .build();
+
+        DirectLearningPlanAgent directPlanAgent = AgenticServices.agentBuilder(DirectLearningPlanAgent.class)
+                .chatModel(model)
+                .build();
+
+        CourseSupportAdvisor supervisor = AgenticServices.supervisorBuilder(CourseSupportAdvisor.class)
+                .chatModel(model)
+                .subAgents(advisorAgent, directPlanAgent)
+                .build();
+
+        String result = supervisor.handle("I know Java. What should I learn next?");
+        System.out.println("Learning plan: " + result);
+
+    }
+}
+```
+
+In the lesson's file, the unused `planAgent` and the commented code of the earlier lessons are still present. They are left out here. The label "Learning plan:" in the print statement is kept as in the video, also for the advice request.
+
+<Callout type="info" title="Checked for these docs">
+The supervisor was compiled against `langchain4j-agentic` 1.18.1-beta28 and run for these docs with a local model in place of OpenAI, with the two requests of the lesson.
+
+- "Create a four-week learning plan for Spring Boot" returned a four-week plan.
+- "I know Java. What should I learn next?" returned a four-week learning plan for the Spring Framework, with lessons and a practical task for each week.
+
+The second result is the same pattern as in the video, with a different model: a question that asks for advice came back in the format of the planning agent. So this is not an accident of one run. With these two descriptions, a supervisor tends to answer "what next" with a full plan.
+</Callout>
+
+## Three ways to coordinate agents
+
+| | By hand | Sequence workflow | Supervisor |
+| --- | --- | --- | --- |
+| Lesson | [Multi-Agent Systems](/docs/langchain4j-one-shot/agentic-ai/multi-agent-systems) | [Agentic Workflows](/docs/langchain4j-one-shot/agentic-ai/agentic-workflows) | This one |
+| The flow is decided by | Your Java code | The pattern and order you configured | A model, for each request |
+| Flexibility | Whatever you code | Fixed | High |
+| Predictability and testability | High | High | Lower |
+| Extra cost | None | None | The supervisor's own model calls |
+| Good for | Very small systems | Tasks with known steps | Requests of different kinds that need different experts |
+
+Use a supervisor when you really cannot know in advance which agents a request needs. If you can write the steps down, a workflow is cheaper, faster and easier to test.
+
+## Additions beyond the lesson
+
+**Seeing what the supervisor did.** The lesson cannot show which agents were called, because nothing is logged. The agentic module has observability features for this, described in the official guide, including listeners that are informed before and after each agent call. Even a simple `println` inside a tool or a logging configuration helps while you learn.
+
+**Which answer comes back.** By default a supervisor returns the response of the last agent it called. It can also return its own summary of everything that was done, or let a scoring step choose between the two. This is set with `responseStrategy(...)` on the builder. The default explains why the answer to a request reads like the output of one specific agent.
+
+**A sub-agent can be a workflow.** Sub-agents do not have to be single agents. A whole sequence can be passed to a supervisor, and the supervisor sees it as one agent. That would be a way to offer "advise, then plan" as one option next to "plan directly".
+
+**Limit what a supervisor can reach.** A supervisor decides by itself which agents to call and how often. Give it only sub-agents whose actions are safe to trigger without review, and keep an eye on the number of calls, because each decision is a model call that you pay for.
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `supervisor.` offers `recommend(...)` and not `handle(...)` | A worker interface was passed to `supervisorBuilder`. This happens in the lesson | Pass the supervisor interface and use it as the variable type |
+| `recommend()` is underlined in red | The same mistake, and the method was called without its argument | Call `supervisor.handle(request)` |
+| The supervisor picks the wrong agent | The descriptions are vague or overlap | Make each description say clearly what the agent is for |
+| An error about a missing argument such as `recommendation` | A sub-agent that depends on another agent's output was given to the supervisor | Give it agents that can work from the request alone, or wrap dependent agents in a workflow |
+| The answer contains more than was asked | The supervisor called more than one agent | Sharpen the descriptions, or use a fixed workflow when the steps are known |
+| Runs take longer and cost more than the sequence | The supervisor needs model calls of its own to decide | Expected. Use a supervisor only when its flexibility is needed |
+
+## Try It Yourself
+
+1. Add `DirectLearningPlanAgent` and `CourseSupportAdvisor`, build the supervisor and run both requests from the lesson.
+2. Run the advice request three times. Is the answer always in the same format?
+3. Ask something in between: "I know Java. Create a plan for what I should learn next." What does the answer look like?
+4. Change the description of the advisor to "Helps students" and run the advice request again. Does the choice get worse?
+5. Ask a question that fits neither agent, for example "What is the capital of France?". How does the supervisor react?
+6. Add the `CourseDescriptionAgent` from the first agent lesson as a third sub-agent and ask for a course description.
+7. Put the sequence of the previous lesson into `subAgents(...)` as one option and test whether the supervisor uses it.
+
+## Official references
+
+- [LangChain4j: agents and agentic AI](https://docs.langchain4j.dev/tutorials/agents)
+- [LangChain4j: agents and agentic AI, supervisor design and customization](https://docs.langchain4j.dev/tutorials/agents#supervisor-design-and-customization)
+- [Anthropic: building effective agents](https://www.anthropic.com/engineering/building-effective-agents)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

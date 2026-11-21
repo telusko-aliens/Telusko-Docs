@@ -1,0 +1,136 @@
+---
+title: LLMs, Tokens and the Context Window
+description: Break down what a large language model is, how it reads text as tokens and not as words, why cost is counted in tokens, and what the context window limits.
+---
+
+<Video id="nZRU4Htu5WQ" title="LLMs, Tokens and the Context Window" start={1460} />
+
+---
+
+The [previous page](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/nlp-and-how-it-evolved) ended with the transformer and the models built on it. Those models have a name you see everywhere: **LLM**.
+
+This page explains that name, and then two ideas that decide how you work with an LLM every day: **tokens** and the **context window**. Both come back later in real code, as numbers you can print and as limits you can hit.
+
+## What LLM stands for
+
+LLM means **Large Language Model**. Each of the three words says something.
+
+### Large
+
+"Large" has nothing to do with the size of your laptop or of the application. It refers to two things:
+
+| What is large | Meaning |
+| --- | --- |
+| The training data | An enormous amount of text: articles, official documentation, books, websites and other publicly available sources |
+| The number of parameters | Billions of them, and for the largest models far more |
+
+A **parameter** is a number inside the model that was set during training. You can think of the parameters as the knowledge the model has learned. They are the weights you met in the [neural network](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/ai-ml-deep-learning-and-generative-ai) example, only in very large numbers. As a general rule, more data and more parameters make a more capable model.
+
+### Language
+
+Language is what these models are good at. They can read and write human language: hold a conversation, summarise a document, translate, explain, and write code.
+
+### Model
+
+A model is a trained AI program. It was trained on that enormous amount of data **before** you ever use it. When you send it a question, it is not learning. It is applying what it learned.
+
+### Examples
+
+| Model family | Company |
+| --- | --- |
+| GPT | OpenAI |
+| Gemini | Google |
+| Claude | Anthropic |
+
+One model of this kind can do many tasks. You do not need one program for translation, another for summaries and a third for code.
+
+## Tokens: how an LLM reads text
+
+Type this prompt into any AI application:
+
+```text
+I love learning AI
+```
+
+You read four words. The model does not. An LLM cannot work with words the way people do. Before it processes anything, your text is cut into small pieces called **tokens**.
+
+![Tokens_And_Context_Window](https://dyz1pdcuffwr5.cloudfront.net/LangChain4jOneShot/lc4j1s-tokens-context.svg)
+
+A token is not always a word:
+
+| Text | Possible tokens |
+| --- | --- |
+| A short, common word | One token |
+| A longer or less common word, such as "learning" | One token, or split into two |
+| Punctuation and special characters | Often a token each |
+
+The step that cuts text into tokens is called **tokenization**, and the program that does it is a **tokenizer**. Every model family has its own tokenizer, so the same sentence can become a different number of tokens with different models. The idea is the same everywhere. The exact split is not.
+
+The flow is always:
+
+```text
+your sentence  ->  tokenization  ->  tokens  ->  the LLM
+```
+
+So when we say "I may be one token, love may be one token", that is a simplification to make the idea easy. Do not assume one word equals one token.
+
+### Why tokens matter to you
+
+Tokens are not an internal detail. Three things you care about are measured in them.
+
+| What | How tokens are involved |
+| --- | --- |
+| **Cost** | API usage is billed per token, not per word and not per request |
+| **How much the model can take in** | Limits such as "32K" or "128K" are counted in tokens |
+| **How much of a conversation it can keep in view** | Also counted in tokens |
+
+And tokens are counted in **both directions**. Your prompt is tokens going in. The model's answer is tokens coming out. A long answer means many output tokens, and you pay for those as well. Cost is about what you ask and about what you get back.
+
+You will see these numbers for real in [Response Metadata and Token Usage](/docs/langchain4j-one-shot/mcp-and-local-models/response-metadata-and-token-usage), where the program prints how many input and output tokens a request used.
+
+## The context window
+
+Can an LLM read an unlimited number of tokens? No.
+
+Every model has a limit on how much it can process at one time. That limit is the **context window**: the maximum number of tokens the model can consider while it generates a response.
+
+When you read "128K context window" or "1 million context window", the number is tokens, not words. A larger window means the model can take more information into account before it answers.
+
+### What it looks like when you hit the limit
+
+You may have seen this without knowing its name. You start a long conversation with an AI application and give it instructions at the beginning: how it should behave, which information it should use. Much later in the same conversation, the answers stop following those instructions. It feels as if the assistant has forgotten them.
+
+There is no error in the application. The early messages are simply no longer within the window. The model can only consider what fits, and what does not fit is not there for it.
+
+The same happens with documents. A document that is larger than the context window cannot be processed in one piece.
+
+<Callout type="info" title="Why this leads to chat memory and RAG">
+Two later topics exist because of this limit. An application has to decide which earlier messages to keep sending, which is the job of [chat memory](/docs/langchain4j-one-shot/langchain4j-in-practice/chat-memory). And for large documents, a technique called RAG, retrieval-augmented generation, sends the model only the parts that are relevant to the question. The video mentions RAG here as the answer to documents that do not fit. If you want to build it, the separate LangChain4j docs have a full lesson: [Building a RAG Pipeline](/docs/langchain4j/embeddings-and-rag/building-a-rag-pipeline).
+</Callout>
+
+## Summary
+
+- An LLM is a large model, trained on huge amounts of text, that is specialised in language.
+- An LLM processes tokens, not words. Tokenization turns text into tokens.
+- Cost, input limits and conversation length are all counted in tokens, for input and for output.
+- A model can only consider a limited number of tokens at a time. That limit is the context window.
+- A larger context window allows longer conversations and larger documents.
+
+## Try It Yourself
+
+1. Open a tokenizer tool, such as the one OpenAI provides, and type "I love learning AI". How many tokens is it?
+2. Type a long technical word and a word in your own language. Into how many tokens is each one split?
+3. Paste a paragraph of about 100 words and note the number of tokens. Work out the ratio of tokens to words.
+4. Look up the context window and the input and output price of one current model. How many pages of text would fit into its window?
+5. Start a long chat with any assistant. Give it an unusual rule at the start, such as "end every answer with the word banana". Keep chatting about other things and watch whether the rule survives.
+
+## Official references
+
+- [OpenAI: tokenizer](https://platform.openai.com/tokenizer)
+- [OpenAI: models](https://platform.openai.com/docs/models)
+- [OpenAI: pricing](https://platform.openai.com/docs/pricing)
+- [Google Machine Learning Crash Course: large language models](https://developers.google.com/machine-learning/crash-course/llm)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,142 @@
+---
+title: AI, ML, Deep Learning and Generative AI
+description: See how AI-powered applications differ from traditional rule-based programs, how artificial intelligence, machine learning, deep learning and generative AI fit inside each other, and what a neural network does.
+---
+
+<Video id="nZRU4Htu5WQ" title="AI, ML, Deep Learning and Generative AI" start={129} />
+
+---
+
+Before any code, one thing has to be clear: what is different about an application that uses AI?
+
+Start with what you already know. Every application you have used for years follows the same idea, whether it is a calculator, an online shop or a social network. Type `10 + 20` into a calculator and it shows `30`. Enter a correct username and password and you are logged in. Enter a wrong one and you get an error.
+
+Behind each of those results is a developer who wrote the rule. For this input, give this output. Everything the application can do was decided in advance and written as code.
+
+## Applications that no developer wrote the rules for
+
+Now look at how applications behave today.
+
+- You tell a shopping site "I want to buy something for my gym" and it suggests shoes that fit a gym.
+- You ask ChatGPT, Gemini or Claude to explain multithreading, and it does.
+- You ask again for five key points, and the answer changes shape.
+- You ask for the same explanation for a five-year-old, and the tone changes completely.
+- You ask for some Java code, then say "convert this to Python", and it does that too.
+
+Did a developer write a rule for each of these? For every possible sentence a person could type? That would take millions of rules, and no team could write them.
+
+So something else is happening. These applications have **AI capabilities**, and to understand them we need four terms that are often mixed up.
+
+![AI_ML_DL_GenAI](https://dyz1pdcuffwr5.cloudfront.net/LangChain4jOneShot/lc4j1s-ai-family.svg)
+
+## Artificial intelligence
+
+**Artificial intelligence**, or AI, means building systems that can do tasks which normally need human intelligence: understanding language, writing a poem, playing chess, recognising what is in a picture.
+
+AI is the widest term. It is an umbrella, and the other three terms sit under it.
+
+## Machine learning
+
+Suppose you want a program that recognises a cat in a photo.
+
+With the traditional approach you would write rules: a cat has pointed ears, whiskers, a tail. But cats come in many sizes, colours and breeds, and photos are taken from every angle. There is no single "standard cat" to describe. Writing a rule for every case is not possible.
+
+**Machine learning**, or ML, turns the approach around:
+
+| Traditional programming | Machine learning |
+| --- | --- |
+| The developer writes the rules | The developer provides examples |
+| The program applies the rules to data | The machine finds the patterns in the data |
+| Works when the rules can be written down | Works when there are too many rules to write |
+
+You show the machine a very large number of cat pictures. From those examples it learns the patterns that make something a cat. Later it recognises a cat it has never seen. Nothing was looked up in a database and no rule was written by hand. The machine was **trained**.
+
+Machine learning is a subset of AI: one way of achieving it.
+
+## Deep learning
+
+As the amount of data grew, and the data became images, video, speech and natural language, classic machine learning reached its limits. Researchers developed a more powerful way to train machines, called **deep learning**.
+
+Deep learning is inspired by how a child learns. Show a child one cat and the child cannot yet recognise cats in general. Show many cats of different sizes and colours over time, and at some point the child can say "that is a cat" about an animal it has never seen. It is the number of examples and the time that make the difference.
+
+Deep learning copies that idea with a structure called a **neural network**, which is explained below. It is a subset of machine learning: a more powerful way to do the same thing. The AI applications you use today are all built with deep learning.
+
+## Generative AI
+
+The fourth term describes what a system produces. **Generative AI** creates new content: text, code, images, audio, video. It does not only pick a label such as "cat" or "not a cat". It writes the summary, draws the picture, produces the program.
+
+The best-known example of generative AI is the **large language model**, or LLM. The models behind ChatGPT, Gemini and Claude are all LLMs. The rest of this section is about how they work.
+
+## How the four fit together
+
+| Term | In one sentence |
+| --- | --- |
+| Artificial intelligence | Making machines do things that need intelligence |
+| Machine learning | Achieving AI by training machines with data |
+| Deep learning | An advanced way of machine learning that uses neural networks |
+| Generative AI | AI that generates content, built with deep learning. LLMs are the main example |
+
+Each one sits inside the one before it, as the diagram shows.
+
+## Neural networks
+
+Deep learning depends on neural networks, so it helps to know what one is.
+
+The idea comes from the human brain. The brain consists of billions of tiny cells called **neurons**, which pass signals to each other all the time. When you see a cat, you do not consciously measure its ears and tail. A very large number of neurons work together, and you recognise it almost at once.
+
+Researchers asked whether a computer system could learn patterns in a similar way. The result is the **artificial neural network**.
+
+<Callout type="info" title="Inspired by the brain, not a copy of it">
+A neural network is not a brain and does not work exactly like one. It borrows a few key ideas. In place of real neurons it uses artificial neurons, usually called **nodes**. The nodes are connected, and information flows through them.
+</Callout>
+
+### An example: the price of a house
+
+Imagine a network that predicts the price of a house. The inputs could be:
+
+- the age of the house
+- its location
+- its size in square feet
+- the number of bedrooms
+
+Do all four matter equally? No. The location probably matters more than the age, and the size more than the number of bedrooms.
+
+**Weights.** A neural network expresses this importance with numbers called **weights**. An input with a higher weight has more influence on the result. Nobody types these weights in. The network learns them by itself during training.
+
+**Activation function.** After a node has combined its inputs and their weights, it decides which information is passed on. That decision is made by an **activation function**. You can think of it as a filter that lets through what is important enough for the next stage.
+
+**Layers.** A real network has many nodes, arranged in layers:
+
+| Layer | Job |
+| --- | --- |
+| Input layer | Receives the data, here the details of the house |
+| Hidden layers | Find the patterns and relationships in the data |
+| Output layer | Produces the final answer, here the predicted price |
+
+After seeing thousands of house records, the network has learned which factors affect the price most, and its predictions become better. That is the strength of the approach: we do not write every rule ourselves. We let the system learn the patterns from data.
+
+The "deep" in deep learning refers to these layers. A deep network has many hidden layers, one after another.
+
+## Why this matters for the rest of the course
+
+You will not train a neural network in this course. You will **use** models that somebody else has trained, by calling them from Java.
+
+Still, one idea from this page stays with you through every later lesson. A model's answer is not produced by rules that a developer wrote. It comes from patterns learned from data. That is why the same question can get a differently worded answer each time, why a model can be confidently wrong, and why later pages spend so much time on controlling and checking what a model returns.
+
+## Try It Yourself
+
+1. Pick three applications you use every day. For each one, name a feature that is clearly rule-based and one that probably uses AI.
+2. Ask any chat assistant to explain multithreading. Then ask for five key points, then for an explanation for a five-year-old. Note what changes between the three answers.
+3. Explain in your own words why recognising a cat cannot be solved with `if` statements.
+4. For the house price example, list three more inputs that could matter, and guess which would get the highest weight.
+5. Draw the four terms as circles inside each other, without looking at the diagram, and place "LLM" in the right circle.
+
+## Official references
+
+- [Google Machine Learning Crash Course: neural networks](https://developers.google.com/machine-learning/crash-course/neural-networks)
+- [Google: introduction to machine learning](https://developers.google.com/machine-learning/intro-to-ml)
+- [LangChain4j: introduction](https://docs.langchain4j.dev/intro)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

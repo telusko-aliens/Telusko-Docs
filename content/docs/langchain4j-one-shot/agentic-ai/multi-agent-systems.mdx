@@ -1,0 +1,241 @@
+---
+title: Multi-Agent Systems
+description: Create two agents with separate jobs, a course advisor and a learning plan creator, and connect them by hand so that the output of the first becomes the input of the second.
+---
+
+<Video id="nZRU4Htu5WQ" title="Multi-Agent Systems" start={15448} />
+
+---
+
+One agent with one job is a building block. Now we take two blocks and make them work on the same task.
+
+The scenario stays in the world of courses. A student tells us what they already know. We want to answer with a learning plan. That is really two jobs:
+
+1. **Advise:** from the student's background, recommend what to learn next.
+2. **Plan:** from that recommendation, create a four-week learning plan.
+
+Each job gets an agent of its own. The output of the first agent is the input of the second.
+
+In this lesson **we connect them ourselves**, in plain Java. Nothing is autonomous yet. That is intentional. Once you have done the coordination by hand, you will see exactly what the workflow of the next lesson takes off your shoulders.
+
+![Two_Agents_Manual_Chain](https://dyz1pdcuffwr5.cloudfront.net/LangChain4jOneShot/lc4j1s-multi-agent.svg)
+
+## The project
+
+A prepared project named `multi-agent-demo`, with the same package and the same two dependencies as in [Your First AI Agent](/docs/langchain4j-one-shot/agentic-ai/your-first-ai-agent). It starts with two empty interfaces and a `Main` class.
+
+## Step 1: The first agent, the advisor
+
+```java title="CourseAdvisorAgent.java"
+package com.telusko.agentic;
+
+import dev.langchain4j.agentic.Agent;
+import dev.langchain4j.service.UserMessage;
+import dev.langchain4j.service.V;
+
+public interface CourseAdvisorAgent
+{
+    @Agent(
+            description = "Recommends the next technical course",
+            outputKey = "recommendation"
+    )
+    @UserMessage("""
+            You are a technical course advisor.
+
+            Student background: {{background}}
+
+            Recommend ONE suitable topic to learn next.
+            Explain your recommendation in 2 sentences.
+            """)
+    String recommend(@V("background") String background);
+
+}
+```
+
+| Part | Value |
+| --- | --- |
+| Job | Recommend one topic to learn next, with a reason in two sentences |
+| Input | `background`, what the student already knows |
+| Output key | `recommendation` |
+
+## Step 2: The second agent, the planner
+
+```java title="LearningPlanAgent.java"
+package com.telusko.agentic;
+
+import dev.langchain4j.agentic.Agent;
+import dev.langchain4j.service.UserMessage;
+import dev.langchain4j.service.V;
+
+public interface LearningPlanAgent
+{
+    @Agent(
+            description = "Creates a learning plan",
+            outputKey = "learningPlan"
+    )
+    @UserMessage("""
+            You are a technical learning plan creator.
+
+            Course recommendation:
+            {{recommendation}}
+
+            Create a simple 4-week learning plan.
+            Include the main topic for each week.
+            Keep the answer concise.
+            """)
+    String createPlan(
+            @V("recommendation") String recommendation
+    );
+}
+```
+
+| Part | Value |
+| --- | --- |
+| Job | Create a four-week plan with the main topic of each week |
+| Input | `recommendation` |
+| Output key | `learningPlan` |
+
+Look at the two names side by side. The advisor's **output key** is `recommendation`. The planner's **input variable** is `recommendation`. In this lesson the matching names are only tidy naming, because we pass the value ourselves. In the next lesson this exact match is what lets LangChain4j pass the value for us.
+
+The planner depends on the advisor. Without a recommendation it has nothing to plan.
+
+## Step 3: Build both agents
+
+```java title="Main.java"
+CourseAdvisorAgent advisorAgent = AgenticServices.agentBuilder(CourseAdvisorAgent.class)
+        .chatModel(model)
+        .build();
+
+LearningPlanAgent planAgent = AgenticServices.agentBuilder(LearningPlanAgent.class)
+        .chatModel(model)
+        .build();
+```
+
+Two calls of the same builder. Both agents use the same model here. They could use different models, for example a cheaper one for the simpler job.
+
+## Step 4: Connect them by hand
+
+```java title="Main.java"
+String recommendation = advisorAgent.recommend("I know Java basics and OOPs and i m a beginner");
+System.out.println("Course recommendation: " + recommendation);
+String plan = planAgent.createPlan(recommendation);
+System.out.println("Learning plan: " + plan);
+```
+
+Four lines, and every bit of coordination is in them:
+
+| Line | Who does it |
+| --- | --- |
+| Call the advisor first | We decided the order |
+| Keep its answer in the variable `recommendation` | We collected the output |
+| Pass that variable to the planner | We handed it over |
+| Print the plan | We decided what the final result is |
+
+## The complete program
+
+```java title="Main.java"
+package com.telusko.agentic;
+
+import dev.langchain4j.agentic.AgenticServices;
+import dev.langchain4j.model.openai.OpenAiChatModel;
+
+public class Main {
+    public static void main(String[] args)
+    {
+        OpenAiChatModel model = OpenAiChatModel.builder()
+                .apiKey(System.getenv("OPENAI_API_KEY"))
+                .modelName("gpt-4o-mini")
+                .build();
+
+        CourseAdvisorAgent advisorAgent = AgenticServices.agentBuilder(CourseAdvisorAgent.class)
+                .chatModel(model)
+                .build();
+
+        LearningPlanAgent planAgent = AgenticServices.agentBuilder(LearningPlanAgent.class)
+                .chatModel(model)
+                .build();
+
+        String recommendation = advisorAgent.recommend("I know Java basics and OOPs and i m a beginner");
+        System.out.println("Course recommendation: " + recommendation);
+        String plan = planAgent.createPlan(recommendation);
+        System.out.println("Learning plan: " + plan);
+
+    }
+}
+```
+
+## Step 5: Run it
+
+```text
+Course recommendation: I recommend learning about **Data Structures and Algorithms**. Understanding data structures (like arrays, li...
+Learning plan: ### 4-Week Learning Plan: Data Structures and Algorithms
+
+#### Week 1: Introduction to Data Structures
+- **Topics to Cover:**
+  - Arrays: Definition, operations, and use cases
+  - Linked Lists: Singly and doubly linked lists
+  - Stacks: Implementation and applications
+  - Queues: Circular queues and priority queues
+```
+
+Follow the topic through the output. The advisor chose Data Structures and Algorithms. The planner never saw the student's background. It only received the advisor's text, and its plan is about Data Structures and Algorithms. The work of the first agent really flowed into the second.
+
+The stars and hash signs are Markdown. The model formats its answer for a screen that renders Markdown, and the console prints it as plain text.
+
+## Why two agents and not one prompt?
+
+One prompt could ask for a recommendation and a plan together. For this small case that would work. Splitting the task still has advantages that grow with the size of a system:
+
+| Advantage | Meaning |
+| --- | --- |
+| A focused prompt | Each agent has one clear job, which is easier to write and to improve |
+| Reuse | The advisor can be used alone when a student only wants advice. You will see that in [Supervisor Agents](/docs/langchain4j-one-shot/agentic-ai/supervisor-agents) |
+| Independent settings | Each agent can have its own model, tools and memory |
+| Easier testing | You can check the recommendation before a plan is built on it |
+
+The price is a second model call, which means more time and more tokens.
+
+## What is manual here
+
+The lesson is clear about the limits of this version. Both agents are powered by the model, and neither contains business logic. But the cooperation is ordinary Java that we wrote:
+
+- we decided which agent runs first,
+- we stored the first result,
+- we passed it on.
+
+With two agents that is four lines. With ten or twenty agents, some of them optional and some running at the same time, this coordination code becomes the hardest part of the application.
+
+The frameworks offer ready-made coordination for that. In LangChain4j it starts with a **workflow**, which is the [next lesson](/docs/langchain4j-one-shot/agentic-ai/agentic-workflows).
+
+<Callout type="info" title="Checked for these docs">
+The three files were compiled against `langchain4j-agentic` 1.18.1-beta28 and run for these docs with a local model in place of OpenAI. The advisor recommended the Spring Framework, with its reasons. The planner, which received only that text, returned a plan with Week 1 "Introduction to Spring Framework", Week 2 "Core Spring Components" and so on. A different model chose a different topic than in the video, and the hand-over between the two agents worked in the same way.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `@Agent`, `@UserMessage` or `@V` in red after pasting the code | The imports are missing. This happens in the lesson for both interfaces | Import `dev.langchain4j.agentic.Agent`, `dev.langchain4j.service.UserMessage` and `dev.langchain4j.service.V` |
+| `AgenticServices` is red in `Main` | The import is missing. Also in the lesson | Import `dev.langchain4j.agentic.AgenticServices` |
+| The IDE suggests `AgenticServices.builder(...)` or `AiServices` | An automatic suggestion that does not fit. The instructor rejects it | For a single agent, use `AgenticServices.agentBuilder(...)` |
+| The plan is about a different topic than the recommendation | The wrong variable was passed to `createPlan` | Pass the advisor's result |
+| The program takes twice as long as before | Two model calls run one after the other | That is the cost of two agents |
+
+## Try It Yourself
+
+1. Build both agents and run the chain with your own background as input.
+2. Print only the recommendation and check that it is one topic with two sentences, as the prompt demands.
+3. Call the planner directly with a recommendation that you wrote yourself, without the advisor.
+4. Swap the order and try to call the planner first. What is missing?
+5. Add a third agent, `QuizAgent`, that creates three quiz questions from a learning plan. Chain all three by hand.
+6. Measure the time of each call with `System.currentTimeMillis()`.
+7. Count how many lines of your `main` method are coordination and not agent logic. Keep the number in mind for the next lesson.
+
+## Official references
+
+- [LangChain4j: agents and agentic AI](https://docs.langchain4j.dev/tutorials/agents)
+- [Anthropic: building effective agents](https://www.anthropic.com/engineering/building-effective-agents)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

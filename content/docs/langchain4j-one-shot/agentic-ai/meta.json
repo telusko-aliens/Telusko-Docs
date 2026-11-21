@@ -1,0 +1,11 @@
+{
+  "title": "Agentic AI",
+  "pages": [
+    "ai-agents-vs-agentic-ai.mdx",
+    "your-first-ai-agent.mdx",
+    "multi-agent-systems.mdx",
+    "agentic-workflows.mdx",
+    "supervisor-agents.mdx",
+    "project-ai-course-support-assistant.mdx"
+  ]
+}

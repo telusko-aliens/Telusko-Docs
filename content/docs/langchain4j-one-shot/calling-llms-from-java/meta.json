@@ -1,0 +1,8 @@
+{
+  "title": "Calling LLMs from Java",
+  "pages": [
+    "setup-for-java-ai-applications.mdx",
+    "calling-an-llm-from-core-java.mdx",
+    "using-the-openai-java-sdk.mdx"
+  ]
+}

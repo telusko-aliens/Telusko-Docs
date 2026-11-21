@@ -1,0 +1,349 @@
+---
+title: Building AI REST APIs
+description: Use LangChain4j inside a Spring Boot application, let Spring create the ChatModel from application.properties, declare an AI Service with one annotation, and expose both as REST endpoints.
+---
+
+<Video id="nZRU4Htu5WQ" title="Building AI REST APIs" start={9121} />
+
+---
+
+Every application so far was a console program. You ran `main`, and the answer appeared in the console of the IDE.
+
+Real users are not sitting in front of your console. They use a React front end, a mobile app, or another service, and all of these talk to a backend over HTTP. So the model call has to move behind a **REST API**.
+
+In Java that usually means Spring Boot. There are three ways to add AI to a Spring Boot application: the OpenAI SDK, Spring AI, or LangChain4j. This course is about LangChain4j, so that is what we use.
+
+The main message of this lesson is short: **the LangChain4j code stays the same**. `chatModel.chat(...)` and an AI Service interface work in a Spring Boot application exactly as they did in the console. What changes is who creates the objects.
+
+<Callout type="info" title="Spring Boot knowledge is assumed">
+The lesson does not teach Spring Boot. It expects that you know what a controller, constructor injection and `application.properties` are. If these are new, learn the basics of Spring Boot first, and do not confuse them with the AI part. The AI part of this lesson is small.
+</Callout>
+
+## Console program and Spring Boot, side by side
+
+| | Console program | Spring Boot application |
+| --- | --- | --- |
+| Creating the model | `OpenAiChatModel.builder()...build()` in `main` | Spring creates it from `application.properties` |
+| API key, model name, temperature | Written in the builder | Written as properties |
+| Creating the AI Service | `AiServices.create(...)` | The `@AiService` annotation on the interface |
+| Getting the objects | You hold them in local variables | Spring injects them into your controller |
+| Calling the model | `chatModel.chat(message)` | `chatModel.chat(message)`, unchanged |
+
+![Spring_Boot_REST_API](https://dyz1pdcuffwr5.cloudfront.net/LangChain4jOneShot/lc4j1s-rest-api.svg)
+
+## Step 1: The project and its dependencies
+
+The lesson starts with a Spring Boot project that already exists. It is named `lc4j-springboot`, its base package is `com.telusko.lc4jspringboot`, and it is a Maven project for Spring Boot 4. To follow along, create the same project at [start.spring.io](https://start.spring.io) with the **Spring Web** dependency, and then add two LangChain4j dependencies to `pom.xml` by hand:
+
+```xml title="pom.xml"
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-webmvc</artifactId>
+    </dependency>
+
+    <!-- LangChain4j OpenAI for Spring Boot 4 -->
+    <dependency>
+        <groupId>dev.langchain4j</groupId>
+        <artifactId>langchain4j-open-ai-spring-boot4-starter</artifactId>
+        <version>${langchain4j.version}</version>
+    </dependency>
+
+    <!-- LangChain4j AI Services for Spring Boot 4 -->
+    <dependency>
+        <groupId>dev.langchain4j</groupId>
+        <artifactId>langchain4j-spring-boot4-starter</artifactId>
+        <version>${langchain4j.version}</version>
+    </dependency>
+</dependencies>
+```
+
+| Dependency | What it gives you |
+| --- | --- |
+| `spring-boot-starter-webmvc` | REST controllers and the embedded Tomcat server |
+| `langchain4j-open-ai-spring-boot4-starter` | A ready `ChatModel` bean for OpenAI, configured from properties |
+| `langchain4j-spring-boot4-starter` | Support for the `@AiService` annotation |
+
+The version is a property, which you define in the `<properties>` section of the same file:
+
+```xml title="pom.xml"
+<properties>
+    <java.version>21</java.version>
+    <langchain4j.version>1.20.0-beta30</langchain4j.version>
+</properties>
+```
+
+<Callout type="warn" title="The starter version is not the plain LangChain4j version">
+The part of `pom.xml` that holds the version number is not shown in the video. The Spring Boot starters of LangChain4j are published with a version such as `1.20.0-beta30`, not `1.20.0`. A plain `1.20.0` is not found for these two artifacts. The project built for these docs used Spring Boot 4.1.3 with `1.20.0-beta30`. Check the official Spring Boot integration page for the current number.
+
+There are also two families of starters. Names with `spring-boot4-starter` are for Spring Boot 4. Names with `spring-boot-starter` are for Spring Boot 3. Use the family that matches your Spring Boot version.
+</Callout>
+
+The main class is the one that Spring Initializr generates, unchanged:
+
+```java title="Lc4jSpringbootApplication.java"
+package com.telusko.lc4jspringboot;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class Lc4jSpringbootApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(Lc4jSpringbootApplication.class, args);
+    }
+}
+```
+
+## Step 2: A controller that uses the ChatModel
+
+Create a package `com.telusko.lc4jspringboot.web` and a class `ChatController` in it:
+
+```java title="ChatController.java"
+package com.telusko.lc4jspringboot.web;
+
+import dev.langchain4j.model.chat.ChatModel;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api")
+public class ChatController
+{
+    private ChatModel chatModel;
+
+    public ChatController(ChatModel chatModel) {
+        this.chatModel = chatModel;
+    }
+
+    @GetMapping("/chat")
+    public String chat(@RequestParam String message)
+    {
+        return chatModel.chat(message);
+    }
+}
+```
+
+| Line | Meaning |
+| --- | --- |
+| `@RestController` | This class answers HTTP requests, and return values go straight into the response body |
+| `@RequestMapping("/api")` | Every endpoint of this class starts with `/api` |
+| `private ChatModel chatModel;` | The same `ChatModel` interface from LangChain4j that the console programs used |
+| The constructor | Constructor injection. When Spring creates the controller, it passes in the `ChatModel` bean |
+| `@GetMapping("/chat")` | The method answers `GET /api/chat` |
+| `@RequestParam String message` | The question comes from the query parameter `message` in the URL |
+| `chatModel.chat(message)` | The call you already know |
+
+Notice what is missing. There is no builder and no API key anywhere in this class. The controller only says "I need a `ChatModel`" and Spring provides one.
+
+## Step 3: Configure the model in application.properties
+
+Spring has to know which model to create. In the console programs, those details were builder calls. Here they are properties:
+
+```properties title="application.properties"
+spring.application.name=lc4j-springboot
+
+langchain4j.open-ai.chat-model.api-key=${OPENAI_API_KEY}
+langchain4j.open-ai.chat-model.model-name=gpt-4o-mini
+langchain4j.open-ai.chat-model.temperature=0.7
+```
+
+The starter reads these properties at start-up, builds an `OpenAiChatModel` from them and registers it as a bean. That bean is what arrives in the controller's constructor. It is a one-time setup: every class that needs the model just asks for it.
+
+| Builder call in the console programs | Property |
+| --- | --- |
+| `.apiKey(apiKey)` | `langchain4j.open-ai.chat-model.api-key` |
+| `.modelName("gpt-4o-mini")` | `langchain4j.open-ai.chat-model.model-name` |
+| `.temperature(0.7)` | `langchain4j.open-ai.chat-model.temperature` |
+
+<Callout type="warn" title="Do not paste the key into the file">
+In the video the key is pasted directly as the value of `api-key`. The instructor says why: it is a learning project and that key is deleted after the recording. He also says that an environment variable works here too.
+
+The properties above use that safer form. `${OPENAI_API_KEY}` tells Spring to take the value from the environment variable of that name, the same variable as in [Setup for Java AI Applications](/docs/langchain4j-one-shot/calling-llms-from-java/setup-for-java-ai-applications). The key stays out of the file, so it cannot end up in Git by accident.
+</Callout>
+
+## Step 4: Run and test the first endpoint
+
+Run `Lc4jSpringbootApplication`. The application starts in the embedded Tomcat on port 8080.
+
+The lesson tests with Postman. Any HTTP client works, including a browser, because both endpoints are `GET` requests.
+
+```text
+GET http://localhost:8080/api/chat?message=agentic ai concept in short
+```
+
+Status `200 OK`, and the body is plain text:
+
+```text
+Agentic AI refers to artificial intelligence systems that possess the ability to act autonomously and make decisions based on their programming and learned experiences. These systems can perceive their environment, process information, and take actions to achieve specific goals without constant human intervention. ...
+```
+
+The response arrives all at once after a few seconds. It is a blocking call, because the controller uses the normal `ChatModel` and not the streaming one from [Streaming Responses](/docs/langchain4j-one-shot/langchain4j-in-practice/streaming-responses).
+
+## Step 5: An AI Service with one annotation
+
+In the console programs, an [AI Service](/docs/langchain4j-one-shot/langchain4j-in-practice/ai-services) needed a line such as `AiServices.create(LearningAssistant.class, chatModel)`. In Spring Boot that line is replaced by an annotation.
+
+Create an interface in the same `web` package:
+
+```java title="TeluskoAssistant.java"
+package com.telusko.lc4jspringboot.web;
+
+import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.service.UserMessage;
+import dev.langchain4j.service.spring.AiService;
+
+@AiService
+public interface TeluskoAssistant
+{
+    @SystemMessage(
+            "You are a friendly Java trainer. Keep answers short."
+    )
+    @UserMessage("Explain {{it}} in simple terms.")
+    String explain(String topic);
+}
+```
+
+Inside the interface nothing is new: a system message, a user message template with `{{it}}` for the single parameter, and a `String` return type.
+
+The new part is `@AiService`, from the package `dev.langchain4j.service.spring`. When the application starts, the starter scans for interfaces with this annotation, creates the implementation, connects it to the `ChatModel` bean and registers the result as a bean. From then on it can be injected like any other Spring component.
+
+## Step 6: Use the AI Service in the controller
+
+Add a second field, extend the constructor and add a second endpoint:
+
+```java title="ChatController.java"
+package com.telusko.lc4jspringboot.web;
+
+import dev.langchain4j.model.chat.ChatModel;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api")
+public class ChatController
+{
+    private ChatModel chatModel;
+    private TeluskoAssistant teluskoAssistant;
+
+    public ChatController(ChatModel chatModel, TeluskoAssistant teluskoAssistant) {
+        this.chatModel = chatModel;
+        this.teluskoAssistant=teluskoAssistant;
+    }
+
+    @GetMapping("/chat")
+    public String chat(@RequestParam String message)
+    {
+        return chatModel.chat(message);
+    }
+
+    @GetMapping("/explain")
+    public String explain(@RequestParam String message)
+    {
+        return teluskoAssistant.explain(message);
+    }
+}
+```
+
+The two endpoints show the two levels of LangChain4j next to each other:
+
+| Endpoint | Calls | What the model receives |
+| --- | --- | --- |
+| `/api/chat` | `chatModel.chat(message)` | Only the user's text |
+| `/api/explain` | `teluskoAssistant.explain(message)` | The system message, plus "Explain ... in simple terms." with the user's text inserted |
+
+## Step 7: Restart and test the second endpoint
+
+Stop the application, run it again, and call the new endpoint with a topic:
+
+```text
+GET http://localhost:8080/api/explain?message=RAG
+```
+
+```text
+RAG stands for "Red, Amber, Green." It's a simple color-coding system used to indicate the status of a project or task:
+
+- **Red**: Serious issues or problems; immediate attention needed.
+- **Amber**: Caution; some concerns exist, but not critical.
+- **Green**: On track; everything is going well.
+
+This system helps quickly assess progress and identify areas needing focus.
+```
+
+The endpoint works, the answer is short and friendly as the system message demands, and it is about the wrong RAG. The instructor expected the AI term.
+
+The model is not broken. "RAG" has several meanings, and nothing in the request says which one is wanted. The system message mentions a Java trainer, which was not enough of a hint here. So the lesson asks more precisely:
+
+```text
+GET http://localhost:8080/api/explain?message=RAG in AI
+```
+
+```text
+RAG stands for Retrieval-Augmented Generation. It's a method in AI where a model retrieves relevant information from a database or documents to help generate more accurate and contextually rich responses. ...
+```
+
+Three extra characters of context changed the answer. It is a small, honest example of why prompts need context. If you want to know what Retrieval-Augmented Generation is, the separate LangChain4j docs build it step by step in [Why RAG and What Are Embeddings](/docs/langchain4j/embeddings-and-rag/why-rag-and-what-are-embeddings).
+
+<Callout type="info" title="Checked for these docs">
+This project was built and run for these docs with Spring Boot 4.1.3, Java 21 and the two starters in version `1.20.0-beta30`. The controller and the interface are the code shown above. No OpenAI key was available, so the three `langchain4j.open-ai.chat-model` properties were pointed at a local model through its OpenAI-compatible address with the extra property `base-url`.
+
+Both endpoints returned status 200 with a text answer, and `/api/explain` followed the system message. A request without the `message` parameter returned status 400. The local model answered "RAG" with Retrieval-Augmented Generation straight away, so the "Red, Amber, Green" answer above is what the video shows for `gpt-4o-mini`, and your model may choose either meaning.
+</Callout>
+
+## Can you skip Spring AI?
+
+Spring has its own framework for this job, Spring AI, and many Spring Boot projects use it. The lesson ends with the question whether a Spring Boot application can be AI powered without it. The answer is yes. LangChain4j integrates through its starters, as you have just seen, and everything from the earlier lessons is available.
+
+Both are valid choices. The Telusko docs have a separate [Spring AI section](/docs/spring-ai/getting-started) if you want to compare them.
+
+## Additions beyond the lesson
+
+**Other model settings are properties too.** Everything the builder offered has a property with the same meaning, for example `langchain4j.open-ai.chat-model.max-completion-tokens`, `timeout`, `log-requests` and `log-responses`.
+
+**More than one model.** With a single `ChatModel` bean, `@AiService` finds it by itself. If you add a second model starter, for example Ollama, the automatic wiring no longer knows which model to use. The official guide describes the explicit wiring mode for that case, for example `@AiService(wiringMode = EXPLICIT, chatModel = "openAiChatModel")`.
+
+**GET is fine for a demo.** A question in the URL is easy to test, but URLs are length-limited and are written to logs. A real chat endpoint normally uses `POST` with the message in the request body.
+
+**An open endpoint spends your money.** Everyone who can reach `/api/chat` can make your application call OpenAI on your bill. Before such an endpoint leaves your machine, it needs authentication and a limit on how often and how much a caller can ask.
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `message` is red in `chatModel.chat(message)` | The method was written as `chat()` without a parameter. This happens in the lesson | Add the parameter `@RequestParam String message` |
+| A warning on `this.chatModel = chatModel` in the constructor | The constructor has no parameter, so the field is assigned to itself and stays `null`. This also appears for a moment in the lesson | Write the constructor as `ChatController(ChatModel chatModel)` |
+| Two `chat` methods underlined in red | The endpoint was copied and pasted and not yet renamed | Rename the copy to `explain` and map it to `/explain` |
+| Maven cannot find the starter | The version is a plain LangChain4j version such as `1.20.0`, or the property `langchain4j.version` is not defined | Use the starter version with its `-beta` suffix |
+| The application fails at start-up and names `ChatModel` as a missing bean | The OpenAI starter is missing, or `langchain4j.open-ai.chat-model.api-key` is not set | Add the starter and the property |
+| The application fails because a placeholder `OPENAI_API_KEY` cannot be resolved | The environment variable is not visible to the application | Set it in the run configuration, or system-wide and restart the IDE |
+| Status 400 for a request | The `message` parameter is missing from the URL | Add `?message=...` |
+| Status 404 | The path is wrong. The endpoints are `/api/chat` and `/api/explain` | Include the `/api` prefix |
+| The new endpoint is not found although the code is there | The application was not restarted | Stop it and run it again |
+
+## Try It Yourself
+
+1. Create the Spring Boot project, add the two starters and the three properties, and call `/api/chat` from a browser or Postman.
+2. Add `TeluskoAssistant` and the `/explain` endpoint. Ask for "RAG" and then for "RAG in AI".
+3. Change the system message so that the first request already gives the AI meaning, without changing the URL.
+4. Call `/api/chat` without the `message` parameter and read the response.
+5. Set `langchain4j.open-ai.chat-model.log-requests=true` and `log-responses=true`, and look at what is sent for `/api/chat` and for `/api/explain`. What is the difference?
+6. Add a second method to `TeluskoAssistant` that returns three quiz questions on a topic, and expose it as `/api/quiz`.
+7. Change one endpoint to return a record in place of a `String`, as in [Structured Output](/docs/langchain4j-one-shot/langchain4j-in-practice/structured-output). What does the HTTP response look like now?
+8. Turn `/api/chat` into a `POST` endpoint that reads the message from the request body.
+
+## Official references
+
+- [LangChain4j: Spring Boot integration](https://docs.langchain4j.dev/tutorials/spring-boot-integration)
+- [LangChain4j: AI Services](https://docs.langchain4j.dev/tutorials/ai-services)
+- [LangChain4j: OpenAI integration](https://docs.langchain4j.dev/integrations/language-models/open-ai)
+- [Spring Boot: reference documentation](https://docs.spring.io/spring-boot/index.html)
+- [Spring Initializr](https://start.spring.io)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

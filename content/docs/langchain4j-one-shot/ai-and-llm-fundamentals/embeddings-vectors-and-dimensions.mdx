@@ -1,0 +1,136 @@
+---
+title: Embeddings, Vectors and Dimensions
+description: Follow a sentence from tokens to token IDs to embeddings, and understand what a vector and its dimensions are, why similar meanings end up close together, and how that makes semantic search possible.
+---
+
+<Video id="nZRU4Htu5WQ" title="Embeddings, Vectors and Dimensions" start={2069} />
+
+---
+
+Can a computer understand the word "Java"? Or "Python", "apple", "cat", "dog"?
+
+No. A computer understands numbers. So before a model can work with a token, the token has to become numbers, and the way that happens explains a lot about why LLMs are good with meaning.
+
+## From text to numbers, step by step
+
+Take the sentence "I love Java". You already know the first step from the [previous page](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/llms-tokens-and-the-context-window): tokenization. The video's diagram continues from there.
+
+![Text_To_Embeddings](https://dyz1pdcuffwr5.cloudfront.net/LangChain4jOneShot/lc4j1s-text-to-embeddings.svg)
+
+| Step | Example | What it is |
+| --- | --- | --- |
+| Raw text | `"I love Java"` | What you typed |
+| Tokens | `I`, `love`, `Ja`, `va` | The text cut into pieces. Here "Java" became two tokens |
+| Token IDs | `40, 1842, 12, 6862` | One number per token |
+| Embedding vectors | `[0.12, -0.45, 0.87, ...]` | A list of numbers per token that carries its meaning |
+| Transformer layers | | The part of the model that processes those vectors |
+
+The numbers in this table are from the slide and are there to show the idea. Real token IDs and embeddings depend on the model.
+
+### Token IDs carry no meaning
+
+Every token gets a **token ID**. It is simply the position of that token in the model's vocabulary, a unique number. In the example, `love` is `1842`.
+
+That number says nothing about love. It does not tell the model that "love" is related to "like", or that it is the opposite of "hate". It is a label and nothing more.
+
+### Embeddings carry the meaning
+
+To represent what a token means, each token ID is turned into a much richer set of numbers. That is the **embedding**.
+
+> An embedding is a numerical representation of a word, a sentence or even an entire document that captures its meaning.
+
+You never calculate these numbers yourself, and you do not need to remember any of them. The model learned them during training.
+
+## Vectors and dimensions
+
+Two more words belong here, and they are simple once you see them together.
+
+| Term | Meaning |
+| --- | --- |
+| Embedding | The numerical representation of a piece of text |
+| Vector | The list of numbers in which that representation is stored |
+| Dimension | How many numbers the list contains |
+
+So `[0.12, -0.45, 0.87]` is a vector with three dimensions. A vector with four numbers has four dimensions, one with a hundred numbers has a hundred.
+
+Real embeddings are much longer than the slide can show. They have **hundreds or thousands** of dimensions. The number `1536` appears on the slide because it is a common size, the default of a widely used OpenAI embedding model.
+
+Why so many? Each dimension can hold a little more information about the text. With more dimensions, a model can capture more of what a token means and more of how it relates to other tokens.
+
+<Callout type="info" title="Sizes vary between models">
+The video says that most embedding models have around 1536 dimensions. Treat that as one common example and not as a rule. Embedding models come in many sizes, for example 384, 768, 1024, 1536 or 3072 dimensions. The size is a property of the model you choose.
+</Callout>
+
+## Similar meaning, nearby vectors
+
+This is the property that makes embeddings useful.
+
+Take "car" and "automobile". The words look nothing alike, and yet you know they mean the same thing. Their embeddings reflect that. They are not identical, and they are **close to each other**.
+
+Now take "car" and "banana". Unrelated meanings, and their embeddings are far apart.
+
+If embeddings had only two dimensions, you could draw them as points on a graph:
+
+| Group on the slide | Words | Where they are |
+| --- | --- | --- |
+| Blue points | Car, Automobile, Vehicle | Close together |
+| Red points | Mango, Banana | Close together, and far from the blue group |
+
+The slide sums it up in one line:
+
+> Similar meaning = nearby vectors. This distance is what powers semantic search.
+
+**Semantic search** means searching by meaning and not by matching letters. A search for "automobile" can find a text that only says "car", because their vectors are neighbours. Keyword search cannot do that.
+
+## Two places where you meet embeddings
+
+The word "embedding" is used in two situations, and it helps to keep them apart.
+
+| | Inside an LLM | From an embedding model |
+| --- | --- | --- |
+| What gets an embedding | Every single token of your prompt | A whole sentence, paragraph or document |
+| Who uses it | The transformer, on the way to an answer | Your own application, for example to search documents |
+| Do you see it | No. It happens inside the model | Yes. You call the model and get the vector back |
+
+This page, like the video, describes the first: what happens to your prompt inside the model. The second is the basis of semantic search and RAG. The idea is the same in both cases: meaning becomes a position in a space of numbers.
+
+<Callout type="info" title="Want to try embeddings in Java?">
+The video does not write embedding code. If you want to create embeddings yourself and compare them, the separate LangChain4j docs do it step by step in [Embeddings and Cosine Similarity](/docs/langchain4j/embeddings-and-rag/embeddings-and-cosine-similarity).
+</Callout>
+
+## Summary
+
+These are the six points from the video's summary slide:
+
+1. Computers understand numbers, not words.
+2. Every token first gets a token ID.
+3. That token ID is converted into an embedding.
+4. An embedding is represented as a vector.
+5. The number of values in the vector determines its dimensions.
+6. These embeddings are then processed by the transformer, which learns the relationships between them and generates the response.
+
+And the full flow, from the same slide:
+
+```text
+Text -> Tokenization -> Tokens -> Token IDs -> Embeddings (vectors) -> Transformer -> Response
+```
+
+The last two steps are the subject of the [next page](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/transformers-and-attention).
+
+## Try It Yourself
+
+1. Write down four pairs of words that mean the same but share no letters, such as "car" and "automobile". These are the pairs that keyword search fails on.
+2. Draw two axes on paper. Place "car", "automobile", "vehicle", "mango" and "banana" as points, so that related words are close. Then add "apple" and "truck".
+3. Explain the difference between a token ID and an embedding in two sentences.
+4. A vector has 768 numbers. How many dimensions does it have? What do you gain and what do you pay with a vector of 3072 numbers?
+5. Think of a search box you use that only matches exact words. Describe one search where semantic search would have found what you wanted.
+
+## Official references
+
+- [OpenAI: embeddings](https://platform.openai.com/docs/guides/embeddings)
+- [Google Machine Learning Crash Course: embeddings](https://developers.google.com/machine-learning/crash-course/embeddings)
+- [LangChain4j: supported embedding models](https://docs.langchain4j.dev/category/embedding-models)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

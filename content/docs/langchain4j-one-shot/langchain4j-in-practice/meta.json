@@ -1,0 +1,14 @@
+{
+  "title": "LangChain4j in Practice",
+  "pages": [
+    "your-first-langchain4j-application.mdx",
+    "chatmodel-configuration.mdx",
+    "ai-services.mdx",
+    "prompt-templates.mdx",
+    "structured-output.mdx",
+    "streaming-responses.mdx",
+    "building-ai-rest-apis.mdx",
+    "chat-memory.mdx",
+    "tool-calling.mdx"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "title": "AI and LLM Fundamentals",
+  "pages": [
+    "ai-ml-deep-learning-and-generative-ai.mdx",
+    "nlp-and-how-it-evolved.mdx",
+    "llms-tokens-and-the-context-window.mdx",
+    "embeddings-vectors-and-dimensions.mdx",
+    "transformers-and-attention.mdx",
+    "open-and-closed-models.mdx",
+    "hallucinations.mdx"
+  ]
+}

@@ -1,0 +1,171 @@
+---
+title: Getting Started
+description: Follow the Telusko LangChain4j full course in one shot, chapter by chapter - from what an LLM is, through AI Services, memory, tools and MCP, to agents and a complete agentic project in Java.
+icon: Sparkles
+---
+
+Welcome to the **LangChain4j One Shot Docs**.
+
+<Video id="nZRU4Htu5WQ" title="LangChain4j Full Course in One Shot" />
+
+---
+
+This section is the written companion to one video: the **LangChain4j Full Course in One Shot** by Haider Abbas on the Telusko channel. The video is five hours long and has 37 chapters. These docs follow it in the same order, one page for each topic, with the code, the output and the mistakes that happen on the way.
+
+You can use the pages in three ways:
+
+- **With the video.** Every lesson page starts with the video at the right moment. Watch a chapter, then read the page to fix it in your mind and to copy the code.
+- **Without the video.** Each page is complete by itself. The code is written out in full, so that you do not have to pause and type from the screen.
+- **As a reference later.** Every page ends with a table of mistakes and their fixes, and with exercises.
+
+---
+
+## What the course builds up
+
+The course does not start with LangChain4j. It starts with what a model is, then calls a model with nothing except the JDK, and only then brings in the library. By that time you know exactly what the library does for you.
+
+| Part | What you learn | Pages |
+| --- | --- | --- |
+| 1. AI and LLM fundamentals | What AI, LLMs, tokens, embeddings and transformers are, and why models hallucinate | 7 |
+| 2. Calling LLMs from Java | An API key, a raw HTTP call from core Java, the official OpenAI Java SDK | 3 |
+| 3. LangChain4j in practice | ChatModel, AI Services, prompt templates, structured output, streaming, REST APIs, memory, tools | 9 |
+| 4. MCP and local models | The Model Context Protocol, an existing MCP server, your own MCP server, response metadata, Ollama | 5 |
+| 5. Agentic AI | Agents, multi-agent systems, workflows, supervisors, and the final project | 6 |
+
+---
+
+## The chapters, with their pages
+
+The time in the second column is where the topic starts in the video.
+
+### Part 1: AI and LLM fundamentals
+
+| Page | Starts at | Chapters of the video |
+| --- | --- | --- |
+| [AI, ML, Deep Learning and Generative AI](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/ai-ml-deep-learning-and-generative-ai) | 0:02:09 | What is AI, ML, DL and Generative AI. Neural Networks Explained |
+| [NLP and How It Evolved](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/nlp-and-how-it-evolved) | 0:14:39 | What is NLP and Why Does It Matter. The Evolution of NLP |
+| [LLMs, Tokens and the Context Window](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/llms-tokens-and-the-context-window) | 0:24:20 | What is a Large Language Model. Tokens. Context Window Explained |
+| [Embeddings, Vectors and Dimensions](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/embeddings-vectors-and-dimensions) | 0:34:29 | Embeddings, Vectors and Dimensions |
+| [Transformers and Attention](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/transformers-and-attention) | 0:42:15 | Transformers. Attention Mechanism. How LLMs Actually Work |
+| [Open and Closed Models](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/open-and-closed-models) | 0:57:11 | Open Models vs Closed Models |
+| [Hallucinations](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/hallucinations) | 1:06:37 | Hallucinations Explained |
+
+### Part 2: Calling LLMs from Java
+
+| Page | Starts at | Chapter of the video |
+| --- | --- | --- |
+| [Setup for Java AI Applications](/docs/langchain4j-one-shot/calling-llms-from-java/setup-for-java-ai-applications) | 1:10:34 | Setup for Java AI Applications |
+| [Calling an LLM from Core Java](/docs/langchain4j-one-shot/calling-llms-from-java/calling-an-llm-from-core-java) | 1:16:01 | Call an LLM from Core Java, No AI Framework |
+| [Using the OpenAI Java SDK](/docs/langchain4j-one-shot/calling-llms-from-java/using-the-openai-java-sdk) | 1:27:08 | Call OpenAI from Java using the Official Java SDK |
+
+### Part 3: LangChain4j in practice
+
+| Page | Starts at | Chapter of the video |
+| --- | --- | --- |
+| [Your First LangChain4j Application](/docs/langchain4j-one-shot/langchain4j-in-practice/your-first-langchain4j-application) | 1:35:02 | Your First LangChain4j Application |
+| [ChatModel Configuration](/docs/langchain4j-one-shot/langchain4j-in-practice/chatmodel-configuration) | 1:44:21 | ChatModel Configuration, Temperature and Prompts |
+| [AI Services](/docs/langchain4j-one-shot/langchain4j-in-practice/ai-services) | 1:54:21 | LangChain4j AI Services |
+| [Prompt Templates](/docs/langchain4j-one-shot/langchain4j-in-practice/prompt-templates) | 2:02:58 | Prompt Templates in LangChain4j |
+| [Structured Output](/docs/langchain4j-one-shot/langchain4j-in-practice/structured-output) | 2:12:11 | Structured Output with LangChain4j |
+| [Streaming Responses](/docs/langchain4j-one-shot/langchain4j-in-practice/streaming-responses) | 2:23:23 | Streaming LLM Responses with LangChain4j |
+| [Building AI REST APIs](/docs/langchain4j-one-shot/langchain4j-in-practice/building-ai-rest-apis) | 2:32:01 | Build AI REST APIs Using ChatModel and AI Services |
+| [Chat Memory](/docs/langchain4j-one-shot/langchain4j-in-practice/chat-memory) | 2:45:21 | Chat Memory with LangChain4j |
+| [Tool Calling](/docs/langchain4j-one-shot/langchain4j-in-practice/tool-calling) | 2:54:06 | Tool Calling with LangChain4j |
+
+### Part 4: MCP and local models
+
+| Page | Starts at | Chapter of the video |
+| --- | --- | --- |
+| [MCP Explained](/docs/langchain4j-one-shot/mcp-and-local-models/mcp-explained) | 3:03:50 | MCP Explained, Architecture and How It Works |
+| [Connecting to a Filesystem MCP Server](/docs/langchain4j-one-shot/mcp-and-local-models/connecting-to-a-filesystem-mcp-server) | 3:13:49 | MCP, Connect AI to a Filesystem MCP Server |
+| [Building Your Own MCP Server](/docs/langchain4j-one-shot/mcp-and-local-models/building-your-own-mcp-server) | 3:26:30 | Build Your Own MCP Server in Java and access it in app |
+| [Response Metadata and Token Usage](/docs/langchain4j-one-shot/mcp-and-local-models/response-metadata-and-token-usage) | 3:47:07 | LangChain4j Response Metadata and Token Usage |
+| [Running LLMs Locally with Ollama](/docs/langchain4j-one-shot/mcp-and-local-models/running-llms-locally-with-ollama) | 3:56:16 | LangChain4j with Ollama, Run LLMs Locally |
+
+### Part 5: Agentic AI
+
+| Page | Starts at | Chapter of the video |
+| --- | --- | --- |
+| [AI Agents vs Agentic AI](/docs/langchain4j-one-shot/agentic-ai/ai-agents-vs-agentic-ai) | 4:03:34 | AI Agents vs Agentic AI Introduction |
+| [Your First AI Agent](/docs/langchain4j-one-shot/agentic-ai/your-first-ai-agent) | 4:09:53 | Build Your First AI Agent with LangChain4j |
+| [Multi-Agent Systems](/docs/langchain4j-one-shot/agentic-ai/multi-agent-systems) | 4:17:28 | Multi-Agent Systems, Two Agents Working Together |
+| [Agentic Workflows](/docs/langchain4j-one-shot/agentic-ai/agentic-workflows) | 4:26:58 | Agentic Workflows Demo |
+| [Supervisor Agents](/docs/langchain4j-one-shot/agentic-ai/supervisor-agents) | 4:33:44 | Agentic AI Workflows, Supervisor Agents |
+| [Project: AI Course Support Assistant](/docs/langchain4j-one-shot/agentic-ai/project-ai-course-support-assistant) | 4:44:51 | Project: AI Course Support Assistant |
+
+---
+
+## What you need
+
+| Requirement | Details |
+| --- | --- |
+| Java knowledge | Core Java: classes, interfaces, records, lambdas, and Maven projects. Spring Boot basics for the REST API lesson only |
+| JDK | 21 is used in the video. LangChain4j needs 17 or newer |
+| IDE | IntelliJ IDEA is used in the video. Any Java IDE works |
+| An OpenAI API key | With a small amount of credit. The setup lesson shows every step. The cost of the whole course is small, because the examples are short |
+| Node.js | Only for the filesystem MCP lesson |
+| Ollama | Only for the local model lesson. It can also replace OpenAI in most examples if you do not want to pay for an API |
+
+No knowledge of AI or machine learning is expected. Part 1 starts from zero.
+
+---
+
+## The projects of the course
+
+The video works in several small Maven projects. Most of them are plain Java with a `main` method, so that nothing hides the code that talks to the model.
+
+| Project in the video | Used for |
+| --- | --- |
+| `first-app-llm` | The raw HTTP call from core Java |
+| `first-lc4j` | The first LangChain4j call, configuration and AI Services |
+| `lc4j-demo` | Prompt templates, structured output and streaming |
+| `lc4j-springboot` | The REST API with Spring Boot |
+| `lc4j-chat-memory-java21` | Chat memory, and then tool calling |
+| `mcp-filesystem-starter` | The MCP client, for both MCP servers |
+| `course-mcp-server-starter-java21` | Our own MCP server |
+| `lc4j-response-metadata-starter-java21` | Response metadata |
+| `lc4j-ollama-starter` | The local model |
+| `first-ai-agent`, `multi-agent-demo` | Agents, workflows and the supervisor |
+| `ai-course-support-assistant-starter-java21` | The final project |
+
+From the chat memory lesson on, the instructor opens prepared starter projects and fills in the important parts. The pages show every file in full, so you can create the same projects yourself. All you need each time is a Maven project with the dependencies listed on the page.
+
+---
+
+## About the versions
+
+The first LangChain4j projects of the video use version **1.20.0**. The prepared starter projects of the later lessons use **1.18.1**, and for the Spring Boot, MCP and agentic modules the matching versions with a `-beta` suffix, such as `1.18.1-beta28`. Each page names the version it uses.
+
+LangChain4j moves quickly, and the agentic module is marked as experimental by its authors. If something in a newer version looks different from a page, the official documentation linked at the bottom of every page is the place to check.
+
+---
+
+## How these docs were checked
+
+A mistake in a lesson costs a learner time, so the code on these pages was not only copied from the screen.
+
+- **Compiled.** The Java code of every lesson was compiled against the LangChain4j versions used in the video.
+- **Run.** No OpenAI key was used for these docs. The examples were run with local models through Ollama, with the model class swapped and everything else unchanged. Each page says in a box named "Checked for these docs" what was run and what was observed.
+- **Compared.** Outputs that are shown as coming from OpenAI are the ones visible in the video. Statements about how LangChain4j behaves were checked against the official documentation.
+
+Where the video does not show a piece of code, the page says so and marks what was completed. Where a run for these docs behaved differently from the video, the page reports both.
+
+---
+
+## Related docs
+
+<Cards>
+  <Card title="LangChain4j course docs" href="/docs/langchain4j/getting-started" description="A separate, lecture-by-lecture course that goes deeper into embeddings and builds a complete RAG pipeline" />
+  <Card title="MCP docs" href="/docs/mcp/getting-started" description="MCP clients and servers with Spring AI, including HTTP transport and the GitHub MCP server" />
+  <Card title="Official LangChain4j documentation" href="https://docs.langchain4j.dev/intro" description="Tutorials and integration guides from the LangChain4j project" />
+</Cards>
+
+---
+
+## Start here
+
+Begin with [AI, ML, Deep Learning and Generative AI](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/ai-ml-deep-learning-and-generative-ai). If you already know how LLMs work and want to write code at once, jump to [Setup for Java AI Applications](/docs/langchain4j-one-shot/calling-llms-from-java/setup-for-java-ai-applications).
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

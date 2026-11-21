@@ -1,0 +1,105 @@
+---
+title: Hallucinations
+description: Understand why a language model sometimes gives confident answers that are wrong or made up, and the practical ways to reduce the risk with clear prompts, context, RAG, tool calling and verification.
+---
+
+<Video id="nZRU4Htu5WQ" title="Hallucinations" start={3997} />
+
+---
+
+An LLM does not search the internet each time you ask something. It does not look up the right answer in a database. As the [transformer page](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/transformers-and-attention) showed, it generates a response one token at a time, from the patterns it learned in training.
+
+That raises an obvious question. If these models are so capable, why are they sometimes completely wrong?
+
+## What a hallucination is
+
+A **hallucination** is when an AI model produces information that looks confident and convincing and is in fact incorrect or entirely made up.
+
+Two examples from the video:
+
+| You ask | What can happen |
+| --- | --- |
+| "Who won the FIFA World Cup in 2038?" | The tournament has not taken place. The model may name a winner anyway |
+| "Give me the built-in Java method that does this" | The model may answer with a method name that sounds right and exists in no Java API |
+
+The second kind is the one developers meet most often. A method that does not exist, a configuration property nobody defined, a library version that was never released. All of them look exactly like real ones.
+
+That is what makes hallucinations dangerous. A wrong answer does not come with a warning. It has the same tone, the same formatting and the same confidence as a correct one.
+
+## Why it happens
+
+The reason is short:
+
+> An LLM predicts the next token. It does not verify facts.
+
+Producing text is the model's whole job. When it writes an answer, it is choosing likely tokens, one after another. No step checks whether the sentence it has built is true.
+
+So when the model does not have enough information, or the question is ambiguous, it does not stop. It continues with the most plausible-looking text, and the result can be an invention.
+
+A hallucination is therefore not a rare malfunction. It follows directly from how a language model works.
+
+## Ways to reduce it
+
+Hallucinations cannot be switched off. They can be made much less likely, and the rest can be caught. The video's slide groups the measures in two blocks.
+
+![Reducing_Hallucinations](https://dyz1pdcuffwr5.cloudfront.net/LangChain4jOneShot/lc4j1s-hallucinations.svg)
+
+### Reduce the chance
+
+| Measure | What it does | Where you learn it in this course |
+| --- | --- | --- |
+| **Clear, specific prompts** | Removes ambiguity. A precise question leaves less room for guessing | [Prompt Templates](/docs/langchain4j-one-shot/langchain4j-in-practice/prompt-templates) |
+| **Provide context** | Gives the model the facts up front. A system prompt can also set how it should behave, including what to do when it does not know | [ChatModel Configuration](/docs/langchain4j-one-shot/langchain4j-in-practice/chatmodel-configuration) |
+| **RAG** | Retrieves the relevant parts of trusted documents and hands them to the model with the question | Covered in the separate [LangChain4j RAG lesson](/docs/langchain4j/embeddings-and-rag/building-a-rag-pipeline) |
+| **Tool calling** | Lets the model fetch live data from APIs and databases, so that it does not depend on what it remembers from training | [Tool Calling](/docs/langchain4j-one-shot/langchain4j-in-practice/tool-calling) and [MCP Explained](/docs/langchain4j-one-shot/mcp-and-local-models/mcp-explained) |
+
+The last two rows change what a model can do. With RAG, tools and MCP, a model is no longer limited to its training data. It can work with your documents and with the current state of real systems.
+
+### Catch what still gets through
+
+The second block of the slide has one line:
+
+> Verify important output, every time.
+
+No measure in the first block is perfect. For anything that matters, a number in a report, a medical or legal statement, code that goes to production, a person or another check has to confirm the result.
+
+The slide closes with a sentence that sets the right expectation:
+
+> None of these eliminate hallucination. They shrink it, and catch the rest.
+
+## What this means when you write code
+
+Three habits follow from this page, and the later lessons use all of them.
+
+**Tell the model it is allowed not to know.** A system message such as "If you do not know the answer, say that you do not know" gives the model a correct way out. Without it, the most likely continuation of a question is an answer.
+
+**Give the model facts, do not test its memory.** If the answer depends on your data or on something that changes, supply it through context, a tool or a document. Asking a model to recall your order status or today's price is asking for an invention.
+
+**Treat the output as a draft.** Check a method name in the documentation before you use it. Compile the code. Run the query. In this course, every program is run, and you will see more than once that a confident answer was wrong.
+
+## Summary
+
+- A hallucination is incorrect or made-up information that looks convincing.
+- It happens because an LLM predicts the next token and does not verify facts.
+- Clear prompts, context, RAG and tool calling reduce the chance.
+- Important output still has to be verified.
+
+This is the end of the theory. From the [next page](/docs/langchain4j-one-shot/calling-llms-from-java/setup-for-java-ai-applications) on, everything is code.
+
+## Try It Yourself
+
+1. Ask a chat assistant about an event in the far future, as if it had already happened. Does it correct you, or does it play along?
+2. Ask for "the Java method in the String class that reverses a string". Check the answer in the official Java documentation. Does a method with that exact name exist?
+3. Ask the same factual question with and without the sentence "If you are not sure, say so". Compare the answers.
+4. Ask a question about your own company or school that the model cannot know. Then paste the relevant text into the prompt and ask again.
+5. Think of an application you would like to build. List three kinds of output in it that would need verification before a user sees them.
+
+## Official references
+
+- [OpenAI: optimizing LLM accuracy](https://platform.openai.com/docs/guides/optimizing-llm-accuracy)
+- [LangChain4j: RAG](https://docs.langchain4j.dev/tutorials/rag)
+- [LangChain4j: tools (function calling)](https://docs.langchain4j.dev/tutorials/tools)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,154 @@
+---
+title: AI Agents vs Agentic AI
+description: The step from applications that answer to applications that act - chatbot, tool-using assistant, AI agent and agentic AI, with the definitions and the worked example from the lesson.
+---
+
+<Video id="nZRU4Htu5WQ" title="AI Agents vs Agentic AI" start={14614} />
+
+---
+
+Open any AI chat application and ask it this:
+
+> How do I deploy a Java app on AWS?
+
+The lesson does exactly that with Gemini. The answer is long and good. It names four ways to deploy, from Elastic Beanstalk to plain EC2, explains each one and ends with a comparison table.
+
+Now ask yourself one question. **Did it deploy anything?**
+
+No. It explained how *you* can do it. It generated text. To really deploy, something would have to look at your application, understand its structure, pick a way, run the steps and check the result. That is the difference between answering and acting, and it is where **AI agents** and **agentic AI** begin.
+
+## Four levels
+
+The lesson's whiteboard shows four rows. Its caption is worth reading first:
+
+> A conceptual progression, not four mutually exclusive technologies.
+
+Each level includes the one before it.
+
+![From_Chatbot_To_Agentic_AI](https://dyz1pdcuffwr5.cloudfront.net/LangChain4jOneShot/lc4j1s-agent-levels.svg)
+
+| Level | Flow | What it does | Where you built it in this course |
+| --- | --- | --- | --- |
+| **Chatbot** | User question, LLM, answer | Answers questions from what the model learned in training | [Your First LangChain4j Application](/docs/langchain4j-one-shot/langchain4j-in-practice/your-first-langchain4j-application) |
+| **Tool-using assistant** | User question, LLM with a tool, answer | Can fetch information or perform actions through tools that you provide | [Tool Calling](/docs/langchain4j-one-shot/langchain4j-in-practice/tool-calling) and [MCP](/docs/langchain4j-one-shot/mcp-and-local-models/mcp-explained) |
+| **AI agent** | Goal, then decide, act and observe, repeated until the goal is met | Can make decisions and work toward a goal | The next lessons |
+| **Agentic AI** | Goal, coordinated steps or multiple agents, verify, result | Systems designed to coordinate these decisions and actions to complete tasks | The next lessons |
+
+The first two rows start with a **user question**. The last two start with a **goal**. That change of word is the heart of the matter. A question wants an answer. A goal wants a result, and reaching it can take several steps that nobody listed in advance.
+
+## The two definitions
+
+The lesson writes both definitions on the whiteboard.
+
+> **AI agent:** An AI agent is a system that uses an AI model to make decisions and perform actions toward a goal, within the permissions and constraints provided to it.
+
+Three parts of this sentence carry the meaning:
+
+| Part | Meaning |
+| --- | --- |
+| "uses an AI model to make decisions" | The model decides what to do next: call a tool, search documents, ask another agent, or answer. You did not write that decision as an `if` statement |
+| "perform actions toward a goal" | It does not stop at text. It does something, and what it does serves a goal |
+| "within the permissions and constraints provided to it" | You decide what it may touch. An agent is powerful only as far as you allow |
+
+> **Agentic AI:** It is a broader approach to building AI systems that can plan, act, use tools, respond to feedback, and coordinate work with varying degrees of autonomy.
+
+So an AI agent is a thing, one unit that decides and acts. Agentic AI is an approach, a way of building whole systems out of such behaviour.
+
+## Is agentic AI always many agents?
+
+A common assumption is that "agentic" means "multi-agent". The lesson corrects it clearly:
+
+- An agentic system **can have a single agent**. If that one agent plans, uses tools, searches documents and works step by step toward a goal, the system is agentic.
+- In practice, such systems **often have several agents** that work together, each with its own job.
+
+What makes a system agentic is the behaviour, deciding and acting toward a goal, and not the number of agents.
+
+## A worked example
+
+A user writes:
+
+> My application is down. Find out what happened.
+
+A chatbot would answer with a list of common reasons why applications go down. An agent treats the sentence as a goal: **investigate the application failure**.
+
+![Agent_Loop_Example](https://dyz1pdcuffwr5.cloudfront.net/LangChain4jOneShot/lc4j1s-agent-loop.svg)
+
+| Step | Action |
+| --- | --- |
+| 1 | Inspect the logs |
+| 2 | Identify the cause |
+| 3 | Propose a fix, or apply it |
+| 4 | Verify the application |
+| If the check fails | Reassess and investigate again, starting at step 1 |
+| If the check passes | Report the outcome back to the user |
+
+Two details of this picture matter.
+
+**The loop.** The agent checks its own work. If the application is still down after the fix, it does not report success. It goes around again. This is the "observe" in decide, act, observe.
+
+**Propose or apply.** Step 3 has two versions. The agent can apply the fix itself, or it can propose the fix and wait for a person to say "go ahead". The second version is called **human in the loop**. For actions that are hard to undo, it is the sensible default.
+
+## What we have built so far, honestly
+
+The lesson is direct about the applications of the earlier chapters. They were AI powered. Some of them called tools, and some used the tools of an MCP server. And still, in the end, each of them produced one text answer to one question. They did not pursue a goal over several steps, and they did not check their own results.
+
+That is not a weakness of those applications. Most useful AI features are exactly that. But when a task needs several steps and decisions, you move toward agents.
+
+## The summary ladder
+
+The last slide of the lesson stacks the four levels with one line each:
+
+| Level | In one line |
+| --- | --- |
+| Chatbot | Answers questions. |
+| Tool-using assistant | Can fetch information or perform actions. |
+| AI agent | Can make decisions and work toward a goal. |
+| Agentic AI | Designing systems that coordinate these decisions and actions to complete tasks. |
+
+## How this maps to LangChain4j
+
+The next lessons use the `langchain4j-agentic` module. This is where each idea of this page turns into code:
+
+| Idea | Lesson |
+| --- | --- |
+| One agent with one job | [Your First AI Agent](/docs/langchain4j-one-shot/agentic-ai/your-first-ai-agent) |
+| Two agents, coordinated by hand | [Multi-Agent Systems](/docs/langchain4j-one-shot/agentic-ai/multi-agent-systems) |
+| Agents coordinated by a fixed workflow | [Agentic Workflows](/docs/langchain4j-one-shot/agentic-ai/agentic-workflows) |
+| A model that decides which agent to use | [Supervisor Agents](/docs/langchain4j-one-shot/agentic-ai/supervisor-agents) |
+| Agents, a supervisor and MCP tools in one application | [Project: AI Course Support Assistant](/docs/langchain4j-one-shot/agentic-ai/project-ai-course-support-assistant) |
+
+## Additions beyond the lesson
+
+**Autonomy is a dial.** The definition says "varying degrees of autonomy". A fixed sequence of two agents has very little autonomy: you decided the order. A supervisor that chooses among agents has more. An agent that plans its own steps and loops until it is satisfied has the most. More autonomy means more flexibility, and also less predictability, higher cost and harder testing. Choose the lowest level that solves the problem. A plain workflow is often the right answer.
+
+**Agents multiply cost and time.** One agentic request can cause many model calls: planning, each step, each check. The token counts from [Response Metadata and Token Usage](/docs/langchain4j-one-shot/mcp-and-local-models/response-metadata-and-token-usage) add up quickly. Measure them.
+
+**Permissions are the real safety mechanism.** The definition ends with "within the permissions and constraints provided to it" for a reason. An instruction in a prompt can be ignored or overridden by cleverly written input. A permission that the agent does not have cannot be. Give an agent only the tools it needs, with the narrowest rights, and require a human decision before anything destructive.
+
+## Check your understanding
+
+| Question | Answer |
+| --- | --- |
+| Gemini explains four ways to deploy on AWS. Which level is that? | Chatbot. It answered, and did nothing |
+| An assistant looks up a course price with a tool and answers. Which level? | Tool-using assistant |
+| What do the agent rows start with, in place of a user question? | A goal |
+| Can a system with one agent be called agentic? | Yes |
+| What does "human in the loop" mean? | A person approves an action before the agent performs it |
+
+## Try It Yourself
+
+1. Ask a chat application how to do a task that takes several steps. Mark every step that you would still have to do yourself.
+2. Take the "application is down" example and write down which tools the agent would need for each of the four steps.
+3. For each of those tools, decide whether the agent may use it freely or needs human approval.
+4. Sort these into the four levels: a FAQ bot, a bot that checks an order status through an API, a system that books a complete trip and rebooks when a flight is cancelled.
+5. Think of a task in your own work that looks like a goal and not like a question. Sketch its decide, act and observe steps.
+
+## Official references
+
+- [LangChain4j: agents and agentic AI](https://docs.langchain4j.dev/tutorials/agents)
+- [Anthropic: building effective agents](https://www.anthropic.com/engineering/building-effective-agents)
+- [OpenAI: a practical guide to building agents](https://platform.openai.com/docs/guides/agents)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,162 @@
+---
+title: Transformers and Attention
+description: Learn what the transformer architecture is, how its layers use the attention mechanism and a feed-forward network to understand context, and how an LLM builds an answer one token at a time.
+---
+
+<Video id="nZRU4Htu5WQ" title="Transformers and Attention" start={2535} />
+
+---
+
+So far a prompt has been turned into tokens, the tokens into token IDs, and the token IDs into [embeddings](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/embeddings-vectors-and-dimensions): vectors that carry meaning.
+
+The open question is who processes those vectors and turns them into an answer. That is the job of the **transformer**.
+
+## Where the transformer comes from
+
+A transformer is not something outside of what you have learned. It is a neural network architecture, and so it belongs to deep learning.
+
+There is no single fixed neural network design. The designs changed over the years:
+
+| Architecture | Typical use |
+| --- | --- |
+| CNN, convolutional neural network | Images |
+| RNN, recurrent neural network | Sequences such as text |
+| LSTM, long short-term memory | Longer sequences |
+| **Transformer** | The basis of today's language models |
+
+The earlier designs shared a weakness with text. Short sentences were fine. With longer text they could not keep track of the context and of how words far apart relate to each other.
+
+In 2017, researchers at Google published a paper with the title **"Attention Is All You Need"**. It introduced the transformer, and it became the biggest breakthrough in deep learning for language. Almost every AI application you use today, including ChatGPT, Gemini and Claude, runs on this architecture.
+
+## Encoder and decoder
+
+The original transformer has two main parts:
+
+| Part | Job |
+| --- | --- |
+| Encoder | Reads the input and understands its meaning and context |
+| Decoder | Generates the output, one token at a time, until the response is complete |
+
+Not every model uses both. The GPT models behind ChatGPT use a **decoder-only** architecture. Their purpose is to generate text, so they keep the part that generates.
+
+## From prompt to response
+
+The video shows the whole journey of a prompt in one diagram.
+
+![How_An_LLM_Works](https://dyz1pdcuffwr5.cloudfront.net/LangChain4jOneShot/lc4j1s-how-llm-works.svg)
+
+| Step | Example from the slide |
+| --- | --- |
+| Prompt | "Explain Java Collections Framework." |
+| Tokenization | Split into pieces the model knows |
+| Tokens | `Explain`, `Java`, `Collections`, `Framework`, `.` |
+| Token IDs | `4467, 7943, 26521, 30435, 13` |
+| Embeddings | `[0.12, -0.45, 0.87, ...]`, one vector per token |
+| Transformer | Understands relationships and context, then predicts the next token |
+| Next token prediction | "The", the token with the highest probability |
+| Repeat | Until the response ends |
+| Generated response | "The Java Collections Framework is..." |
+
+The key idea is in the last rows. The model does not write a whole answer at once. It predicts **one token**, adds it to what it has, and predicts the next one. That loop runs until the answer is finished.
+
+<Callout type="info" title="This is why answers can be streamed">
+Because the answer is produced token by token, an application can show each piece as soon as it exists. That is the typing effect you know from chat applications, and you will build it in [Streaming Responses](/docs/langchain4j-one-shot/langchain4j-in-practice/streaming-responses).
+</Callout>
+
+## Inside the transformer: layers
+
+A transformer is not one block. It is made of many **transformer layers**, stacked on top of each other. Each layer is one stage that improves the model's understanding of the input.
+
+The slide shows three. Real models have dozens, and some have a hundred or more. The number differs from model to model.
+
+Every layer has the same two components:
+
+| Component | Slide text | What it does |
+| --- | --- | --- |
+| **Attention mechanism** | "Tokens exchange information" | Works out which words matter for each other and how they are related |
+| **Feed-forward neural network** | "Each token processed alone" | Processes that information further and refines the understanding |
+
+Then the result goes to the next layer, which has the same structure with its own learned weights, and the same two steps happen again.
+
+The slide has a line for the whole stack that is worth remembering:
+
+> Vectors go in, richer vectors come out. The shape never changes.
+
+## The attention mechanism
+
+Attention is the part that gave the paper its title. Two examples from the video show what it does.
+
+### What does "it" refer to?
+
+> The animal didn't cross the road because it was tired.
+
+What is "it"? The road or the animal?
+
+You know at once that it is the animal. Roads do not get tired. A transformer learns the same relationship through attention. It does not treat every word as equally important. For the word "it", it puts more weight on the words that are most relevant, here "animal".
+
+### One word, two meanings
+
+> Java is a programming language.
+>
+> I visited Java last year.
+
+The word "Java" is identical in both sentences, and it means two different things. The transformer looks at the surrounding words. "Programming language" points to the language. "Visited" and "last year" point to the Indonesian island.
+
+That is attention in one sentence: **it lets the model understand a word through its context and through its relationships with the other words.**
+
+## The feed-forward network
+
+After attention has worked out the relationships, the information is passed to the **feed-forward neural network**, FFN for short.
+
+If attention answers "which words are important here?", the feed-forward network takes that and says "good, now let me process this further before it goes to the next layer".
+
+So every layer repeats one pattern:
+
+```text
+attention  ->  feed-forward network  ->  next transformer layer
+```
+
+This runs through all the layers. At the end, the model has a deep understanding of the entire input and predicts the most likely next token.
+
+## Putting it all together
+
+Everything from the last three pages, in order:
+
+1. You type a prompt.
+2. Tokenization splits it into tokens.
+3. Each token gets a token ID, a number without meaning.
+4. Each token ID becomes an embedding, a vector that carries meaning.
+5. The vectors pass through many transformer layers. In each one, attention relates the tokens to each other and the feed-forward network refines the result.
+6. The model predicts the next token.
+7. Steps 5 and 6 repeat, one token at a time, until the response is complete.
+
+## What this means when you write code
+
+You will never implement any of this. You will call a model through an API. But this page explains behaviour you are about to see in every program:
+
+| What you will observe | The reason from this page |
+| --- | --- |
+| The same question gets differently worded answers | The answer is built from predicted tokens, not looked up |
+| A setting called temperature changes how varied the answers are | It changes how the next token is chosen among the likely ones |
+| A model can be wrong and sound certain | It predicts likely text. It does not check facts |
+| Long answers cost more and take longer | Every token of the answer is a prediction step |
+
+The third row has a name, and it gets its own page: [Hallucinations](/docs/langchain4j-one-shot/ai-and-llm-fundamentals/hallucinations).
+
+## Try It Yourself
+
+1. In the sentence "The trophy did not fit in the suitcase because it was too big", what does "it" refer to? Change "big" to "small" and answer again. Which words did you use to decide?
+2. Write two sentences in which the word "bank" has different meanings, and underline the words that tell you which meaning is meant.
+3. Ask a chat assistant the same question three times in new chats and compare the wording of the answers.
+4. Explain in your own words why a model produces its answer one token at a time.
+5. From memory, list the steps from prompt to response and say what goes into and what comes out of each step.
+
+## Official references
+
+- [Attention Is All You Need (the 2017 transformer paper)](https://arxiv.org/abs/1706.03762)
+- [Google Machine Learning Crash Course: transformers](https://developers.google.com/machine-learning/crash-course/llm/transformers)
+- [Hugging Face LLM course: how do transformers work](https://huggingface.co/learn/llm-course/chapter1/4)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

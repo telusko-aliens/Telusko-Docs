@@ -1,0 +1,297 @@
+---
+title: AI Services
+description: Describe what you want from a model as a plain Java interface, add the system and user messages as annotations, and let LangChain4j's AiServices create the implementation at run time.
+---
+
+<Video id="nZRU4Htu5WQ" title="AI Services" start={6861} />
+
+---
+
+In the [previous lesson](/docs/langchain4j-one-shot/langchain4j-in-practice/chatmodel-configuration) we created a `SystemMessage` object, a `UserMessage` object, passed both to the model, received a `ChatResponse` and took the text out of it. It works, and it is manual. Every new kind of question would repeat those steps.
+
+LangChain4j has a higher level that removes them. It is called **AI Services**, and it starts with something every Java developer knows well: an interface.
+
+## The idea
+
+An interface in Java is a specification. It says *what* should be done and leaves the *how* to whoever implements it.
+
+With AI Services you write only that specification:
+
+- You define an interface with a method.
+- LangChain4j provides the implementation, at run time.
+- You call your method.
+
+You never write the class that implements the interface.
+
+![AI_Services](https://dyz1pdcuffwr5.cloudfront.net/LangChain4jOneShot/lc4j1s-ai-services.svg)
+
+## Step 1: Write the interface
+
+In the same project, `first-lc4j`, create a new interface. The name is yours to choose. The lesson calls it `JavaAssistant`:
+
+```java title="JavaAssistant.java"
+package com.telusko;
+
+public interface JavaAssistant
+{
+    String chat(String prompt);
+}
+```
+
+One abstract method. It takes the prompt as a `String` and returns the answer as a `String`. There is no implementation anywhere.
+
+## Step 2: Let AiServices build it
+
+In `Main.java`, comment out the `ChatResponse` lines from the previous lesson and add:
+
+```java title="Main.java"
+JavaAssistant assistant = AiServices.builder(JavaAssistant.class)
+        .chatModel(model)
+        .build();
+String answer=assistant.chat("What is dependency injection in short");
+System.out.println(answer);
+```
+
+| Call | Meaning |
+| --- | --- |
+| `AiServices.builder(JavaAssistant.class)` | "Create an implementation of this interface" |
+| `.chatModel(model)` | The model it should use, the one we built earlier |
+| `.build()` | Returns an object that implements `JavaAssistant` |
+
+Then `assistant.chat(...)` is an ordinary method call on an ordinary Java object. That object happens to have been created by LangChain4j.
+
+Run it:
+
+```text
+Dependency Injection (DI) is a design pattern used in software development to improve the modularity and testability of code. ...
+
+By using DI, developers can easily swap out implementations, facilitate unit testing by mocking dependencies, and reduce tight coupling ...
+```
+
+Two paragraphs, no code example. The model answered a bare question in its own default style. We wrote an interface, gave no implementation, and it worked.
+
+## Step 3: Add a system message as an annotation
+
+Last time the system message was an object that we created and passed along. With AI Services it is an annotation on the method:
+
+```java title="JavaAssistant.java"
+package com.telusko;
+
+import dev.langchain4j.service.SystemMessage;
+
+public interface JavaAssistant
+{
+    @SystemMessage(
+            """
+            You are an experienced Java instructor.
+            Explain concepts in simple words.
+            Always provide a small example.
+            """
+    )
+    String chat(String prompt);
+}
+```
+
+Nothing changes in `Main.java` except the question:
+
+```java title="Main.java"
+String answer=assistant.chat("What is dependency injection");
+```
+
+This time the answer contains a Java example, with an `Engine` passed into a `Car`:
+
+```java
+    private Engine engine;
+
+    // Constructor Injection
+    public Car(Engine engine) {
+        this.engine = engine;
+    }
+```
+
+The question did not ask for an example. The system message did, with "Always provide a small example". The role now lives in one place, next to the method it belongs to.
+
+<Callout type="warn" title="Two things are called SystemMessage">
+The annotation used here is `dev.langchain4j.service.SystemMessage`. The class from the previous lesson is `dev.langchain4j.data.message.SystemMessage`. They have the same simple name and different jobs. In an AI Service interface you need the one from the `service` package. The same is true for `UserMessage`.
+</Callout>
+
+## Step 4: A user message with a placeholder
+
+At the moment the caller writes the whole question each time. Often the wording of the question is fixed, and only one part changes. That fixed wording can go into the interface as well:
+
+```java title="JavaAssistant.java"
+package com.telusko;
+
+import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.service.UserMessage;
+import dev.langchain4j.service.V;
+
+public interface JavaAssistant
+{
+    @SystemMessage(
+            """
+            You are an experienced Java instructor.
+            Explain concepts in simple words.
+            Always provide a small example.
+            """
+    )
+    @UserMessage("Explain {{topic}} with a simple example")
+    String chat(@V("topic") String topic);
+}
+```
+
+| Part | Meaning |
+| --- | --- |
+| `@UserMessage("...")` | The text of the user message. It is a template |
+| `{{topic}}` | A placeholder inside the template |
+| `@V("topic")` | Says that this method parameter fills the placeholder named `topic` |
+
+The caller passes only the topic:
+
+```java title="Main.java"
+String answer=assistant.chat("Dependency injection");
+```
+
+LangChain4j builds the user message "Explain Dependency injection with a simple example", adds the system message, calls the model and returns the text. The output is again an explanation with the `Engine` and `Car` example.
+
+Templates get a lesson of their own next: [Prompt Templates](/docs/langchain4j-one-shot/langchain4j-in-practice/prompt-templates).
+
+## Step 5: Name the method for what it does
+
+The method no longer chats. It explains a topic. Its name is ours to choose, so the lesson renames it:
+
+```java title="JavaAssistant.java"
+String explain(@V("topic") String topic);
+```
+
+and the call:
+
+```java title="Main.java"
+String answer=assistant.explain("Dependency injection");
+```
+
+LangChain4j does not care what the method is called. Good names make the calling code read like your application: `assistant.explain("Dependency injection")`.
+
+## The complete code
+
+```java title="JavaAssistant.java"
+package com.telusko;
+
+import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.service.UserMessage;
+import dev.langchain4j.service.V;
+
+public interface JavaAssistant
+{
+    @SystemMessage(
+            """
+            You are an experienced Java instructor.
+            Explain concepts in simple words.
+            Always provide a small example.
+            """
+    )
+    @UserMessage("Explain {{topic}} with a simple example")
+    String explain(@V("topic") String topic);
+}
+```
+
+```java title="Main.java"
+package com.telusko;
+
+import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.service.AiServices;
+
+public class Main {
+    public static void main(String[] args)
+    {
+        String apiKey = System.getenv("OPENAI_API_KEY");
+
+        OpenAiChatModel model = OpenAiChatModel.builder()
+                .apiKey(apiKey)
+                .modelName("gpt-4o-mini")
+                .temperature(0.4)
+                .maxCompletionTokens(400)
+                .build();
+
+        JavaAssistant assistant = AiServices.builder(JavaAssistant.class)
+                .chatModel(model)
+                .build();
+        String answer=assistant.explain("Dependency injection");
+        System.out.println(answer);
+    }
+}
+```
+
+In the lesson's file, the message objects and the `ChatResponse` lines from the previous lesson are still present, the latter as comments. They are left out here because the AI Service replaces them.
+
+The last run in the lesson ends like this:
+
+```text
+### Explanation of the Example:
+
+1. **Engine Interface**: This defines what an engine can do (in this case, just starting).
+2. **V8
+```
+
+It stops in the middle of point 2. The model still has `maxCompletionTokens(400)` from the previous lesson, and the answer with its example is longer than that.
+
+<Callout type="info" title="Checked for these docs">
+The complete code above was compiled against LangChain4j 1.20.0 and run for these docs with a local model in place of OpenAI. The interface needed no change. The answer followed the system message: simple words and a small Java example.
+</Callout>
+
+## Who implemented the interface?
+
+LangChain4j did. `AiServices` creates an object at run time that implements your interface. Such an object is called a **proxy**.
+
+When you call `assistant.explain("Dependency injection")`, the proxy does what you did by hand in the previous lesson:
+
+| Step | What the proxy does |
+| --- | --- |
+| 1 | Reads `@SystemMessage` and creates the system message |
+| 2 | Takes the `@UserMessage` template and replaces `{{topic}}` with your argument |
+| 3 | Sends both messages to the chat model |
+| 4 | Takes the text out of the model's reply |
+| 5 | Converts it to the method's return type, here `String`, and returns it |
+
+If you have used Spring Data JPA, the pattern is familiar. There you declare a repository interface and never write its implementation. The official LangChain4j documentation makes the same comparison.
+
+Step 5 will become important soon. The proxy converts the reply to whatever type your method returns. In [Structured Output](/docs/langchain4j-one-shot/langchain4j-in-practice/structured-output) the return type is a Java record, and the same mechanism gives you an object with fields.
+
+## Before and after
+
+| | Previous lesson | AI Service |
+| --- | --- | --- |
+| System message | A `SystemMessage` object created in `main` | An annotation on the method |
+| User message | A `UserMessage` object created in `main` | A template annotation plus a method parameter |
+| Calling the model | `model.chat(systemMessage, userMessage)` | `assistant.explain(topic)` |
+| Reading the answer | `chatResponse.aiMessage().text()` | The return value |
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `.build()` is underlined in red | The variable was declared as `AiServices<JavaAssistant> assistant`. This happens in the lesson | Declare it with the interface type: `JavaAssistant assistant = ...`. `build()` returns an implementation of your interface |
+| `answer` is red in the print statement | The old line that declared `answer` was commented out | Declare it again from `assistant.chat(...)` |
+| The annotation does not compile | `SystemMessage` or `UserMessage` was imported from `dev.langchain4j.data.message` | Import both from `dev.langchain4j.service` |
+| `IllegalArgumentException: Value for the variable 'topic' is missing` when the method is called | The name in `@V("...")` does not match the placeholder in the template | Use the same name in both places |
+| The answer stops in the middle | `maxCompletionTokens(400)` is still set on the model | Raise the limit or ask for a shorter answer |
+
+## Try It Yourself
+
+1. Create the plain `JavaAssistant` with only `String chat(String prompt)` and call it.
+2. Add the `@SystemMessage` and ask the same question. What changed in the answer?
+3. Add the `@UserMessage` template and pass only a topic.
+4. Change the placeholder to `{{subject}}` without changing `@V("topic")`. Read the error, then fix it.
+5. Add a second method `String quiz(@V("topic") String topic)` with its own `@UserMessage` that asks for three quiz questions. Call both methods.
+6. Replace the builder with the short form `AiServices.create(JavaAssistant.class, model)` and confirm that it behaves the same.
+7. Print `assistant.getClass()`. It shows a name such as `jdk.proxy2.$Proxy4`. What does that tell you about who wrote the class?
+
+## Official references
+
+- [LangChain4j: AI Services](https://docs.langchain4j.dev/tutorials/ai-services)
+- [LangChain4j: chat and language models](https://docs.langchain4j.dev/tutorials/chat-and-language-models)
+- [LangChain4j: get started](https://docs.langchain4j.dev/get-started)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

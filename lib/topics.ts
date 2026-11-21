@@ -9,6 +9,7 @@ const TOPIC_ORDER = [
   'fastapi',
   'spring-ai',
   'langchain4j',
+  'langchain4j-one-shot',
   'aws',
   'go',
   'docker',
