@@ -1,0 +1,346 @@
+---
+title: Global and Local Variables
+description: See where a variable can be used, why a function gets its own variables, and how to read and change a global variable from inside a function.
+---
+
+You have used variables since the first lessons. They store data, and you can change that data later. Until now every variable could be used anywhere in the file, so there was nothing to think about.
+
+Functions change that. A variable created inside a function is not the same thing as a variable created outside it, even when both have the same name. One is called a **local variable** and the other a **global variable**.
+
+This lesson shows the difference with one variable named `a` and one small function, in a new file named `global_demo.py`. A name like `a` says nothing about its purpose. In a real program you would pick a name that makes sense. For a short experiment it will do.
+
+## Step 1: A variable outside any function
+
+```python title="global_demo.py"
+a = 10
+
+print(a)
+```
+
+```text
+10
+```
+
+Nothing new here. The variable `a` is created at the top level of the file, outside any function, and printed.
+
+## Step 2: Use it inside a function
+
+Now define a function that prints the same variable, and call it. A label in each `print` shows which line is speaking:
+
+```python title="global_demo.py"
+a = 10
+
+def something():
+    print("inside : ", a)
+
+something()
+
+print("outside : ", a)
+```
+
+```text
+inside :  10
+outside :  10
+```
+
+Both lines print 10. So a function can **use** a variable that was created outside it.
+
+Remember to call the function. Without the line `something()`, the body never runs and the first line is not printed.
+
+## Step 3: Create the variable only inside the function
+
+Turn it around. Comment out `a = 10` and create `a` inside the function:
+
+{/* check: error */}
+```python title="global_demo.py"
+# a = 10
+
+def something():
+    a = 15
+    print("inside : ", a)
+
+something()
+
+print("outside : ", a)
+```
+
+{/* check: skip */}
+```text
+inside :  15
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\global_demo.py", line 9, in <module>
+    print("outside : ", a)
+                        ^
+NameError: name 'a' is not defined
+```
+
+The function prints 15. Then the last line fails with `NameError: name 'a' is not defined`. In the video, the editor already warns about it with a wavy line under that `a`.
+
+It looks strange at first, because `a` clearly is defined. It is defined inside the function, and the last line tries to use it outside the function.
+
+The lesson compares this with a house. The things inside your house are yours. A person from outside cannot walk in and take them. The bench in the park and the sand on the beach are public, and anyone can use them, including you. A variable inside a function is like a thing inside the house. It is a **local variable**, and the code outside the function cannot reach it.
+
+## Step 4: The same name in both places
+
+Bring back the first line, so that `a` is created outside and inside:
+
+```python title="global_demo.py"
+a = 10                    # global variable
+
+def something():
+    a = 15                # local variable
+    print("inside : ", a)
+
+something()
+
+print("outside : ", a)
+```
+
+```text
+inside :  15
+outside :  10
+```
+
+Inside the function `a` is 15. Outside it is still 10. The line `a = 15` did not change the outer variable. The two names do not point to the same variable. There are two different variables that happen to share a name.
+
+| | Global variable | Local variable |
+| --- | --- | --- |
+| Created | Outside every function | Inside a function |
+| In this program | `a = 10` | `a = 15` |
+| Can be used | In the whole file, also inside functions | Only inside that function |
+| Lives | As long as the program runs | Only while the function runs |
+
+The rule behind Steps 2 to 4 is short:
+
+- Reading a name inside a function: Python looks for a local variable first. If there is none, it uses the global one. That is Step 2.
+- Assigning to a name inside a function, as in `a = 15`: Python creates a local variable. The global one is not touched. That is Step 4.
+
+The part of a program where a name can be used is called its **scope**. A global variable has the whole file as its scope. A local variable has only its function.
+
+## Step 5: Look at all global variables with globals()
+
+So `a = 15` inside the function creates a new variable. What if you really want to change the outer `a` from inside the function? You need a way to reach the global variables.
+
+Python has a built-in function for that, `globals()`. It returns a dictionary that contains the global variables of the file. To see it, print it:
+
+{/* check: noout */}
+```python title="global_demo.py"
+a = 10                    # global variable
+
+def something():
+
+    print(globals())
+
+    a = 15                # local variable
+    print("inside : ", a)
+
+something()
+
+print("outside : ", a)
+```
+
+{/* check: skip */}
+```text
+{'__name__': '__main__', '__doc__': None, '__package__': None, '__loader__': <_frozen_importlib_external.SourceFileLoader object at 0x00000221D5A1A190>, '__spec__': None, '__annotations__': {}, '__builtins__': <module 'builtins' (built-in)>, '__file__': 'C:\\PythonCourse\\FirstProject\\global_demo.py', '__cached__': None, 'a': 10, 'something': <function something at 0x00000221D5A41440>}
+inside :  15
+outside :  10
+```
+
+The first output line is one long dictionary. It holds more than you created:
+
+| Key | Value | Where it comes from |
+| --- | --- | --- |
+| `'__name__'`, `'__doc__'`, `'__package__'` and other names with two underscores on each side | Details about the file | Python adds them to every file. `__name__` gets its own lesson, [The Special Variable `__name__`](/docs/python-tutorial-2026/functional-python/special-variable-name) |
+| `'__file__'` | The path of the file | Python |
+| `'a'` | `10` | Your global variable |
+| `'something'` | `<function something at 0x...>` | Your function. A function name is a global name too |
+
+The interesting pair is `'a': 10`. The key is the name of the variable, written as a string, and the value is what the variable holds. If the file had more global variables, such as `b` and `c`, they would all be listed.
+
+<Callout type="info" title="Your output will differ a little">
+The numbers after `at 0x` are places in memory and change on every run. The path after `'__file__'` is the place of the file on your computer. The exact list of keys with underscores also depends on the Python version. This output is the one shown in the video.
+</Callout>
+
+## Step 6: Read one global variable
+
+`globals()` is a dictionary, so you can fetch one value by its key, as you learned in [Dictionaries](/docs/python-tutorial-2026/data-structures-and-types/dictionaries). The key is a string, so it goes in quotes:
+
+```python title="global_demo.py"
+a = 10                    # global variable
+
+def something():
+
+    print(globals()['a'])
+
+    a = 15                # local variable
+    print("inside : ", a)
+
+something()
+
+print("outside : ", a)
+```
+
+```text
+10
+inside :  15
+outside :  10
+```
+
+The first line of the output is 10. Inside this function the plain name `a` means the local variable. `globals()['a']` reaches the global one.
+
+## Step 7: Change the global variable from inside the function
+
+Printing was only a test. The goal is to assign a new value. Assign to the same dictionary entry:
+
+```python title="global_demo.py"
+a = 10                    # global variable
+
+def something():
+
+    globals()['a'] = 20
+
+    a = 15                # local variable
+    print("inside : ", a)
+
+something()
+
+print("outside : ", a)
+```
+
+```text
+inside :  15
+outside :  20
+```
+
+The global variable was 10 and is now 20. The local variable is still 15. The function changed the outer variable and left its own alone.
+
+To show that the order of the two lines does not matter, the lesson defines the local variable first and changes the global one after it:
+
+```python title="global_demo.py"
+a = 10                    # global variable
+
+def something():
+
+    a = 15                # local variable
+    globals()['a'] = 20
+    print("inside : ", a)
+
+something()
+
+print("outside : ", a)
+```
+
+```text
+inside :  15
+outside :  20
+```
+
+The result is the same.
+
+![Global_And_Local_Variable](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-global-local.svg)
+
+The lesson introduces this now because global variables come up again later in the course.
+
+## Additions beyond the lesson
+
+The lesson changes the global variable through `globals()`. Two more things are worth knowing, because you will meet them in other code and in error messages.
+
+### The global keyword
+
+The more common way to change a global variable inside a function is the keyword `global`. The line `global a` tells Python that, in this function, the name `a` means the global variable:
+
+```python title="global_keyword.py"
+a = 10
+
+def something():
+    global a
+    a = 20
+    print("inside : ", a)
+
+something()
+
+print("outside : ", a)
+```
+
+```text
+inside :  20
+outside :  20
+```
+
+Now `a = 20` changes the global variable and no local `a` is created. That is the difference to the lesson's way:
+
+| | `globals()['a'] = 20` | `global a` and then `a = 20` |
+| --- | --- | --- |
+| Changes the global `a` | Yes | Yes |
+| A local `a` in the same function | Possible, as in the lesson | Not possible. The name `a` is global in the whole function |
+| Where you see it | Rarely | In most Python code |
+
+The `global a` line has to come before the first use of `a` in the function.
+
+### Reading before assigning
+
+Step 2 read the global `a` inside the function, and that worked. It stops working as soon as the same function also assigns to `a` somewhere:
+
+{/* check: error */}
+```python title="unbound_demo.py"
+a = 10
+
+def something():
+    print("inside : ", a)
+    a = 15
+
+something()
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\unbound_demo.py", line 7, in <module>
+    something()
+    ~~~~~~~~~^^
+  File "C:\PythonCourse\FirstProject\unbound_demo.py", line 4, in something
+    print("inside : ", a)
+                       ^
+UnboundLocalError: cannot access local variable 'a' where it is not associated with a value
+```
+
+Because of `a = 15`, Python treats `a` as a local variable in the whole function, also in the line above the assignment. At the `print` line this local variable has no value yet. The same error appears for a line such as `a = a + 5`. The fix is `global a` at the top of the function, or a different name for the local variable.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown. The two programs that end in an error were run too, and the tracebacks are what Python 3.13 prints, with the folder from the video and line numbers that fit the code on this page. The output of `print(globals())` is copied from the video, because memory addresses and the file path differ on every computer. A run for these docs gave the same keys in the same order. The programs `global_keyword.py` and `unbound_demo.py` are not in the video.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `NameError: name 'a' is not defined` on a line outside the function | `a` was created only inside the function, so it is local. This happens in the lesson | Create the variable outside the function too |
+| `outside 10` while the other line prints `inside :  10` | The second label was typed as `"outside"` without the colon. This happens in the lesson | Write `"outside : "` so that both labels look the same |
+| The global variable keeps its old value after `a = 15` inside a function | The assignment created a local variable | Use `globals()['a'] = 15`, or `global a` before the assignment |
+| `UnboundLocalError: cannot access local variable 'a' where it is not associated with a value` on the line `print(globals()[a])` in the function from Step 6 | The key was written without quotes, so Python reads the variable `a`. The function assigns `a = 15` further down, so `a` is local there and has no value yet | Write the name as a string, `globals()['a']` |
+| `KeyError: 10` on the line `print(globals()[a])` in a function that does not assign to `a` | The key was written without quotes, so Python used the value of the global `a`, which is 10, as the key | Write the name as a string, `globals()['a']` |
+| `UnboundLocalError: cannot access local variable 'a' where it is not associated with a value` | The function reads `a` before it assigns to `a`, so `a` is local and still empty | Add `global a`, or use another name for the local variable |
+| `SyntaxError: name 'a' is assigned to before global declaration` | `global a` comes after `a = ...` in the function | Move `global a` to the first line of the function |
+| Nothing is printed for the `inside` line | The function was defined and never called | Add the call `something()` |
+
+## Try It Yourself
+
+1. Create `city = 'Pune'` at the top of a file. Write a function that prints `city`, call it, and print `city` outside too.
+2. Inside a function, create `marks = 80` and print it. Then print `marks` after the call, outside the function. Read the error and explain it.
+3. Create `x = 1` outside and `x = 2` inside a function. Print `x` in both places and predict the two values before you run the file.
+4. In the function from exercise 3, add a line that prints the global `x` with `globals()`.
+5. Change the global `x` to 100 from inside the function with `globals()`. Check the result with a `print` after the call.
+6. Print only the keys of `globals()` with a `for` loop. Loop over `list(globals())`, because the loop variable is a new global variable itself, and a loop directly over `globals()` stops with `RuntimeError: dictionary changed size during iteration`. Which of the keys did you create?
+7. Write a global variable `count = 0` and a function `increase()` that adds 1 to it through `globals()`. Call the function three times and print `count`.
+8. Rewrite exercise 7 with the `global` keyword from the additions.
+
+## Official references
+
+- [Python library: globals()](https://docs.python.org/3/builtins/functions.html#globals)
+- [Python tutorial: Python scopes and namespaces](https://docs.python.org/3/tutorial/classes.html#python-scopes-and-namespaces)
+- [Python FAQ: what are the rules for local and global variables in Python?](https://docs.python.org/3/faq/programming.html#what-are-the-rules-for-local-and-global-variables-in-python)
+- [Python reference: the global statement](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,235 @@
+---
+title: OOPs Introduction
+description: Learn what object-oriented programming is, why programs are built from objects, and how a class acts as the blueprint from which Python creates objects.
+---
+
+Up to this point the course has been about functions. You wrote them, called them, passed one function to another in [Higher Order Functions](/docs/python-tutorial-2026/functional-python/higher-order-functions), wrote one inside another in [Inner Functions](/docs/python-tutorial-2026/functional-python/inner-functions) and returned one from another in [Decorators](/docs/python-tutorial-2026/functional-python/decorators).
+
+That way of working has a name. It is called **functional programming**. The function is the most important building block, and it can be handled like any other value.
+
+This lesson introduces a second way of thinking, called **object-oriented programming**, or **OOP** for short. Here the most important building block is the **object**. Nothing is typed or run in this lesson. It gives you the ideas and the words that the next lessons turn into code.
+
+## Two ways of thinking
+
+When you plan a program, what comes to your mind first?
+
+| If you think first about | Your style is | The main building block |
+| --- | --- | --- |
+| The steps and calculations to perform | Functional programming | The function |
+| The things the program deals with | Object-oriented programming | The object |
+
+Python supports both styles. You do not have to choose one language for functions and another one for objects.
+
+<Callout type="info" title="A function as a first-class citizen">
+The instructor says that in functional programming the function becomes a "first-class citizen". It means that a function is treated like any other value. You can store it in a variable, pass it to another function and return it from a function. You did all three in the previous section.
+</Callout>
+
+## Why objects?
+
+If functions can do everything, why learn a second style?
+
+The answer of the lesson is that software solves real-life problems, and in real life we do everything with objects.
+
+| You want to | You use |
+| --- | --- |
+| Call someone | A phone |
+| Control the air conditioner | A remote |
+| Record your voice | A microphone |
+| Take a picture of yourself | A camera |
+
+All of these are objects. A program that deals with phones, users or employees is easier to plan when the program has objects too. An object in a program represents one thing: one user, one employee, one camera.
+
+## An object knows something and does something
+
+Take an employee. An employee has a name, a designation (the job title), a salary and a location. An employee also does things: works, talks to team members, attends meetings.
+
+The slide in the video sorts these into two groups:
+
+| Properties (what it knows) | Behaviors (what it does) |
+| --- | --- |
+| Name and employee ID | Performs assigned work tasks |
+| Job designation and salary | Communicates with team members |
+| Work location and home address | Attends meetings and collaborates |
+| Contact information | Submits reports and updates |
+
+The instructor then holds up a small remote that controls the lights in his studio. It is white, it has a certain size and it has several buttons. Those are its **properties**. Pressing a button changes the lights behind him. That is its **behavior**.
+
+So every object has two sides:
+
+- An object **knows** something. These are its properties.
+- An object **does** something. This is its behavior.
+
+## A class is the blueprint
+
+How do you get an object?
+
+Think of a factory that makes remotes. You walk in and say that you need a remote for a new device. The factory cannot start yet. It needs to know the size, the colour, the number of buttons and what each button does. In other words, it needs a **blueprint**, which is a detailed design that a thing is built from.
+
+In programming, that blueprint is called a **class**. You write the class. Python creates the objects from it.
+
+The video shows this as three steps:
+
+| Step | What happens |
+| --- | --- |
+| You provide the class | You define the properties and the behavior in your code |
+| The runtime creates objects | Python builds real objects from your blueprint while the program runs |
+| Multiple instances | You can create as many objects as you need from a single class |
+
+Two new words appear here. The **runtime** is the software that runs your program, which for us is Python itself. An **instance** is another word for an object that was created from a class.
+
+One class can produce many objects, and each kind of thing gets a class of its own. The video shows the idea with a card like this:
+
+```python
+class Phone:
+
+    # class body
+
+
+phone1 = Phone()
+phone2 = Phone()
+phone3 = Phone()
+```
+
+One `Phone` class, three phone objects. A `Remote` class would give remote objects in the same way. You will type lines like these and run them in the next lesson, [Class and Object](/docs/python-tutorial-2026/object-oriented-python/class-and-object).
+
+![Class_And_Objects](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-class-blueprint.svg)
+
+## What goes inside a class
+
+A class has to describe both sides of an object, and you already know the tools for both.
+
+| The object's | Is written in the class as | You know it as |
+| --- | --- | --- |
+| Properties | Variables | A name that holds a value |
+| Behavior | Methods | Functions |
+
+A **method** is a function that belongs to a class. The video puts it this way: same concept, specialized name. If you can write a function, you can write a method.
+
+The video shows the general shape on a card:
+
+```python
+class ClassName:
+
+    # Property
+    class_variable = "some value"
+
+    # Behaviour
+    def method_name():
+        # Function body
+```
+
+And then the remote as a class:
+
+```python
+class Remote:
+
+    # Properties
+    height = None
+    width = None
+    color = None
+    button_count = None
+    button_size = None
+
+    # Behaviour
+    def click():
+        print("Button clicked!")
+
+    def light():
+        print("Signal Sent!")
+```
+
+The five variables are the properties. `None` is Python's value for "nothing yet", so the card only lists which properties a remote has. The two methods are the behavior: what happens when a button is clicked, and how the remote sends its signal.
+
+<Callout type="warn" title="These cards are sketches">
+The cards show the shape of a class. They are not finished programs. The first two contain only comments where code should be, and Python does not accept a class or a function with an empty body. In real code, a method also takes a first parameter named `self`, which the cards leave out to keep the picture simple. The next lesson adds `self` and explains it step by step.
+</Callout>
+
+## Do you now forget functional programming?
+
+No. The lesson is clear about this. Most applications need both styles:
+
+| Use | For |
+| --- | --- |
+| Object-oriented programming | Representing things, such as users, employees or devices |
+| Functional programming | Processing, such as calculating, filtering and converting values |
+
+Class and object are only the start. OOP has more ideas, and the following lessons introduce them one at a time.
+
+## The words of this lesson
+
+| Word | Meaning |
+| --- | --- |
+| Object | One thing in your program. It has properties and behavior |
+| Class | The blueprint that objects are created from |
+| Instance | Another word for an object of a class |
+| Property | Something an object knows. Stored in a variable |
+| Behavior | Something an object does. Written as a method |
+| Method | A function that belongs to a class |
+
+## Additions beyond the lesson
+
+**A version of the remote that runs.** The video does not run any code in this lesson. If you want to see a class at work already, here is a small complete program. It uses `self`, which the next lesson explains, so read it only as a preview.
+
+```python title="remote.py"
+class Remote:
+
+    color = "white"
+    button_count = 6
+
+    def click(self):
+        print("Button clicked!")
+
+
+remote1 = Remote()
+remote2 = Remote()
+
+print(remote1.color)
+remote1.click()
+remote2.click()
+```
+
+```text
+white
+Button clicked!
+Button clicked!
+```
+
+One class, two objects. Each object knows its colour and can do `click()`. The number of buttons is made up for this example.
+
+**You have used objects all along.** Every value you met in this course, such as a number, a string or a list, is an object too. When you wrote `nums.append(33)` in [List Functions](/docs/python-tutorial-2026/data-structures-and-types/list-functions), you called a method of a list object. The next lesson starts from exactly this point.
+
+<Callout type="info" title="Checked for these docs">
+The video runs no code in this lesson. The three cards are reproduced from the screen and are sketches, as explained above. The program `remote.py` is an addition. It was run with Python 3.13 and printed the output shown.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `IndentationError: expected an indented block after class definition on line 1` | The class body holds only a comment, as on the `Phone` card | Put real code in the body. The next lesson uses the word `pass` for an empty class |
+| `IndentationError: expected an indented block after function definition on line 7` | The method body holds only a comment, as on the `ClassName` card | Write at least one statement in the method |
+| `TypeError: Remote.click() takes 0 positional arguments but 1 was given` | A method written without `self`, as on the `Remote` card, was called on an object | Write `def click(self):` |
+| "Class" and "object" used as if they meant the same thing | The two words are mixed up | The class is the design. The object is the thing built from that design |
+| "A method is something completely new" | The new name hides a known idea | A method is a function that belongs to a class |
+
+## Try It Yourself
+
+1. Pick three objects on your desk. For each one, write down three properties and two behaviors.
+2. For a `Student` in a school program, list five properties and three behaviors. Mark which ones would be variables and which would be methods.
+3. Explain in your own words the difference between a class and an object. Use the factory and the blueprint.
+4. A car factory builds 500 cars from one design. How many classes are there, and how many objects?
+5. Look at the `Remote` card. Which lines describe what a remote knows, and which lines describe what it does?
+6. On paper, write a card like the `Remote` one for a `Phone`. Give it four properties set to `None` and two methods that each print a message.
+7. Think of the programs you wrote in the earlier lessons, for example the calculator. Name one thing in it that could become an object.
+8. Type `nums = [1, 2, 3]` at the Python prompt and then call `nums.append(4)`. Which part of that line is the object and which part is the method?
+
+## Official references
+
+- [Python tutorial: classes](https://docs.python.org/3/tutorial/classes.html)
+- [Python glossary: object](https://docs.python.org/3/glossary.html#term-object)
+- [Python glossary: class](https://docs.python.org/3/glossary.html#term-class)
+- [Python how-to: functional programming](https://docs.python.org/3/howto/functional.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

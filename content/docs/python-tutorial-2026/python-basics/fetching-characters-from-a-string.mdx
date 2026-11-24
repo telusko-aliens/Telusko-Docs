@@ -1,0 +1,271 @@
+---
+title: Fetching Characters from a String
+description: Pick characters from a string by index, cut out parts with slices, see that a string cannot be changed, find its length, and write strings that span several lines.
+---
+
+The previous lesson, [String Concatenation](/docs/python-tutorial-2026/python-basics/string-concatenation), joined whole strings. That treated a string as one block.
+
+Real programs rarely use a string as one block. They take the first letter of a word, or the last four characters of a code. They need to know how long a text is.
+
+For all of this, it helps to see a string as a row of characters, each with its own position. This lesson builds that picture and uses it.
+
+## A string is a row of characters
+
+Create a variable `text` with the value `'telusko'`:
+
+```python
+>>> text = 'telusko'
+>>> text
+'telusko'
+```
+
+The word has seven characters. Typing `text` gives all seven. To get one character, you need a way to say which one.
+
+In daily life we count objects from one: first, second, third. In programming, the count starts at **zero**. The number of a position is called its **index**. So `t` is at index 0, `e` at index 1, `l` at index 2, and the last character `o` is at index 6.
+
+![String_Index_Numbers](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-string-index.svg)
+
+The seventh character has index 6. This difference of one confuses most people who are new to programming. It becomes a habit with practice.
+
+## Step 1: Pick one character
+
+Write the index in square brackets after the variable:
+
+```python
+>>> text = 'telusko'
+>>> text[0]
+'t'
+>>> text[3]
+'u'
+>>> text[6]
+'o'
+```
+
+The indexes of `'telusko'` go from 0 to 6. Ask for index 7 and you are asking for an eighth character, which does not exist:
+
+{/* check: skip */}
+```python
+>>> text[7]
+Traceback (most recent call last):
+  File "<python-input-14>", line 1, in <module>
+    text[7]
+    ~~~~^^^
+IndexError: string index out of range
+```
+
+The last line says exactly what went wrong: the index is out of range. Make it a habit to read the error before you change the code. Here it tells you to go back to 6.
+
+## Step 2: Count from the end with negative indexes
+
+What would `text[-1]` be? There is nothing before index 0, so an error seems likely.
+
+```python
+>>> text = 'telusko'
+>>> text[-1]
+'o'
+>>> text[-7]
+'t'
+```
+
+Python allows a second set of index numbers that count from the right. `-1` is the last character, `-2` the second last, and so on. For a string of seven characters, `-7` is the first one.
+
+This is useful when you want the last character. With `text[6]` you have to know the length of the string and subtract one. With `text[-1]` you do not have to think.
+
+Negative indexes have a limit too:
+
+{/* check: skip */}
+```python
+>>> text[-9]
+Traceback (most recent call last):
+  File "<python-input-18>", line 1, in <module>
+    text[-9]
+    ~~~~^^^^
+IndexError: string index out of range
+```
+
+## Step 3: Cut out a part with a slice
+
+To get several characters at once, give two numbers with a colon between them. The result is called a **slice**.
+
+```python
+>>> text = 'telusko'
+>>> text[3:7]
+'usko'
+>>> text[0:3]
+'tel'
+```
+
+The first number is the index where the slice starts. The second number is where it stops, and the character at that index is left out. So the end is always the index of the last character you want, plus one.
+
+- For `'usko'`: skip indexes 0, 1 and 2 and start at 3. The last character wanted is `o` at index 6, so the end is 7.
+- For `'tel'`: start at 0. The last character wanted is `l` at index 2, so the end is 3.
+
+With a single index, going past the end is an error. A slice is more relaxed:
+
+```python
+>>> text = 'telusko'
+>>> text[2:9]
+'lusko'
+>>> text[2:]
+'lusko'
+>>> text[:4]
+'telu'
+```
+
+There is no index 9, and still `text[2:9]` works. A slice stops at the end of the string, whatever larger number you give. Since the number does not matter, you can leave it out: `text[2:]` means "from index 2 to the end". The same works on the other side. `text[:4]` means "from the start up to index 4, without index 4".
+
+| Slice | Meaning | Result for `'telusko'` |
+| --- | --- | --- |
+| `text[3:7]` | Index 3 up to 6 | `'usko'` |
+| `text[0:3]` | Index 0 up to 2 | `'tel'` |
+| `text[2:9]` | Index 2 to the end, because 9 is past the end | `'lusko'` |
+| `text[2:]` | Index 2 to the end | `'lusko'` |
+| `text[:4]` | The start up to index 3 | `'telu'` |
+
+## Step 4: A string cannot be changed
+
+Suppose the first three letters should be capitals: `TELusko`. One way is to give the variable a new value:
+
+```python
+>>> text = 'telusko'
+>>> text = 'TELusko'
+>>> text
+'TELusko'
+>>> text = 'telusko'
+>>> text
+'telusko'
+```
+
+No problem here. The value of a variable can be replaced as often as you like.
+
+The lesson then tries something different. It keeps the string and tries to replace only its first three characters:
+
+{/* check: skip */}
+```python
+>>> text[0:3] = 'TEL'
+Traceback (most recent call last):
+  File "<python-input-33>", line 1, in <module>
+    text[0:3] = 'TEL'
+    ~~~~^^^^^
+TypeError: 'str' object does not support item assignment
+```
+
+`str` is Python's name for the string type. The message says that a string does not allow you to assign to a part of it. Once a string exists, its characters stay as they are.
+
+| Action | Example | Allowed? |
+| --- | --- | --- |
+| Give the variable a new string | `text = 'TELusko'` | Yes |
+| Change characters inside the existing string | `text[0:3] = 'TEL'` | No, `TypeError` |
+
+The two rows may look like the same thing at this point. The difference becomes clear when the course explains how variables and values are kept in memory, in [Variable Storage](/docs/python-tutorial-2026/data-structures-and-types/variable-storage).
+
+## Step 5: The length of a string
+
+`len` tells you how many characters a string has:
+
+```python
+>>> text = 'telusko'
+>>> len(text)
+7
+```
+
+`len` is a function. For now, think of a function as a helper that takes your data and gives back a result. Functions get their own lesson, [Introduction to Functions](/docs/python-tutorial-2026/functions-modules-and-input/introduction-to-functions).
+
+Note the link to the index numbers: the length is 7, and the last index is 6.
+
+## Step 6: Text on more than one line
+
+A string written in one line of code prints on one line. To break it, put `\n` at the place where the new line should start. `\n` is the escape sequence for a new line, which [Working with Strings](/docs/python-tutorial-2026/python-basics/working-with-strings) mentioned.
+
+```python
+>>> text = 'My name is Navin Reddy,\n welcome to Telusko'
+>>> text
+'My name is Navin Reddy,\n welcome to Telusko'
+>>> print(text)
+My name is Navin Reddy,
+ welcome to Telusko
+```
+
+Typing `text` shows the string as it is stored, with `\n` in it. `print` turns the `\n` into a real line break. The second line starts with a space because there is a space after `\n` in the string.
+
+### Triple quotes
+
+There is a second way. Start and end the string with three double quotes. Then you can press Enter inside the string, and every Enter becomes a line break:
+
+```python
+>>> text = """
+... My name is Navin
+... welcome to telusko
+... """
+>>> text
+'\nMy name is Navin\nwelcome to telusko\n'
+```
+
+The three dots `...` are shown by the prompt. They mean that Python is waiting for the rest of the statement. Do not type them.
+
+Python stored a `\n` for every Enter, including the one directly after the opening quotes and the one before the closing quotes. So `print` shows an empty line first and an empty line last:
+
+{/* check: skip */}
+```python
+>>> print(text)
+
+My name is Navin
+welcome to telusko
+
+>>>
+```
+
+<Callout type="info" title="A typing slip in the video">
+In the video the first line of this string is typed as `My name is NAvin`, with two capital letters, and the output shows it the same way. This page writes `Navin`. Everything else is as on screen.
+</Callout>
+
+Both ways give the same kind of string. Use `\n` for a short break and triple quotes when you have several lines of text.
+
+## Additions beyond the lesson
+
+**How to get `TELusko` without retyping it.** A string cannot be changed, and a new string can be built from parts of the old one. Slices and the `+` operator from the previous lesson are enough for that:
+
+```python
+>>> text = 'telusko'
+>>> text = 'TEL' + text[3:]
+>>> text
+'TELusko'
+```
+
+This does not change the old string. It builds a new one and gives it to the variable, which is the allowed case from Step 4.
+
+**The word for this.** A value that cannot be changed after it is created is called **immutable**. Strings are immutable. You will meet values that can be changed in [List Functions](/docs/python-tutorial-2026/data-structures-and-types/list-functions).
+
+<Callout type="info" title="Checked for these docs">
+Every prompt session on this page was run again with Python 3.13, and each line gave the result shown. The three error messages and the `print` output of the triple-quoted string were produced with Python 3.13 and copied from its output. The number in names such as `<python-input-14>` counts the lines typed since the prompt started, so it will differ on your machine. Each block repeats the assignment `text = 'telusko'`, so that it can be run by itself. In the video the assignment is typed once per session.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `IndexError: string index out of range` | The index is past the end, such as `text[7]` or `text[-9]` for a string of 7 characters. Both are shown in the lesson | Use an index from 0 to 6, or from -7 to -1 |
+| `text[3:6]` gives `'usk'` and the last letter is missing | The end index of a slice is left out of the result | Use the last index you want plus one: `text[3:7]` |
+| `TypeError: 'str' object does not support item assignment` | An attempt to change part of a string, such as `text[0:3] = 'TEL'`. This happens in the lesson | Assign a whole new string to the variable |
+| `\n` shows in the result | The variable was typed alone in the prompt, which shows the string as stored | Use `print(text)` |
+| The prompt shows `...` and nothing happens | A triple-quoted string was opened and not closed | Type the three closing quotes and press Enter |
+
+## Try It Yourself
+
+1. Set `word = 'python'`. Show the first character and the last character. Get the last one in two ways, with a positive and with a negative index.
+2. Guess what `word[6]` gives for `word = 'python'`. Run it and explain the result.
+3. From `word = 'python'`, cut out `'pyt'`, then `'hon'`, then `'th'`.
+4. Without running it, write down the results of `word[2:]`, `word[:2]` and `word[2:100]`. Then check.
+5. Find the length of `'navin telusko'` with `len`. Does the space count?
+6. Try `word[0] = 'P'` and read the error. Then build `'Python'` from `word` with `+` and a slice.
+7. Print two lines of text in two ways: once with `\n` and once with triple quotes.
+
+## Official references
+
+- [Python library: common sequence operations](https://docs.python.org/3/builtins/stdtypes.html#common-sequence-operations)
+- [Python library: text sequence type str](https://docs.python.org/3/builtins/stdtypes.html#text-sequence-type-str)
+- [Python library: the len function](https://docs.python.org/3/builtins/functions.html#len)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

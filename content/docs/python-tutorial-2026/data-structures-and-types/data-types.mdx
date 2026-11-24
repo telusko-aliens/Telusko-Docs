@@ -1,0 +1,347 @@
+---
+title: Data Types
+description: Review the built-in data types of Python, meet complex numbers, booleans, None and range, and convert a value from one type to another.
+---
+
+Every value in Python has a **type**. The type says what kind of value it is, and it decides what you can do with it. You can divide two numbers. You cannot divide two names.
+
+You have already worked with most of the types: whole numbers, numbers with a decimal point, strings, lists, tuples, sets and dictionaries. This lesson puts them side by side, so that you see the whole family in one place.
+
+It also adds four things that are new: complex numbers, the boolean type, the value `None` and the `range` type. And it shows how to turn a value of one type into a value of another type.
+
+## Step 1: Ask for the type
+
+The built-in function `type` tells you the type of any value:
+
+```python
+>>> x = 10
+>>> type(x)
+<class 'int'>
+>>> pi = 3.14
+>>> type(pi)
+<class 'float'>
+```
+
+Read `<class 'int'>` as "type int". What a class is comes much later, in [Class and Object](/docs/python-tutorial-2026/object-oriented-python/class-and-object).
+
+| Type | Holds | Example |
+| --- | --- | --- |
+| `int` | Whole numbers, called integers | `10` |
+| `float` | Numbers with a decimal point | `3.14` |
+
+You never declare the type yourself. Python works it out from the value on the right side of the `=`.
+
+## Step 2: Complex numbers
+
+From school maths you may remember complex numbers, written as a + bi, where i stands for the imaginary part. Python supports them as a type of their own. The one thing to remember is the letter. Python writes the imaginary part with `j`, not with `i`:
+
+```python
+>>> c = 6 + 8j
+>>> c
+(6+8j)
+>>> type(c)
+<class 'complex'>
+```
+
+When the two parts are stored in variables, the built-in function `complex` builds the number from them:
+
+```python
+>>> a = 2
+>>> b = 3
+>>> c = complex(a,b)
+>>> c
+(2+3j)
+```
+
+`complex(2,3)` gives the same result. Most programs never need complex numbers. They matter in fields such as electrical engineering and signal processing.
+
+## Step 3: Convert between number types
+
+`complex` is one of several built-in functions that carry the name of a type. `int` and `float` are two more. Each of them takes a value and gives back a new value of its own type.
+
+The lesson has `pi` with the value 3.14 and wants it as an integer. Writing `k = pi` would only give the same float a second name. To convert it, pass it to `int`:
+
+```python
+>>> pi = 3.14
+>>> k = int(pi)
+>>> type(k)
+<class 'int'>
+>>> k
+3
+>>> p = float(k)
+>>> type(p)
+<class 'float'>
+>>> p
+3.0
+```
+
+Two things happen here:
+
+- `int(pi)` gives 3. An integer has no place for the part after the point, so that part is lost.
+- `float(k)` gives 3.0. The value becomes a float, and the lost .14 does not come back.
+
+`pi` itself is still 3.14. A conversion makes a new value and leaves the old one alone.
+
+![Python_Data_Types](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-data-types.svg)
+
+## Step 4: Strings
+
+Text is the type `str`, short for string, which you know from [Working with Strings](/docs/python-tutorial-2026/python-basics/working-with-strings):
+
+```python
+>>> name = 'navin'
+>>> type(name)
+<class 'str'>
+```
+
+In the video the screen is cleared before the answer to `type(name)` can be read. The output above comes from running the two lines for these docs.
+
+## Step 5: Booleans, True and False
+
+Some questions have only two possible answers. Is `b` greater than `a`? Yes or no. The type for such answers is the **boolean** type, `bool`. It has exactly two values, `True` and `False`, both written with a capital first letter.
+
+```python
+>>> a = 7
+>>> b = 6
+>>> greater = b > a
+>>> greater
+False
+>>> greater = b < a
+>>> greater
+True
+```
+
+`b > a` asks whether 6 is greater than 7. It is not, so the result is `False`, and that result is stored in `greater`. Turned around, `b < a` is `True`. The signs `>` and `<` are covered properly in [Arithmetic, Assignment and Relational Operators](/docs/python-tutorial-2026/data-structures-and-types/arithmetic-assignment-and-relational-operators).
+
+You can also write a boolean value directly:
+
+```python
+>>> is_it = True
+>>> is_it
+True
+```
+
+The lesson lists booleans together with the numbers, and there is a reason for that. A boolean converts cleanly into an integer:
+
+```python
+>>> k = int(True)
+>>> k
+1
+>>> k = int(False)
+>>> k
+0
+```
+
+`True` is 1 and `False` is 0. Keep this in mind. It returns in the truth tables of [Logical Operators](/docs/python-tutorial-2026/data-structures-and-types/logical-operators).
+
+## Step 6: None, the value for "no value"
+
+Sometimes a variable has to exist although there is nothing sensible to put into it yet. Python has a special value for that, `None`. Other languages call the same idea null.
+
+```python
+>>> result = None
+>>> result
+>>> print(result)
+None
+>>> type(result)
+<class 'NoneType'>
+```
+
+The prompt prints nothing for a `None` value, so `result` alone seems to do nothing. `print(result)` shows the word `None`. You met this already when `get` could not find a key in [Dictionaries](/docs/python-tutorial-2026/data-structures-and-types/dictionaries).
+
+<Callout type="info" title="What the video shows here">
+In the video, `result` is typed without a visible assignment, and `print(result)` shows `None`. The explanation given is that no value is assigned to it. The assignment is not visible in the video. The variable must already have held `None`, because otherwise the line would end in a `NameError`. The first line of the block above and the `type` line are added for these docs, so that the block also works in a fresh prompt. A name that was never assigned does not give `None`. It gives an error:
+
+```text
+>>> total
+Traceback (most recent call last):
+  File "<python-input-0>", line 1, in <module>
+    total
+NameError: name 'total' is not defined
+```
+</Callout>
+
+## Step 7: The collection types
+
+Next come the types that hold several values, which the earlier lessons of this section covered one by one:
+
+```python
+>>> l = [4,5,6,7]
+>>> type(l)
+<class 'list'>
+>>> t = (4,5,6,7)
+>>> type(t)
+<class 'tuple'>
+>>> s = {4,5,6,4}
+>>> type(s)
+<class 'set'>
+>>> s
+{4, 5, 6}
+```
+
+The variable in the first line is the small letter `l`, not the digit 1. Square brackets make a list, round brackets a tuple and curly brackets a set. The set was given the value 4 two times and keeps it once. A dictionary, with its `key: value` pairs, has the type `dict`.
+
+<Callout type="info" title="A word on the word sequence">
+The lesson uses "sequence" for all of these types. In the Python documentation the word is narrower. A **sequence** keeps its values in a fixed order and lets you read them by index. Lists, tuples, strings and ranges are sequences. A set is a set type and a dictionary is a mapping type. All of them are collections.
+</Callout>
+
+## Step 8: range, a sequence of numbers
+
+One more sequence type is new: `range`.
+
+```python
+>>> r = range(10)
+>>> r
+range(0, 10)
+>>> type(r)
+<class 'range'>
+```
+
+`range(10)` stands for the whole numbers from 0 up to 9. It starts at 0 unless you say otherwise, and it stops one before the number you give. Printing `r` does not list the numbers. A range only remembers where it starts, where it stops and how big each step is.
+
+To see the numbers, hand the range to a collection type. The lesson uses `set`:
+
+```python
+>>> r = range(10)
+>>> set(r)
+{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+```
+
+### The step that fails in the video
+
+Before `set(r)`, the instructor tries the more natural choice, `list(r)`, and gets an error:
+
+```text
+>>> list(r)
+Traceback (most recent call last):
+  File "<python-input-166>", line 1, in <module>
+    list(r)
+    ~~~~^^^
+TypeError: 'list' object is not callable
+```
+
+This is not how `list` normally behaves. The instructor guesses the cause on the spot: the name `list` had been used as a variable earlier in the same prompt session. From that moment on, `list` meant that one list object and no longer the built-in type. A list object cannot be called with round brackets, and that is what the message says.
+
+The mistake and the repair look like this:
+
+{/* check: skip */}
+```python
+>>> list = [4,5,6,7]
+>>> r = range(10)
+>>> list(r)
+Traceback (most recent call last):
+  File "<python-input-2>", line 1, in <module>
+    list(r)
+    ~~~~^^^
+TypeError: 'list' object is not callable
+>>> del list
+>>> list(r)
+[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+```
+
+`del list` removes your variable, and the built-in `list` is visible again. Closing the prompt and opening a new one has the same effect. In a fresh prompt the conversion works right away:
+
+```python
+>>> list(range(10))
+[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+```
+
+<Callout type="warn" title="Do not use type names as variable names">
+Python lets you assign to `list`, `set`, `str`, `int`, `type` and other built-in names, and it gives no warning. The built-in is hidden from then on. Choose names such as `nums` or `names` for your variables.
+</Callout>
+
+### Start, stop and step
+
+`range` accepts up to three numbers. To get the even numbers up to 10:
+
+```python
+>>> set(range(2,11,2))
+{2, 4, 6, 8, 10}
+```
+
+| Position | Name | Meaning | Here |
+| --- | --- | --- | --- |
+| First | Start | The first number | 2 |
+| Second | Stop | The range ends before this number | 11, so that 10 is included |
+| Third | Step | The distance from one number to the next. It is 1 if you leave it out | 2 |
+
+`range` becomes really useful together with loops, in [The for Loop](/docs/python-tutorial-2026/control-flow/for-loop).
+
+## The types at a glance
+
+| Type | Example | Notes |
+| --- | --- | --- |
+| `int` | `10` | Whole number |
+| `float` | `3.14` | Number with a decimal point |
+| `complex` | `6 + 8j` | Imaginary part written with `j` |
+| `bool` | `True`, `False` | Converts to 1 and 0 |
+| `str` | `'navin'` | Text |
+| `NoneType` | `None` | The value for "no value" |
+| `list` | `[4, 5, 6, 7]` | Ordered, can be changed |
+| `tuple` | `(4, 5, 6, 7)` | Ordered, cannot be changed |
+| `range` | `range(10)` | Numbers from a start to before a stop |
+| `set` | `{4, 5, 6}` | Unique values, no fixed order |
+| `dict` | `{'kiran': 34}` | Values stored under keys |
+
+The instructor closes by saying that Python has other types as well. These are the ones you will use most.
+
+## Additions beyond the lesson
+
+**`int` cuts off. It does not round.** The part after the point is dropped, however large it is:
+
+```python
+>>> int(3.99)
+3
+>>> int(-3.99)
+-3
+```
+
+**Text that looks like a number can be converted too.** `int` and `float` accept a string, and `str` turns a number into text. This becomes important in [User Input](/docs/python-tutorial-2026/functions-modules-and-input/user-input):
+
+```python
+>>> int('12') + 1
+13
+>>> float('3.5')
+3.5
+>>> str(10)
+'10'
+```
+
+<Callout type="info" title="Checked for these docs">
+Every prompt session on this page was run with Python 3.13 and gave the output shown. The `list(r)` error and its repair were reproduced by assigning a list to the name `list` first, and the `NameError` and the message for `6 + 8i` were produced by running the lines. The error blocks show the file label of the Python 3.13 prompt, which carries a counter that differs from session to session.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `TypeError: 'list' object is not callable` | A variable named `list` hides the built-in `list`. This happens in the lesson | Run `del list` or start a new prompt, and do not use `list` as a variable name |
+| `SyntaxError: invalid decimal literal` after `c = 6 + 8i` | Python writes the imaginary part with `j` | Write `c = 6 + 8j` |
+| `int(pi)` gives `3` and the .14 is gone | An integer cannot hold the part after the point | Keep the float if you need the decimals |
+| Typing `result` shows nothing | The value is `None`, and the prompt does not display `None`. This happens in the lesson | Use `print(result)` |
+| `NameError: name 'total' is not defined` | The name was never assigned. Python does not fill in `None` by itself | Assign a value first, for example `total = None` |
+| `NameError: name 'true' is not defined. Did you mean: 'True'?` | `True` and `False` need a capital first letter | Write `True` or `False` |
+| `r` shows `range(0, 10)` and not the numbers | A range does not list its numbers when printed | Use `list(r)` or `set(r)` |
+| `range(2,10,2)` stops at 8 | The stop value is never included | Use 11 as the stop to include 10 |
+
+## Try It Yourself
+
+1. Use `type` on `25`, `2.5`, `'25'`, `True` and `None`. Write down each answer before you press Enter.
+2. Create the complex number 4 + 5j in two ways: directly, and with `complex` from two variables.
+3. Store `9.81` in `g`. Convert it to an integer, then convert that integer back to a float. What was lost?
+4. Assign `x = 12` and `y = 20`. Store `x > y` in a variable and print it. Then store `x < y` and print it.
+5. What do `int(True) + int(True)` and `int(False)` give? Guess first.
+6. Create a list, a tuple and a set from the values 1, 2, 2 and 3. Print each one and its type. Which one changed the values?
+7. Show the numbers of `range(5)` as a list. Then show the numbers from 1 to 5.
+8. Use `range` with three numbers to produce the odd numbers from 1 to 15 as a list.
+
+## Official references
+
+- [Python library: built-in types](https://docs.python.org/3/builtins/stdtypes.html)
+- [Python library: numeric types int, float, complex](https://docs.python.org/3/builtins/stdtypes.html#numeric-types-int-float-complex)
+- [Python library: ranges](https://docs.python.org/3/builtins/stdtypes.html#ranges)
+- [Python library: built-in constants True, False and None](https://docs.python.org/3/builtins/constants.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

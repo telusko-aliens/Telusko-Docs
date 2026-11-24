@@ -1,0 +1,376 @@
+---
+title: Types of Methods
+description: Learn the difference between instance variables and class variables, and write the three kinds of methods a class can have, which are instance methods, class methods and static methods.
+---
+
+The `computer` class from [The `__init__` Method](/docs/python-tutorial-2026/object-oriented-python/init-method) has two methods, `__init__` and `config`. Both take `self`, and both work with the data of one object.
+
+Some things do not belong to one object. A brand name is the same for every computer the company makes. A small calculation, such as turning gigabytes into bytes, needs no computer at all.
+
+Python has a kind of method for each of these cases. This lesson adds them to the `computer` class one by one: the **instance method** you already know, the **class method** and the **static method**. On the way you meet a new kind of variable, the class variable.
+
+## Instance methods and instance variables
+
+An **instance** is another word for an object. `com1` and `com2` are instances of the class `computer`.
+
+`__init__` and `config` are **instance methods**. You call them with the help of an object, and they receive that object as `self`.
+
+The variables `self.cpu`, `self.ram` and `self.ssd` are **instance variables**. They are created through `self`, so they belong to one object. Each object has its own copy with its own values: one computer has an i5 and 16GB, the other has an i9 and 96GB.
+
+## Step 1: Add a class variable
+
+Now create a variable inside the class and outside every method.
+
+```python title="demo.py"
+class computer:
+
+    brand = "Telusko AI"
+
+    def __init__(self, cpu, ram, ssd):
+        print("init called")
+        self.cpu = cpu
+        self.ram = ram
+        self.ssd = ssd
+
+    def config(self):
+        print("config : ",self.cpu, self.ram, self.ssd)
+
+com1 = computer("i5","16GB","512GB")
+com2 = computer("i9","96GB","2TB")
+
+
+com1.config()
+com2.config()
+
+print(com1.brand)
+```
+
+```text
+init called
+init called
+config :  i5 16GB 512GB
+config :  i9 96GB 2TB
+Telusko AI
+```
+
+`brand` is a **class variable**. It is not written with `self`, so it does not belong to any single object. It belongs to the class, and all objects share it.
+
+In the lesson the value is first `"Telusko"` and is then changed to `"Telusko AI"`. That one change reaches every computer, because there is only one `brand`.
+
+| | Instance variable | Class variable |
+| --- | --- | --- |
+| Example | `self.cpu`, `self.ram`, `self.ssd` | `brand` |
+| Created | Inside a method, through `self` | Inside the class, outside the methods |
+| Belongs to | One object | The class |
+| Value | Can differ from object to object | One value, shared by all objects |
+| A change affects | Only that object | Every object |
+
+### Reaching the class variable
+
+The lesson first writes `print(brand)` at the bottom of the file. The editor underlines it at once, and the instructor replaces it before running. The name `brand` does not exist outside the class. You have to say where it belongs.
+
+Two ways work:
+
+```python title="brand.py"
+class computer:
+
+    brand = "Telusko AI"
+
+    def __init__(self, cpu):
+        self.cpu = cpu
+
+com1 = computer("i5")
+
+print(com1.brand)
+print(computer.brand)
+```
+
+```text
+Telusko AI
+Telusko AI
+```
+
+`com1.brand` goes through an object. `computer.brand` goes through the class name. The second form says more clearly what is going on. The variable is shared by all objects, so there is no reason to pick one of them.
+
+## Step 2: A method that returns the brand
+
+Suppose you do not want to read the variable directly. You want a method, `computer.info()`, that returns the brand. The first attempt in the lesson looks like this:
+
+{/* check: error */}
+```python title="demo.py"
+
+class computer:
+
+    brand = "Telusko AI"
+
+    def __init__(self, cpu, ram, ssd):
+        print("init called")
+        self.cpu = cpu
+        self.ram = ram
+        self.ssd = ssd
+
+    def config(self):
+        print("config : ",self.cpu, self.ram, self.ssd)
+
+    def info():
+        return brand
+
+com1 = computer("i5","16GB","512GB")
+com2 = computer("i9","96GB","2TB")
+
+
+com1.config()
+com2.config()
+
+print(computer.info())
+```
+
+{/* check: skip */}
+```text
+init called
+init called
+config :  i5 16GB 512GB
+config :  i9 96GB 2TB
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\demo.py", line 25, in <module>
+    print(computer.info())
+          ~~~~~~~~~~~~~^^
+  File "C:\PythonCourse\FirstProject\oop\demo.py", line 16, in info
+    return brand
+           ^^^^^
+NameError: name 'brand' is not defined
+```
+
+Inside a method, a plain name such as `brand` is not looked up in the class. The variable lives in the class, so the method has to go through the class to reach it.
+
+The instructor explains this with **namespaces**. A namespace is the place where a set of names is kept. The class has its own namespace, and each object has its own namespace. A class variable is stored in the namespace of the class. An instance variable is stored in the namespace of the object. That is also why a class and an object can each have a variable with the same name without a clash.
+
+## Step 3: Accept the class as `cls`
+
+So the method needs the class. The lesson adds a parameter for it and reads the variable through that parameter. Only the two lines of `info` change:
+
+```python
+    def info(cls):
+        return cls.brand
+```
+
+Running the file again gives a different error:
+
+{/* check: skip */}
+```text
+init called
+init called
+config :  i5 16GB 512GB
+config :  i9 96GB 2TB
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\demo.py", line 25, in <module>
+    print(computer.info())
+          ~~~~~~~~~~~~~^^
+TypeError: computer.info() missing 1 required positional argument: 'cls'
+```
+
+The method expects one argument, and the call `computer.info()` passes none.
+
+Compare this with `com1.config()`. That call also has empty brackets, and `config` still receives `self`. Python passes the object in for you. You might expect Python to pass the class in the same way here, since the call is written with the class name.
+
+It does not, because `info` is still an ordinary instance method. Naming a parameter `cls` changes nothing. `cls` is a variable name like any other. It is the name everybody uses for this purpose, and Python does not treat it in a special way.
+
+## Step 4: Make it a class method
+
+To tell Python that the method works with the class, put the **decorator** `@classmethod` on the line above it. You met decorators in [Decorators](/docs/python-tutorial-2026/functional-python/decorators).
+
+```python title="demo.py"
+class computer:
+
+    brand = "Telusko AI"
+
+    def __init__(self, cpu, ram, ssd):
+        print("init called")
+        self.cpu = cpu
+        self.ram = ram
+        self.ssd = ssd
+
+    def config(self):
+        print("config : ",self.cpu, self.ram, self.ssd)
+
+    @classmethod
+    def info(cls):
+        return cls.brand
+
+com1 = computer("i5","16GB","512GB")
+com2 = computer("i9","96GB","2TB")
+
+
+com1.config()
+com2.config()
+
+print(computer.info())
+```
+
+```text
+init called
+init called
+config :  i5 16GB 512GB
+config :  i9 96GB 2TB
+Telusko AI
+```
+
+Now `computer.info()` works. With `@classmethod`, Python passes the class itself as the first argument. Inside `info`, `cls` is the class `computer`, so `cls.brand` is `computer.brand`.
+
+The rule of thumb from the lesson:
+
+- Use an instance method when you work with instance variables.
+- Use a class method when you work with class variables.
+
+## Step 5: A static method
+
+What about a method that needs neither?
+
+The RAM of the first computer is `"16GB"`. Suppose you want to know how many bytes that is. The calculation takes a number of gigabytes and gives back a number of bytes. It does not use `cpu`, `ram` or `ssd` of any object, and it does not use `brand`.
+
+Such a helper is a **static method**. It is marked with the decorator `@staticmethod`, and it has no `self` and no `cls`. Its parameters are only the values you pass yourself.
+
+```python title="demo.py"
+class computer:
+
+    brand = "Telusko AI"
+
+    def __init__(self, cpu, ram, ssd):
+        print("init called")
+        self.cpu = cpu
+        self.ram = ram
+        self.ssd = ssd
+
+    def config(self):
+        print("config : ",self.cpu, self.ram, self.ssd)
+
+    @classmethod
+    def info(cls):
+        return cls.brand
+
+    @staticmethod
+    def gb_to_bytes(gb):
+        return gb * (1024 ** 3)
+
+
+com1 = computer("i5","16GB","512GB")
+com2 = computer("i9","96GB","2TB")
+
+
+com1.config()
+com2.config()
+
+print(computer.gb_to_bytes(16))
+```
+
+```text
+init called
+init called
+config :  i5 16GB 512GB
+config :  i9 96GB 2TB
+17179869184
+```
+
+In the call `computer.gb_to_bytes(16)`, the `16` goes to the parameter `gb`. Python adds nothing in front of it.
+
+The instructor calls this a utility method. It sits in the class because it has to do with computers, and it would work the same way as a plain function outside the class.
+
+<Callout type="info" title="About the number">
+The instructor says that the formula is not the point of the lesson, and asks viewers to check the number. It is correct for the usual meaning of a gigabyte of memory: 1 kilobyte is 1024 bytes, 1 megabyte is 1024 kilobytes and 1 gigabyte is 1024 megabytes. So one gigabyte is `1024 ** 3`, which is 1,073,741,824 bytes. While typing, the video describes this as "one million". It is a little over one billion. 16 times that is 17,179,869,184.
+</Callout>
+
+## The three types side by side
+
+![Three_Types_Of_Methods](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-method-types.svg)
+
+| | Instance method | Class method | Static method |
+| --- | --- | --- | --- |
+| Decorator | None | `@classmethod` | `@staticmethod` |
+| First parameter | `self` | `cls` | No automatic first parameter |
+| Python passes in | The object the method is called on | The class | Nothing |
+| Works with | Instance variables | Class variables | Only its own parameters |
+| In the lesson | `__init__`, `config` | `info` | `gb_to_bytes` |
+| Called as | `com1.config()` | `computer.info()` | `computer.gb_to_bytes(16)` |
+
+A method is an instance method by default. It becomes one of the other two only through its decorator.
+
+## Additions beyond the lesson
+
+These points are not in the video. They were run for these docs.
+
+**1. Class methods and static methods also work through an object.** Python still passes the class to a class method, and still passes nothing extra to a static method.
+
+**2. Assigning through an object does not change the class variable.** The line `com1.brand = "Other"` creates a new instance variable on `com1` only. To change the shared value, assign through the class.
+
+```python title="extra.py"
+class computer:
+
+    brand = "Telusko AI"
+
+    @classmethod
+    def info(cls):
+        return cls.brand
+
+    @staticmethod
+    def gb_to_bytes(gb):
+        return gb * (1024 ** 3)
+
+com1 = computer()
+com2 = computer()
+
+print(com1.info())
+print(com1.gb_to_bytes(1))
+
+com1.brand = "Other"
+print(com1.brand)
+print(com2.brand)
+print(computer.brand)
+
+computer.brand = "Telusko"
+print(com2.brand)
+```
+
+```text
+Telusko AI
+1073741824
+Other
+Telusko AI
+Telusko AI
+Telusko
+```
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown. The two tracebacks were produced by hand and match the video. The file path in them is the one from the video. In the video the last line of the final program, `print(computer.gb_to_bytes(16))`, is below the visible part of the editor. It is confirmed by the output `17179869184`.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| The editor underlines `brand` in `print(brand)` | A class variable cannot be used by its bare name outside the class. This happens in the lesson | Write `computer.brand` or `com1.brand` |
+| `NameError: name 'brand' is not defined` | A method uses `brand` without saying where it belongs. This happens in the lesson | Use `cls.brand` in a class method |
+| `TypeError: computer.info() missing 1 required positional argument: 'cls'` | The method has a `cls` parameter and no `@classmethod`, so Python passes nothing. This happens in the lesson | Add `@classmethod` on the line above the method |
+| `TypeError: computer.gb_to_bytes() takes 1 positional argument but 2 were given` | The method is called through an object, such as `com1.gb_to_bytes(16)`, and `@staticmethod` is missing, so the object is passed in as well | Add `@staticmethod` |
+| `TypeError: computer.info() takes 0 positional arguments but 1 was given` | `@classmethod` is there, and the method has no parameter to receive the class | Write `def info(cls):` |
+| Changing `com1.brand` does not change the brand of `com2` | The assignment created an instance variable on `com1` | Assign through the class: `computer.brand = ...` |
+
+## Try It Yourself
+
+1. Add a class variable `brand` to the `computer` class and print it through `com1`, through `com2` and through the class name.
+2. Change the value of `brand` in the class and run the file again. Which of the three prints change?
+3. Write `info` without a parameter and with `return brand`. Run it and read the error.
+4. Change it to `info(cls)` with `return cls.brand`, without the decorator. Call `computer.info()` and read the error.
+5. Add `@classmethod` and check that `computer.info()` now returns the brand.
+6. Add a static method `mb_to_bytes(mb)` that returns `mb * (1024 ** 2)`. Call it with `512`.
+7. Add a class variable `count = 0`. For each of these jobs, say which type of method fits: returning `count`, printing the `cpu` of one computer, converting bytes to kilobytes.
+8. Write a class `Student` with a class variable `school`, an instance variable `name`, an instance method that prints the name, and a class method that returns the school.
+
+## Official references
+
+- [Python tutorial: class and instance variables](https://docs.python.org/3/tutorial/classes.html#class-and-instance-variables)
+- [Python library: `classmethod`](https://docs.python.org/3/builtins/functions.html#classmethod)
+- [Python library: `staticmethod`](https://docs.python.org/3/builtins/functions.html#staticmethod)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

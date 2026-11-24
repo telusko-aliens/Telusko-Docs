@@ -1,0 +1,181 @@
+---
+title: Introduction to Python
+description: Learn what kind of language Python is, what high-level, general-purpose and multi-paradigm mean, where Python is used and why so many people choose it.
+---
+
+Before you write a single line, it helps to know what you are about to learn. Python is described with three labels: high-level, general-purpose and multi-paradigm. They sound heavy. Each one answers a plain question.
+
+How close is the language to the way people write? What can you build with it? In which styles can you write your code?
+
+The lesson takes the three labels one by one, then visits python.org to see where Python is used, and ends with the reasons for its popularity. Nothing is installed and nothing is typed yet. That starts in [First Code in Python](/docs/python-tutorial-2026/python-basics/first-code-in-python).
+
+## Python in one line
+
+Python is a high-level, general-purpose, multi-paradigm programming language.
+
+| Label | The question it answers | Short answer |
+| --- | --- | --- |
+| High-level | How close is the code to human language? | Close to English, far from the hardware |
+| General-purpose | What can you build with it? | Almost any kind of application |
+| Multi-paradigm | In which styles can you write code? | Several, and you can mix them |
+
+## High-level: close to English
+
+A computer understands one language only, the **binary** language of ones and zeros. To make a machine do what you want, somebody has to speak to it in ones and zeros. Nobody is comfortable writing that by hand.
+
+So programmers moved step by step to languages that are easier for people.
+
+First came **assembly language**, where you pass short commands to the machine. Adding two numbers looks like this on the slide in the lesson:
+
+```text
+MOV A, 5
+MOV B, 10
+ADD A, B
+```
+
+Put 5 in A, put 10 in B, add them. This is a drawing of the idea, not code for one particular processor. It is still very close to the hardware, and that is why assembly is called a **low-level** language. Building a large application this way is slow and tiring.
+
+Languages kept evolving, and **C** and **C++** arrived. They work very well and are still widely used. They are also hard for a beginner to learn.
+
+Python sits at the other end. The same addition in Python:
+
+```python title="add.py"
+a = 5
+b = 10
+print(a + b)
+```
+
+```text
+15
+```
+
+You can almost read it aloud. That is the meaning of **high-level**: the code is near to English and far from the machine.
+
+| | Low-level language | High-level language |
+| --- | --- | --- |
+| Close to | The hardware | Human language |
+| Example in the lesson | Assembly | Python |
+| Easy for | The machine | The programmer |
+| Adding 5 and 10 | `MOV A, 5`, `MOV B, 10`, `ADD A, B` | `print(5 + 10)` |
+
+## Somebody has to convert the code
+
+The machine has not changed. It still wants ones and zeros. So when you write high-level code, something must convert it before it can run.
+
+![From_Code_To_Machine](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-high-level.svg)
+
+The program that does this conversion is called an **interpreter** or a **compiler**. The lesson leaves the details for later. For now, keep one picture in mind: you write code that looks like English, and a translator stands between your code and the machine.
+
+For Python, that translator is the Python interpreter. You install it in [Python Setup](/docs/python-tutorial-2026/python-basics/python-setup).
+
+## General-purpose: one language, many kinds of software
+
+Some languages are made for one job. Python is not tied to one job. The lesson gives three examples of what you can build with it:
+
+- a small calculator that runs on your own machine,
+- a web application,
+- an application based on AI.
+
+A language that can be used in most areas like this is called a **general-purpose** language.
+
+## Multi-paradigm: more than one style
+
+A **paradigm** is a style of writing programs, a way of organising your code. Different languages are built around different paradigms.
+
+| Paradigm | You organise the code around | Example language in the lesson |
+| --- | --- | --- |
+| Procedure-oriented | Procedures, which are named sets of steps | C |
+| Object-oriented | Objects, which keep data and behaviour together | Java, C# |
+| Functional | Functions that you pass around and combine | JavaScript |
+| Structured | Clear blocks: one step after another, decisions and loops | |
+
+Python says: I can do all of them. That is why it is called a **multi-paradigm** language. The slide in the lesson lists object-oriented, functional and structured programming, and the instructor adds procedure-oriented programming when he speaks.
+
+You do not need to choose a style today. The course starts with plain step by step code, moves to functions in [Introduction to Functions](/docs/python-tutorial-2026/functions-modules-and-input/introduction-to-functions), and reaches objects in [OOPs Introduction](/docs/python-tutorial-2026/object-oriented-python/oops-introduction).
+
+<Callout type="info" title="Other languages mix styles too">
+The examples in the table show the style each language is best known for. As the instructor says, it does not mean those languages can work in one style only. Java has functional features and JavaScript has objects.
+</Callout>
+
+## A language from 1991
+
+Python is often seen as a new language because it became so popular with AI. It is older than many people think. Python was created by **Guido van Rossum** and first released in **1991**. Java, for comparison, appeared in 1995.
+
+The instructor mentions the reason behind the design: Guido van Rossum wanted a language that anyone could learn, not only a small group of specialists. That goal explains much of what you will see in this course. Python code is short, and it reads like plain sentences.
+
+## What Python is used for
+
+The lesson opens [python.org](https://www.python.org/), the official website. This is also the place where you download Python later. The home page has a section named "Use Python for...", and it lists these areas:
+
+| Area | Tools named on python.org |
+| --- | --- |
+| Web Development | Django, Pyramid, Bottle, Tornado, Flask, web2py |
+| GUI Development | tkInter, PyGObject, PyQt, PySide, Kivy, wxPython, DearPyGui |
+| Scientific and Numeric | SciPy, Pandas, IPython |
+| Software Development | Buildbot, Trac, Roundup |
+| System Administration | Ansible, Salt, OpenStack, xonsh |
+
+Three words in this table are new:
+
+- A **library** or **framework** is code that other people have already written, which you can use in your own programs. Django and Flask are for websites. Pandas is for working with data.
+- **GUI** stands for graphical user interface. It means an application with windows and buttons.
+- **System administration** means managing computers and servers, for example installing software on many machines at once.
+
+The list is the one shown in the video. The website changes over time, so the page you see may differ a little.
+
+The instructor points out the two areas where Python is most in demand today: **AI** and **web development**.
+
+## Why Python is so popular
+
+| Reason | What it means for you |
+| --- | --- |
+| It is easy to work with | The code is short and close to English, so you can focus on the logic |
+| It has a huge community | Many people use it, so answers, tutorials and help are easy to find |
+| It has a lot of libraries | Whatever area you work in, somebody has probably built a library for it |
+
+The second and third reasons feed each other. A language becomes famous because of its community, and it gets a bigger community because it is famous. The instructor calls it a cycle.
+
+In the AI world this matters a lot. Most AI libraries are written for Python, which is one more reason to learn it now.
+
+## Additions beyond the lesson
+
+**Interpreter or compiler?** A compiler translates a whole program before it runs. An interpreter reads the program and runs it straight away. Python is usually called an **interpreted** language, and that description is fine. For the curious, the standard Python that you download from python.org does both in a small way. It first compiles your code into a simpler form called **bytecode**, and then a part of Python called the **virtual machine** runs that bytecode. All of this happens by itself each time you run a program. You never have to start a separate compile step.
+
+**Where the name comes from.** Python is not named after the snake. Guido van Rossum took the name from a British comedy show, "Monty Python's Flying Circus".
+
+## Mistakes and fixes
+
+There is no code to break in this lesson. These are the misunderstandings that beginners most often take away from an introduction.
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| "Python is a new language" | It became famous with AI in recent years | Python was first released in 1991, before Java |
+| "High-level means advanced or difficult" | The word "high" sounds like a skill level | High-level means close to human language. It is the easier kind |
+| The slide shows three paradigms and the instructor names four | This happens in the lesson. The spoken list adds procedure-oriented programming | Python supports all four styles |
+| One article calls Python interpreted, another talks about compiling | Both happen. Python compiles to bytecode and then runs it | Calling Python an interpreted language is the usual description |
+| "Python is only for AI" | AI is the most visible use today | Python is general-purpose. Web, desktop, scientific and admin tools are all built with it |
+
+## Try It Yourself
+
+1. Explain in your own words what high-level, general-purpose and multi-paradigm mean. Use one sentence for each.
+2. Look at the assembly lines and the Python lines for adding 5 and 10. Write down two differences you notice.
+3. Open [python.org](https://www.python.org/) and find the section "Use Python for...". Pick one area that interests you and note two tools listed under it.
+4. Name the paradigm that the lesson connects with each of these languages: C, Java, JavaScript.
+5. A machine understands only binary. What is the job of an interpreter or a compiler?
+6. Write down three reasons why Python is popular, and mark the one that matters most to you.
+7. Think of one application you use every day. Would you call it a web application, a GUI application or something else? Which area from the python.org table fits it best?
+
+<Callout type="info" title="Checked for these docs">
+The small program `add.py` on this page was run with Python 3.13 and printed the result shown. The assembly lines are an illustration from the slide and are not meant to be run. The release year, the creator of Python and the origin of the name were checked against the official Python documentation.
+</Callout>
+
+## Official references
+
+- [Python tutorial: whetting your appetite](https://docs.python.org/3/tutorial/appetite.html)
+- [Python FAQ: general questions about Python](https://docs.python.org/3/faq/general.html)
+- [Python glossary: interpreted, bytecode and virtual machine](https://docs.python.org/3/glossary.html#term-interpreted)
+- [python.org: applications for Python](https://www.python.org/about/apps/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

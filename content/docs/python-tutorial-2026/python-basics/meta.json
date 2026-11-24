@@ -1,0 +1,17 @@
+{
+  "title": "Python Basics",
+  "pages": [
+    "introduction-to-python.mdx",
+    "first-code-in-python.mdx",
+    "python-setup.mdx",
+    "ides-for-python.mdx",
+    "vs-code-setup.mdx",
+    "pycharm-setup.mdx",
+    "jupyter-notebook.mdx",
+    "idle-and-number-operations.mdx",
+    "introduction-to-variables.mdx",
+    "working-with-strings.mdx",
+    "string-concatenation.mdx",
+    "fetching-characters-from-a-string.mdx"
+  ]
+}

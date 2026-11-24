@@ -1,0 +1,109 @@
+---
+title: Built-in Functions on Lists
+description: Replace several values of a list with a slice assignment, turn the list around with reverse, put it in order with sort, and get the smallest value, the largest value and the total with min, max and sum.
+---
+
+In [List Functions](/docs/python-tutorial-2026/data-structures-and-types/list-functions) you added values to a list and removed them again. At the end the list was `[23, 55, 44, 56, 11, 99]`.
+
+A list of numbers raises more questions than "what is in it". Which value is the smallest? Which is the largest? What is the total? And what if two values are wrong and have to be swapped for new ones? This lesson answers all of these, first with the list itself and then with three functions that are built into Python.
+
+## Step 1: Replace several values
+
+The lesson prints the list once more and then replaces two of its values in one line:
+
+```python
+>>> nums = [23, 55, 44, 56, 11, 99]
+>>> nums[2:4] = [54,76]
+>>> nums
+[23, 55, 54, 76, 11, 99]
+```
+
+The second line assigns to a slice. `nums[2:4]` stands for the values at index 2 and 3, which are 44 and 56, and the assignment replaces them with 54 and 76.
+
+This is the exact operation that failed for a string in [Fetching Characters from a String](/docs/python-tutorial-2026/python-basics/fetching-characters-from-a-string), where `text[0:3] = 'TEL'` gave a `TypeError`. It works here because a list is mutable, which means it can be changed, as [List Functions](/docs/python-tutorial-2026/data-structures-and-types/list-functions) explained.
+
+## Step 2: Reverse, sort, min, max and sum
+
+```python
+>>> nums = [23, 55, 54, 76, 11, 99]
+>>> nums.reverse()
+>>> nums
+[99, 11, 76, 54, 55, 23]
+>>> nums.sort()
+>>> nums
+[11, 23, 54, 55, 76, 99]
+>>> min(nums)
+11
+>>> max(nums)
+99
+>>> sum(nums)
+318
+```
+
+`reverse()` turns the order around. `sort()` puts the values in order, smallest first. Both change the list itself and print nothing.
+
+`min`, `max` and `sum` are different. They are built-in functions of Python, not methods of the list. You pass the list to them in round brackets, and they return the smallest value, the largest value and the total.
+
+`min` also works on a list of strings:
+
+```python
+>>> names = ['navin','harsh','kiran']
+>>> min(names)
+'harsh'
+```
+
+Strings are compared in alphabetical order. `h` comes before `k` and `n`, so `'harsh'` is the minimum. By the same rule `max(names)` gives `'navin'`, as the instructor says without running it.
+
+A total of names makes no sense, and Python agrees:
+
+{/* check: skip */}
+```python
+>>> names = ['navin','harsh','kiran']
+>>> sum(names)
+Traceback (most recent call last):
+  File "<python-input-1>", line 1, in <module>
+    sum(names)
+    ~~~^^^^^^^
+TypeError: unsupported operand type(s) for +: 'int' and 'str'
+```
+
+`sum` starts at the number 0 and adds each value to it. Adding the string `'navin'` to the number 0 is not possible. `int` is Python's name for a whole number and `str` its name for a string.
+
+## List operations in this lesson
+
+| Code | What it does | Changes the list |
+| --- | --- | --- |
+| `nums[2:4] = [54,76]` | Replaces a slice | Yes |
+| `nums.reverse()`, `nums.sort()` | Reverses or sorts | Yes |
+| `min(nums)`, `max(nums)`, `sum(nums)` | Smallest, largest, total | No |
+
+<Callout type="info" title="Checked for these docs">
+Every prompt session on this page was run again with Python 3.13, and each line gave the result shown. The session that ends in an error was run by hand. The lesson runs it in IDLE. This page shows it as the plain Python 3.13 prompt prints it, so the middle lines can look a little different from the video. The last line, which names the error, is the same in both. The number in `<python-input-1>` counts the lines you have typed, so yours may differ. Each session starts with a line that enters `nums` or `names` again, so that it works by itself. In the video these lists are still in memory from the lesson before.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `TypeError: unsupported operand type(s) for +: 'int' and 'str'` | `sum` was used on a list of strings. This is shown in the lesson | Use `sum` on lists of numbers only |
+| Nothing is printed after `nums.reverse()` or `nums.sort()` | These methods change the list and return nothing to show | Type `nums` to see the list |
+| `TypeError: '<' not supported between instances of 'int' and 'str'` | `sort` was called on a list that holds numbers and strings, such as `['navin',67,6.5]`. Python cannot say which of the two comes first | Sort lists that hold numbers only, or strings only |
+
+## Try It Yourself
+
+1. Start with `nums = [5, 3, 9]`. Add 8, 1 and 7 in one line with `extend`, replace the first two values with a slice assignment, then sort the list and print `min`, `max` and `sum`.
+2. Create a list `marks` with the values 72, 85, 64, 91 and 58. Reverse it and print it. Then sort it and print it again. Compare the first value of the sorted list with `min(marks)`.
+3. Create `cities` with three city names. Print `min(cities)` and `max(cities)` and explain the result with the first letters of the names.
+4. Type `sum(cities)`. Read the error message and say in your own words what it means.
+5. Work out the average of `marks` with `sum(marks) / len(marks)`.
+
+## Official references
+
+- [Python library: min](https://docs.python.org/3/builtins/functions.html#min)
+- [Python library: max](https://docs.python.org/3/builtins/functions.html#max)
+- [Python library: sum](https://docs.python.org/3/builtins/functions.html#sum)
+- [Python library: list.sort](https://docs.python.org/3/builtins/stdtypes.html#list.sort)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

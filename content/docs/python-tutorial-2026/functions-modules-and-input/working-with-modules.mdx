@@ -1,0 +1,116 @@
+---
+title: Working with Modules
+description: Learn what a module is, why sqrt does not work until the math module is imported, and two ways to import, the whole module or one function by name.
+---
+
+In [Introduction to Functions](/docs/python-tutorial-2026/functions-modules-and-input/introduction-to-functions) one task became one function. A real program has many tasks, so it has many functions. The next question is where to keep them all.
+
+The lesson answers with three examples. A calculator has addition, subtraction, division and multiplication. A login system has log in, log out, create a user and delete a user. A shopping site has add a product, delete a product and check out. Each of these is a group of functions that belong together.
+
+Such a group is called a **module**. Think of a module as a box that holds related functions. Python comes with many modules that are ready to use. This lesson uses one of them, `math`, to show how any module is used.
+
+## Step 1: A function that Python does not know yet
+
+Clear `Demo.py`. The task is to find the square root of 25. The square of a number is easy, `4 * 4`. The square root needs a real formula, so it is better to use a function that already exists. It is named `sqrt`:
+
+{/* check: error */}
+```python title="Demo.py"
+num = 25
+
+result = sqrt(num)
+
+print(result)
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\Users\navin\OneDrive\Documents\Python Course\FirstProject\Demo.py", line 3, in <module>
+    result = sqrt(num)
+             ^^^^
+NameError: name 'sqrt' is not defined
+```
+
+A `NameError` means that Python met a name it does not know. `print` and `int` are always available, because every program needs them. `sqrt` is needed only for mathematics, so it is kept in a module, and a module must be asked for first.
+
+<Callout type="info" title="Built-in or not">
+The instructor calls `sqrt` an inbuilt function that is "not openly available". The exact terms are these. **Built-in functions**, such as `print`, `int` and `len`, work without any import. `sqrt` is part of the **standard library**, the collection of modules that is installed together with Python. Nothing has to be downloaded for it, and it has to be imported before use.
+</Callout>
+
+## Step 2: Import the module
+
+The keyword `import` makes a module available in your file. After that, a function of the module is written as the module name, a dot, and the function name:
+
+```python title="Demo.py"
+import math
+
+num = 25
+
+result = math.sqrt(num)
+
+print(result)
+```
+
+```text
+5.0
+```
+
+The answer is `5.0` and not `5`, because `math.sqrt` always gives a float. If you need a whole number, pass the result to `int`, as in `int(math.sqrt(num))`.
+
+Import lines go at the top of the file. In VS Code, type `import ` and press Ctrl+Space to see a list of the modules you can import. The lesson scrolls past `base64`, `calendar`, `colorsys`, `concurrent`, `datetime` and many more. You can also write modules of your own, which comes later in [Modules and Packages](/docs/python-tutorial-2026/functional-python/modules-and-packages).
+
+## Step 3: Import one function by name
+
+`import math` gives access to everything in the module, and every call needs the prefix `math.`. Can the prefix be dropped? Removing it alone does not work. With `import math` at the top and a plain `sqrt(num)` below, the program stops with the same `NameError: name 'sqrt' is not defined`.
+
+To use the short name, import the function itself:
+
+```python title="Demo.py"
+# import math
+
+from math import sqrt
+
+num = 25
+
+result = sqrt(num)
+
+print(result)
+```
+
+```text
+5.0
+```
+
+`from math import sqrt` takes one name out of the module and puts it into your file. Now `sqrt(num)` works without a prefix. The first line is a comment, so it does nothing here.
+
+`sqrt` is one of many functions in `math`. The next lesson, [The math Module](/docs/python-tutorial-2026/functions-modules-and-input/the-math-module), tries more of them and shows a third way to write the import line.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown. This includes the version with `import math` and a plain `sqrt(num)`, whose error message is cut off in the video. The line number in the traceback matches the code on this page. In the video it says line 6, because the file there starts with empty lines.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `NameError: name 'sqrt' is not defined` | `sqrt` is used without an import. This happens in the lesson | Add `import math` and call `math.sqrt(num)` |
+| The same `NameError` with `import math` at the top | The call is a plain `sqrt(num)`, and only the module name was imported. This happens in the lesson | Write `math.sqrt(num)`, or use `from math import sqrt` |
+| `ModuleNotFoundError: No module named 'maths'` | The module name is misspelled | The name is `math` |
+| The result is `5.0` and you wanted `5` | `math.sqrt` always gives a float | Use `int(math.sqrt(num))` |
+| `ValueError: math domain error` | `math.sqrt` was given a negative number | Pass zero or a positive number |
+
+## Try It Yourself
+
+1. Use `import math` to print the square root of `144`.
+2. Remove the import line and run the file. Read the error, then put the line back.
+3. Print the same square root with `from math import sqrt` and a call without the prefix.
+4. Write a function `hypotenuse(a, b)` that returns `math.sqrt(a * a + b * b)`. Print `hypotenuse(3, 4)`.
+
+## Official references
+
+- [Python tutorial: modules](https://docs.python.org/3/tutorial/modules.html)
+- [Python reference: the import statement](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

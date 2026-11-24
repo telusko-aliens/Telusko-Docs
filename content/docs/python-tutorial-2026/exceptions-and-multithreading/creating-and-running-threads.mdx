@@ -1,0 +1,293 @@
+---
+title: Creating and Running Threads
+description: Turn two classes into threads by inheriting from Thread, start them with start instead of run, slow them down with sleep, and create threads from plain functions with target.
+---
+
+The previous lesson, [Why and What Are Threads](/docs/python-tutorial-2026/exceptions-and-multithreading/why-and-what-are-threads), ended with a file in which `Hello` prints five lines and only then `Hi` prints five lines. It also explained that a thread is a light line of execution inside a process.
+
+Now the question is how to create one. This lesson makes the two loops run at the same time, first with classes and then with plain functions. It also shows a surprise on the way: creating a thread is not enough to make it run.
+
+## Step 1: Turn the classes into threads
+
+Python's `threading` module has a class named `Thread`. The lesson says there are two ways to use it: with classes, and with functions. It starts with classes. The instructor first types `Thread(target=Hello.do)`, removes it again, and uses inheritance: `Hello` and `Hi` inherit from `Thread`, and the method `do` is renamed to `run`.
+
+```python title="threads_demo.py"
+from threading import Thread
+
+class Hello(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hello ", i+1)
+
+class Hi(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hi ", i+1)
+
+if __name__ == '__main__':
+
+    t1 = Hello()
+    t2 = Hi()
+
+    t1.run()
+    t2.run()
+```
+
+```text
+Hello  1
+Hello  2
+Hello  3
+Hello  4
+Hello  5
+Hi  1
+Hi  2
+Hi  3
+Hi  4
+Hi  5
+```
+
+Still one after the other. `t1` and `t2` are thread objects now, but nobody has started them. Calling `run()` yourself is an ordinary method call.
+
+## Step 2: start, not run
+
+Change the last two lines to `start()`:
+
+{/* check: noout */}
+```python title="threads_demo.py"
+from threading import Thread
+
+class Hello(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hello ", i+1)
+
+class Hi(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hi ", i+1)
+
+if __name__ == '__main__':
+
+    t1 = Hello()
+    t2 = Hi()
+
+    t1.start()
+    t2.start()
+```
+
+The first run in the video prints:
+
+{/* check: skip */}
+```text
+Hello  1
+Hello  2
+Hello  3
+Hi  1
+Hello  4
+Hi  2
+Hello  5
+Hi  3
+Hi  4
+Hi  5
+```
+
+The two loops are mixed. `start()` asks the system for a new thread, and that new thread calls `run()`. The lesson opens `threading.py` and shows the description of `start`: "It arranges for the object's run() method to be invoked in a separate thread of control."
+
+The name `run` is fixed. To prove it, the instructor renames the method in `Hello` back to `do` and keeps `start()`:
+
+```python title="threads_demo.py"
+from threading import Thread
+
+class Hello(Thread):
+    def do(self):
+        for i in range(5):
+            print("Hello ", i+1)
+
+class Hi(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hi ", i+1)
+
+if __name__ == '__main__':
+
+    t1 = Hello()
+    t2 = Hi()
+
+    t1.start()
+    t2.start()
+```
+
+```text
+Hi  1
+Hi  2
+Hi  3
+Hi  4
+Hi  5
+```
+
+No error, and no "Hello". `Thread` has a `run` method of its own that does nothing here. `Hello` inherits it, `start()` calls it, and `do` is never called. Change `do` back to `run` before you go on.
+
+<Callout type="warn" title="Your order will differ">
+A second run in the video gives a different mix: two "Hello" lines, then "Hi  1". The operating system decides which thread runs at each moment. That part of the system is called the **scheduler**, and your program does not control it. On a fast machine you may even see all five "Hello" lines first, because the first thread finishes before the second one starts. That happened in the runs for these docs. Every output of two running threads on this page is one possible result.
+</Callout>
+
+## Step 3: Slow the threads down with sleep
+
+To see the two threads take turns, the lesson makes each loop pause. `sleep(0.3)` from the `time` module pauses the thread that calls it for 0.3 seconds, and the other thread can work in the meantime.
+
+{/* check: noout */}
+```python title="threads_demo.py"
+from threading import Thread
+from time import sleep
+
+
+class Hello(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hello ", i+1)
+            sleep(0.3)
+
+
+class Hi(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hi ", i+1)
+            sleep(0.3)
+
+if __name__ == '__main__':
+
+    t1 = Hello()
+    t2 = Hi()
+
+    t1.start()
+    t2.start()
+```
+
+{/* check: skip */}
+```text
+Hello  1
+Hi  1
+Hello  2
+Hi  2
+Hello  3
+Hi  3
+Hi  4
+Hello  4
+Hi  5
+Hello  5
+```
+
+Almost a clean pattern. Look at the seventh line: "Hi  4" comes before "Hello  4". Both threads wake up at nearly the same moment, and either one can print first.
+
+### Where the pause has to go
+
+The instructor then tries to let one thread start a little after the other. In the video the pause is written between the two lines that create the objects:
+
+```python
+    t1 = Hello()
+    sleep(0.2)
+    t2 = Hi()
+
+    t1.start()
+    t2.start()
+```
+
+The output in the video still swaps now and then, and the instructor concludes that the scheduler cannot be controlled. That conclusion is right. The pause, however, has no effect in this position. Creating a `Thread` object does not start anything. The program waits 0.2 seconds before any thread exists, and then both `start()` calls follow each other at once.
+
+To make the second thread begin later, the pause must sit between the two `start()` calls. This is an addition to the lesson:
+
+{/* check: noout */}
+```python title="threads_demo.py"
+from threading import Thread
+from time import sleep
+
+
+class Hello(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hello ", i+1)
+            sleep(0.3)
+
+
+class Hi(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hi ", i+1)
+            sleep(0.3)
+
+if __name__ == '__main__':
+
+    t1 = Hello()
+    t2 = Hi()
+
+    t1.start()
+    sleep(0.2)
+    t2.start()
+```
+
+Measured for these docs, "Hi  1" appeared at the same moment as "Hello  1" with the pause in the video's position, and 0.2 seconds after it with the pause between the `start()` calls. Six runs in a row then gave a clean Hello, Hi, Hello, Hi pattern. It is still a delay and no guarantee. As the instructor says, slowing a program down on purpose is only good for a demonstration.
+
+## Step 4: Threads from functions
+
+The second way needs no classes, and the lesson calls it the more Pythonic one. Write plain functions and hand each one to a `Thread` as its `target`:
+
+{/* check: noout */}
+```python title="threads_demo.py"
+from threading import Thread
+from time import sleep
+
+def hello():
+    for i in range(5):
+        print("Hello ", i+1)
+        sleep(0.3)
+
+
+def hi():
+    for i in range(5):
+        print("Hi ", i+1)
+        sleep(0.3)
+
+if __name__ == '__main__':
+
+    t1 = Thread(target=hello)
+    t2 = Thread(target=hi)
+
+    t1.start()
+    t2.start()
+```
+
+`target=hello` has no brackets after `hello`. You pass the function itself, as in [Higher Order Functions](/docs/python-tutorial-2026/functional-python/higher-order-functions), and the thread calls it later. The output is the same kind of mix as before. The file in the video still has the `sleep(0.2)` line between the two `Thread(...)` lines. It is left out here because it changes nothing.
+
+Both threads now run next to the rest of the program. What happens to a line that comes after the two `start()` calls is the topic of the next lesson, [The Thread join() Function](/docs/python-tutorial-2026/exceptions-and-multithreading/thread-join).
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 on Windows and finished without an error. The two programs without threads running side by side (the one that calls `run()` and the one with `do`) gave exactly the output shown. For the others, the output shown is the one from the video, because the order of lines changes from run to run. The error messages in the table below were produced by running the code.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| "Hello" five times, then "Hi" five times, although the classes inherit from `Thread` | `run()` was called directly. This happens in the lesson | Call `start()` |
+| One thread prints nothing, and there is no error | The method is not named `run`, so the empty `run` of `Thread` is used. The lesson shows this with `do` | Name the method `run` |
+| `NameError: name 'Target' is not defined` | `Target()` was typed for `Thread(target=...)`. The instructor types it and corrects it before running | `t1 = Thread(target=hello)` |
+| The pause between creating `t1` and `t2` changes nothing | A thread begins at `start()`, not when the object is created. The video has the pause in this place | Put the pause between the two `start()` calls |
+| `RuntimeError: threads can only be started once` | `start()` was called twice on the same thread object | Create a new `Thread` object for each run |
+
+## Try It Yourself
+
+1. Write two functions, `tick` and `tock`, that each print their word five times. Run both as threads with `Thread(target=...)` and `start()`. Run the file several times. Is the order always the same?
+2. Rewrite `tick` as a class that inherits from `Thread`. Call `run()` once and `start()` once and explain the difference.
+3. In the class version of `threads_demo.py`, rename `run` to `do` in `Hi` and keep `run` in `Hello`. Say what the program prints before you run it.
+4. Add `sleep(0.2)` in both loops of `tick` and `tock`. Then change one of them to `sleep(0.4)` and describe how the output changes.
+5. Add a third function `hey` to the function version and run it as a third thread `t3`.
+
+## Official references
+
+- [Python library: threading, Thread objects](https://docs.python.org/3/library/threading.html#thread-objects)
+- [Python library: Thread.start](https://docs.python.org/3/library/threading.html#threading.Thread.start)
+- [Python library: time.sleep](https://docs.python.org/3/library/time.html#time.sleep)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

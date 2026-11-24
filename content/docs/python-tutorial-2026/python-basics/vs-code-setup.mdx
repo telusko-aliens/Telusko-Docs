@@ -1,0 +1,140 @@
+---
+title: VS Code Setup
+description: Install VS Code, find your way around its window, open a folder, create a Python file, run it in the terminal and with the Run button, and add the Python extension.
+---
+
+[IDEs for Python](/docs/python-tutorial-2026/python-basics/ides-for-python) presented three places to write Python. Knowing their names does not run any code. This lesson sets up the first one, **VS Code**, and takes one Python file from an empty window to its output.
+
+## Step 1: Install VS Code
+
+1. Go to [code.visualstudio.com](https://code.visualstudio.com/).
+2. Click the download button for Windows. The button changes with your operating system.
+3. Run the downloaded installer and accept the default choices.
+
+The installer is not shown in the video, because VS Code is already on the instructor's machine. He describes it as next, next, next.
+
+## Step 2: Find your way around VS Code
+
+When VS Code opens, look at the column of icons at the far left. It is called the **Activity Bar**.
+
+| Icon | Shortcut | What it is for |
+| --- | --- | --- |
+| Explorer | `Ctrl+Shift+E` | Your folder and its files |
+| Search | | Find a file or a word in your files |
+| Source Control | | Work with Git, a tool that keeps the history of your code |
+| Run and Debug | `Ctrl+Shift+D` | Run a program and debug it |
+| Extensions | `Ctrl+Shift+X` | Add support for languages and other features |
+
+VS Code works with many languages, and it does not ship with all of them built in. Support for a language arrives as an **extension**. Why not include everything from the start? There are so many languages and tools that VS Code would become very heavy. So you add only what you need. For this course that is one extension, in Step 5.
+
+## Step 3: Open a folder and create a file
+
+VS Code works on a folder. Create a folder for your code first, or use the one from [Python Setup](/docs/python-tutorial-2026/python-basics/python-setup).
+
+1. Click the **Explorer** icon, then **Open Folder**, and choose your folder. The lesson opens a folder named `PythonCodes` on the Desktop.
+2. In the Explorer, click the **New File** button next to the folder name.
+3. Type the name `Demo1.py` and press Enter. The empty file opens in the editor.
+4. Type the code and save with `Ctrl+S`.
+
+{/* check: noout */}
+```python title="Demo1.py"
+print('welcome to telusko')
+```
+
+<Callout type="warn" title="Always end the name with .py">
+In the video the file is named `Demo1`, without an extension, and it is run with `python Demo1`. That works on the instructor's machine. Name your own files with `.py`, as the instructor himself advises a moment later. The `.py` ending tells VS Code that the file is a Python program, so it switches on the colours and suggestions for Python and shows the Run button.
+</Callout>
+
+## Step 4: Run the file
+
+There are two ways.
+
+### In the terminal inside VS Code
+
+Open the menu **Terminal** and choose **New Terminal**. A terminal panel opens at the bottom of the window. It already stands in your folder, so there is no `cd` to type.
+
+If you do not see Terminal in the menu bar, the window is too narrow for the whole menu. Click the three dots `...` at the end of the menu bar. That is what the instructor does, because his VS Code is zoomed in for the recording.
+
+Type `python` and the file name:
+
+```text
+PS C:\Users\navin\OneDrive\Desktop\PythonCodes> python Demo1.py
+welcome to telusko
+```
+
+### With the Run button
+
+At the top right of the editor there is a play button, **Run Python File**. Click it. VS Code types a command into the terminal for you, made of the path of the Python interpreter and the path of your file, and the output appears below it:
+
+```text
+welcome to telusko
+```
+
+If the Run button is missing, check two things: the file name ends with `.py`, and the Python extension from Step 5 is installed.
+
+That is the point of an IDE. You type the code here, you run it here, and you can debug it here.
+
+## Step 5: Install the Python extension
+
+1. Click the **Extensions** icon.
+2. Type `python` in the search box.
+3. Choose the extension named **Python** from **Microsoft**.
+4. Click **Install**. If VS Code asks you to restart, do that.
+
+In the video the extension is already installed, so the buttons there read Disable and Uninstall and no Install button is visible. On a fresh VS Code you will see Install.
+
+The instructor's list of installed extensions has four entries.
+
+| Extension | From | Do you need to install it? |
+| --- | --- | --- |
+| Python | Microsoft | Yes. This is the one to install |
+| Pylance | Microsoft | No. It normally arrives together with the Python extension |
+| Python Debugger | Microsoft | No. It is installed automatically with the Python extension |
+| GitHub Theme | GitHub | No. It only gives the dark colours you see in the video |
+
+<Callout type="info" title="The Python version at the bottom of the window">
+When a Python file is open, VS Code shows a Python version at the bottom right, in the status bar. That is the interpreter the Run button uses. On the instructor's screen it reads 3.13.0, taken from one of his earlier projects, and yours will show the Python you installed. To change it, click that version number and pick another one from the list.
+</Callout>
+
+VS Code is ready. The second tool is next, in [PyCharm Setup](/docs/python-tutorial-2026/python-basics/pycharm-setup).
+
+## Additions beyond the lesson
+
+**macOS and Linux.** VS Code is available for macOS and Linux as well, from the same website. The steps inside the program are the same. In the terminal, type `python3 Demo1.py` if `python` is not found on your system.
+
+**The official VS Code guide.** Microsoft has a short tutorial for exactly this setup, [Getting Started with Python in VS Code](https://code.visualstudio.com/docs/python/python-tutorial). It is a good second source if a screen looks different from the video, because VS Code is updated every month.
+
+<Callout type="info" title="Checked for these docs">
+The Python file on this page was run with Python 3.13 and printed the text shown. Running a file without an extension, as in the video, was also tried and works. The listing leaves out the empty first line that the file in the video has. The VS Code terminal line is the one from the video with `.py` added to the file name. The installer of VS Code is not shown in the video and was not run for these docs, so it is described only in general terms. The notes on the Python extension were checked against the official VS Code pages when this page was written. Websites and buttons change over time.
+</Callout>
+
+## Mistakes and fixes
+
+No error message appears in this lesson. These are the problems a beginner is most likely to meet during the setup.
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| No Run button at the top right in VS Code | The file name has no `.py` ending, or the Python extension is missing. In the lesson the file is named `Demo1` and the instructor gives this advice | Name the file `Demo1.py` and install the Python extension |
+| No colours and no suggestions in the editor | VS Code does not know that the file is Python | Use the `.py` ending |
+| `can't open file ... [Errno 2] No such file or directory` | The file name in the command is not the name of the file, for example `python Demo1` for a file named `Demo1.py`, or the terminal is in another folder | Type the full name with `.py`, and open the folder of the file in VS Code |
+| `Python was not found; run without arguments to install from the Microsoft Store, ...` in the VS Code terminal | Python is not installed, or VS Code was open while Python was being installed | Install Python as in [Python Setup](/docs/python-tutorial-2026/python-basics/python-setup), then close VS Code and open it again |
+| The output shows old text after you changed the code | The file was not saved. A dot on the file tab marks unsaved changes | Save with `Ctrl+S`, then run again |
+| No Terminal in the VS Code menu bar | The window is narrow or zoomed in. This happens in the lesson | Click the three dots at the end of the menu bar |
+
+## Try It Yourself
+
+1. Install VS Code and find the five icons of the Activity Bar: Explorer, Search, Source Control, Run and Debug, Extensions.
+2. Install the Python extension from Microsoft. Which other extensions appear in your installed list afterwards?
+3. Open a folder in VS Code, create `Welcome.py` and make it print `welcome to telusko`.
+4. Run `Welcome.py` in two ways: with `python Welcome.py` in the VS Code terminal and with the Run button. Compare what appears in the terminal each time.
+5. Change the text, do not save, and run the file from the terminal. Then save and run again. What is the difference?
+
+## Official references
+
+- [VS Code documentation: getting started with Python in VS Code](https://code.visualstudio.com/docs/python/python-tutorial)
+- [Python tutorial: using the Python interpreter](https://docs.python.org/3/tutorial/interpreter.html)
+- [Python documentation: using Python on Windows](https://docs.python.org/3/using/windows.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

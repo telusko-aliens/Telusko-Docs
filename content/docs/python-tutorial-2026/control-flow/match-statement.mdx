@@ -1,0 +1,339 @@
+---
+title: The match Statement
+description: Rewrite an if, elif, else chain as a match statement with case blocks, use the underscore as the catch-all case, and learn why match needs Python 3.10 or newer.
+---
+
+The chain from [elif](/docs/python-tutorial-2026/control-flow/elif) works. It also repeats itself. Every line asks about the same variable: `num == 1`, `num == 2`, `num == 3`, and so on.
+
+When one value is compared with a list of fixed values, many languages offer a shorter form. In C and Java it is called `switch`. For a long time Python had nothing like it, and programmers wrote `elif` chains.
+
+Since version 3.10 Python has its own form, under a different name: **`match`**. This lesson rewrites the number program with it.
+
+## Where match comes from
+
+The lesson starts with a little history. The C language has `if` and `else if`, and it also has `switch`. The video shows the number program as a C `switch` on a card:
+
+```c
+#include <stdio.h>
+
+int main() {
+    int num = 6;
+
+    switch (num) {
+        case 1:
+            printf("One\n");
+            break;
+        case 2:
+            printf("Two\n");
+            break;
+        case 3:
+            printf("Three\n");
+            break;
+        case 4:
+            printf("Four\n");
+            break;
+        case 5:
+            printf("Five\n");
+            break;
+        default:
+            printf("Incorrect\n");
+            break;
+    }
+
+    return 0;
+}
+```
+
+You do not need to know C to see the pattern. The value is named once, at the top. Each `case` names one value to compare it with.
+
+The instructor points at one weak spot: the word `break` after every case. In C, a case without `break` does not stop. The program runs on into the next case. Forgetting a `break` is a classic bug.
+
+A second card shows the same program in Java, in a newer form with arrows that needs no `break`:
+
+```java
+class Main {
+    public static void main(String[] args) {
+        int num = 6;
+
+        switch (num) {
+            case 1 -> System.out.println("One");
+            case 2 -> System.out.println("Two");
+            case 3 -> System.out.println("Three");
+            case 4 -> System.out.println("Four");
+            case 5 -> System.out.println("Five");
+            default -> System.out.println("Incorrect");
+        }
+    }
+}
+```
+
+<Callout type="info" title="Small notes on the cards and the history">
+On the Java card in the video, the line for 4 prints `"Fout"`. That is a typing slip on the card. It is `"Four"` here.
+
+Java did not remove `break`. The older form of `switch` with colons still exists in Java and still needs it. The arrow form shown on the card, which came later, does not.
+
+The video places the B and C languages in the 1960s. That fits B, which is from 1969. C followed in 1972, so C belongs to the 1970s. The other dates in the lesson are the usual ones: C++ got its name in 1983 and Python was first released in 1991.
+</Callout>
+
+Python went without a `switch` for about thirty years. That changed in **Python 3.10**, released in October 2021, which added the `match` statement.
+
+<Callout type="warn" title="match needs Python 3.10 or newer">
+The video uses Python 3.13, so `match` works there. An older Python, such as 3.9, does not know the statement and stops with a `SyntaxError` at the `match` line. Check your version with `python --version` in the terminal.
+</Callout>
+
+## Step 1: Start from the elif chain
+
+The lesson first removes the nested salary check from `elif_demo.py`, so that the branch for 3 only prints `Three` again. Then it copies the whole chain into a new file, `match_demo.py`, and adds `num = 3` at the top:
+
+```python title="match_demo.py"
+num = 3
+
+if num == 1:
+    print("One")
+
+elif num == 2:
+    print("Two")
+
+elif num == 3:
+    print("Three")
+
+elif num == 4:
+    print("Four")
+
+elif num == 5:
+    print("Five")
+
+else:
+    print("Incorrect")
+```
+
+```text
+Three
+```
+
+This is the starting point. The next step changes the form and keeps the behaviour.
+
+## Step 2: Rewrite it with match and case
+
+Three changes turn the chain into a `match` statement:
+
+1. Above the chain, write `match num:`. This names the value once.
+2. Replace each `if num == 1:` or `elif num == 2:` with `case 1:`, `case 2:`, and so on. The comparison with `num` is no longer written out.
+3. Replace `else:` with `case _:`.
+
+Every `case` is part of the `match`, so it is indented one level. The `print` lines belong to their `case`, so they are indented two levels.
+
+```python title="match_demo.py"
+num = 3
+
+match num:
+
+    case 1:
+        print("One")
+
+    case 2:
+        print("Two")
+
+    case 3:
+        print("Three")
+
+    case 4:
+        print("Four")
+
+    case 5:
+        print("Five")
+
+    case _:
+        print("Incorrect")
+```
+
+```text
+Three
+```
+
+Run it with `python match_demo.py`. The result is the same as before.
+
+| Part | Meaning |
+| --- | --- |
+| `match num:` | Take the value of `num` and compare it with the cases below |
+| `case 3:` | If the value is equal to 3, run this block |
+| `case _:` | The catch-all case. It matches any value |
+| Indentation | `case` lines 4 spaces, their blocks 8 spaces |
+
+![Match_Statement_Flow](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-match-case.svg)
+
+Python compares the value with the cases from top to bottom. The first case that matches runs, and after its block Python leaves the `match`. No `break` is needed, and a case never runs on into the next one.
+
+## Step 3: The underscore case
+
+A `match` has no `else`. Its place is taken by `case _:`. The underscore is called the **wildcard**. It matches anything, so it catches every value that no case above it has taken.
+
+The lesson changes the first line to `num = 6` and runs the file again:
+
+```python title="match_demo.py"
+num = 6
+
+match num:
+
+    case 1:
+        print("One")
+
+    case 2:
+        print("Two")
+
+    case 3:
+        print("Three")
+
+    case 4:
+        print("Four")
+
+    case 5:
+        print("Five")
+
+    case _:
+        print("Incorrect")
+```
+
+```text
+Incorrect
+```
+
+There is no `case 6:`, so the value falls through to the wildcard.
+
+Because it matches everything, the wildcard has to be the last case. Python refuses a file where another case follows it.
+
+<Callout type="info" title="Not the underscore from the prompt">
+In [Introduction to Variables](/docs/python-tutorial-2026/python-basics/introduction-to-variables) the underscore held the last result at the `>>>` prompt. Inside a `case` it has a different job. There it only means "any value".
+</Callout>
+
+## Step 4: A shorter layout
+
+The empty lines between the cases came along with the copied chain. They are not required. The instructor mentions that the code gets shorter without them:
+
+```python title="match_demo.py"
+num = 3
+
+match num:
+    case 1:
+        print("One")
+    case 2:
+        print("Two")
+    case 3:
+        print("Three")
+    case 4:
+        print("Four")
+    case 5:
+        print("Five")
+    case _:
+        print("Incorrect")
+```
+
+```text
+Three
+```
+
+## match or elif?
+
+| | `if`, `elif`, `else` | `match`, `case` |
+| --- | --- | --- |
+| The variable is written | In every condition | Once, after `match` |
+| Each branch | Any condition: `==`, `>`, `<=`, combinations | A value to compare with |
+| "Everything else" | `else:` | `case _:` |
+| Works in | Every Python version | Python 3.10 and newer |
+| Good for | Ranges and mixed conditions, such as `salary > 5` | One value against a list of fixed values |
+
+The lesson sums it up the same way. `match` is good for matching a value. When you want to check conditions, keep using `if` and `else`.
+
+## Additions beyond the lesson
+
+**Several values in one case.** Put a `|` between the values. Read it as "or":
+
+```python title="match_or.py"
+num = 4
+
+match num:
+    case 1 | 3 | 5:
+        print("Odd")
+    case 2 | 4:
+        print("Even")
+    case _:
+        print("Incorrect")
+```
+
+```text
+Even
+```
+
+**Strings work as well.** The value does not have to be a number:
+
+```python title="match_text.py"
+day = "sat"
+
+match day:
+    case "sat" | "sun":
+        print("Weekend")
+    case _:
+        print("Weekday")
+```
+
+```text
+Weekend
+```
+
+**Without a wildcard, nothing happens for an unknown value.** There is no error. The `match` is skipped and the program goes on:
+
+```python title="match_no_wildcard.py"
+num = 6
+
+match num:
+    case 1:
+        print("One")
+    case 2:
+        print("Two")
+
+print("Done")
+```
+
+```text
+Done
+```
+
+The lesson introduces `match` as Python's version of `switch`, and for fixed values it is used that way. The statement can do more than a `switch`. Its full name is structural pattern matching, and a case can also describe the shape of a list or of an object. That is a topic for later.
+
+<Callout type="info" title="Checked for these docs">
+Every Python program on this page was run with Python 3.13 and gave the output shown. The claims about the wildcard, about `|`, about strings and about a `match` without a wildcard were each tested with a program, and the error messages in the table below were produced with Python 3.13. Two things could not be run here: the C and Java programs, which are copied from the cards in the video, and the `SyntaxError` of a Python older than 3.10, because only Python 3.13 was available.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `SyntaxError` at the `match` line, although the code is typed correctly | The Python version is older than 3.10 | Check with `python --version` and install a current Python |
+| `IndentationError: expected an indented block after 'match' statement on line 3` | The `case` lines are not indented. The number is the line of your `match`. In the lesson the editor shows many red marks while the chain is half converted | Indent every `case` by 4 spaces and its block by 8 |
+| `SyntaxError: expected ':'` | The colon after `match num` or after a `case` is missing | End both kinds of line with `:` |
+| `SyntaxError: invalid syntax` at `else:` | A `match` has no `else` | Write `case _:` |
+| `SyntaxError: wildcard makes remaining patterns unreachable` | `case _:` is followed by another case | Move `case _:` to the end |
+| Nothing is printed | No case matched and there is no `case _:` | Add `case _:` as the last case |
+| Yellow underline under `num` in the editor | The chain was pasted before `num` was defined. This happens in the lesson | Add `num = 3` at the top |
+| One `print` line starts a little further left than the others | In the lesson, `print("Three")` in `elif_demo.py` is left with 3 spaces after the nested `if` is removed. Python accepts it, because that block has only one line. It is fixed in the final `match_demo.py` | Use 4 spaces for every level |
+
+## Try It Yourself
+
+1. Type the final `match_demo.py` and run it with `num` set to 1, 5, 6 and -3.
+2. Remove `case _:` and its block, then run the file with `num = 6`. What is printed?
+3. Extend the program with the words for 6 to 10.
+4. Write a `match` on a variable `day` from 1 to 7 that prints the name of the day, and `Invalid day` for any other number.
+5. Read a number with `input` and convert it with `int`, as in [User Input](/docs/python-tutorial-2026/functions-modules-and-input/user-input). Both steps fit in one line: `num = int(input("Enter a number: "))`. Then print its word with `match`.
+6. Write a `match` on a string variable `color` that prints `Stop` for `"red"`, `Wait` for `"yellow"`, `Go` for `"green"` and `Unknown` for anything else.
+7. Use `|` to print `Weekend` for the days 6 and 7 and `Weekday` for 1 to 5.
+8. The salary check `salary > 5` from [Nested if](/docs/python-tutorial-2026/control-flow/nested-if) is a condition, not a fixed value. Decide whether you would write it with `match` or with `if`, and say why.
+
+## Official references
+
+- [Python tutorial: match statements](https://docs.python.org/3/tutorial/controlflow.html#match-statements)
+- [Python reference: the match statement](https://docs.python.org/3/reference/compound_stmts.html#the-match-statement)
+- [What's new in Python 3.10: structural pattern matching](https://docs.python.org/3/whatsnew/3.10.html#pep-634-structural-pattern-matching)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

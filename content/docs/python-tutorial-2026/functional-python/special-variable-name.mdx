@@ -1,0 +1,259 @@
+---
+title: The Special Variable __name__
+description: See what Python stores in the special variable __name__ when a file is run and when it is imported, and use that to write code that runs only when the file is started directly.
+---
+
+Sooner or later you open somebody's Python file and find this line near the bottom:
+
+```python
+if __name__ == "__main__":
+```
+
+It looks strange, with all its underscores, and it is in almost every real Python program. This lesson explains what it means and which problem it solves.
+
+The setting is the same as in [Modules and Packages](/docs/python-tutorial-2026/functional-python/modules-and-packages): a folder `calculator` with a module `calc.py` and a file `demo.py` that uses it. The lesson starts by turning the old code in both files into comments.
+
+The variable is written with two underscores before and two after the word: `__name__`. Many Python programmers say "dunder name" for short, from "double underscore".
+
+## Step 1: Find `__name__` among the globals
+
+In [Global and Local Variables](/docs/python-tutorial-2026/arrays-and-recursion/global-and-local-variables) you met the function `globals()`. It returns all global variables of a file as a dictionary. Call it in a file that defines no variable at all:
+
+{/* check: noout */}
+```python title="calculator/demo.py"
+print(globals())
+```
+
+Move into the folder and run the file:
+
+{/* check: skip */}
+```text
+PS C:\PythonCourse\FirstProject> cd .\calculator\
+PS C:\PythonCourse\FirstProject\calculator> python demo.py
+{'__name__': '__main__', '__doc__': None, '__package__': None, ...
+```
+
+The output is one long dictionary, shortened here. The rest contains a memory address and the path of the file, which differ on every machine.
+
+The file is not empty after all. Python creates a few variables for every file before it runs your first line. The first one in the list is the one this lesson is about: the key `'__name__'` with the value `'__main__'`.
+
+## Step 2: Print `__name__` in each file
+
+Print the variable alone:
+
+```python title="calculator/demo.py"
+print(__name__)
+```
+
+```text
+__main__
+```
+
+Do the same in the module. The two functions of `calc.py` are commented out for now, so this line is all it does:
+
+```python title="calculator/calc.py"
+print(__name__)
+```
+
+```text
+__main__
+```
+
+Run with `python demo.py` and with `python calc.py`, both print `__main__`. So far it looks as if the value were always the same.
+
+## Step 3: Import the module and look again
+
+To tell the two print lines apart, the lesson adds a label to each. Run `calc.py` first:
+
+```python title="calculator/calc.py"
+print("in calc",__name__)
+```
+
+```text
+in calc __main__
+```
+
+Then import `calc` in `demo.py` and run `demo.py`:
+
+```python title="calculator/demo.py"
+import calc
+
+print("in demo",__name__)
+```
+
+```text
+in calc calc
+in demo __main__
+```
+
+Two things happen here.
+
+**An import runs the module.** `demo.py` contains one print line and the output has two lines. When Python imports a module, it executes that file from top to bottom. A `def` creates a function. A `print` prints. That is where the line `in calc ...` comes from.
+
+**The value of `__name__` in `calc.py` has changed.** A moment ago the same line printed `in calc __main__`. Now it prints `in calc calc`.
+
+| How the file is used | Value of `__name__` inside that file |
+| --- | --- |
+| It is the file you start, for example `python calc.py` | `"__main__"` |
+| It is imported by another file, for example `import calc` | The module name, `"calc"`, without `.py` |
+
+The file you run is the main file of the program, and for that file the name is `__main__`. Every other file takes part as a module, and its `__name__` is its module name. In the editor, hovering over the variable shows `__name__: str`. It is an ordinary string.
+
+## Step 4: Why this matters
+
+So far this is only a curiosity. The lesson now shows where it becomes a real problem.
+
+Bring the two functions in `calc.py` back. The module exists so that `demo.py` can use them. While writing a module, you also want to try it out. So the instructor calls the functions at the bottom of the file. The first attempt is `add()` and `sub()` on two lines, and the run shows nothing, because nobody prints the returned values. With `print` it works:
+
+```python title="calculator/calc.py"
+def add():
+    return "addition"
+
+def sub():
+    return "substraction"
+
+print(add())
+print(sub())
+```
+
+```text
+addition
+substraction
+```
+
+Good. Now use the module in `demo.py`:
+
+```python title="calculator/demo.py"
+from calc import *
+
+result = add()
+print("in demo",result)
+```
+
+```text
+addition
+substraction
+in demo addition
+```
+
+One line was expected, `in demo addition`. Three lines came out. The import ran `calc.py` from top to bottom, including the two test lines at the end. This also happens with `from calc import *`. Every form of import runs the whole module.
+
+## Step 5: The deadlock
+
+The quick repair is to comment the two test lines out:
+
+```python
+# print(add())
+# print(sub())
+```
+
+Now `python demo.py` prints only `in demo addition`. And `python calc.py` prints nothing at all, so the module can no longer be tried out by itself.
+
+With the lines, the import is noisy. Without them, the module cannot test itself. The instructor calls this a deadlock: should the lines be commented or not?
+
+## Step 6: Run code only in the main file
+
+The value of `__name__` is exactly the piece of information that is needed. It tells the file whether it was started directly or imported. So put the test lines under a condition:
+
+```python title="calculator/calc.py"
+def add():
+    return "addition"
+
+def sub():
+    return "substraction"
+
+if __name__ == "__main__":
+    print(add())
+    print(sub())
+```
+
+```text
+addition
+substraction
+```
+
+That was `python calc.py`. The file was started directly, `__name__` is `"__main__"`, the condition is true and the test lines run.
+
+`demo.py` is unchanged:
+
+```python title="calculator/demo.py"
+from calc import *
+
+result = add()
+print("in demo",result)
+```
+
+```text
+in demo addition
+```
+
+This time `calc.py` is imported. Inside it, `__name__` is `"calc"`. The condition is false, the two print lines are skipped, and only the functions are created.
+
+![Two_Values_Of_Dunder_Name](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-dunder-name.svg)
+
+Whenever you see `if __name__ == "__main__":` in a file, read it like this: if this is the main file, run this part. Otherwise the file only offers its functions to whoever imported it. Later in the course the same holds for classes.
+
+| Command | `__name__` in `calc.py` | Test lines | Output |
+| --- | --- | --- | --- |
+| `python calc.py` | `"__main__"` | Run | `addition`, `substraction` |
+| `python demo.py` | `"calc"` | Skipped | `in demo addition` |
+
+<Callout type="warn" title="Count the underscores and keep the quotes">
+There are two underscores on each side of both words. `__name__` is a variable and has no quotes. `"__main__"` is a string and needs quotes. The comparison uses a double equals sign.
+</Callout>
+
+## Additions beyond the lesson
+
+**A `main` function.** Many programs put their starting code into a function, usually named `main`, and call it under the check. The file stays tidy, and no extra global variables are created when it runs.
+
+```python title="app.py"
+def main():
+    print("the program starts here")
+
+if __name__ == "__main__":
+    main()
+```
+
+```text
+the program starts here
+```
+
+**Modules inside a package.** When `calc` is imported from the root folder with `from calculator.calc import *`, its `__name__` is the full dotted name, `"calculator.calc"`. The check works the same way, because that is not `"__main__"` either.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 in a `calculator` folder with the two files, and gave the output shown. The versions that are only described (the calls without `print`, the commented test lines, the dotted name inside a package) and the error messages in the table below were run by hand. The output of `globals()` is shortened, because it contains a memory address and a file path that are different on every machine and in every run. Old lines from earlier steps, which the video keeps as comments in its files, are left out of the listings.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| The output does not change after `calc.py` was edited | The other file was run. This happens in the lesson, where `python demo.py` is typed once when `calc.py` was meant | Check the file name in the command |
+| `python calc.py` prints nothing | The functions are called and the returned values are not printed. This happens in the lesson | Write `print(add())` |
+| Extra lines appear when a module is imported | The module has calls or prints at the top level, and an import runs the whole file. This happens in the lesson | Put that code under `if __name__ == "__main__":` |
+| The module prints nothing when run directly | The test lines were commented out. This happens in the lesson | Use the `__name__` check and keep the lines |
+| `NameError: name '_name_' is not defined. Did you mean: '__name__'?` | Only one underscore on each side | Type two underscores before and two after |
+| `NameError: name '__main__' is not defined. Did you mean: '__name__'?` | `__main__` was written without quotes | Write `"__main__"` |
+| `SyntaxError: invalid syntax. Maybe you meant '==' or ':=' instead of '='?` | A single `=` in the condition | Use `==` to compare |
+| The block under the check never runs | The string is misspelled, for example `"main"` | Write `"__main__"` exactly |
+
+## Try It Yourself
+
+1. Create a file `one.py` with the line `print(__name__)` and run it. What is printed?
+2. Create `two.py` with `import one` and `print("in two", __name__)`. Run `two.py` and explain both lines of the output.
+3. In `calc.py`, add a function `mul()` that returns the text `multiplication`, and print its result inside the `__name__` check. Run `calc.py`, then run `demo.py`.
+4. Remove the `if` line in `calc.py` and move the prints back to the left edge. Run `demo.py` and count the lines of output. Then put the check back.
+5. Add `print("loading calc")` as the first line of `calc.py`, outside the check. Run `demo.py`. Why is this line printed?
+6. Add an `else:` branch to the check in `calc.py` that prints `imported as` followed by `__name__`. Run both files.
+7. Write `greet.py` with a function `hello()` that returns `hello`, and a `main()` function that prints the result of `hello()`. Call `main()` only when the file is started directly.
+8. Run `print(globals())` in a new file and find the entries for `__name__` and `__file__` in the output.
+
+## Official references
+
+- [Python library: `__main__`, the top-level code environment](https://docs.python.org/3/library/__main__.html)
+- [Python tutorial: executing modules as scripts](https://docs.python.org/3/tutorial/modules.html#executing-modules-as-scripts)
+- [Python library: the globals function](https://docs.python.org/3/builtins/functions.html#globals)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

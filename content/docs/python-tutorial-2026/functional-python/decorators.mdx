@@ -1,0 +1,267 @@
+---
+title: Decorators
+description: Move logic that two functions share into one decorator, apply it with the @ sign, and see that the @ line is a short form of an assignment.
+---
+
+You have a function that works. Now you want it to do a little more: check its values first, or print a line every time it is called. The obvious way is to open the function and add the lines.
+
+That is fine for one function. With two functions you copy the same lines twice. With ten functions you copy them ten times, and every later change has to be made in ten places.
+
+A **decorator** solves this. It is a function that takes another function and gives back a new version of it with extra behaviour around it. The original function is not edited. The lesson builds one step by step, and it uses the idea from [Inner Functions](/docs/python-tutorial-2026/functional-python/inner-functions): a function defined inside another function, and returned from it.
+
+## Step 1: A function, and a twist
+
+Create a new file named `deco.py` with one small function:
+
+```python title="deco.py"
+def divide(a,b):
+    return a/b
+
+
+result = divide(4,2)
+print(result)
+```
+
+```text
+2.0
+```
+
+Run it with `python deco.py`. Nothing special so far. If the call is changed to `divide(2,4)`, the output is `0.5`, because 2 is divided by 4.
+
+Now the twist. The instructor wants the bigger number to be divided by the smaller number, whatever order the caller uses. The logic is short. If the first value is less than the second, swap them. The swap in one line comes from [Swapping Variables](/docs/python-tutorial-2026/functions-modules-and-input/swapping-variables).
+
+```python title="deco.py"
+def divide(a,b):
+    if a<b:
+        a,b = b,a
+    return a/b
+
+
+result = divide(2,4)
+print(result)
+```
+
+```text
+2.0
+```
+
+Problem solved, and no decorator was needed. The need appears with the second function.
+
+## Step 2: The same lines in two functions
+
+Add a function `sub` for subtraction and call both. Without the swap, `sub(2,4)` prints `-2`. To get the bigger number first there too, the lesson copies the two lines from `divide` and pastes them into `sub`:
+
+```python title="deco.py"
+def sub(a,b):
+    if a<b:
+        a,b = b,a
+    return a-b
+
+def divide(a,b):
+    if a<b:
+        a,b = b,a
+    return a/b
+
+
+result1 = divide(2,4)
+print(result1)
+
+result2 = sub(2,4)
+print(result2)
+```
+
+```text
+2.0
+2
+```
+
+It works, and the same two lines now live in two places. The goal of the lesson is to take this common part out, keep it in one place, and then tell each function "use that feature".
+
+## Step 3: A first attempt, and two errors
+
+The lesson removes the swap from both functions and writes an empty function named `greater_first`. The word `pass` means "do nothing here". To use the function as a decorator, write its name with an `@` sign on the line above the function it should change.
+
+{/* check: error */}
+```python title="deco.py"
+def greater_first():
+    pass
+
+@greater_first
+def sub(a,b):
+    return a-b
+
+@greater_first
+def divide(a,b):
+    return a/b
+
+
+result1 = divide(2,4)
+print(result1)
+
+result2 = sub(2,4)
+print(result2)
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\deco.py", line 4, in <module>
+    @greater_first
+     ^^^^^^^^^^^^^
+TypeError: greater_first() takes 0 positional arguments but 1 was given
+```
+
+Nobody called `greater_first` with an argument, and still Python says one was given. The `@` line did it. When Python reads `@greater_first` above `def sub`, it calls `greater_first` and passes the function `sub` to it. So a decorator must accept one parameter, the function:
+
+```python
+def greater_first(func):
+    pass
+```
+
+Run again, and a different error appears:
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\deco.py", line 13, in <module>
+    result1 = divide(2,4)
+TypeError: 'NoneType' object is not callable
+```
+
+A function that has no `return` gives back `None`. Python stores whatever the decorator returns under the name `divide`. So `divide` is now `None`, and `None` cannot be called. A decorator must return something that can be called, which means a function.
+
+The quickest way to make the error go away is to return the function that came in:
+
+```python
+def greater_first(func):
+
+    return func
+```
+
+With this version the file runs and prints `0.5` and `-2`. The decorator takes the function and hands the same function back, so nothing has changed. The empty line in the middle is where the real logic has to go.
+
+<Callout type="info" title="Line numbers in the tracebacks">
+In the video, `deco.py` starts with an empty line, so the tracebacks there say line 5 and line 14. The files on this page start on line 1, which gives line 4 and line 13. The error messages are the same.
+</Callout>
+
+## Step 4: Wrap the function
+
+To change how the function behaves, the decorator defines an inner function. Any name works. The usual name is `wrap` or `wrapper`, because it wraps the original function. It takes the same parameters as the functions it will stand in for, here `a` and `b`.
+
+```python title="deco.py"
+def greater_first(func):
+    def wrap(a,b):
+        if a<b:
+            a,b = b,a
+        return func(a,b)
+    return wrap
+
+@greater_first
+def sub(a,b):
+    return a-b
+
+@greater_first
+def divide(a,b):
+    return a/b
+
+
+result1 = divide(2,4)
+print(result1)
+
+result2 = sub(2,4)
+print(result2)
+```
+
+```text
+2.0
+2
+```
+
+Two `return` lines do two different jobs:
+
+| Line | What it does |
+| --- | --- |
+| `return func(a,b)` | Inside `wrap`. Calls the original function with the values, swapped if needed, and passes its result back |
+| `return wrap` | Inside `greater_first`. Hands back the function `wrap` itself, without calling it. There are no brackets |
+
+If the caller passes `4,2`, the values go through unchanged. If the caller passes `2,4`, the original function receives `4,2`.
+
+![Decorator_Wraps_A_Function](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-decorator.svg)
+
+<Callout type="info" title="Does a decorator return the same function?">
+The instructor says that a decorator takes a function and returns the same function with some modification. To be exact, `greater_first` returns a new function, `wrap`. The original `sub` is not modified. It is kept inside `wrap` under the name `func` and called from there.
+</Callout>
+
+## Step 5: What the @ sign does
+
+To show how this works, the lesson removes the two `@` lines and writes the same thing by hand:
+
+```python title="deco.py"
+def greater_first(func):
+    def wrap(a,b):
+        if a<b:
+            a,b = b,a
+        return func(a,b)
+    return wrap
+
+def sub(a,b):
+    return a-b
+
+def divide(a,b):
+    return a/b
+
+sub = greater_first(sub)
+divide = greater_first(divide)
+
+result1 = divide(2,4)
+print(result1)
+
+result2 = sub(2,4)
+print(result2)
+```
+
+```text
+2.0
+2
+```
+
+Read `sub = greater_first(sub)` from right to left:
+
+1. The function `sub` is passed to `greater_first`, where it is known as `func`.
+2. `greater_first` returns `wrap`.
+3. The name `sub` now refers to `wrap`.
+
+So where is `wrap` called? In the line `sub(2,4)`. That call runs `wrap(2,4)`, which swaps the values and then calls the original function.
+
+Writing `@greater_first` above a function does exactly this assignment for you. Both forms work. The `@` form is the one used today, and you will see it a lot once you work with Python frameworks. The lesson puts the `@` lines back and turns the two manual lines into comments.
+
+A decorator is not limited to swapping numbers. Any logic that should run around a function can go into one. The lesson ends with one more example of such logic, keeping a log, and asks how that could be done. The next lesson, [Decorators, Part 2](/docs/python-tutorial-2026/functional-python/decorators-part-2), answers it. It writes a second decorator for logging, puts two decorators on one function and makes a wrapper accept any number of arguments.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown. The two tracebacks were produced by running the files. Only the folder in the `File` line was replaced by the path from the video. The intermediate versions in Step 3 were also run by hand.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `TypeError: greater_first() takes 0 positional arguments but 1 was given` | The decorator has no parameter, and `@` passes the function to it. This happens in the lesson | Write `def greater_first(func):` |
+| `TypeError: 'NoneType' object is not callable` | The decorator returns nothing, so the decorated name becomes `None`. This happens in the lesson | Return a function from the decorator |
+| The decorator is applied and the output does not change | The decorator returns `func` itself. This happens in the lesson | Define an inner function with the new logic and return that |
+| `TypeError: greater_first.<locals>.wrap() missing 2 required positional arguments: 'a' and 'b'` | `return wrap()` was written with brackets, so the wrapper is called at once, with no values | Write `return wrap` |
+
+## Try It Yourself
+
+1. Type the Step 4 file and run it. Then change the calls to `divide(4,2)` and `sub(4,2)` and check that the output stays the same.
+2. Remove `@greater_first` from `sub` only. Predict the two output lines, then run the file.
+3. Replace both `@` lines with the manual form `sub = greater_first(sub)` and `divide = greater_first(divide)`. Confirm that the output is the same.
+4. Write a decorator `shout` whose wrapper prints `calling` before it calls the function and `done` after it. Apply it to a function `greet()` that prints `hello`.
+
+## Official references
+
+- [Python glossary: decorator](https://docs.python.org/3/glossary.html#term-decorator)
+- [Python reference: function definitions](https://docs.python.org/3/reference/compound_stmts.html#function-definitions)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

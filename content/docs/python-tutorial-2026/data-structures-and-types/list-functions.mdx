@@ -1,0 +1,177 @@
+---
+title: List Functions
+description: Change a list after it is created, with append and insert to add values, count to count them, remove, pop and del to take values out, and extend to add several values at once.
+---
+
+In [Lists](/docs/python-tutorial-2026/data-structures-and-types/lists) you created lists and read values out of them. Every list stayed exactly as it was typed.
+
+Real data does not stay the same. A new student joins the class, an item is taken out of the cart, a wrong entry has to go. A list can do all of this. It comes with its own set of functions for adding, counting and removing values, and this lesson goes through them one by one.
+
+<Callout type="info" title="IDLE shows what a list can do">
+IDLE adds one helpful feature for this topic. When you type a variable name and a dot, such as `nums.`, and wait about two seconds, a small list of everything you can do with that value pops up. If it does not appear, press Ctrl+Space.
+</Callout>
+
+## Step 1: Add values with append and insert
+
+The lesson starts in a restarted IDLE window and enters a new `nums` list. The values are different from the ones in the previous lesson.
+
+Type `nums.` in IDLE and the popup shows what a list can do: `append`, `clear`, `copy`, `count`, `extend`, `index`, `insert`, `pop`, `remove`, `reverse` and, at the end, `sort`. These are called **methods**. A method is a function that belongs to a value. You call it with a dot after the value.
+
+```python
+>>> nums = [23,56,14,36,45]
+>>> nums.append(33)
+>>> nums
+[23, 56, 14, 36, 45, 33]
+>>> nums.count(14)
+1
+>>> nums.count(15)
+0
+>>> nums.insert(1,55)
+>>> nums
+[23, 55, 56, 14, 36, 45, 33]
+```
+
+- `append(33)` adds 33 at the end of the list.
+- `count(14)` tells you how many times 14 occurs. There is one 14 and no 15.
+- `insert(1,55)` puts 55 at index 1. The first number is the index, the second is the value. The 56 that was at index 1, and everything after it, moves one place to the right.
+
+`append` and `insert` print nothing. They change the list and return nothing to show. Type `nums` to see the result.
+
+`count` needs to know what to count. In the lesson it is first called with empty brackets:
+
+{/* check: skip */}
+```python
+>>> nums = [23,56,14,36,45,33]
+>>> nums.count()
+Traceback (most recent call last):
+  File "<python-input-1>", line 1, in <module>
+    nums.count()
+    ~~~~~~~~~~^^
+TypeError: list.count() takes exactly one argument (0 given)
+```
+
+An **argument** is a value you pass to a function inside its brackets. The message says that `count` wants exactly one, and got none.
+
+### Lists are mutable
+
+In [Fetching Characters from a String](/docs/python-tutorial-2026/python-basics/fetching-characters-from-a-string) you tried to change a part of a string, and Python refused. A string is **immutable**, which means it cannot be changed after it is created.
+
+A list is **mutable**. Mutable means it can be changed. That is why `append` and `insert` work, and why everything in the next steps works too.
+
+## Step 2: Remove values with remove, pop and del
+
+After Step 1 the list is `[23, 55, 56, 14, 36, 45, 33]`.
+
+```python
+>>> nums = [23, 55, 56, 14, 36, 45, 33]
+>>> nums.remove(56)
+>>> nums
+[23, 55, 14, 36, 45, 33]
+>>> nums.pop(4)
+45
+>>> nums
+[23, 55, 14, 36, 33]
+>>> nums.pop()
+33
+>>> del nums[2:4]
+>>> nums
+[23, 55]
+```
+
+There are three ways to remove, and they differ in what you tell Python:
+
+| Code | You give | What it does |
+| --- | --- | --- |
+| `nums.remove(56)` | A value | Removes the value 56. Prints nothing |
+| `nums.pop(4)` | An index | Removes the value at index 4 and gives it back, here 45 |
+| `nums.pop()` | Nothing | Removes the last value and gives it back, here 33 |
+| `del nums[2:4]` | A slice | Deletes the values at index 2 and 3. Prints nothing |
+
+`del` is a Python keyword, not a method, so it is written before the list and without a dot.
+
+After `nums.pop()` the list is `[23, 55, 14, 36]`. Index 2 holds 14 and index 3 holds 36, and the stop index 4 is excluded as in every slice. So `del nums[2:4]` removes 14 and 36, and only `[23, 55]` is left. The instructor hesitates for a moment at this output in the video and then confirms the same result.
+
+<Callout type="info" title="Why the method is called pop">
+A **stack** is a way of organising data in which the value that was added last is taken out first. This rule is called last in, first out. Think of a stack of books: the last book you put on top is the first one you take off. Taking a value off a stack is called popping, and `pop()` without an index does exactly that with the last value of a list.
+</Callout>
+
+## Step 3: Add several values with extend
+
+`append` and `insert` add one value. To add several at once, pass a list to `extend`:
+
+```python
+>>> nums = [23, 55]
+>>> nums.extend([44,56,11,99])
+>>> nums
+[23, 55, 44, 56, 11, 99]
+```
+
+The four values are added at the end, in the order in which you wrote them.
+
+## List operations in this lesson
+
+| Code | What it does | Changes the list |
+| --- | --- | --- |
+| `nums.append(33)` | Adds a value at the end | Yes |
+| `nums.insert(1,55)` | Adds a value at an index | Yes |
+| `nums.extend([44,56])` | Adds several values at the end | Yes |
+| `nums.count(14)` | How many times a value occurs | No |
+| `nums.remove(56)` | Removes a value | Yes |
+| `nums.pop(4)`, `nums.pop()` | Removes by index, or the last value, and returns it | Yes |
+| `del nums[2:4]` | Deletes a slice | Yes |
+
+The list now holds six values. The next lesson, [Built-in Functions on Lists](/docs/python-tutorial-2026/data-structures-and-types/built-in-functions-on-lists), replaces two of them, puts the list in order and finds its smallest value, its largest value and its total.
+
+## Additions beyond the lesson
+
+The instructor mentions that a list can also find the index of a value, and does not run it. The method is `index`:
+
+```python
+>>> nums = [23,56,14,36,45]
+>>> nums.index(14)
+2
+```
+
+`remove` needs a value that is in the list. For a value that is not there, it stops with an error:
+
+{/* check: skip */}
+```python
+>>> nums = [23,56,14,36,45]
+>>> nums.remove(100)
+Traceback (most recent call last):
+  File "<python-input-1>", line 1, in <module>
+    nums.remove(100)
+    ~~~~~~~~~~~^^^^^
+ValueError: list.remove(x): x not in list
+```
+
+<Callout type="info" title="Checked for these docs">
+Every prompt session on this page was run again with Python 3.13, and each line gave the result shown. The two sessions that end in an error were run by hand. The lesson runs the first of them in IDLE. This page shows them as the plain Python 3.13 prompt prints them, so the middle lines can look a little different from the video. The last line, which names the error, is the same in both. The number in `<python-input-1>` counts the lines you have typed, so yours may differ.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `TypeError: list.count() takes exactly one argument (0 given)` | `count()` was called with empty brackets. This happens in the lesson | Pass the value to count, as in `nums.count(14)` |
+| `TypeError: insert expected 2 arguments, got 1` | `insert` was given the value only, as in `nums.insert(55)`. The instructor types this and corrects it before pressing Enter | Give the index first, then the value: `nums.insert(1,55)` |
+| `ValueError: list.remove(x): x not in list` | The value passed to `remove` is not in the list | Check with `nums.count(value)` first, or remove a value that exists |
+| Nothing is printed after `nums.append(33)` | The method changes the list and returns nothing to show | Type `nums` to see the list |
+
+## Try It Yourself
+
+1. Create a list `marks` with the values 72, 85, 64, 91 and 58. Add 77 to the end of `marks` with `append`, then put 100 at index 0 with `insert`. Print the list after each line.
+2. Remove 64 with `remove`, the value at index 1 with `pop`, and the last value with `pop()`. Before each line, write down what you expect the list to be.
+3. Create `votes = [1, 2, 1, 3, 1]`. Use `count` to find out how many times 1 occurs and how many times 4 occurs.
+4. Create `letters = ['a','b','c','d','e']`. Delete `'b'` and `'c'` in one line with `del` and a slice, then print the list.
+5. Start with `nums = [10, 20]`. Add 30, 40 and 50 in one line with `extend` and print the list. Then type `nums.count()` with empty brackets and read the error message.
+
+## Official references
+
+- [Python tutorial: more on lists](https://docs.python.org/3/tutorial/datastructures.html#more-on-lists)
+- [Python tutorial: the del statement](https://docs.python.org/3/tutorial/datastructures.html#the-del-statement)
+- [Python tutorial: using lists as stacks](https://docs.python.org/3/tutorial/datastructures.html#using-lists-as-stacks)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

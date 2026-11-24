@@ -1,0 +1,189 @@
+---
+title: The Thread join() Function
+description: Meet the main thread, make it wait for other threads with join, and measure with a download example how much time threads save when the work is mostly waiting.
+---
+
+In [Creating and Running Threads](/docs/python-tutorial-2026/exceptions-and-multithreading/creating-and-running-threads), the functions `hello` and `hi` ran as two threads, `t1` and `t2`, and their lines came out mixed.
+
+A program rarely ends with the start of its threads. Something comes after them: a result, a summary, a goodbye. This lesson adds one such line to the file and finds it in the wrong place. The fix is `join()`. After that, the lesson asks a new question: do threads make a program faster?
+
+## Step 1: The main thread and join
+
+Open `threads_demo.py` from the previous lesson, the version with the functions `hello` and `hi`. Add one line at the end of the file, after `t2.start()`:
+
+```python
+    print("Bye")
+```
+
+A greeting at the end of the program. This is what the video shows:
+
+{/* check: skip */}
+```text
+Hello  1
+Hi  1
+Bye
+Hello  2
+Hi  2
+Hi  3
+Hello  3
+Hi  4
+Hello  4
+Hello  5
+Hi  5
+```
+
+"Bye" is the third line. The reason is that the program had a thread from the beginning: the one that runs the file from top to bottom. It is called the **main thread**. It starts `t1`, starts `t2`, and then has nothing left to wait for, so it goes on to `print("Bye")` while the other two are in their first pause.
+
+To make the main thread wait, call `join()`:
+
+{/* check: noout */}
+```python title="threads_demo.py"
+from threading import Thread
+from time import sleep
+
+def hello():
+    for i in range(5):
+        print("Hello ", i+1)
+        sleep(0.3)
+
+
+def hi():
+    for i in range(5):
+        print("Hi ", i+1)
+        sleep(0.3)
+
+if __name__ == '__main__':
+
+    t1 = Thread(target=hello)
+    t2 = Thread(target=hi)
+
+    t1.start()
+    t2.start()
+
+    t1.join()
+    t2.join()
+
+    print("Bye")
+```
+
+{/* check: skip */}
+```text
+Hello  1
+Hi  1
+Hello  2
+Hi  2
+Hello  3
+Hi  3
+Hi  4
+Hello  4
+Hi  5
+Hello  5
+Bye
+```
+
+`t1.join()` means: wait here until `t1` has finished. After both joins, "Bye" is the last line in every run.
+
+![Threads_And_Join](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-threads-join.svg)
+
+## Step 2: Do threads save time?
+
+So far threads changed the order of the output. Now the lesson measures time. The function `download` pretends to download a file. The `sleep(0.5)` stands for the waiting.
+
+{/* check: noout */}
+```python title="threads_demo.py"
+from threading import Thread
+from time import sleep, time
+
+def download(file_name):
+    print("Downloading file... ",file_name)
+    sleep(0.5)
+    print("Download complete")
+
+if __name__ == '__main__':
+
+    files = ['video.mp4', 'image.png', 'data.csv']
+
+    start = time()
+    for f in files:
+        download(f)
+    end = time()
+    print(f"serial time {end - start:.2f} seconds")
+
+    threads = []
+
+    for f in files:
+        t = Thread(target=download, args=(f,))
+        threads.append(t)
+
+    start = time()
+
+    for t in threads:
+        t.start()
+
+    for t in threads:
+        t.join()
+
+    end = time()
+
+    print(f"parallel with threads time {end - start:.2f} seconds")
+
+    print("Bye")
+```
+
+{/* check: skip */}
+```text
+Downloading file...  video.mp4
+Download complete
+Downloading file...  image.png
+Download complete
+Downloading file...  data.csv
+Download complete
+serial time 1.50 seconds
+Downloading file...  video.mp4
+Downloading file...  image.png
+Downloading file...  data.csv
+Download complete
+Download complete
+Download complete
+parallel with threads time 0.50 seconds
+Bye
+```
+
+| Line | Meaning |
+| --- | --- |
+| `time()` | The current time as a number of seconds. `end - start` is the time that passed |
+| `:.2f` | Show the number with two decimals, inside an f-string |
+| `args=(f,)` | The arguments for the target function, as a tuple. The comma makes `(f,)` a tuple with one item, as in [Tuples](/docs/python-tutorial-2026/data-structures-and-types/tuples) |
+| `threads.append(t)` | Keep every thread in a list, so that two loops can start them all and then join them all |
+
+One after the other, three downloads take three times 0.5 seconds. With three threads, all three wait at the same time, and the total is 0.5 seconds. The same numbers came out on the machine used for these docs. The order of the "Downloading" lines can differ.
+
+Here threads saved two thirds of the time. The next lesson, [The GIL and Multiprocessing](/docs/python-tutorial-2026/exceptions-and-multithreading/gil-and-multiprocessing), tries the same with a calculation and gets a very different result.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 on Windows and finished without an error. The output shown is the one from the video, because the order of lines and the times change from run to run. In the two Hello and Hi outputs of Step 1, one line had scrolled out of view in the video ("Hi  5" at the bottom of the first, "Hello  1" at the top of the second). It is filled in here, since it is the one line that thread still had to print. The first four lines of the download output had scrolled away too and are taken from the earlier serial run in the video. The first "Bye" output and the download times of 1.50 and 0.50 seconds were reproduced exactly in runs for these docs.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| "Bye" appears in the middle of the output | The main thread does not wait for the others. This happens in the lesson | Call `join()` on each thread before the last `print` |
+| `TypeError: download() takes 1 positional argument but 9 were given` | `args=(f)` is a string, not a tuple, so each of the 9 letters of `'video.mp4'` becomes an argument. The instructor types `(f)` first and corrects it | `args=(f,)` with the comma |
+
+## Try It Yourself
+
+1. Write two functions, `tick` and `tock`, that each print their word five times with `sleep(0.2)` in the loop, and run both as threads. Then print "Done" at the end of the file, first without `join()` and then with it.
+2. Add a fourth file name to the `files` list of the download program. Guess the serial time and the thread time before you run it.
+3. Change `sleep(0.5)` in `download` to `sleep(1)`. Guess both times before you run the file.
+4. This is the homework from the lesson. Give each file a size, and let `download` sleep for a time that depends on the size. Compare the serial time and the thread time.
+
+## Official references
+
+- [Python library: Thread.join](https://docs.python.org/3/library/threading.html#threading.Thread.join)
+- [Python library: time.time](https://docs.python.org/3/library/time.html#time.time)
+- [Python tutorial: formatted string literals](https://docs.python.org/3/tutorial/inputoutput.html#formatted-string-literals)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

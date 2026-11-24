@@ -1,0 +1,394 @@
+---
+title: Abstraction
+description: Learn what abstraction means, how to write an abstract class with ABC and abstractmethod, and why an abstract class keeps a set of classes to one standard.
+---
+
+Abstraction is the last of the object-oriented ideas in this course. The lesson splits it into two parts, and says openly why.
+
+The first part is what abstraction is and how to write it in Python. That part is easy. The second part is why anyone needs it. That part is harder to see, because the first example ends with a class from which you cannot even create an object. So the lesson gives the "why" a section and an example of its own: an online shop and its payment gateway.
+
+## What abstraction means
+
+**Abstraction** means hiding the complex implementation from the user.
+
+Think of driving a car. A car has an engine, a braking system, a clutch, an accelerator and gears, and all of them together make it move. The most important part is the engine. Yet when you learn to drive, you do not have to know how the engine works. What matters to you is the steering wheel, the three pedals (the lesson calls them A, B, C for accelerator, brake and clutch) and the gear stick.
+
+The complicated part is hidden. And that has an advantage. Suppose you learned to drive in one car and now sit in another one with a very different engine, say a V8. You can still start it and drive it. What you learned was the **interface**, the part in front of you, and that stayed the same.
+
+## Interface and implementation
+
+Programs use the same split:
+
+| | What it is | In the car |
+| --- | --- | --- |
+| Interface | A list of what must be there. It declares methods and does not say how they work | "There is a steering wheel, there is a brake" |
+| Implementation | The class that contains the real code for those methods | The actual engine and brake system |
+
+The user of the code looks at the interface. When the program runs, the implementation does the work.
+
+The lesson points back to `override.py` from [Method Overriding](/docs/python-tutorial-2026/object-oriented-python/method-overriding). There, class `A` had a `show` method and class `B(A)` had its own `show`. Imagine that `show` in `A` did nothing at all and only said "a method named `show` must exist". Then `A` would be the interface and `B` the implementation. How do you write that in Python?
+
+## Step 1: Start with a normal class
+
+Create a new file in the `oop` folder and name it `abstract_demo.py`.
+
+```python title="abstract_demo.py"
+class A:
+    def show(self):
+        print("in A show")
+
+
+obj1 = A()
+obj1.show()
+```
+
+```text
+in A show
+```
+
+An ordinary class. You can create an object of it and call its method.
+
+## Step 2: Import ABC and abstractmethod
+
+Python has no `interface` keyword. An interface is written as an **abstract class**, and the tools for that are in a module named `abc`. The name stands for **abstract base classes**: abstract, because no object should be created from such a class. Base, because other classes will inherit from it. (And no, the instructor adds, it is not accelerator, brake and clutch this time.)
+
+Two things are imported from it:
+
+```python
+from abc import ABC, abstractmethod
+```
+
+| Name | What it is |
+| --- | --- |
+| `ABC` | A class. A class that inherits from `ABC` can be an abstract class |
+| `abstractmethod` | A decorator. A method marked with it is an abstract method |
+
+The module is called `abc` in small letters and the class is called `ABC` in capitals. Decorators were introduced in [Decorators](/docs/python-tutorial-2026/functional-python/decorators).
+
+Importing these names changes nothing by itself. The lesson runs the file again after adding the import, and it still prints `in A show`.
+
+The lesson lists three properties to remember:
+
+1. You cannot create an object of an abstract class.
+2. An abstract method belongs inside an abstract class.
+3. An abstract method has no implementation. It only declares the method.
+
+<Callout type="info" title="A note on what the video says here">
+The video says that Python was built for functional programming and that object-oriented programming came later. Classes have in fact been part of Python since its early versions. What came later is the `abc` module, which was added in Python 2.6. The helper class `ABC` itself came later, in Python 3.4.
+</Callout>
+
+## Step 3: Make the class abstract
+
+First let `A` inherit from `ABC`. Then put the decorator `@abstractmethod` on the line above the method. An abstract method has no real code, but Python does not allow an empty body, so the body is `pass`:
+
+{/* check: error */}
+```python title="abstract_demo.py"
+from abc import ABC, abstractmethod
+
+
+class A(ABC):
+
+    @abstractmethod
+    def show(self):
+        pass
+
+
+obj1 = A()
+obj1.show()
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\abstract_demo.py", line 11, in <module>
+    obj1 = A()
+TypeError: Can't instantiate abstract class A without an implementation for abstract method 'show'
+```
+
+To **instantiate** a class means to create an object (an instance) of it. Python refuses: `A` has an abstract method `show` without an implementation, so no object of `A` can exist.
+
+Both parts are needed. A class that inherits from `ABC` and has no abstract method can still create objects. It is the abstract method that blocks it.
+
+That is how an abstract class is written. And it raises the obvious question: what is the use of a class that cannot create an object?
+
+## Why abstraction is needed: the payment gateway
+
+Suppose you build an online shop, for products or for courses. To take money you connect a **payment gateway**, a service that handles the payment, such as Razorpay, Stripe or PayPal.
+
+You could pick one gateway and write your code for exactly that one. Then the shop and the gateway are **tightly coupled**: the shop's code depends on the details of that one gateway. If the gateway changes its terms one day and you want to switch, you have to rewrite your own code.
+
+It would be better if gateways were plug and play. Today Razorpay, tomorrow another one, and the shop's code stays as it is. The lesson builds this step by step, and runs into two problems on the way.
+
+## Step 4: A purchase and one gateway
+
+Delete everything in `abstract_demo.py` except the import line.
+
+The class `Purchase` stands for the checkout page. Its `checkout` method prints a line and then asks the gateway to take the payment with `self.gateway.pay()`. The gateway object is handed over when the purchase is created, in `__init__`. The class `RazorPay` is the gateway, with a `pay` method.
+
+The first attempt in the lesson ends like this:
+
+```python
+gateway1 = RazorPay()
+purchase = Purchase()
+
+purchase.checkout(gateway1)
+```
+
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\abstract_demo.py", line 18, in <module>
+    purchase = Purchase()
+TypeError: Purchase.__init__() missing 1 required positional argument: 'gateway'
+```
+
+"My bad", says the instructor. The gateway was passed to `checkout`, but it is `__init__` that expects it. The corrected program:
+
+```python title="abstract_demo.py"
+from abc import ABC, abstractmethod
+
+class RazorPay:
+    def pay(self):
+        print("paying using RazorPay..")
+
+class Purchase:
+
+    def __init__(self, gateway):
+        self.gateway = gateway
+
+    def checkout(self):
+        print("checking out..")
+
+        self.gateway.pay()
+
+gateway1 = RazorPay()
+purchase = Purchase(gateway1)
+
+purchase.checkout()
+```
+
+```text
+checking out..
+paying using RazorPay..
+```
+
+The shop works. Normal classes, nothing abstract yet.
+
+## Step 5: The gateway changes its method name
+
+`Purchase` relies on one thing: the gateway has a method named `pay`. Now imagine the gateway's developers rename their method. The lesson changes `pay` to `pe` in `RazorPay`:
+
+{/* check: error */}
+```python title="abstract_demo.py"
+from abc import ABC, abstractmethod
+
+class RazorPay:
+    def pe(self):
+        print("paying using RazorPay..")
+
+class Purchase:
+
+    def __init__(self, gateway):
+        self.gateway = gateway
+
+    def checkout(self):
+        print("checking out..")
+
+        self.gateway.pay()
+
+gateway1 = RazorPay()
+purchase = Purchase(gateway1)
+
+purchase.checkout()
+```
+
+{/* check: skip */}
+```text
+checking out..
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\abstract_demo.py", line 20, in <module>
+    purchase.checkout()
+    ~~~~~~~~~~~~~~~~~^^
+  File "C:\PythonCourse\FirstProject\oop\abstract_demo.py", line 15, in checkout
+    self.gateway.pay()
+    ^^^^^^^^^^^^^^^^
+AttributeError: 'RazorPay' object has no attribute 'pay'
+```
+
+Look at where it fails. `checking out..` is printed first. The error comes in the middle of the checkout, at the moment a customer tries to pay.
+
+The lesson then adds a second gateway of its own, `TeluskoPay`, with a proper `pay` method, and creates `gateway2 = TeluskoPay()`. With `Purchase(gateway1)` the same error comes again. With `Purchase(gateway2)` the program prints:
+
+```text
+checking out..
+paying using TeluskoPay
+```
+
+Any object with a `pay` method works. That is the duck typing from [Polymorphism and Duck Typing](/docs/python-tutorial-2026/object-oriented-python/polymorphism-and-duck-typing). The lesson even tries a type hint that names `RazorPay` for the `gateway` parameter and still passes the `TeluskoPay` object. It runs without complaint, because type hints are not enforced.
+
+So two things are missing:
+
+1. A **standard**. Every payment gateway must have a method named `pay`, not `pe`.
+2. A common type. `Purchase` should not be written for `RazorPay` or for `TeluskoPay`. It should work with "a payment gateway".
+
+## Step 6: An abstract class as the standard
+
+Both come from one abstract class. `PaymentGateway` inherits from `ABC` and declares `pay` as an abstract method. Nobody should create an object of `PaymentGateway` itself. It is only the concept. The real gateways inherit from it:
+
+{/* check: error */}
+```python title="abstract_demo.py"
+from abc import ABC, abstractmethod
+
+class PaymentGateway(ABC):
+    @abstractmethod
+    def pay(self):
+        pass
+
+class TeluskoPay(PaymentGateway):
+    def pay(self):
+        print("paying using TeluskoPay")
+
+class RazorPay(PaymentGateway):
+    def pe(self):
+        print("paying using RazorPay..")
+
+class Purchase:
+
+    def __init__(self, gateway):
+        self.gateway = gateway
+
+    def checkout(self):
+        print("checking out..")
+
+        self.gateway.pay()
+
+gateway1 = RazorPay()
+gateway2 = TeluskoPay()
+purchase = Purchase(gateway2)
+
+purchase.checkout()
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\abstract_demo.py", line 26, in <module>
+    gateway1 = RazorPay()
+TypeError: Can't instantiate abstract class RazorPay without an implementation for abstract method 'pay'
+```
+
+`RazorPay` inherited the abstract method `pay` and did not implement it. It has `pe`, which is a different method. As long as an abstract method is left without an implementation, the child class counts as abstract too, and no object can be created from it.
+
+Compare this error with the one in Step 5:
+
+| | Without the abstract class | With the abstract class |
+| --- | --- | --- |
+| Error | `AttributeError` | `TypeError` |
+| Where | Inside `checkout`, at `self.gateway.pay()` | At `gateway1 = RazorPay()` |
+| When | During a purchase, after `checking out..` | When the object is created, before anything is printed |
+| Needs | A purchase that uses this gateway | Nothing. Creating the object is enough |
+
+Note that the purchase uses `gateway2` here. The broken `RazorPay` is not even used for a payment, and the mistake is still found.
+
+![Abstract_Class_As_A_Contract](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-abstraction.svg)
+
+The fix is to follow the standard. Rename `pe` back to `pay`:
+
+```python title="abstract_demo.py"
+from abc import ABC, abstractmethod
+
+class PaymentGateway(ABC):
+    @abstractmethod
+    def pay(self):
+        pass
+
+class TeluskoPay(PaymentGateway):
+    def pay(self):
+        print("paying using TeluskoPay")
+
+class RazorPay(PaymentGateway):
+    def pay(self):
+        print("paying using RazorPay..")
+
+class Purchase:
+
+    def __init__(self, gateway):
+        self.gateway = gateway
+
+    def checkout(self):
+        print("checking out..")
+
+        self.gateway.pay()
+
+gateway1 = RazorPay()
+gateway2 = TeluskoPay()
+purchase = Purchase(gateway2)
+
+purchase.checkout()
+```
+
+```text
+checking out..
+paying using TeluskoPay
+```
+
+The video ends with this version of the file and does not run it on screen. The output above was produced for these docs.
+
+A gateway class may have other methods as well, `pe` included. But `pay` has to be there. That is how an abstract class keeps a standard: if the interface says there is a steering wheel, every implementation must provide one. `Purchase` only needs to know the interface, `PaymentGateway`. Which gateway is behind it can change without touching `Purchase`.
+
+## Additions beyond the lesson
+
+**Checking the type.** The lesson mentions, without writing the code, that `Purchase` could check whether the object it receives really is a payment gateway. The built-in function `isinstance` does that check, and a type hint with the abstract class documents the intention. These lines can go at the end of the final program:
+
+```python
+print(isinstance(gateway2, PaymentGateway))
+print(isinstance("some text", PaymentGateway))
+```
+
+```text
+True
+False
+```
+
+The matching hint would be `def __init__(self, gateway: PaymentGateway):`. Remember that the hint alone is not enforced.
+
+**An abstract method may contain code.** The lesson says that an abstract method must not have statements. That is the idea of an interface, and `pass` is the usual body. Python itself does not forbid code there. The rule Python enforces is the other one: a class with an abstract method that is not implemented cannot create objects.
+
+<Callout type="info" title="Checked for these docs">
+Every complete program on this page was run with Python 3.13 and gave the output or the error shown, including the final version that is not run in the video. The four error messages were compared with the ones on screen. In the tracebacks the folder is written as in the video. In the video the file of Step 1 starts with two empty lines, which this page leaves out. The claim that a class inheriting from `ABC` without an abstract method can still create objects was tested, and so were the two `isinstance` lines, added to the final program.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `TypeError: Can't instantiate abstract class A without an implementation for abstract method 'show'` | An object of an abstract class was created. Shown on purpose in the lesson | Create objects from a child class that implements `show` |
+| `TypeError: Purchase.__init__() missing 1 required positional argument: 'gateway'` | `Purchase()` was called without the gateway, which was passed to `checkout` instead. This happens in the lesson | `purchase = Purchase(gateway1)` and `purchase.checkout()` |
+| `AttributeError: 'RazorPay' object has no attribute 'pay'` | The gateway's method is named `pe`, and `checkout` calls `pay`. Shown on purpose in the lesson | Name the method `pay`, and use an abstract class so that the mistake is found early |
+| `TypeError: Can't instantiate abstract class RazorPay without an implementation for abstract method 'pay'` | `RazorPay` inherits from `PaymentGateway` and does not define `pay`. This happens in the lesson | Define `pay` in `RazorPay` |
+| A class with `@abstractmethod` still creates objects | The class does not inherit from `ABC` | Write `class A(ABC):` |
+| `NameError: name 'abstractmethod' is not defined` | Only `ABC` was imported | `from abc import ABC, abstractmethod` |
+| `IndentationError: expected an indented block after function definition on line 7` | The abstract method has no body at all. The number is the line of the `def`, here in the file from Step 3 without `pass` | Write `pass` as the body |
+| `ImportError: cannot import name 'abc' from 'abc' (...). Did you mean: 'ABC'?` where `(...)` is the path of the module on your computer | The class name was typed in small letters, as in `from abc import abc` | The module is `abc`, the class is `ABC` |
+
+## Try It Yourself
+
+1. Write the class `A` from Step 1 and run it. Then make it abstract as in Step 3 and read the error.
+2. Add a class `B(A)` that defines `show` and prints `in B show`. Create an object of `B` and call `show`. Why does this work when `A()` does not?
+3. Remove `(ABC)` from `class A(ABC):` and keep `@abstractmethod`. Create an object of `A`. What happens, and what does that tell you?
+4. Type the final payment program and run it with `Purchase(gateway1)` and with `Purchase(gateway2)`.
+5. Add a third gateway, `StripePay(PaymentGateway)`, with a `pay` method that prints `paying using StripePay`. Use it for a purchase without changing the `Purchase` class.
+6. In your `StripePay` class, rename `pay` to `payment`. Run the program and note on which line the error appears.
+7. Add a second abstract method `refund` to `PaymentGateway`. Run the program, read the error, and then implement `refund` in every gateway.
+8. Write an abstract class `Car` with the abstract methods `start` and `brake`, and two implementations, `EcoSport` and `V8Car`. Write a function `drive(car)` that calls both methods, and call it with both cars.
+
+## Official references
+
+- [Python library: abc, abstract base classes](https://docs.python.org/3/library/abc.html)
+- [What's New in Python 2.6 (abstract base classes)](https://docs.python.org/3/whatsnew/2.6.html)
+- [Python glossary: abstract base class](https://docs.python.org/3/glossary.html#term-abstract-base-class)
+- [Python library: isinstance](https://docs.python.org/3/builtins/functions.html#isinstance)
+- [Python tutorial: classes](https://docs.python.org/3/tutorial/classes.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

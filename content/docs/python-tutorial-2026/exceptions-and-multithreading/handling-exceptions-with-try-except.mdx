@@ -1,0 +1,197 @@
+---
+title: Handling Exceptions with try and except
+description: Put critical statements in a try block, handle the failure in an except block, see why except Exception matches a division by zero, and print the exception object with as.
+---
+
+In [Introduction to Exceptions](/docs/python-tutorial-2026/exceptions-and-multithreading/introduction-to-exceptions), a division by zero stopped `exception_demo.py` before its last line. The lesson called the division a critical statement, a line where something can go wrong.
+
+A user should never see a traceback. This lesson keeps the program alive when the division fails. Then the numbers come from the keyboard, and a second kind of error shows up.
+
+## Step 1: try and except
+
+Open `exception_demo.py` from the previous lesson, where `a` is 5 and `b` is 0. Put critical statements in a `try` block:
+
+```python
+try:
+    result = a / b
+    print("Result is:", result)
+```
+
+`try` means: try to run these lines, and if one of them fails, the failure will be handled. A `try` alone is not complete. The editor complains at once. If you run the file in that state, Python says `SyntaxError: expected 'except' or 'finally' block`. The handling goes into an `except` block, which also names the kind of error it handles:
+
+```python title="exception_demo.py"
+a = 5
+b = 0
+
+try:
+    result = a / b
+    print("Result is:", result)
+except Exception:
+    print("An error occurred: Division by zero is not allowed.")
+
+print("End of execution")
+```
+
+```text
+An error occurred: Division by zero is not allowed.
+End of execution
+```
+
+The division fails. Python leaves the `try` block at that line, so `print("Result is:", result)` is skipped. Then the `except` block runs, and the program goes on after it. "End of execution" is printed. The program did not crash.
+
+An `except` block may do more than print. It could ask the user for a new value of `b` and try the division again.
+
+## The exception hierarchy
+
+Why `Exception`, when the error was a `ZeroDivisionError`? The lesson opens the [exception hierarchy](https://docs.python.org/3/builtins/exceptions.html#exception-hierarchy) in the Python documentation. Exceptions are classes, and they inherit from each other, as you saw in [Inheritance and MRO](/docs/python-tutorial-2026/object-oriented-python/inheritance-and-mro). A small part of the tree:
+
+```text
+BaseException
+ └── Exception
+      ├── ArithmeticError
+      │    ├── FloatingPointError
+      │    ├── OverflowError
+      │    └── ZeroDivisionError
+      ├── OSError
+      │    └── FileNotFoundError
+      ├── RuntimeError
+      │    └── RecursionError
+      └── ValueError
+```
+
+`ZeroDivisionError` is a subclass of `ArithmeticError`, which is a subclass of `Exception`. An `except` block handles the class it names and all its subclasses. So `except Exception` handles a division by zero, a missing file and a wrong value alike. You can ask Python to confirm the family tree:
+
+```python
+>>> issubclass(ZeroDivisionError, ArithmeticError)
+True
+>>> issubclass(ArithmeticError, Exception)
+True
+>>> issubclass(ValueError, Exception)
+True
+```
+
+## Step 2: Take the numbers from the user
+
+Fixed values never surprise anyone. Read the two numbers with `input`, as in [User Input](/docs/python-tutorial-2026/functions-modules-and-input/user-input):
+
+{/* check: stdin=4|t; error */}
+```python title="exception_demo.py"
+a = int(input("Enter numerator: "))
+b = int(input("Enter denominator: "))
+
+try:
+    result = a / b
+    print("Result is:", result)
+except Exception:
+    print("An error occurred: Division by zero is not allowed.")
+
+print("End of execution")
+```
+
+With 4 and 2 the program prints `Result is: 2.0`. With 4 and 0 it prints the message from the `except` block. Then the instructor wants to type 5 and hits the letter `t`:
+
+{/* check: skip */}
+```text
+Enter numerator: 4
+Enter denominator: t
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\adv\exception_demo.py", line 2, in <module>
+    b = int(input("Enter denominator: "))
+ValueError: invalid literal for int() with base 10: 't'
+```
+
+A crash again, and no "End of execution". This time it is a `ValueError`: `int()` cannot turn the text `'t'` into a number. The line that failed is outside the `try` block, so nothing handled it. The input lines are critical statements too.
+
+## Step 3: Move the input into the try block
+
+{/* check: stdin=4|t; noout */}
+```python title="exception_demo.py"
+try:
+    a = int(input("Enter numerator: "))
+    b = int(input("Enter denominator: "))
+    result = a / b
+    print("Result is:", result)
+except Exception:
+    print("An error occurred: Division by zero is not allowed.")
+
+print("End of execution")
+```
+
+{/* check: skip */}
+```text
+Enter numerator: 4
+Enter denominator: t
+An error occurred: Division by zero is not allowed.
+End of execution
+```
+
+No crash. But read the message. Nobody divided by zero. There is one `except` block with one fixed text, and it runs for every kind of error.
+
+## Step 4: Look at the exception object
+
+An exception is an object, and `as` gives it a name. Change the last two lines of the `except` part:
+
+```python
+except Exception as e:
+    print("An error occurred: Division by zero is not allowed.", e)
+```
+
+Printing `e` shows the message of the exception. With 4 and `t`:
+
+```text
+Enter numerator: 4
+Enter denominator: t
+An error occurred: Division by zero is not allowed. invalid literal for int() with base 10: 't'
+End of execution
+```
+
+And with 4 and 0:
+
+```text
+Enter numerator: 4
+Enter denominator: 0
+An error occurred: Division by zero is not allowed. division by zero
+End of execution
+```
+
+The second half of the line is now true in both runs. The first half is still the same fixed text.
+
+A different error deserves a different message. The next lesson, [Specific Exceptions and the finally Block](/docs/python-tutorial-2026/exceptions-and-multithreading/specific-exceptions-and-finally), writes one `except` block for each kind of error.
+
+## Additions beyond the lesson
+
+**What Exception does not cover.** The lesson says `Exception` can handle everything. It handles every ordinary error. A few classes sit beside it, directly under `BaseException`, for example `KeyboardInterrupt`, which is raised when you press Ctrl+C. `except Exception` lets those pass, so you can still stop your program.
+
+<Callout type="info" title="Checked for these docs">
+Every program and the prompt session on this page were run with Python 3.13, with the inputs shown, and gave the output shown. The error messages are the real text from those runs. Only the folder in the `File` line is written as in the video, and line numbers are those of the code on this page. The `SyntaxError` for a `try` without an `except` block was not run in the video and was run for these docs. The outputs asked for in the exercises were also checked by running the code.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `SyntaxError: expected 'except' or 'finally' block` | A `try` block with nothing after it. In the lesson the editor marks this while typing, and the file is not run in that state | Add an `except` block. The `finally` block that the message also names is the topic of the next lesson |
+| `ValueError: invalid literal for int() with base 10: 't'` | The user typed a letter, and the `input` lines were outside the `try` block. This happens in the lesson | Move the `input` lines into the `try` block |
+| "Division by zero is not allowed." for the input `t` | One general `except` block with a fixed message. This happens in the lesson | Print the exception with `as e`, or write one `except` block for each kind |
+
+<Callout type="info" title="A slip of the tongue">
+While reading the `ValueError`, the instructor says that the `input` function tried to convert the text. `input` only returns the text. The conversion is done by `int()`, as the message itself says: `invalid literal for int()`.
+</Callout>
+
+## Try It Yourself
+
+1. Write a program that stores 10 and 0 in two variables and divides them. Put the division in a `try` block with `except ZeroDivisionError` and print your own message. Add a last `print` and check that it runs.
+2. Remove the `except` block from exercise 1 and keep the `try` block. Run the file and read the error. Then put the `except` block back.
+3. Read both numbers with `int(input(...))`. Run the program three times: with 8 and 2, with 8 and 0, and with 8 and `x`.
+4. Move the `input` lines into the `try` block and change the handler to `except Exception as e`. Print `e` and `type(e)`. Which class do you see for 8 and 0, and which for 8 and `x`?
+5. Use `issubclass` at the prompt to check that `FileNotFoundError` is a subclass of `OSError`, and that `OSError` is a subclass of `Exception`. Compare with the tree on this page.
+
+## Official references
+
+- [Python library: built-in exceptions and the exception hierarchy](https://docs.python.org/3/builtins/exceptions.html#exception-hierarchy)
+- [Python tutorial: handling exceptions](https://docs.python.org/3/tutorial/errors.html#handling-exceptions)
+- [Python library: ValueError](https://docs.python.org/3/builtins/exceptions.html#ValueError)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

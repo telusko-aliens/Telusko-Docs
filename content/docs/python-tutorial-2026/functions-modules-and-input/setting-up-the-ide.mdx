@@ -1,0 +1,84 @@
+---
+title: Setting Up the IDE
+description: Move from the Python prompt to a program file by opening a folder in VS Code, creating Demo.py and running it with the Run button or with the python command.
+---
+
+The basics are done, and the next big topic of the course is functions. Before it starts, the lesson changes the place where the code is written.
+
+A real program is a file with many lines, which you save and run as a whole. This short lesson sets that up: a folder, a file named `Demo.py` and two ways to run it. The next lessons work in this file.
+
+## Step 1: Move from the prompt to a file
+
+Until now, every line went into the Python prompt and was answered at once. A function takes several lines, so the lesson moves to an editor. The video uses VS Code. PyCharm works the same way, and both were installed earlier, in [VS Code Setup](/docs/python-tutorial-2026/python-basics/vs-code-setup) and [PyCharm Setup](/docs/python-tutorial-2026/python-basics/pycharm-setup).
+
+1. In VS Code choose **File**, then **Open Folder**, and open an empty folder. The lesson creates one named `FirstProject`. The name does not matter.
+2. Create a new file in that folder and name it `Demo.py`. Keep the `.py` ending. It tells the editor that the file holds Python code.
+3. Type one line to test that everything works:
+
+```python title="Demo.py"
+print('Hello')
+```
+
+```text
+Hello
+```
+
+## Step 2: Run the file
+
+There are two ways to run the file. The Run button, the small triangle at the top right of the editor, runs it in the terminal panel at the bottom. You can also type the command yourself in that terminal:
+
+```text
+python Demo.py
+```
+
+The rest of the course types the command, because the output stays clean. The terminal must be in the folder that holds `Demo.py`.
+
+<Callout type="info" title="The short prompt in the video">
+The terminal in VS Code is PowerShell, and its prompt shows the full folder path, which is long. The instructor shortens it with a PowerShell command and then checks the folder with `pwd`, which prints the present working directory. In the video the three commands are on three separate terminal screens, because the terminal is cleared in between. The block below puts them together:
+
+```text
+PS C:\Users\navin\OneDrive\Documents\Python Course\FirstProject> function prompt { "PS> " }
+PS> pwd
+
+Path
+----
+C:\Users\navin\OneDrive\Documents\Python Course\FirstProject
+
+PS> python Demo.py
+Hello
+```
+
+This is optional and has nothing to do with Python. It lasts until you close that terminal, and it only works in PowerShell.
+</Callout>
+
+The file runs, and the setup is complete. The next lesson, [Introduction to Functions](/docs/python-tutorial-2026/functions-modules-and-input/introduction-to-functions), uses `Demo.py` to write the first function.
+
+<Callout type="info" title="Checked for these docs">
+The program on this page was run as `Demo.py` with the command `python Demo.py` and Python 3.13, and gave the output shown. The terminal lines in the callout about the short prompt come from the video. The three error messages in the table below were produced with Python 3.13.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| A line that ends with `[Errno 2] No such file or directory` | The terminal is in another folder, or the file name in the command is misspelled | Check the folder with `pwd`, open the right folder, and type the name as it is saved: `python Demo.py` |
+| `NameError: name 'Print' is not defined. Did you mean: 'print'?` | `print` was typed with a capital letter | Write `print` in small letters |
+| `SyntaxError: unterminated string literal (detected at line 1)` | The closing quote is missing, as in `print('Hello)` | Close the text with the same quote that opens it |
+
+## Try It Yourself
+
+1. Create a folder and a file `Demo.py`, type `print('Hello')` and run it with `python Demo.py`.
+2. Run the same file with the Run button. Compare what the terminal shows with what it shows for `python Demo.py`.
+3. Change the text in `Demo.py` to your name, save the file and run it again.
+4. Create a second file `Hello.py` in the same folder with the line `print('Telusko')`. Run it with `python Hello.py`.
+5. Run `python Test.py` in a folder that has no file with that name. Read the last part of the message.
+
+## Official references
+
+- [Python tutorial: invoking the interpreter](https://docs.python.org/3/tutorial/interpreter.html#invoking-the-interpreter)
+- [Python setup and usage: command line](https://docs.python.org/3/using/cmdline.html#command-line)
+- [Python setup and usage: using Python on Windows](https://docs.python.org/3/using/windows.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

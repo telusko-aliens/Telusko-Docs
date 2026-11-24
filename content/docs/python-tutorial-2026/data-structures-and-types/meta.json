@@ -1,0 +1,15 @@
+{
+  "title": "Data Structures and Types",
+  "pages": [
+    "lists.mdx",
+    "list-functions.mdx",
+    "built-in-functions-on-lists.mdx",
+    "tuples.mdx",
+    "sets.mdx",
+    "dictionaries.mdx",
+    "variable-storage.mdx",
+    "data-types.mdx",
+    "arithmetic-assignment-and-relational-operators.mdx",
+    "logical-operators.mdx"
+  ]
+}

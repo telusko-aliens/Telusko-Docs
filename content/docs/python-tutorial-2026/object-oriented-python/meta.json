@@ -1,0 +1,16 @@
+{
+  "title": "Object-Oriented Python",
+  "pages": [
+    "oops-introduction.mdx",
+    "class-and-object.mdx",
+    "init-method.mdx",
+    "constructor-with-new.mdx",
+    "types-of-methods.mdx",
+    "inheritance-and-mro.mdx",
+    "init-and-super-with-inheritance.mdx",
+    "polymorphism-and-duck-typing.mdx",
+    "operator-overloading.mdx",
+    "method-overriding.mdx",
+    "abstraction.mdx"
+  ]
+}

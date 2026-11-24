@@ -1,0 +1,184 @@
+---
+title: Logical Operators
+description: Combine conditions with the logical operators and, or and not, read their truth tables, and see how they differ from the bitwise operators.
+---
+
+The previous lesson, [Arithmetic, Assignment and Relational Operators](/docs/python-tutorial-2026/data-structures-and-types/arithmetic-assignment-and-relational-operators), ended with relational operators. Each of them checks one condition and answers with `True` or `False`.
+
+One answer is often not enough. This lesson covers the logical operators, which join several such answers into one. A program that can compare and combine conditions can make decisions, and that is where the course is heading next.
+
+## Step 1: Logical operators
+
+Real decisions rarely depend on one condition. The instructor's example is an umbrella. Do you take one when you leave the house? In the rainy season, yes, if you are going to the office. On a Sunday without office, no, rain or not. And nobody takes an umbrella to play cricket. You take it only when two things are true together: it is the rainy season and it is a working day.
+
+In the prompt, the lesson sets `b = 5` and checks two conditions one at a time:
+
+```python
+>>> a = 4
+>>> b = 5
+>>> a < 10
+True
+>>> b > 1
+True
+```
+
+Writing both on one line does not combine them:
+
+{/* check: skip */}
+```python
+>>> a < 10 b > 1
+  File "<python-input-256>", line 1
+    a < 10 b > 1
+           ^
+SyntaxError: invalid syntax
+```
+
+Something has to stand between the two conditions. That something is a **logical operator**, and Python uses plain English words for them: `and`, `or` and `not`.
+
+```python
+>>> a = 4
+>>> b = 5
+>>> a < 10 and b > 1
+True
+>>> a < 10 or b > 1
+True
+```
+
+Both lines give `True`, so `and` and `or` look the same here. They are not. Both conditions happen to be true, and that is the one case in which the two agree. Change the second condition so that it is false:
+
+```python
+>>> a = 4
+>>> b = 5
+>>> a < 10 or b > 10
+True
+>>> a < 10 and b > 10
+False
+```
+
+`a < 10` is `True` and `b > 10` is `False`. `or` is satisfied with one true condition. `and` insists on both.
+
+![Logical_Operators](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-logical-operators.svg)
+
+### Truth tables
+
+A **truth table** lists the result for every possible combination of inputs. With two conditions, c1 and c2, there are four combinations. The video writes the tables with 1 for `True` and 0 for `False`, which matches what `int(True)` and `int(False)` gave in [Data Types](/docs/python-tutorial-2026/data-structures-and-types/data-types).
+
+| c1 | c2 | c1 `and` c2 | c1 `or` c2 |
+| --- | --- | --- | --- |
+| `True` | `True` | `True` | `True` |
+| `True` | `False` | `False` | `True` |
+| `False` | `True` | `False` | `True` |
+| `False` | `False` | `False` | `False` |
+
+Two sentences sum it up:
+
+- `and` gives `True` in one case only: both conditions are true.
+- `or` gives `False` in one case only: both conditions are false.
+
+The lesson confirms the last row for `or`:
+
+```python
+>>> a = 4
+>>> b = 5
+>>> a > 10 or b > 10
+False
+```
+
+### not
+
+The third logical operator works on a single value and reverses it:
+
+```python
+>>> result = True
+>>> result
+True
+>>> not result
+False
+```
+
+| Value | `not` value |
+| --- | --- |
+| `True` | `False` |
+| `False` | `True` |
+
+The exclamation mark does not work here. It exists only inside `!=`. To reverse a boolean, write the word `not`.
+
+## Operators in this lesson
+
+This row completes the table of operator groups from the previous lesson:
+
+| Group | Operators | Result |
+| --- | --- | --- |
+| Logical | `and`, `or`, `not` | `True` or `False` |
+
+## Additions beyond the lesson
+
+**Which logical operator goes first.** In a line with several logical operators, Python applies `not` first, then `and`, then `or`. Comparisons are done before all three. Brackets change the order and make it visible:
+
+```python
+>>> a = 4
+>>> b = 5
+>>> not a < 10 and b > 10
+False
+>>> not (a < 10 and b > 10)
+True
+```
+
+In the first line, `not` belongs to `a < 10` only. That gives `False and False`, which is `False`. In the second line the brackets are worked out first. They give `False`, and `not` turns that into `True`.
+
+**Bitwise operators.** In [IDLE and Number Operations](/docs/python-tutorial-2026/python-basics/idle-and-number-operations), `8 ^ 10` gave 2 instead of a power. This lesson does not cover the reason, so here it is in short. A computer stores a whole number in binary, as a row of **bits** that are each 0 or 1. Bitwise operators compare two numbers bit by bit. `&` and `|` use the truth tables above on every pair of bits, with 1 as true and 0 as false. `bin` shows the bits of a number after the prefix `0b`:
+
+```python
+>>> bin(12)
+'0b1100'
+>>> bin(10)
+'0b1010'
+>>> 12 & 10
+8
+>>> 12 | 10
+14
+>>> 12 ^ 10
+6
+>>> 8 ^ 10
+2
+```
+
+Written under each other, the bits explain the results:
+
+```text
+12            1 1 0 0
+10            1 0 1 0
+
+12 & 10       1 0 0 0    which is 8     and: 1 where both bits are 1
+12 | 10       1 1 1 0    which is 14    or:  1 where at least one bit is 1
+12 ^ 10       0 1 1 0    which is 6     xor: 1 where the two bits differ
+```
+
+The operator `^` is called exclusive or, or xor for short. For `8 ^ 10`, the bits are 1000 and 1010. They differ in one place only, which leaves 0010, and that is 2. Use `and` and `or` for conditions. The bitwise operators are for work on the bits of integers. The same symbols `|`, `&` and `^` have a second meaning for sets, as shown in [Sets](/docs/python-tutorial-2026/data-structures-and-types/sets).
+
+<Callout type="info" title="Checked for these docs">
+Every prompt session on this page was run with Python 3.13 and gave the output shown. The `SyntaxError` message was reproduced by hand. The number in `<python-input-256>` is from the video. Such a number counts the entries typed so far in that prompt session, so your number will be different. Every value in the tables, including the bit patterns, was calculated by running the code.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `SyntaxError: invalid syntax` after `a < 10 b > 1` | Two conditions stand next to each other with nothing between them. This happens in the lesson | Join them with `and` or `or` |
+| `SyntaxError: invalid syntax` after `!result` | The exclamation mark only exists inside `!=` | Write `not result` |
+
+## Try It Yourself
+
+1. With `a = 4` and `b = 5`, predict `a > 2 and b > 2`, `a > 4 and b > 4`, `a > 4 or b > 4` and `a > 5 or b > 5`. Name the row of the truth table that each one uses.
+2. Assign `is_raining = True` and `is_sunday = False`. Write one line that is `True` only when it is raining and it is not Sunday.
+3. With `a = 4` and `b = 5`, type `a > 2 b > 2`. Read the error, then join the two conditions so that the line gives `True`.
+4. With `a = 4` and `b = 5`, assign `result = a > b`. Predict `result`, `not result` and `not not result`. Then check in the prompt.
+
+## Official references
+
+- [Python library: boolean operations and, or, not](https://docs.python.org/3/builtins/stdtypes.html#boolean-operations-and-or-not)
+- [Python reference: operator precedence](https://docs.python.org/3/reference/expressions.html#operator-precedence)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

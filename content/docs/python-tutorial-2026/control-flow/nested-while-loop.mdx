@@ -1,0 +1,267 @@
+---
+title: Nested while Loop
+description: Keep output on one line with the end parameter of print, put one while loop inside another, and reset the inner counter so that every round of the outer loop gets its full inner loop.
+---
+
+The previous lesson, [The while Loop](/docs/python-tutorial-2026/control-flow/while-loop), ended with a loop that prints `Hello World` five times and then the value of `i`. This lesson keeps that file and gives it a harder job.
+
+The loop should print `Telusko` and after it `Rocks!!` several times, on one line, and it should do that five times. You could type `Rocks!!` as often as you want it. For ten or a hundred times that plan fails, the same way copying a line failed before. Repeating something is a job for a loop, and here the thing to repeat already sits inside a loop. A loop inside a loop is called a **nested loop**.
+
+## Step 1: Stay on the same line with end
+
+Start with the simplest version. The whole text is typed out in one `print`:
+
+```python title="while_demo.py"
+i = 1
+
+while i <= 5:
+    print("Telusko Rocks!! Rocks!!")
+    i += 1
+
+print(i)
+```
+
+```text
+Telusko Rocks!! Rocks!!
+Telusko Rocks!! Rocks!!
+Telusko Rocks!! Rocks!!
+Telusko Rocks!! Rocks!!
+Telusko Rocks!! Rocks!!
+6
+```
+
+Two times `Rocks!!` is fixed in the text. For four times or ten times you would have to retype it. So the lesson takes the text apart and gives each part its own `print`:
+
+```python title="while_demo.py"
+i = 1
+
+while i <= 5:
+    print("Telusko ")
+    print("Rocks!! Rocks!! ")
+    i += 1
+
+print(i)
+```
+
+```text
+Telusko
+Rocks!! Rocks!!
+Telusko
+Rocks!! Rocks!!
+Telusko
+Rocks!! Rocks!!
+Telusko
+Rocks!! Rocks!!
+Telusko
+Rocks!! Rocks!!
+6
+```
+
+Now the two parts land on separate lines. In the video the instructor types `clear` wrongly as `clar` before this run, and PowerShell answers with a red error. That one is about the terminal command and has nothing to do with Python.
+
+Why separate lines? The instructor opens the definition of `print` in VS Code. Among its parameters is this one:
+
+```text
+end: str | None = "\n"
+```
+
+`print` has a parameter named `end`. It is the text that `print` adds after your values. Its default value is `"\n"`, the newline character, which moves the output to the next line. You never typed it, and it has been there in every `print` so far.
+
+You can pass a different ending. An empty string means "add nothing", so the output stays on the same line:
+
+```python title="while_demo.py"
+i = 1
+
+while i <= 5:
+    print("Telusko ", end = "")
+    print("Rocks!! Rocks!! ")
+    i += 1
+
+print(i)
+```
+
+```text
+Telusko Rocks!! Rocks!!
+Telusko Rocks!! Rocks!!
+Telusko Rocks!! Rocks!!
+Telusko Rocks!! Rocks!!
+Telusko Rocks!! Rocks!!
+6
+```
+
+The space inside `"Telusko "` keeps the two words apart. With `end = ""` nothing else would separate them.
+
+## Step 2: A loop inside a loop
+
+Now the repeated word. The second `print` is cut down to one `"Rocks!! "`, and it should run four times. Repeating a statement is a job for a loop, so a second `while` goes inside the first one. The counter `i` is already in use. The new loop gets its own counter, `j`.
+
+- The **outer loop** runs with `i` and prints `Telusko`.
+- The **inner loop** runs with `j` and prints `Rocks!!`.
+
+The editor underlines `j` at first, because it is not defined. The instructor adds `j = 1` at the top and runs the file:
+
+{/* check: skip */}
+```python title="while_demo.py"
+i = 1
+j = 1
+
+while i <= 5:
+    print("Telusko ", end = "")
+
+    while j <= 4:
+        print("Rocks!! ")
+
+    i += 1
+
+print(i)
+```
+
+`Rocks!!` runs down the terminal without end. It is the mistake from the previous lesson again, where the counter of the first loop never changed. `i` is increased, and nothing increases `j`. Stop it with Ctrl+C, then add `j += 1` to the inner block:
+
+```python title="while_demo.py"
+i = 1
+j = 1
+
+while i <= 5:
+    print("Telusko ", end = "")
+
+    while j <= 4:
+        print("Rocks!! ")
+        j += 1
+
+    i += 1
+
+print(i)
+```
+
+```text
+Telusko Rocks!!
+Rocks!!
+Rocks!!
+Rocks!!
+Telusko Telusko Telusko Telusko 6
+```
+
+The program ends now, and the output is a mess. The lesson repairs it in three steps.
+
+### Repair 1: keep Rocks on the same line
+
+Each `Rocks!!` ends with a newline. Give the inner `print` an empty ending as well:
+
+```python
+        print("Rocks!! ", end = "")
+```
+
+```text
+Telusko Rocks!! Rocks!! Rocks!! Rocks!! Telusko Telusko Telusko Telusko 6
+```
+
+### Repair 2: start a new line after each round
+
+Now nothing ends a line any more, and everything sits in one row. After each round of the outer loop the output should move to the next line. A `print()` with nothing in the brackets prints only its ending, the newline:
+
+```python title="while_demo.py"
+i = 1
+j = 1
+
+while i <= 5:
+    print("Telusko ", end = "")
+
+    while j <= 4:
+        print("Rocks!! ", end = "")
+        j += 1
+
+    i += 1
+    print()
+
+print(i)
+```
+
+```text
+Telusko Rocks!! Rocks!! Rocks!! Rocks!!
+Telusko
+Telusko
+Telusko
+Telusko
+6
+```
+
+Five lines, as wanted. Only the first one rocks.
+
+### Repair 3: reset j for every round
+
+The instructor debugs again and watches `j`:
+
+| Round of the outer loop | `j` when the inner loop is reached | Inner loop |
+| --- | --- | --- |
+| `i` is 1 | 1 | Runs four times. `j` goes up to 5 |
+| `i` is 2 | 5 | `j <= 4` is false at once. Nothing is printed |
+| `i` is 3, 4, 5 | 5 | The same |
+
+`j = 1` stands above both loops, so it runs once. After the first round `j` is 5 and stays 5. The inner loop needs a fresh counter each time the outer loop starts a new round. The line `j = 1` belongs inside the outer loop, before the inner one:
+
+```python title="while_demo.py"
+i = 1
+
+
+while i <= 5:
+    print("Telusko ", end = "")
+    j = 1
+    while j <= 4:
+        print("Rocks!! ", end = "")
+        j += 1
+
+    i += 1
+    print()
+
+print(i)
+```
+
+```text
+Telusko Rocks!! Rocks!! Rocks!! Rocks!!
+Telusko Rocks!! Rocks!! Rocks!! Rocks!!
+Telusko Rocks!! Rocks!! Rocks!! Rocks!!
+Telusko Rocks!! Rocks!! Rocks!! Rocks!!
+Telusko Rocks!! Rocks!! Rocks!! Rocks!!
+6
+```
+
+Where a value is assigned and where it is increased decides how a loop behaves.
+
+### Days and hours
+
+The lesson closes with a picture for the reset. Think of days and hours. On the first of the month the hours count 0, 1, 2 and so on, and the day stays the same. After hour 23 the day moves on by one, and the hours start again at 0.
+
+The day is the outer loop. The hours are the inner loop. Every time the inner loop has finished its full cycle, the outer loop takes one step and the inner counter starts from the beginning.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page that ends by itself was run with Python 3.13 and gave the output shown, including the one-line output of Repair 1. The values in the table of Repair 3 were confirmed with a line trace and by running the files. The endless program in Step 2 is not run by the automatic check. It was started by hand and interrupted after a fraction of a second. The PowerShell message for `clar` was reproduced in Windows PowerShell.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `Rocks!!` without end | The inner loop has no `j += 1`. This happens in the lesson | Press Ctrl+C. Then add `j += 1` inside the inner block |
+| Each part appears on its own line | `print` ends with a newline by default. This happens in the lesson | Pass `end = ""` |
+| Everything appears on one line | Every `print` has `end = ""`. This happens in the lesson | Add an empty `print()` where a line should end |
+| Only the first line has `Rocks!!` | `j = 1` stands before the outer loop, so `j` is never reset. This happens in the lesson | Move `j = 1` inside the outer loop, before the inner `while` |
+| `NameError: name 'j' is not defined` | The counter is used before it has a value. In the lesson the editor warns about this before the file is run | Assign `j = 1` before the inner loop |
+| `clar : The term 'clar' is not recognized as the name of a cmdlet, function, script file, or operable program.` | A typing slip for `clear` in PowerShell. This happens in the lesson | Type `clear` or `cls` |
+
+## Try It Yourself
+
+1. Print the numbers 1 to 10, one per line. Then print them on a single line with `end = " "`.
+2. Print `Rocks!! ` three times on one line with a single loop and `end = ""`. Then print `Done` on a line of its own. You need an empty `print()` between the loop and `Done`.
+3. Change the final program so that it prints three lines, each with `Telusko` followed by six times `Rocks!!`.
+4. Use a nested loop to print four lines, each with five stars. Print one star with `print("* ", end = "")`.
+5. Use a nested loop to print the hours 0 to 23 for day 1 and day 2, each day on its own line. This is the days and hours picture as code.
+
+## Official references
+
+- [Python tutorial: first steps towards programming](https://docs.python.org/3/tutorial/introduction.html#first-steps-towards-programming)
+- [Python library: the print function](https://docs.python.org/3/builtins/functions.html#print)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

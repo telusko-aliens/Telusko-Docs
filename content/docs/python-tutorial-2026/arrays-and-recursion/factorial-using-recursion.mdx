@@ -1,0 +1,137 @@
+---
+title: Factorial Using Recursion
+description: Write the factorial function again with recursion, see why it needs a base case to stop, and follow every call and return value in the debugger.
+---
+
+The previous lesson, [Recursion](/docs/python-tutorial-2026/arrays-and-recursion/recursion), showed a function `greet` that calls itself until Python stops it with an error. This lesson combines that idea with the factorial from [Factorial](/docs/python-tutorial-2026/arrays-and-recursion/factorial), and this time the calls stop by themselves.
+
+## Factorial, one step at a time
+
+Recursion becomes useful when each call works on a smaller piece of the problem.
+
+The factorial of 5 is 5 * 4 * 3 * 2 * 1, which is 120. In [Factorial](/docs/python-tutorial-2026/arrays-and-recursion/factorial) a `for` loop did the multiplication. Now look at the same product in a different way. The part 4 * 3 * 2 * 1 is the factorial of 4. So:
+
+| Question | Answer |
+| --- | --- |
+| 5! | 5 * 4! |
+| 4! | 4 * 3! |
+| 3! | 3 * 2! |
+| 2! | 2 * 1! |
+| 1! | 1 |
+
+The instructor describes it as asking yourself for help. To find the factorial of 5, you ask for the factorial of 4 and multiply by 5. The one who was asked for 4 asks for 3, and so on. The one who is asked for the factorial of 1 knows the answer at once. Then the answers travel back: 1, then 2, then 6, then 24, then 120.
+
+## Step 1: Write fact with recursion
+
+Create `fact_recursion.py`. The function name, the call and the `print` stay the same as in the loop version. Only the body changes. The lesson uses 5 and not 1000, so that the result is easy to check.
+
+The table above translates almost word for word. The factorial of `num` is `num` times the factorial of `num - 1`:
+
+{/* check: skip */}
+```python title="fact_recursion.py"
+def fact(num):
+
+    return num * fact(num - 1)
+
+
+result = fact(5)
+print(result)
+```
+
+The lesson does not run this version, and there is a reason. `fact(5)` calls `fact(4)`, which calls `fact(3)`, then 2, 1, 0, -1 and so on. Nothing stops it. This is `greet` all over again:
+
+```text
+  [Previous line repeated 996 more times]
+RecursionError: maximum recursion depth exceeded
+```
+
+The missing piece is the last row of the table. When `num` is 1, the answer is 1, and no further call is needed. This stop condition is commonly called the **base case**:
+
+```python title="fact_recursion.py"
+def fact(num):
+
+    if num == 1:
+        return 1
+
+    return num * fact(num - 1)
+
+
+result = fact(5)
+print(result)
+```
+
+```text
+120
+```
+
+A recursive function always needs these two parts:
+
+| Part | In `fact` | Job |
+| --- | --- | --- |
+| Base case | `if num == 1:` and `return 1` | Answers directly and ends the chain of calls |
+| Recursive call | `return num * fact(num - 1)` | Passes a smaller problem to the same function |
+
+![Factorial_With_Recursion](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-recursion.svg)
+
+## Step 2: Watch it in the debugger
+
+The result is right, but did the function really call itself five times? The debugger from [else and Debugging](/docs/python-tutorial-2026/control-flow/else-and-debugging) can show it.
+
+1. Click to the left of the line `result = fact(5)` to set a breakpoint.
+2. Open the menu next to the run button and choose **Python Debugger: Debug Python File**.
+3. Use **Step Into** to go into the function. **Step Over** would run the whole call at once and show only the result, `120`. The instructor clicks it by mistake the first time and starts again.
+
+Keep pressing **Step Into** and watch two panels on the left:
+
+| Panel | What it shows |
+| --- | --- |
+| Variables | `num` is 5, then 4, 3, 2 and 1 |
+| Call Stack | One more `fact` entry with every call, until there are five |
+
+The **call stack** is the list of calls that have started and not finished yet. With `num` at 1 it holds five `fact` entries. Each one is waiting for the one above it. Click an older entry and the Variables panel shows the `num` of that call, for example 3. Every call has its own `num`.
+
+Then the base case returns 1 and the stack shrinks, one entry at a time:
+
+| Return value shown | Returned by |
+| --- | --- |
+| 1 | `fact(1)` |
+| 2 | `fact(2)` |
+| 6 | `fact(3)` |
+| 24 | `fact(4)` |
+| 120 | `fact(5)` |
+
+At the end `result` is 120, and that is what `print` shows.
+
+## Additions beyond the lesson
+
+- **Zero and negative numbers.** With the base case `num == 1`, the call `fact(0)` skips the base case, continues with -1, -2 and so on, and ends in a `RecursionError`. The factorial of 0 is defined as 1. Writing the base case as `if num <= 1:` covers 0 and 1 and also stops negative input.
+- **Loop or recursion?** Both versions of `fact` give the same result for 5. The loop version from the lesson [Factorial](/docs/python-tutorial-2026/arrays-and-recursion/factorial) also handled `fact(1000)`. The recursive version stops with a `RecursionError` for `fact(1000)`, because that needs more open calls than the default limit allows. For plain counting work, a loop is the safer tool in Python.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page that ends by itself was run with Python 3.13 and gave the output shown. The `RecursionError` of `fact` without a base case was reproduced by hand. The calls `fact(0)` and `fact(1000)` were run and ended in a `RecursionError`, and `fact(0)` with the base case `if num <= 1:` returned 1. The debugger steps are described from the video.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `fact(5)` ends in `RecursionError: maximum recursion depth exceeded` | The base case is missing, so the calls go on with 0, -1, -2 and so on | Add `if num == 1:` and `return 1` above the recursive call |
+| The debugger shows `120` at once and never enters `fact` | Step Over was used. This happens in the lesson | Start again and use Step Into |
+| `fact(0)` ends in a `RecursionError` | The base case `num == 1` is never reached | Use `if num <= 1:` |
+
+## Try It Yourself
+
+1. Type `fact` with recursion from memory and check `fact(5)`, `fact(6)` and `fact(1)`.
+2. Change the base case to `if num <= 1:` and call `fact(0)`.
+3. Add `print(num)` as the first line of `fact` and call `fact(5)`. Explain the order of the printed numbers.
+4. Write a recursive function `total(num)` that returns the sum 1 + 2 + ... + `num`. Use the same two parts: a base case and a call with `num - 1`.
+5. Run `fact_recursion.py` in the debugger with Step Into and write down the largest number of `fact` entries you see in the call stack.
+
+## Official references
+
+- [Python tutorial: defining functions](https://docs.python.org/3/tutorial/controlflow.html#defining-functions)
+- [Python reference: the return statement](https://docs.python.org/3/reference/simple_stmts.html#the-return-statement)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

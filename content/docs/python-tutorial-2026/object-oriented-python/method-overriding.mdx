@@ -1,0 +1,168 @@
+---
+title: Method Overriding
+description: Learn how a child class replaces a method it inherited from its parent by defining a method with the same name, and which of the two Python calls.
+---
+
+In [Operator Overloading](/docs/python-tutorial-2026/object-oriented-python/operator-overloading) the `Account` class got its own `__str__` method. Every class already has a `__str__`, inherited from the `object` class, and it prints the class name and a memory address. Writing a new `__str__` in `Account` replaced that behaviour.
+
+That was **method overriding**, used before it had a name. A child class inherits a method from its parent, and then defines a method with the same name. From then on, the child's version is the one that runs.
+
+This lesson shows the idea again with the smallest example possible: two classes and one method.
+
+## Step 1: One class, one method
+
+Create a new file in the `oop` folder and name it `override.py`.
+
+```python title="override.py"
+class A:
+    def show(self):
+        print("in A show")
+
+
+obj1 = A()
+obj1.show()
+```
+
+```text
+in A show
+```
+
+Class `A` has an instance method `show`. The program creates an object of `A` and calls the method. Nothing new so far.
+
+## Step 2: A child class with nothing in it
+
+Now add a class `B` that inherits from `A`. Its body is only `pass`, the keyword for "nothing here". Then create the object from `B`:
+
+```python title="override.py"
+class A:
+    def show(self):
+        print("in A show")
+
+class B(A):
+    pass
+
+obj1 = B()
+obj1.show()
+```
+
+Can an object of `B` call `show`? `B` does not define it.
+
+```text
+in A show
+```
+
+It can. This is inheritance, as in [Inheritance and MRO](/docs/python-tutorial-2026/object-oriented-python/inheritance-and-mro). `B` has nothing of its own, so whatever belongs to `A` belongs to `B` as well.
+
+### The phone story
+
+The instructor links this to his own life. Around 2005, in junior college, most of his friends had a mobile phone. He did not. They kept asking which phone he had, and one day he decided to give an answer: "I have a Nokia 1100." It was a plain and very good phone. It was also his parents' phone. But what the parents have belongs to the child too, does it not?
+
+That is the program above. `B` has no `show`, so it uses the one from its parent.
+
+## Step 3: The child gets its own method
+
+A few days later he got a phone of his own as a gift, a Motorola. If someone now asks which phone he has, what will he say? Nokia or Motorola?
+
+Put the question to Python. Replace `pass` with a `show` method inside `B`:
+
+```python title="override.py"
+class A:
+    def show(self):
+        print("in A show")
+
+class B(A):
+    def show(self):
+        print("in B show")
+
+obj1 = B()
+obj1.show()
+```
+
+```text
+in B show
+```
+
+Motorola. `B` has its own `show` now, and that is the one that runs. The `show` of `B` **overrides** the `show` of `A`.
+
+## Which method Python picks
+
+The call is the same in Step 2 and Step 3: `obj1.show()`, with `obj1` created from `B`. What changes is where Python finds the method.
+
+Python starts in the class of the object. If the method is defined there, Python uses it and looks no further. If it is not there, Python goes to the parent class.
+
+![Method_Overriding_Lookup](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-method-overriding.svg)
+
+| Class `B` contains | `obj1.show()` runs | Output |
+| --- | --- | --- |
+| `pass` | The `show` of `A`, which is inherited | `in A show` |
+| Its own `show` | The `show` of `B`, which overrides the one in `A` | `in B show` |
+
+The instructor sums it up this way: when you do not have your own method, you can use the parent's method. When you have your own method with the same name, your own method is called.
+
+Class `A` itself is not changed by this. An object created from `A` still prints `in A show`. Only objects of `B` get the new behaviour.
+
+<Callout type="info" title="Overriding and overloading">
+The two words look alike and mean different things. In the last lesson, operator **overloading** gave an operator such as `+` a meaning for a new type of object. Method **overriding** replaces a method that a class inherited from its parent. In that lesson, writing `__add__` was overloading and writing `__str__` was overriding, since `__str__` already existed in `object`.
+</Callout>
+
+## Additions beyond the lesson
+
+**Only the name counts.** The video says the child's method is called when it has the same name and the same parameters. In Python the name alone decides. If `B` defines `show` with a different list of parameters, it still replaces the `show` of `A` for objects of `B`. The old version does not stay available next to it. Keep the parameters the same anyway, so that code written for `A` also works with `B`.
+
+**Using both versions.** Overriding does not have to throw the parent's method away. With `super()`, which you met in [`__init__` and super() with Inheritance](/docs/python-tutorial-2026/object-oriented-python/init-and-super-with-inheritance), the child's method can call the parent's version first and then add something:
+
+```python title="override_super.py"
+class A:
+    def show(self):
+        print("in A show")
+
+class B(A):
+    def show(self):
+        super().show()
+        print("in B show")
+
+obj1 = B()
+obj1.show()
+```
+
+```text
+in A show
+in B show
+```
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown. The file in the video starts with an empty line, which this page leaves out. The last program, `override_super.py`, is not part of the video.
+</Callout>
+
+## Mistakes and fixes
+
+The lesson has no errors on screen, apart from lines that are still being typed. These are the ones beginners run into with this example.
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `TypeError: A.show() takes 0 positional arguments but 1 was given` | The method was written as `def show():` without `self`, and then called on an object | Write `def show(self):` |
+| `in A show` although `B` has a `show` method | The object was created from `A`, as in `obj1 = A()` | Create it from the child: `obj1 = B()` |
+| `in A show` although `B` should override it | The method in `B` has a different name, for example `Show` or `shows`. Names are case sensitive | Use exactly the same name as in the parent |
+| `IndentationError: expected an indented block after class definition on line 5` | `class B(A):` has no body | Write `pass` or a method inside the class |
+| `SyntaxError: expected ':'` | The colon after `class B(A)` is missing | Write `class B(A):` |
+| `in A show` is gone and you wanted both lines | The child's method replaces the parent's | Call `super().show()` inside the child's method |
+
+## Try It Yourself
+
+1. Type the program from Step 1 and run it.
+2. Add `class B(A)` with `pass`, create `obj1` from `B` and call `show`. Explain where the output comes from.
+3. Give `B` its own `show` and run again. Then create a second object, `obj2 = A()`, and call `obj2.show()`. What does each object print?
+4. Add a second method `display` to `A` that prints `in A display`. Do not define it in `B`. Call both `show` and `display` on an object of `B` and explain the two lines.
+5. Write the phone story as code: a class `Parent` with a method `phone` that prints `Nokia 1100`, and a class `Child(Parent)`. Call `phone` on a `Child` object. Then give `Child` its own `phone` method that prints `Motorola`.
+6. Add a class `C(B)` with `pass` and call `show` on an object of `C`. Which class does the output come from?
+7. In the `Account` class of the last lesson, remove `__str__` and print an account. Put it back and print again. Which class provides `__str__` in each case?
+
+## Official references
+
+- [Python tutorial: inheritance](https://docs.python.org/3/tutorial/classes.html#inheritance)
+- [Python library: super](https://docs.python.org/3/builtins/functions.html#super)
+- [Python reference: special method names](https://docs.python.org/3/reference/datamodel.html#special-method-names)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

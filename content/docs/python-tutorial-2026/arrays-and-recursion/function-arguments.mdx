@@ -1,0 +1,473 @@
+---
+title: Function Arguments
+description: Pass values to a function in four ways, with default arguments, variable length arguments, keyword arguments and keyword variable length arguments.
+---
+
+You already know how to create a function, how to pass values to it and how to call it. That was the subject of [Introduction to Functions](/docs/python-tutorial-2026/functions-modules-and-input/introduction-to-functions). So far the rule was strict: a function with two parameters gets exactly two values.
+
+Real programs are less tidy. Sometimes the caller has one value and not two. Sometimes the caller has ten. Sometimes the caller mixes up the order. And sometimes the caller wants to send extra details that the function never asked for.
+
+Python has an answer for each of these cases. The lesson goes through them one by one with two small functions, `add` and `person`, in a new file named `func_arg.py`.
+
+## Step 1: A function with two parameters
+
+Start with the function from the earlier lesson. It takes two numbers and returns their sum:
+
+```python title="func_arg.py"
+def add(num1, num2):
+    return num1 + num2
+
+
+result = add(4,5)
+
+print(result)
+```
+
+```text
+9
+```
+
+Two words are used all the time in this lesson:
+
+| Word | Meaning | In this program |
+| --- | --- | --- |
+| **Parameter** | A name in the brackets of the `def` line | `num1`, `num2` |
+| **Argument** | A value in the brackets of the call | `4`, `5` |
+
+The arguments go into the parameters by position. The first value goes to the first name, the second value goes to the second name. That is why they are called **positional arguments**.
+
+## Step 2: Leave out one value
+
+What if the call passes only the 4?
+
+{/* check: error */}
+```python title="func_arg.py"
+def add(num1, num2):
+    return num1 + num2
+
+
+result = add(4)
+
+print(result)
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\func_arg.py", line 5, in <module>
+    result = add(4)
+TypeError: add() missing 1 required positional argument: 'num2'
+```
+
+The editor shows no warning while you type. The problem appears when the program runs. Python says that the call gave a value for `num1`, and asks where `num2` is. If a function accepts two parameters, you have to pass two values.
+
+There are two ways out. Pass the second value, or give `num2` a value to fall back on.
+
+## Step 3: Default arguments
+
+A parameter can have a **default value**, written with `=` in the `def` line. If the call does not pass a value for that parameter, Python uses the default:
+
+```python title="func_arg.py"
+def add(num1, num2=0):
+    return num1 + num2
+
+
+result = add(4)
+
+print(result)
+```
+
+```text
+4
+```
+
+The 4 goes to `num1`. Nothing is passed for `num2`, so it is 0, and 4 plus 0 is 4. A parameter with a default value is called a **default argument**.
+
+Both parameters can have a default. Then the call can pass no value, one value or two values, and Python does not complain. The lesson changes the call line and runs the file again each time. Here the three calls are in one file:
+
+```python title="func_arg.py"
+def add(num1=0, num2=0):   # default arguments
+    return num1 + num2
+
+
+print(add())
+print(add(4))
+print(add(4,5))
+```
+
+```text
+0
+4
+9
+```
+
+A value that you pass always replaces the default.
+
+<Callout type="warn" title="Defaults come last">
+Once a parameter has a default value, every parameter after it needs one too. In the video the instructor types `def add(num1=0, num2=0, num3, num4):` for a moment and the editor underlines `num3` in red. Python refuses such a line with `SyntaxError: parameter without a default follows parameter with a default`. With two values in the call, Python could not tell which parameters they are meant for.
+</Callout>
+
+## Step 4: Pass too many values
+
+Defaults help when values are missing. They do not help when there are too many:
+
+{/* check: error */}
+```python title="func_arg.py"
+def add(num1=0, num2=0):   # default arguments
+    return num1 + num2
+
+
+result = add(4,5,6)
+
+print(result)
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\func_arg.py", line 5, in <module>
+    result = add(4,5,6)
+TypeError: add() takes from 0 to 2 positional arguments but 3 were given
+```
+
+The function wanted at most two values and got three.
+
+### A second function with the same name does not help
+
+The first idea in the lesson is to write one more function named `add` that accepts four values. The instructor types it, and then rejects the idea without running it: a function for four values fails with five, and you cannot write a new function for 10 values, for 100 values and so on.
+
+<Callout type="info" title="What Python does with two functions of the same name">
+While typing the second `add`, the video says that a call with two values goes to the first function and a call with four values goes to the second one. That is how some other languages work, where it is called function overloading. Python has no function overloading. A `def` line gives a name to a function, the same way `=` gives a name to a value. The second `def add` replaces the first one, and only the last definition remains. The program below was run for these docs to show it.
+</Callout>
+
+{/* check: error */}
+```python title="two_adds.py"
+def add(num1=0, num2=0):
+    return num1 + num2
+
+def add(num1, num2, num3, num4):
+    return num1 + num2 + num3 + num4
+
+print(add(4,5,6,7))
+print(add(4,5))
+```
+
+{/* check: skip */}
+```text
+22
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\two_adds.py", line 8, in <module>
+    print(add(4,5))
+          ~~~^^^^^
+TypeError: add() missing 2 required positional arguments: 'num3' and 'num4'
+```
+
+The call with four values works. The call with two values fails, because the two-value `add` no longer exists. So this road is closed in both ways. What we want is one function that works however many values are passed.
+
+## Step 5: Variable length arguments
+
+When you add numbers, the first value is always there. The number of values after it can change. It can be one, two, ten or a thousand.
+
+Put a **star** in front of the second parameter:
+
+```python title="func_arg.py"
+def add(num1, *num2):   # variable length arguments
+    print(num1)
+    print(num2)
+    return 0
+
+result = add(4,5,6,7)
+
+print(result)
+```
+
+```text
+4
+(5, 6, 7)
+0
+```
+
+The 4 goes to `num1`. All the remaining values are packed into one **tuple**, and that tuple goes to `num2`. The round brackets in the output show it. Tuples were covered in [Tuples](/docs/python-tutorial-2026/data-structures-and-types/tuples).
+
+The function returns 0 for now, because `num1 + num2` would try to add a number and a tuple, and that does not work. This version only shows what arrives in the two parameters.
+
+A parameter with a star is called a **variable length argument**. Once you have the tuple, you can go through it with a `for` loop and add the values one at a time:
+
+```python title="func_arg.py"
+def add(num1, *num2):   # variable length arguments
+
+    sum = num1
+    for n in num2:
+        sum += n
+
+    return sum
+
+result = add(4,5,6,7)
+
+print(result)
+```
+
+```text
+22
+```
+
+| Line | What it does |
+| --- | --- |
+| `sum = num1` | Start with the first value, 4 |
+| `for n in num2:` | Take one value at a time from the tuple `(5, 6, 7)` |
+| `sum += n` | Add it. This is short for `sum = sum + n` |
+| `return sum` | Send the total back |
+
+Check it by hand: 4 plus 5 is 9, plus 6 is 15, plus 7 is 22.
+
+The loop is not the important part here. The important part is that the call can pass any number of values, they arrive as a tuple, and you can do with that tuple whatever you want.
+
+## Step 6: A function that describes a person
+
+For the next two ideas the lesson comments out the `add` code and writes a new function. It takes the name and the age of a person and prints them:
+
+```python title="func_arg.py"
+def person(name, age):
+    print("name : ", name)
+    print("age : ", age)
+
+person('Navin',30)
+```
+
+```text
+name :  Navin
+age :  30
+```
+
+There are two spaces after the colon. One is inside the string `"name : "`, and `print` puts one more between the two values it prints.
+
+Leave out the age and you get the error from Step 2 again:
+
+{/* check: error */}
+```python title="func_arg.py"
+def person(name, age):
+    print("name : ", name)
+    print("age : ", age)
+
+person('Navin')
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\func_arg.py", line 5, in <module>
+    person('Navin')
+    ~~~~~~^^^^^^^^^
+TypeError: person() missing 1 required positional argument: 'age'
+```
+
+You know the fix: a default value. The lesson imagines ticket booking for a film that only adults may watch. If the caller does not pass an age, the function can assume 18:
+
+```python title="func_arg.py"
+def person(name, age=18):
+    print("name : ", name)
+    print("age : ", age)
+
+person('Navin')
+```
+
+```text
+name :  Navin
+age :  18
+```
+
+## Step 7: Keyword arguments
+
+Now a different mistake. Remove the default again and pass the two values in the wrong order:
+
+```python title="func_arg.py"
+def person(name, age):
+    print("name : ", name)
+    print("age : ", age)
+
+person(30,'Navin')
+```
+
+```text
+name :  30
+age :  Navin
+```
+
+There is no error. Nothing in the `def` line says what type of data each parameter accepts, so Python puts the first value into `name` and the second value into `age`, as always. The program runs and the result is wrong. This is a bug, and it is the caller's mistake.
+
+It is an easy mistake to make. The function may be in another file, written by someone else, and you may not have its `def` line in front of you. An editor helps, because it shows the parameter names while you type the call. Mistakes still happen.
+
+To be safe, say in the call which value is meant for which parameter:
+
+```python title="func_arg.py"
+def person(name, age):
+    print("name : ", name)
+    print("age : ", age)
+
+person(age=30,name='Navin')     # keyword arguments
+```
+
+```text
+name :  Navin
+age :  30
+```
+
+These are **keyword arguments**. Each value is passed together with the name of its parameter, so the order in the call does not matter any more.
+
+| | Positional arguments | Keyword arguments |
+| --- | --- | --- |
+| Call | `person('Navin',30)` | `person(age=30,name='Navin')` |
+| Matched by | Position | Name |
+| Order matters | Yes | No |
+
+<Callout type="warn" title="Keyword arguments go after positional ones">
+On the way to this call, the instructor types `person(age=30,'Navin')` and the editor marks it in red. A value without a name must not follow a value with a name. Python stops with `SyntaxError: positional argument follows keyword argument`. Writing `person('Navin',age=30)` is fine.
+</Callout>
+
+## Step 8: Keyword variable length arguments
+
+The call can now name its values. What if it sends more named values than the function has parameters? Add a location and a favourite technology:
+
+{/* check: error */}
+```python title="func_arg.py"
+def person(name, age):
+    print("name : ", name)
+    print("age : ", age)
+
+person(name='Navin',age=30, loc="Pune", tech="Python")     # keyword arguments
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\func_arg.py", line 5, in <module>
+    person(name='Navin',age=30, loc="Pune", tech="Python")     # keyword arguments
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: person() got an unexpected keyword argument 'loc'
+```
+
+Python looks for a parameter named `loc` in the definition and does not find one.
+
+The lesson compares this with ordering a pizza online. Your name is required. The toppings are up to you: none, one or twelve. The shop has to accept whatever list you send.
+
+A single star does not solve this. It would collect the values `"Pune"` and `"Python"`, and the function would not know what each value stands for. Here every value comes with a keyword. A keyword and a value together are a key and a value, and that is a **dictionary**, which you know from [Dictionaries](/docs/python-tutorial-2026/data-structures-and-types/dictionaries).
+
+Put **two stars** in front of a parameter and Python collects all extra keyword arguments into a dictionary:
+
+```python title="func_arg.py"
+def person(name, **kwlargs):
+    print("name : ", name)
+    print(kwlargs)
+
+person(name='Navin',age=30, loc="Pune", tech="Python")     # keyword arguments
+```
+
+```text
+name :  Navin
+{'age': 30, 'loc': 'Pune', 'tech': 'Python'}
+```
+
+`name` is still required and gets `'Navin'`. Everything else lands in the dictionary. The keywords become the keys, as strings.
+
+Note that `age` is no longer a parameter. A line such as `print("age : ", age)` inside this function would fail, because the name `age` does not exist there. The age is now `kwlargs['age']`.
+
+This kind of parameter is called a **keyword variable length argument**. To print the pairs one by one, loop over the dictionary. Its `items()` method gives one key and one value in each round:
+
+```python title="func_arg.py"
+def person(name, **kwlargs):
+    print("name : ", name)
+    for k,v in kwlargs.items():
+        print(k," : ", v)
+
+person(name='Navin',age=30, loc="Pune", tech="Python")     # keyword arguments
+```
+
+```text
+name :  Navin
+age  :  30
+loc  :  Pune
+tech  :  Python
+```
+
+In each round `k` holds a key and `v` holds its value. The extra spaces around the colon come from `print` again, which puts a space between each of its three values.
+
+![Star_And_Double_Star_Parameters](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-function-arguments.svg)
+
+<Callout type="info" title="About the name kwlargs">
+The video names this parameter `kwlargs`, short for keyword length arguments. The name is free. Only the two stars matter. The usual convention among Python programmers is `**kwargs`, and `*args` for the parameter with one star. You will see these two names in almost every book and library.
+</Callout>
+
+## The four kinds in one table
+
+| Kind | Where you write it | Example | What it solves |
+| --- | --- | --- | --- |
+| Default argument | In the `def` line | `def add(num1=0, num2=0):` | The call passes fewer values |
+| Variable length argument | In the `def` line | `def add(num1, *num2):` | The call passes any number of extra values. They arrive as a tuple |
+| Keyword argument | In the call | `person(age=30,name='Navin')` | The order of the values is not known or not remembered |
+| Keyword variable length argument | In the `def` line | `def person(name, **kwlargs):` | The call passes any number of extra named values. They arrive as a dictionary |
+
+## Additions beyond the lesson
+
+**The name `sum` is already taken.** Python has a built-in function `sum()` that adds up the values of a tuple or a list. The lesson uses `sum` as a variable name inside `add`. That works, and inside that function the built-in `sum()` is hidden behind the variable. A name such as `total` avoids this. With the built-in function, the whole loop becomes one line:
+
+```python
+>>> def add(num1, *num2):
+...     return num1 + sum(num2)
+...
+>>> add(4,5,6,7)
+22
+>>> add(4)
+4
+```
+
+The second call shows one more detail. When no extra values are passed, the starred parameter is an empty tuple, and the function still works.
+
+**One star and two stars can be used together.** The order in the `def` line is: plain parameters, then the one with one star, then the one with two stars.
+
+```python
+>>> def show(name, *args, **kwargs):
+...     print(name, args, kwargs)
+...
+>>> show('Navin', 1, 2, loc="Pune")
+Navin (1, 2) {'loc': 'Pune'}
+```
+
+<Callout type="info" title="Checked for these docs">
+Every program and prompt session on this page was run with Python 3.13 and gave the output shown. The five programs that end in an error were run too, and each traceback is what Python 3.13 prints. The folder in the tracebacks is the one from the video, and the line numbers fit the code as it is printed on this page. In the video the file starts with empty lines, so its line numbers are higher. The listings in Steps 5 to 8 leave out the commented-out `add` code that is still in the video's file and is not used. The program `two_adds.py` is not in the video.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `TypeError: add() missing 1 required positional argument: 'num2'` | The call passes fewer values than the function has parameters. This happens in the lesson | Pass the value, or give the parameter a default such as `num2=0` |
+| `TypeError: add() takes from 0 to 2 positional arguments but 3 were given` | The call passes more values than the function has parameters. This happens in the lesson | Collect the extra values with a starred parameter, `*num2` |
+| `SyntaxError: parameter without a default follows parameter with a default` | A parameter without a default comes after one with a default. The editor flags this in the lesson | Move the parameters with defaults to the end |
+| `TypeError: add() missing 2 required positional arguments: 'num3' and 'num4'` | Two functions have the same name, and the later one replaced the earlier one | Keep one function. Use defaults or a starred parameter |
+| `TypeError: unsupported operand type(s) for +: 'int' and 'tuple'` | `num1 + num2` where `num2` is a starred parameter, so it is a tuple | Loop over the tuple and add its values one by one |
+| `name :  30` and `age :  Navin` | The values were passed in the wrong order. This happens in the lesson | Pass them in the order of the parameters, or use keyword arguments |
+| `SyntaxError: positional argument follows keyword argument` | A plain value comes after a named one, as in `person(age=30,'Navin')`. The editor flags this in the lesson | Put plain values first, or name every value |
+| `TypeError: person() got an unexpected keyword argument 'loc'` | The call uses a keyword that is not a parameter of the function. This happens in the lesson | Add a parameter with two stars, such as `**kwlargs` |
+| `NameError: name 'age' is not defined` | `age` was removed from the `def` line and is still used in the body | Read it from the dictionary, `kwlargs['age']` |
+
+## Try It Yourself
+
+1. Write `multiply(num1, num2)` that returns the product. Call it with one value and read the error. Then give `num2` the default 1 and run it again.
+2. Give both parameters of `multiply` a default. Call it with no value, one value and two values, and explain each result.
+3. Write `def add(num1, *num2):` and print `num2` for the calls `add(1)`, `add(1,2)` and `add(1,2,3,4,5)`. What type is `num2` each time?
+4. Write a function `largest(first, *others)` that returns the biggest of all the values passed. Use a `for` loop and an `if`.
+5. Call `person(name, age)` with the values in the wrong order. Then fix the call with keyword arguments, without changing the order of the values.
+6. Type `person(age=30,'Navin')` and read the error. Fix it in two different ways.
+7. Write `def order(name, **toppings):` that prints the name and then every topping with its amount, for example `order('Navin', cheese=2, corn=1)`.
+8. Call the function from exercise 7 with only a name. What does `toppings` hold then?
+
+## Official references
+
+- [Python tutorial: more on defining functions](https://docs.python.org/3/tutorial/controlflow.html#more-on-defining-functions)
+- [Python tutorial: default argument values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
+- [Python tutorial: keyword arguments](https://docs.python.org/3/tutorial/controlflow.html#keyword-arguments)
+- [Python tutorial: arbitrary argument lists](https://docs.python.org/3/tutorial/controlflow.html#arbitrary-argument-lists)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,251 @@
+---
+title: Decorators, Part 2
+description: Write a second decorator that logs every call, stack two decorators on one function, and make a wrapper accept any number of arguments with *args and **kwargs.
+---
+
+The previous lesson, [Decorators](/docs/python-tutorial-2026/functional-python/decorators), ended with one decorator, `greater_first`. It swaps two values when the first is smaller, and it is applied to `sub` and `divide` with the `@` sign.
+
+That decorator does one fixed job, and its wrapper takes exactly two values. Real programs ask for more. You may want a record of every call, for several functions at once. And the functions do not all take two values. This lesson handles both in the same `deco.py`.
+
+## Step 1: A second decorator for logging
+
+The lesson writes a second decorator that keeps a **log**, a record of what happened: which values came in and what the result was. The decorator `greater_first` and the functions `sub` and `divide` are the file from the previous lesson, with the two manual lines still there as comments.
+
+```python title="deco.py"
+def log_deco(func):
+    def wrap(a,b):
+        print("values ", a, " ", b)
+        result = func(a,b)
+        print("Result ", result)
+        return result
+    return wrap
+
+def greater_first(func):
+    def wrap(a,b):
+        if a<b:
+            a,b = b,a
+        return func(a,b)
+    return wrap
+
+@log_deco
+@greater_first
+def sub(a,b):
+    return a-b
+
+@log_deco
+@greater_first
+def divide(a,b):
+    return a/b
+
+# sub = greater_first(sub)
+# divide = greater_first(divide)
+
+result1 = divide(8,20)
+print(result1)
+
+result2 = sub(2,4)
+print(result2)
+```
+
+```text
+values  8   20
+Result  2.5
+2.5
+values  2   4
+Result  2
+2
+```
+
+Points to notice:
+
+- The wrapper stores the result in a variable, prints it, and returns the same variable. That way the original function is called only once.
+- Writing `log_deco` is not enough. Nothing is logged until `@log_deco` is placed above a function. In the lesson it is first added to `sub` only, and only `sub` is logged.
+- The call is changed to `divide(8,20)` so that you can tell the two logs apart.
+- A function can carry more than one decorator. This is called stacking.
+- A real program usually writes its log to a file and not to the screen.
+
+<Callout type="info" title="Why the log shows 8 and 20, and still 2.5">
+This detail is an addition to the lesson. Stacked decorators are applied from the bottom up, so the two lines mean `divide = log_deco(greater_first(divide))`. The logging wrapper is on the outside. It sees the values as the caller wrote them, 8 and 20. Then the inner wrapper swaps them, and the result is 20 divided by 8, which is 2.5.
+</Callout>
+
+## Step 2: A wrapper that accepts any number of arguments
+
+Next comes a third function, `add`. It does not need `greater_first`, because the order does not matter for addition. It should still be logged, so it gets `@log_deco` only. With two numbers, `add(5,7)`, the log shows `values  5   7` and `Result  12`.
+
+Then the lesson gives `add` a third parameter and calls `add(5,7,6)`. The instructor expects a problem, and here it is:
+
+{/* check: error */}
+```python title="deco.py"
+def log_deco(func):
+    def wrap(a,b):
+        print("values ", a, " ", b)
+        result = func(a,b)
+        print("Result ", result)
+        return result
+    return wrap
+
+@log_deco
+def add(a,b,c):
+    return a+b+c
+
+result3 = add(5,7,6)
+print(result3)
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\deco.py", line 13, in <module>
+    result3 = add(5,7,6)
+TypeError: log_deco.<locals>.wrap() takes 2 positional arguments but 3 were given
+```
+
+The listing above shows only the part of the file that matters for the error. In the video the other two functions are still in the file, their output is printed first, and the traceback says line 40.
+
+Read the last line. The function that complains is `wrap`, not `add`. The name `add` now refers to `wrap`, and `wrap(a,b)` takes exactly two values.
+
+Writing one decorator for two values, another for three and another for five is no solution. The lesson goes back to the idea from [Function Arguments](/docs/python-tutorial-2026/arrays-and-recursion/function-arguments): a parameter written as `*args` collects any number of values into a tuple. In the call `func(*args)`, the star does the opposite and spreads the tuple out into separate values again.
+
+```python title="deco.py"
+def log_deco(func):
+    def wrap(*args):
+        print("values ", args)
+        result = func(*args)
+        print("Result ", result)
+        return result
+    return wrap
+
+def greater_first(func):
+    def wrap(a,b):
+        if a<b:
+            a,b = b,a
+        return func(a,b)
+    return wrap
+
+@log_deco
+@greater_first
+def sub(a,b):
+    return a-b
+
+@log_deco
+@greater_first
+def divide(a,b):
+    return a/b
+
+@log_deco
+def add(a,b,c):
+    return a+b+c
+
+# sub = greater_first(sub)
+# divide = greater_first(divide)
+
+result1 = divide(8,20)
+print(result1)
+
+result2 = sub(2,4)
+print(result2)
+
+result3 = add(5,7,6)
+print(result3)
+```
+
+```text
+values  (8, 20)
+Result  2.5
+2.5
+values  (2, 4)
+Result  2
+2
+values  (5, 7, 6)
+Result  18
+18
+```
+
+The values are now printed as tuples, and the same decorator works for functions with two and with three parameters. This is how a decorator is normally written.
+
+`greater_first` still uses `a,b`. The instructor leaves it that way, because its logic would have to change, and suggests it as practice for you.
+
+## Step 3: Keyword arguments too
+
+One case is still open. A caller can also pass a value with its name, for example `add(5,7,c=6)`. A wrapper with only `*args` does not accept that. For the safer side, the lesson adds a second parameter, `**kwargs`, which collects all keyword arguments:
+
+```python
+    def wrap(*args, **kwargs):
+```
+
+<Callout type="warn" title="The video stops one edit early">
+In the video only the `def wrap` line is changed. The call inside the wrapper still reads `func(*args)`. The instructor then clears the terminal and runs `python deco.py` once more. The same nine output lines appear, and he says it is still working. The unfinished call does not show as a problem there, because the program only passes positional arguments. With a keyword argument, as in `add(5,7,c=6)`, that state fails. The value `c=6` is accepted by `wrap` and then dropped, so the original function never receives it, and the run ends with `TypeError: add() missing 1 required positional argument: 'c'`. The finished form passes both on: `func(*args, **kwargs)`.
+</Callout>
+
+This is the finished `log_deco`. The rest of the file stays as in Step 2, and the full file prints the same nine lines as there. The listing below shows only `log_deco` and `add`, so its output is the last three of those lines.
+
+```python title="deco.py"
+def log_deco(func):
+    def wrap(*args, **kwargs):
+        print("values ", args)
+        result = func(*args, **kwargs)
+        print("Result ", result)
+        return result
+    return wrap
+
+@log_deco
+def add(a,b,c):
+    return a+b+c
+
+result3 = add(5,7,6)
+print(result3)
+```
+
+```text
+values  (5, 7, 6)
+Result  18
+18
+```
+
+With this version the call `add(5,7,c=6)` also works and gives 18. The log line then shows `values  (5, 7)`, because only `args` is printed.
+
+## The shape of a decorator
+
+| Part | Purpose |
+| --- | --- |
+| `def log_deco(func):` | The decorator. It receives the function to change |
+| `def wrap(*args, **kwargs):` | The inner function that will be called in place of the original |
+| Lines before `func(...)` | Extra work before the original runs, such as a check or a log line |
+| `result = func(*args, **kwargs)` | The call to the original function |
+| `return result` | Gives the original result back to the caller |
+| `return wrap` | Hands the wrapper back, without brackets |
+| `@log_deco` | Placed above a function to apply the decorator |
+
+## Additions beyond the lesson
+
+**`functools.wraps`.** After decoration, the name `add` refers to the wrapper, so `add.__name__` gives `'wrap'` and not `'add'`. Python has a helper that copies the name and the description of the original function onto the wrapper. Write `from functools import wraps` at the top and put `@wraps(func)` on the line above `def wrap`. Then `add.__name__` gives `'add'` again. Most real decorators use it.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown. The traceback was produced by running the file. Only the folder in the `File` line was replaced by the path from the video. The two-number call `add(5,7)`, the keyword call `add(5,7,c=6)` and the `functools.wraps` note were also run by hand.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| A red line under `print("values ", a, " " b)` | A comma is missing before `b`. This happens in the lesson, and the editor shows it before the file is run | Write `print("values ", a, " ", b)` |
+| No log lines are printed | The decorator was written and never placed above a function. This happens in the lesson | Add `@log_deco` above the function |
+| `TypeError: log_deco.<locals>.wrap() takes 2 positional arguments but 3 were given` | The wrapper has a fixed number of parameters. This happens in the lesson | Use `def wrap(*args, **kwargs):` and `func(*args, **kwargs)` |
+| `TypeError: add() missing 1 required positional argument: 'c'` | The wrapper accepts `**kwargs` and calls `func(*args)`, so `c=6` is lost | Pass both on with `func(*args, **kwargs)` |
+| `TypeError: log_deco.<locals>.wrap() got an unexpected keyword argument 'c'` | The wrapper has only `*args` and the call uses `c=6` | Add `**kwargs` to the wrapper and to the call of `func` |
+
+## Try It Yourself
+
+1. Add a function `mul(a,b)` that returns `a*b`. Give it `@log_deco` only and call `mul(3,9)`.
+2. In the Step 1 file, swap the order of the two `@` lines above `divide`. Run it with `divide(8,20)` and explain why the log line now shows the bigger number first.
+3. Take up the instructor's suggestion. Rewrite the wrapper inside `greater_first` with `*args`, so that it still swaps two values when the first is smaller.
+4. With the finished `log_deco` from Step 3, call `add(5,7,c=6)`. Then change the wrapper back to `func(*args)` and read the error.
+
+## Official references
+
+- [Python tutorial: arbitrary argument lists](https://docs.python.org/3/tutorial/controlflow.html#arbitrary-argument-lists)
+- [Python library: functools.wraps](https://docs.python.org/3/library/functools.html#functools.wraps)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

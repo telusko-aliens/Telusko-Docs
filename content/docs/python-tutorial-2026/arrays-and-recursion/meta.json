@@ -1,0 +1,12 @@
+{
+  "title": "Arrays, Arguments and Recursion",
+  "pages": [
+    "arrays.mdx",
+    "array-functions.mdx",
+    "function-arguments.mdx",
+    "global-and-local-variables.mdx",
+    "factorial.mdx",
+    "recursion.mdx",
+    "factorial-using-recursion.mdx"
+  ]
+}

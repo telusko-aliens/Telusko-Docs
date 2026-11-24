@@ -1,0 +1,283 @@
+---
+title: Python Setup
+description: Install Python on Windows from python.org, add it to PATH, check the version in a terminal, open the Python prompt and run your first program from a file.
+---
+
+You have run Python code on a website. Now you want it on your own machine, where you control the files, the version and the tools.
+
+Writing code is the easy part. Open Notepad, type `print('Hello')` and you have written a Python program. But Notepad cannot run it. For that you need the **Python interpreter**, the program that reads your code and makes the machine do the work.
+
+This lesson installs the interpreter on Windows, checks that the terminal can find it, and runs the same line in two ways: first at the Python prompt, then from a file.
+
+![Python_Setup_Steps](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-python-setup.svg)
+
+<Callout type="info" title="Which version should you install?">
+The video installs Python 3.13.5, the stable release at the time of recording. Install the current stable version that python.org shows on the day you read this. A newer number is fine. The installation steps are the same, and everything in this course works the same way. In the steps below, read the version numbers as examples.
+</Callout>
+
+## Step 1: Check whether Python is already installed
+
+Maybe Python is on your machine already. Then you can skip the installation.
+
+Open a **terminal**. A terminal is a window where you type commands instead of clicking. On Windows, open the Start menu, type `PowerShell` or `Terminal` and press Enter. Then type this command:
+
+```text
+PS C:\Users\navin> python --version
+Python was not found; run without arguments to install from the Microsoft Store, or disable this shortcut from Settings > Apps > Advanced app settings > App execution aliases.
+```
+
+`PS C:\Users\navin>` is the prompt of the terminal. It shows the folder you are in. You type only the part after it.
+
+"Python was not found" means there is no Python on this machine. On some machines the command is named `python3`, so the lesson tries that too and gets the same message:
+
+```text
+PS C:\Users\navin> python3 --version
+Python was not found; run without arguments to install from the Microsoft Store, or disable this shortcut from Settings > Apps > Advanced app settings > App execution aliases.
+```
+
+If both commands say "not found", carry on with Step 2. If one of them prints a version that starts with 3, Python is already installed and you can go to "The Python prompt" below.
+
+In the video the instructor opens the download page first and then says that you should check for an existing Python before you install. This page puts the check first for that reason.
+
+## Step 2: Download Python from the official website
+
+Go to [python.org](https://www.python.org/). The instructor stresses the word official. Other websites offer Python installers too, and some of those files may be harmful. Download only from python.org.
+
+1. Move the mouse over **Downloads** in the menu.
+2. Choose your operating system. The lesson uses **Windows**.
+3. On the page "Python Releases for Windows", look under **Stable Releases** and pick the release with the highest version number. In the video that is Python 3.13.5.
+4. Pick the installer that fits your processor.
+
+| Your machine | Download |
+| --- | --- |
+| Intel or AMD processor, such as i5, i7 or Ryzen, with 64-bit Windows | Windows installer (64-bit) |
+| ARM processor | Windows installer (ARM64) |
+
+Most Windows laptops and desktops are 64-bit Intel or AMD machines. If you are not sure, open `Settings > System > About` in Windows and read the line "System type".
+
+The instructor's machine has an Intel processor, so he clicks **Windows installer (64-bit)**. In the video the file that arrives is named `python-3.13.5-amd64.exe` and is about 27 MB.
+
+<Callout type="warn" title="Stay away from pre-releases">
+In the video the same page also has a section named Pre-releases, with names such as 3.14.0b2. The letter a, b or rc after the number marks an alpha, a beta or a release candidate. These versions bring new features and are not fully tested. If something goes wrong, you cannot tell whether the fault is in your code or in Python. While you are learning, use a stable release. You can try pre-releases later, when you have built a few projects.
+</Callout>
+
+<Callout type="info" title="Addition: python.org today">
+Since the video was recorded, python.org has added a second way to install Python on Windows, a small tool named **Python install manager**, and the Downloads page now offers it first. The classic installer from the video is still offered there at the time of writing, as the standalone installer or "Windows installer (64-bit)". The Python documentation says that it will be retired in a later version.
+
+Both ways give you a working `python` command, so either one is fine for this course. The install manager has no "Add python.exe to PATH" tick box. If your screens differ from the ones described here, follow the official guide [Using Python on Windows](https://docs.python.org/3/using/windows.html).
+</Callout>
+
+## Step 3: Run the installer
+
+Double-click the downloaded file. A window with the heading "Install Python 3.13.5 (64-bit)" opens. Do not click anything yet. At the bottom there are two tick boxes.
+
+| Option on the first screen | In the lesson |
+| --- | --- |
+| Use admin privileges when installing py.exe | Left empty |
+| Add python.exe to PATH | **Ticked** |
+
+Tick **Add python.exe to PATH**, then click **Install Now**.
+
+Why is this box important? Python is installed in one folder, and your programs will be saved in other folders. **PATH** is a list of folders that Windows searches when you type a command. If the Python folder is on that list, the command `python` works from every folder. Without the tick box you would have to add the folder to PATH by hand.
+
+Install Now also shows what you get and where it goes:
+
+- the install folder, in the video `C:\Users\navin\AppData\Local\Programs\Python\Python313`,
+- IDLE, pip and the documentation. IDLE is a small editor that the course opens in [IDLE and Number Operations](/docs/python-tutorial-2026/python-basics/idle-and-number-operations). pip is a tool for adding libraries.
+
+A progress bar runs for a short time. When the installer reports that the setup has finished, close it.
+
+## Step 4: Reopen the terminal
+
+Go back to the terminal and ask for the version again. In the lesson this happens in the window that was already open:
+
+```text
+PS C:\Users\navin> python --version
+Python was not found; run without arguments to install from the Microsoft Store, or disable this shortcut from Settings > Apps > Advanced app settings > App execution aliases.
+```
+
+Still not found, right after a successful installation. This happens in the lesson, and the instructor shows it on purpose, because so many people get stuck here.
+
+A terminal reads the PATH list once, when it starts. A window that was open before the installation still has the old list. **Close the terminal and open a new one.**
+
+## Step 5: Verify the installation
+
+In the new terminal window:
+
+```text
+PS C:\Users\navin> python --version
+Python 3.13.5
+```
+
+Python answers with its version. Your number will be the version you installed.
+
+The lesson also tries `python3` once more:
+
+```text
+PS C:\Users\navin> python3 --version
+Python was not found; run without arguments to install from the Microsoft Store, or disable this shortcut from Settings > Apps > Advanced app settings > App execution aliases.
+```
+
+On the instructor's Windows machine only `python` works, and that is all you need. If on your machine `python3` works and `python` does not, that is fine too. Use `python3` wherever this course says `python`.
+
+## The Python prompt
+
+Python is installed. Can you type Python code straight into the terminal now? The lesson tries:
+
+```text
+PS C:\Users\navin> print('hello')
+Unable to initialize device PRN
+```
+
+That is not Python answering. The line went to Windows, and Windows has a command of its own named `print`, which sends a file to a printer. The terminal speaks its own language. To speak Python, you first have to start Python.
+
+Type `python` and press Enter:
+
+```text
+PS C:\Users\navin> python
+Python 3.13.5 (tags/v3.13.5:6cb20a2, Jun 11 2025, 16:15:46) [MSC v.1943 64 bit (AMD64)] on win32
+Type "help", "copyright", "credits" or "license" for more information.
+>>>
+```
+
+The first line shows the version. The three arrows `>>>` are the **Python prompt**. Whatever you type after them goes to Python.
+
+```python
+>>> print('Hello')
+Hello
+```
+
+Congratulations. That is the first Python code running on your own machine.
+
+To leave the Python prompt and return to the terminal, type `exit()` and press Enter.
+
+| Prompt | Who is listening | What you type there |
+| --- | --- | --- |
+| `PS C:\Users\navin>` | PowerShell, the Windows terminal | Commands such as `python --version` and `cd` |
+| `>>>` | Python | Python code such as `print('Hello')` |
+
+## Step 6: Run a program from a file
+
+The prompt is fine for one line. A real program has ten lines, a hundred or a thousand. You want to keep those lines, correct them and run them again. So the code goes into a file.
+
+### Write and save the file
+
+Open Notepad and type the code. It is the same line as before:
+
+```text
+print('Hello')
+```
+
+Then save it:
+
+1. Choose Save as.
+2. Pick a folder. The lesson creates a folder for the course on the C drive, named `PythonPracs`. Any folder will do, as long as you remember where it is.
+3. Type the file name `Demo` and save. Notepad stores it as a text document, so the file is named `Demo.txt`.
+
+### Go to the folder and run the file
+
+To run a file, type `python` followed by the file name. The terminal looks for the file in the folder it is in. In the lesson the terminal is in `C:\Users\navin`, and the file is in `C:\PythonPracs`, so the instructor first has to change folder.
+
+The command for that is `cd`, short for change directory. `cd ..` goes one folder up, and `cd` with a folder name goes into that folder. The instructor goes up twice to reach `C:\` and then enters `PythonPracs`. You can also go there in one step:
+
+```text
+PS C:\Users\navin> cd C:\PythonPracs
+PS C:\PythonPracs>
+```
+
+The command `ls` lists the files in the folder, and then the file can be run:
+
+```text
+PS C:\PythonPracs> ls
+
+
+    Directory: C:\PythonPracs
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----        12-06-2025     16:29             14 Demo.txt
+
+
+PS C:\PythonPracs> python Demo.txt
+Hello
+```
+
+Python read the file and ran the line in it.
+
+### Use the .py extension
+
+The program works, but the name is not right yet. A Python file should end in **.py**. Python itself does not insist on it, as the run above shows. There are three good reasons to do it anyway.
+
+| Reason | Detail |
+| --- | --- |
+| Importing | Later you will use code from one file inside another. That feature expects `.py` files. See [Modules and Packages](/docs/python-tutorial-2026/functional-python/modules-and-packages) further on in the course |
+| Editors | Editors and IDEs recognise a `.py` file as Python and switch on their Python features |
+| Readability | Anyone who sees `Demo.py` knows it is a Python file |
+
+In Notepad, choose Save as again and give the file the name `Demo.py`. Set the file type to "All files" in the same dialog, so that Notepad does not add `.txt` to the name. The folder now holds two files, `Demo.txt` and `Demo.py`.
+
+{/* check: noout */}
+```python title="Demo.py"
+print('Hello')
+```
+
+```text
+PS C:\PythonPracs> python Demo.py
+Hello
+```
+
+From now on, every program in this course is a `.py` file.
+
+## Additions beyond the lesson
+
+**macOS and Linux.** The lesson uses Windows. On macOS and Linux the command is usually `python3`. Open the Terminal application and check what you have:
+
+```text
+python3 --version
+```
+
+If a version starting with 3 appears, Python is already there. On macOS you can install the current version from [python.org/downloads](https://www.python.org/downloads/), which has an installer for macOS. Most Linux systems come with Python 3. On those two systems, type `python3` wherever this course types `python`, for example `python3 Demo.py`.
+
+**Seeing file extensions on Windows.** File Explorer hides extensions by default, so `Demo.txt` and `Demo.py` can both appear as `Demo`. In File Explorer on Windows 11, choose View, then Show, then "File name extensions" to see the full names.
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `Python was not found; run without arguments to install from the Microsoft Store, ...` before installing | Python is not installed. The lesson uses this as the check | Install Python as in Steps 2 and 3 |
+| The same message right after installing | The terminal was opened before the installation and has the old PATH. This happens in the lesson | Close the terminal and open a new one |
+| The same message in a new terminal | "Add python.exe to PATH" was not ticked | Uninstall Python, then install it again with the box ticked |
+| `python3 --version` says not found, `python --version` works | With this installer on Windows the command is `python`. This happens in the lesson | Use `python` |
+| `Unable to initialize device PRN` | `print('hello')` was typed in the terminal, where `print` is a Windows command. This happens in the lesson | Type `python` first and wait for `>>>` |
+| `can't open file 'C:\\Users\\navin\\Demo.py': [Errno 2] No such file or directory` | The terminal is not in the folder that holds the file, or the name is misspelled. In the lesson the instructor starts in the wrong folder | Use `cd` to go to the folder, check with `ls`, then run again |
+| `SyntaxError: invalid syntax` after typing `python Demo.py` | The command was typed at the `>>>` prompt, which only understands Python code | Type `exit()` first, then run the command in the terminal |
+| The file is listed as `Demo.py.txt` | Notepad added `.txt` when saving | Save again with the file type "All files" |
+
+About the "can't open file" message: the command for the wrong folder is typed but never run in the video. The instructor types `python Demo.` there and deletes it without pressing Enter. The line in the table is what Python 3.13 printed on a test machine for the same mistake. Python puts the full path of its own program in front of the message, and the path of the file will be your own. The doubled backslashes are how Python prints a Windows path there.
+
+## Try It Yourself
+
+1. Open a terminal and run `python --version`. Write down what you get.
+2. Close the terminal, open a new one and run the command again. After a fresh installation, why can the two results differ?
+3. Start the Python prompt, print your own name, and leave the prompt with `exit()`.
+4. Type `print('hello')` directly in PowerShell, without starting Python. Explain the message in one sentence.
+5. Create a folder for this course, write a file `Hello.py` in Notepad that prints `Hello`, and run it from the terminal.
+6. Go one folder up with `cd ..` and try to run `Hello.py` from there. Read the message, then go back into your folder and run it again.
+7. Use `ls` to list your folder. Is your file really named `Hello.py`, or did Notepad add `.txt`?
+8. Add a second `print` line to `Hello.py`, save the file and run it again.
+
+<Callout type="info" title="Checked for these docs">
+The file `Demo.py`, the prompt session and the commands `python --version`, `python Demo.txt` and `python Demo.py` were run on Windows with Python 3.13 and behaved as shown. The messages "Unable to initialize device PRN" and "can't open file" were produced again on a test machine. The terminal sessions and the installer options are copied from the video, where the version is 3.13.5. The last screen of the installer, the second Save as dialog and the `cd` into the folder are not visible in the video and are described in our own words. The download page and the installers on python.org were looked at when this page was written, and they change over time.
+</Callout>
+
+## Official references
+
+- [Python documentation: using Python on Windows](https://docs.python.org/3/using/windows.html)
+- [Python documentation: using Python on macOS](https://docs.python.org/3/using/mac.html)
+- [Python tutorial: using the Python interpreter](https://docs.python.org/3/tutorial/interpreter.html)
+- [python.org: downloads](https://www.python.org/downloads/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

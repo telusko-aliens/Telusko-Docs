@@ -1,0 +1,316 @@
+---
+title: User Input
+description: Read values from the keyboard with input(), show a prompt, convert the text to a number with int() and keep only the first character of what the user typed.
+---
+
+Every program so far has had its values written into the code. To swap two numbers, the lesson typed `a = 5` and `b = 6` into the file. The lists, tuples and names were typed in the same way. Values that are fixed in the code like this are called **hardcoded** values.
+
+That is fine while you are learning. A real application is different, because it is used by other people. They have their own numbers and their own names, and they cannot open your file to change them.
+
+So the program has to ask. This lesson shows how to take a value from the user while the program is running, and the one surprise that comes with it.
+
+## Step 1: Replace the fixed values with input()
+
+To show something on the screen you call the function `print`. To take something from the user there is a function too, and it has the name you would guess: `input`.
+
+The lesson starts from the swap program of [Swapping Variables](/docs/python-tutorial-2026/functions-modules-and-input/swapping-variables) and replaces the two fixed values:
+
+{/* check: stdin=6|4; noout */}
+```python title="Demo.py"
+a = input()
+b = input()
+
+a,b = b,a
+
+print("a : ",a)
+print("b : ",b)
+```
+
+Run it with `python Demo.py`. The terminal shows an empty line and the program waits. The instructor types `6`, presses Enter, types `4` and presses Enter again:
+
+{/* check: skip */}
+```text
+6
+4
+a :  4
+b :  6
+```
+
+The first two lines are what the user typed. The first `input()` gave `6` to `a`, the second gave `4` to `b`, and the swap did the rest.
+
+Each call of `input()` does three things:
+
+| Step | What happens |
+| --- | --- |
+| 1 | The program stops and waits |
+| 2 | The user types something and presses Enter |
+| 3 | `input()` gives the typed text back to the program, and the next line runs |
+
+## Step 2: Tell the user what to type
+
+Run the same program again and look at it as a user would. There is an empty line and a blinking cursor. Nothing is printed. You know that the program is waiting, because you wrote `input()`. A user does not know that. To a user it looks as if the application is stuck.
+
+So the program has to say what it is waiting for. `input` accepts a text between its brackets. This text is called the **prompt**, and it is printed before the program waits:
+
+{/* check: stdin=5|6; noout */}
+```python title="Demo.py"
+a = input("Enter 1st num ")
+b = input("Enter 2nd num ")
+
+a,b = b,a
+
+print("a : ",a)
+print("b : ",b)
+```
+
+{/* check: skip */}
+```text
+Enter 1st num 5
+Enter 2nd num 6
+a :  6
+b :  5
+```
+
+Now the user reads `Enter 1st num` and knows what to do. The `5` and the `6` after the prompts are typed by the user.
+
+Look at the space before the closing quote in `"Enter 1st num "`. `input` does not start a new line after the prompt, so the user types on the same line. Without that space the screen would show `Enter 1st num5`.
+
+## Step 3: Add the two numbers
+
+Swapping is not very useful to a user. Adding two numbers makes more sense. The lesson removes the swap and writes:
+
+{/* check: stdin=5|7; noout */}
+```python title="Demo.py"
+a = input("Enter 1st num ")
+b = input("Enter 2nd num ")
+
+c = a + b
+
+print(c)
+```
+
+{/* check: skip */}
+```text
+Enter 1st num 5
+Enter 2nd num 7
+57
+```
+
+The expected answer is 12. The program prints `57`.
+
+The user typed 5 and 7, and the code adds them. Nothing in the file looks wrong.
+
+## input() always gives a string
+
+The instructor opens the definition of `input` in VS Code. The editor shows this line:
+
+```text
+def input(prompt: object = "", /) -> str: ...
+```
+
+Read only the end of it for now. The arrow `-> str` says what the function gives back, and `str` is the string type from [Data Types](/docs/python-tutorial-2026/data-structures-and-types/data-types). The help text below it in the video begins with "Read a string from standard input."
+
+So whatever the user types, `input` hands it over as a string. The user pressed the key 5, and the program received the text `"5"`.
+
+And you already know what `+` does with two strings from [String Concatenation](/docs/python-tutorial-2026/python-basics/string-concatenation). It joins them, which is called **concatenation**:
+
+```python
+>>> "5" + "7"
+'57'
+>>> 5 + 7
+12
+```
+
+That is the whole story of the 57. Python added correctly. It was given two pieces of text.
+
+## Step 4: Convert the text to a number
+
+Before adding, the text has to become a number. The function `int` does that. It takes a string of digits and gives back an integer:
+
+```python
+>>> int("5")
+5
+>>> int("5") + int("7")
+12
+```
+
+In the program, the lesson converts `a` and stores the result in `a` again, and does the same for `b`:
+
+{/* check: stdin=5|7; noout */}
+```python title="Demo.py"
+a = input("Enter 1st num ")
+b = input("Enter 2nd num ")
+
+a = int(a)
+b = int(b)
+
+c = a + b
+
+print(c)
+```
+
+{/* check: skip */}
+```text
+Enter 1st num 5
+Enter 2nd num 7
+12
+```
+
+![Input_Returns_A_String](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-input-flow.svg)
+
+The rule to remember: `input` gives you a string every time. If you need a number, convert it yourself.
+
+| Code | Type of the value | `a + b` for 5 and 7 |
+| --- | --- | --- |
+| `a = input("Enter 1st num ")` | `str` | `57` |
+| `a = int(a)` after the input | `int` | `12` |
+
+## Step 5: Take one character
+
+Sometimes text is exactly what you want. The lesson clears the file and asks for a character:
+
+{/* check: stdin=u; noout */}
+```python title="Demo.py"
+a = input("Enter a character ")
+
+print(a)
+```
+
+{/* check: skip */}
+```text
+Enter a character u
+u
+```
+
+That works. The prompt asks for one character, but nothing stops the user from typing more. With `you` the program prints `you`:
+
+{/* check: stdin=you; noout */}
+```python title="Demo.py"
+a = input("Enter a character ")
+
+print(a)
+```
+
+{/* check: skip */}
+```text
+Enter a character you
+you
+```
+
+`input` takes the whole line, however long it is.
+
+### Print only the first character
+
+A string has positions, and the first one is position 0, as you saw in [Fetching Characters from a String](/docs/python-tutorial-2026/python-basics/fetching-characters-from-a-string). So `a[0]` is the first character:
+
+{/* check: stdin=you; noout */}
+```python title="Demo.py"
+a = input("Enter a character ")
+
+print(a[0])
+```
+
+{/* check: skip */}
+```text
+Enter a character you
+y
+```
+
+The instructor then types a long row of random keys, and the program still prints one character, the first one:
+
+{/* check: stdin=asdjhfalksdfoi2u3oijlakjdsflkjasldkflasdf; noout */}
+```python title="Demo.py"
+a = input("Enter a character ")
+
+print(a[0])
+```
+
+{/* check: skip */}
+```text
+Enter a character asdjhfalksdfoi2u3oijlakjdsflkjasldkflasdf
+a
+```
+
+### Keep only the first character
+
+The program prints one character, but `a` still holds the whole long text. If one character is all you need, there is no reason to keep the rest.
+
+`input(...)` gives back a string, so the `[0]` can be written directly after the call:
+
+{/* check: stdin=laskdfjlasdjflasjdflasldkfjlksdf; noout */}
+```python title="Demo.py"
+a = input("Enter a character ")[0]
+
+print(a)
+```
+
+{/* check: skip */}
+```text
+Enter a character laskdfjlasdjflasjdflasldkfjlksdf
+l
+```
+
+The output is the lower-case letter `l`, the first key that was typed. Now `a` holds one character, whatever the user enters.
+
+<Callout type="info" title="Two small notes on the wording in the video">
+The video calls `a[0]` slicing. Taking one position with `[0]` is called **indexing**. A slice takes a range, such as `a[0:3]`.
+
+The video says that storing the whole text in `a` wastes memory. With `input(...)[0]`, Python still reads the whole line first. The difference is what stays afterwards. Only the first character is stored in `a`, and the rest of the text is thrown away at once.
+</Callout>
+
+## Additions beyond the lesson
+
+These two points are not in the video. You will meet them as soon as you test your own programs.
+
+**Text that is not a whole number.** `int` can only convert text that looks like a whole number. If the user types `five` in the program of Step 4, the program stops with an error:
+
+```text
+ValueError: invalid literal for int() with base 10: 'five'
+```
+
+The same happens for `2.5`. For numbers with a decimal point, use `float(a)` in place of `int(a)`.
+
+**Nothing typed.** If the user presses Enter without typing anything, `input` gives an empty string. An empty string has no position 0, so the program of the last step stops with:
+
+```text
+IndexError: string index out of range
+```
+
+Handling such errors properly comes later in the course, in [Handling Exceptions with try and except](/docs/python-tutorial-2026/exceptions-and-multithreading/handling-exceptions-with-try-except).
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 with the same values that are typed in the video, and the terminal blocks show what appeared. The prompt sessions were run too. The two error messages in the additions were produced by typing `five` and by pressing Enter on an empty line. In the terminal blocks, the text after a prompt is typed by the user. It appears on the screen only when you run the program in a real terminal. The listings leave out the empty first line of the video's file and the three commented lines `# c = a`, `# a = b` and `# b = c`, which stay at the bottom of that file from the previous lesson.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| The program shows an empty line and seems stuck | `input()` has no prompt and is waiting for you. This happens in the lesson | Type a value and press Enter. Then add a prompt, such as `input("Enter 1st num ")` |
+| `Enter 1st num5`, the typed value sticks to the prompt | The prompt has no space at the end | End the prompt with a space |
+| 5 and 7 give `57`. This happens in the lesson | `input` gives strings, and `+` joins strings | Convert first with `a = int(a)` and `b = int(b)` |
+| `TypeError: unsupported operand type(s) for -: 'str' and 'str'` | Subtracting two inputs that are still strings | Convert both with `int` |
+| `ValueError: invalid literal for int() with base 10: 'five'` | The typed text is not a whole number | Type digits only. Use `float` for numbers with a decimal point |
+| The whole word is printed when you wanted one character. This happens in the lesson | `input` takes the complete line | Use `a[0]`, or `input("Enter a character ")[0]` |
+| `IndexError: string index out of range` | Enter was pressed on an empty line, so there is no first character | Type at least one character |
+
+## Try It Yourself
+
+1. Write a program that asks `Enter your name ` and prints the name.
+2. Remove the space at the end of the prompt and run the program again. Describe what changes on the screen.
+3. Ask for two numbers and print their sum. Run it first without `int` and then with `int`, and explain both results.
+4. Ask for two numbers and print their product with `*`.
+5. Ask for a word and print how many characters it has with `len`.
+6. Ask for a word and print its last character. Remember what the position `-1` means.
+7. Ask for a number and print its square. Use `**`.
+8. Ask for the user's name and print only the first letter, using `[0]` directly after `input(...)`.
+
+## Official references
+
+- [Python tutorial: input and output](https://docs.python.org/3/tutorial/inputoutput.html)
+- [Python library: the input function](https://docs.python.org/3/builtins/functions.html#input)
+- [Python library: the int class](https://docs.python.org/3/builtins/functions.html#int)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

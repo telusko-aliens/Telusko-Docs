@@ -1,0 +1,97 @@
+---
+title: Introduction to Variables
+description: Reuse the last result of the Python prompt with the underscore, see why that is fragile, and store values in your first named variables.
+---
+
+In [IDLE and Number Operations](/docs/python-tutorial-2026/python-basics/idle-and-number-operations) the Python prompt worked as a calculator. Every line gave a result, and the next line started from nothing again.
+
+Real calculations build on each other. You work something out, and the next line needs that result. Typing the number again by hand is slow, and you may not remember it. This lesson shows two ways to reuse a result: a shortcut of the prompt, and then the proper tool, a variable.
+
+## Step 1: The underscore remembers the last result
+
+Press the up arrow key and the prompt brings back the line you typed before. That is how the lesson repeats `8 ** 3`. Now suppose you want to use that result in the next line:
+
+{/* check: skip */}
+```python
+>>> 8 ** 3
+512
+>>> 5 + _
+517
+>>> 2 + _
+519
+```
+
+In the prompt, the underscore `_` holds the result of the last line that produced one. So `5 + _` is 5 plus 512.
+
+Look at the third line. The idea was 2 plus 512, and the answer is 519. The underscore had moved on. After the second line, the last result was 517.
+
+The underscore is handy for a quick calculation, and it is fragile. It changes with every result. It is also a feature of the prompt only. Do not rely on it in a program file.
+
+One key behaves differently in IDLE: there the up arrow moves the cursor, and an earlier line is brought back with Alt+P.
+
+## Step 2: Variables, boxes with a name
+
+To keep a value for as long as you need it, give it a name:
+
+```python
+>>> num1 = 8 ** 3
+>>> num1
+512
+>>> print(num1)
+512
+```
+
+Think of a **variable** as a box with a name on it. `num1` is the name, and the box holds a value.
+
+| Part | Meaning |
+| --- | --- |
+| `num1` | The name of the variable |
+| `=` | Assignment. It puts the value on the right into the variable on the left |
+| `8 ** 3` | Worked out first. The result, 512, is what gets stored |
+
+The first line prints nothing. An assignment only stores the value. To see it, type the name. In the prompt, typing a name shows its value. In a program file you will use `print(...)`, which works in both places. What `print` really is comes later, in [Introduction to Functions](/docs/python-tutorial-2026/functions-modules-and-input/introduction-to-functions).
+
+Now the value stays put, whatever else you calculate in between:
+
+```python
+>>> num1 = 8 ** 3
+>>> 4 + 8
+12
+>>> 5 + num1
+517
+>>> num2 = 8
+>>> num1 + num2
+520
+>>> num3 = num1 + num2
+>>> num3
+520
+```
+
+After `4 + 8`, the underscore would be 12. `num1` is still 512. And the result of a calculation with variables can go into another variable, as `num3` shows.
+
+<Callout type="info" title="Checked for these docs">
+Every prompt session on this page was run again for these docs with Python 3.13, and each line gave the result shown. The last block repeats the line `num1 = 8 ** 3`, which the video types only once, so that the block can be run by itself. The underscore session was typed into a real prompt, because it cannot be replayed automatically.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `2 + _` gives an unexpected number | `_` holds the most recent result, not the one you had in mind | Store the value in a variable |
+| Nothing is printed after `num1 = 8 ** 3` | An assignment stores a value and prints nothing | Type `num1` or `print(num1)` |
+
+## Try It Yourself
+
+1. Type `10 * 3`, then `_ + 1`, then `_ + 1` again. Explain each result.
+2. Store the price `250` in `price` and the quantity `4` in `qty`. Store their product in `total` and print it.
+3. Store `9 // 2` in `q` and `9 % 2` in `r`. Then check that `q * 2 + r` gives 9.
+4. Store `2 ** 10` in `big`. Calculate `7 * 6`, then type `big` again. Has its value changed?
+
+## Official references
+
+- [Python tutorial: numbers, the `=` sign and the underscore in interactive mode](https://docs.python.org/3/tutorial/introduction.html#numbers)
+- [Python reference: assignment statements](https://docs.python.org/3/reference/simple_stmts.html#assignment-statements)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

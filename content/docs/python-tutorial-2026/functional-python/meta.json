@@ -1,0 +1,14 @@
+{
+  "title": "Functional Python",
+  "pages": [
+    "higher-order-functions.mdx",
+    "lambda-functions.mdx",
+    "filter-function.mdx",
+    "map-and-reduce.mdx",
+    "inner-functions.mdx",
+    "decorators.mdx",
+    "decorators-part-2.mdx",
+    "modules-and-packages.mdx",
+    "special-variable-name.mdx"
+  ]
+}

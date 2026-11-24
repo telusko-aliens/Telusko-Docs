@@ -1,0 +1,247 @@
+---
+title: Variable Storage
+description: See what a variable really is in Python by using id to find out which names point to the same object, and learn what happens to an object that no name points to.
+---
+
+You have used variables for numbers, strings, lists, tuples, sets and dictionaries. In [Introduction to Variables](/docs/python-tutorial-2026/python-basics/introduction-to-variables) a variable was described as a box with a name on it. That picture is good enough to start with.
+
+This lesson goes back to that picture and tests it. If `a = 5` makes a box named `a`, then `b = 5` should make a second box named `b`. Two boxes, the same value in each.
+
+Python can tell you whether that is true. The answer changes the picture, and the new picture explains many things you will meet later.
+
+## Step 1: Two variables, one value
+
+```python
+>>> a = 5
+>>> a
+5
+>>> b = 5
+>>> b
+5
+```
+
+If each variable were its own box in memory, each box would sit at its own place. Python has a built-in function, `id`, that returns the **identity** of whatever you pass to it. The identity is a whole number that belongs to one object for as long as that object exists. In the standard Python that you downloaded from python.org, the number is the address of the object in memory.
+
+{/* check: skip */}
+```python
+>>> a = 5
+>>> b = 5
+>>> id(a)
+140726264022056
+>>> id(b)
+140726264022056
+```
+
+Two different boxes cannot have the same address. Yet both lines print the same number.
+
+<Callout type="warn" title="Your numbers will be different">
+The values printed by `id` depend on the machine and on the run. The numbers on this page are the ones on the instructor's screen. You will get other numbers, and other numbers again after you restart Python. Do not compare your numbers with the page. Compare your own two results with each other: are they the same or different?
+</Callout>
+
+## Step 2: Give b a new value
+
+Does `b = 6` open the box named `b` and replace the 5 with a 6? If so, the identity of `b` would stay the same.
+
+{/* check: skip */}
+```python
+>>> a = 5
+>>> b = 5
+>>> b = 6
+>>> id(b)
+140726264022088
+```
+
+The number changed. So `b` is not the name of a box whose content was replaced. Something else is going on.
+
+## Names and objects
+
+Everything in Python is an **object**. The number 5 is an object. The string `'navin'` is an object. A list with many values is an object. The objects are the boxes, and each object has an identity.
+
+A variable is a name that **refers** to an object. Another word for such a name is a **reference**. The name is like a label tied to the box with a string. It is not the box.
+
+With that, the three lines read like this:
+
+| Line | What Python does |
+| --- | --- |
+| `a = 5` | Takes an object for 5 and makes the name `a` point to it |
+| `b = 5` | An object for 5 is already there. `b` points to the same object |
+| `b = 6` | Takes an object for 6 and moves the name `b` to it. The object 5 is untouched, and `a` still points to it |
+
+That is why `id(a)` and `id(b)` were equal at first, and why `id(b)` changed after `b = 6`. Assigning to a name never changes an object. It moves the name.
+
+![Names_Point_To_Objects](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-names-and-objects.svg)
+
+## Step 3: A third name, and an object nobody uses
+
+{/* check: skip */}
+```python
+>>> a = 5
+>>> b = 6
+>>> k = 5
+>>> b = 9
+>>> id(k)
+140726264022056
+>>> id(b)
+140726264022184
+```
+
+`k` is a new name, and it points to the same 5 as `a`. Their identities match. `b` has moved again, this time to an object for 9.
+
+Now count the names:
+
+| Object | Names that point to it |
+| --- | --- |
+| 5 | `a` and `k` |
+| 9 | `b` |
+| 6 | None |
+
+Nobody refers to the object 6 any more. An object that cannot be reached is wasted memory. Python cleans up such objects by itself. This is called **garbage collection**.
+
+The instructor compares it with tidying a room. A remote control on the floor is still used for something, so you put it back on the table. A scrap of paper that nobody needs goes in the bin. Python decides the same way: an object that some name still refers to stays, and an object without any reference can go.
+
+<Callout type="info" title="A detail about small numbers">
+The rule in the drawing is right for objects in general. The number 6 itself is a special case. The standard Python keeps a range of small whole numbers ready for the entire run, because programs use them all the time. In Python 3.13, the version in the video, these are the numbers from -5 to 256. So the object 6 is not really thrown away. An object for a large number such as 100000, a long string or a list is removed once nothing refers to it.
+</Callout>
+
+## Step 4: Strings behave the same way
+
+{/* check: skip */}
+```python
+>>> name = 'navin'
+>>> name1 = 'navin'
+>>> id(name)
+2123605867856
+>>> id(name1)
+2123605867856
+```
+
+Two names, one string object. The lesson calls this **string interning**: Python keeps one copy of a string in a pool and lets every name that needs it point to that copy.
+
+## Step 5: Equal values are not always the same object
+
+The lesson then tries a longer string:
+
+{/* check: skip */}
+```python
+>>> a = 'My fav my color is black'
+>>> b = 'My fav my color is black'
+>>> id(a)
+2123605794992
+>>> id(b)
+2123605795632
+```
+
+The text is the same, and the identities differ. This time Python made two objects. The same happens with a larger number. Note that `id(b)` is asked first here:
+
+{/* check: skip */}
+```python
+>>> a = 1000
+>>> b = 1000
+>>> id(b)
+2123605692560
+>>> id(a)
+2123605692752
+```
+
+The instructor's reasoning is that sharing is a way to save memory. Small numbers and short words are repeated all the time, so one shared copy pays off. Big numbers and whole sentences are rarely repeated, so Python does not spend effort on finding an existing copy.
+
+## What decides whether an object is shared
+
+The idea in the lesson is right: sharing is an optimisation, and Python applies it where it is cheap. The exact rules belong to the Python implementation and to the way the code is run. They are not part of the language. For these docs, the lines from the lesson were run with the standard Python 3.13 in two ways, and the two ids were compared each time:
+
+| Lines | Typed into the prompt, one by one | Saved in a file and run |
+| --- | --- | --- |
+| `a = 5` and `b = 5` | Same id | Same id |
+| `name = 'navin'` and `name1 = 'navin'` | Same id | Same id |
+| The two long strings | Different ids | Same id |
+| `a = 1000` and `b = 1000` | Different ids | Same id |
+
+Three things explain the table:
+
+- **Small whole numbers.** In Python 3.13 the numbers from -5 to 256 exist once and are always shared. In the prompt, `256` gave the same id two times and `257` did not. The documentation of Python 3.13 and 3.14 names this range, and the documentation of Python 3.15 names a larger one, from -5 to 1024. On such a version `a = 1000` and `b = 1000` give the same id, also in the prompt. A larger number such as 5000 shows the effect there. This shows how much the range is a detail of one version.
+- **Strings that look like a name.** A string that is written directly in the code and consists only of the letters a to z (upper or lower case), digits and underscores is interned. For the other strings it is the characters that count, and the length does not. In the prompt, the short string `'hello world'` gave two different ids because of the space, and a string of 45 letters and underscores gave the same id. A string that is built while the program runs, for example by joining two strings with `+`, is not shared automatically. A string of one character from the English keyboard is shared whatever the character is, even a space or `!`.
+- **Code that is compiled together.** The prompt handles every line by itself. A file is prepared as a whole before it runs, and equal values inside it are stored once. That is why the file shows the same id in every row.
+
+The video says that interning works for small strings of one or two words. The two-word test above shows that the exact rule is about the characters. The conclusion of the lesson stays the same.
+
+<Callout type="warn" title="Never build a program on this">
+Whether two equal values share one object can change with the Python version, with the implementation and with the place the code runs in. Use `id` to understand what is going on. To find out whether two values are equal, use `==`, which you will meet in [Arithmetic, Assignment and Relational Operators](/docs/python-tutorial-2026/data-structures-and-types/arithmetic-assignment-and-relational-operators).
+</Callout>
+
+## Additions beyond the lesson
+
+**Why this matters: two names, one list.** With numbers and strings, sharing is invisible, because these objects cannot be changed. A list can be changed. If two names point to one list, a change made through one name is seen through the other:
+
+```python
+>>> a = [1, 2]
+>>> c = a
+>>> c.append(3)
+>>> a
+[1, 2, 3]
+```
+
+`c = a` did not copy the list. It gave the same list a second name.
+
+**The `is` operator.** `a is b` is `True` when both names point to the same object. It is the same question as comparing the two ids. Two lists that are written out separately are always two objects, even with equal content:
+
+```python
+>>> a = [1, 2]
+>>> b = [1, 2]
+>>> a == b
+True
+>>> a is b
+False
+>>> c = a
+>>> c is a
+True
+```
+
+**Interning by hand.** The instructor mentions that you can ask Python to intern a string. The function for that is `sys.intern`. `import` loads a module, which is covered in [Working with Modules](/docs/python-tutorial-2026/functions-modules-and-input/working-with-modules):
+
+{/* check: skip */}
+```python
+>>> import sys
+>>> a = sys.intern('My fav my color is black')
+>>> b = sys.intern('My fav my color is black')
+>>> a is b
+True
+```
+
+A beginner program does not need this.
+
+<Callout type="info" title="Checked for these docs">
+The `id` values on this page are copied from the instructor's screen and cannot be reproduced. The pattern was checked instead: every pair of lines was run with the standard Python 3.13 on Windows, entered line by line at the prompt and also saved in a file, and the ids were compared. The results are in the table above. The list examples and the `sys.intern` example were run and gave the output shown. Other Python versions and other implementations can share objects differently.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| Your `id` numbers do not match the video or this page | Identities depend on the machine and on the run | Compare your own results with each other. Only "same" or "different" matters |
+| `id(a)` and `id(b)` are equal for two separate variables | Both names point to one object. The lesson shows this with `a = 5` and `b = 5` | Nothing to fix. This is how names work |
+| `a = 1000` and `b = 1000` give the same id on your machine | The two lines were run from a file, or on one line, or with another Python | Nothing to fix. Sharing is an optimisation and can differ |
+| The address in a drawing in the video differs from the terminal by two digits | A typing slip in the drawing for the second long string | Trust the number printed in the terminal |
+| A list changes although you changed "another" variable | Both names point to the same list after `c = a` | Make a real copy with `c = a.copy()` |
+| `a is b` is `False` although `a == b` is `True` | `is` compares identity, and `==` compares values | Use `==` to compare values |
+
+## Try It Yourself
+
+1. Assign `x = 7` and `y = 7`. Print `id(x)` and `id(y)`. Are they the same?
+2. Now assign `y = 8` and print both ids again. Which one changed?
+3. Assign `z = x`. Without running it, say whether `id(z)` equals `id(x)`. Then check.
+4. Create two variables with the string `'python'`, and two variables with a full sentence of your own. Compare the ids of each pair in the prompt.
+5. In the prompt, assign `5000` to two variables on two separate lines and compare the ids. Then type both assignments on one line, separated by a semicolon, as `p = 5000; q = 5000`, and compare again.
+6. Put the lines of exercise 5 into a file, print `id(p) == id(q)` and run the file. Compare with the prompt.
+7. Draw the names and objects after these lines: `a = 10`, `b = a`, `a = 20`. Which value does `b` have? Check in the prompt.
+8. Create `nums = [1, 2, 3]` and `other = nums`. Append 4 to `other` and print `nums`. Explain the result with the word "reference".
+
+## Official references
+
+- [Python library: the id function](https://docs.python.org/3/builtins/functions.html#id)
+- [Python reference: objects, values and types](https://docs.python.org/3/reference/datamodel.html#objects-values-and-types)
+- [Python library: sys.intern](https://docs.python.org/3/library/sys.html#sys.intern)
+- [Python 3.13 C API: integer objects, with the note on the numbers from -5 to 256](https://docs.python.org/3.13/c-api/long.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

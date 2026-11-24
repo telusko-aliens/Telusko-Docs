@@ -1,0 +1,100 @@
+---
+title: Why and What Are Threads
+description: See why programs need to do several things at the same time, write the two-class example that runs one step after the other, and learn what processes and threads are.
+---
+
+Every program in this course has run one step at a time. A line finishes, then the next line starts. A function that is called runs to its end before the caller goes on.
+
+Real software does several things at once. You are on a phone call, you minimise it, and you read a chat or check the cricket score while the call goes on. In a game such as Mario, the player moves, the enemies move, the music plays and the score updates, all together. If each of these were a function that had to finish before the next one starts, the player would move, then stop, then the enemies would move, then stop, then a bit of music would play.
+
+The last chapter of the course shows how Python runs functions side by side with **threads**, where threads help, where they do not, and what **multiprocessing** does about that. This first lesson of the chapter sets up the example and explains what a thread is.
+
+## Step 1: Two classes, one after the other
+
+The instructor uses a small example, and says so himself: the output is not important, the way it is produced is. Create `threads_demo.py` in the `adv` folder:
+
+```python title="threads_demo.py"
+class Hello:
+    def do(self):
+        for i in range(5):
+            print("Hello ", i+1)
+
+class Hi:
+    def do(self):
+        for i in range(5):
+            print("Hi ", i+1)
+
+if __name__ == '__main__':
+
+    t1 = Hello()
+    t2 = Hi()
+
+    t1.do()
+    t2.do()
+```
+
+```text
+Hello  1
+Hello  2
+Hello  3
+Hello  4
+Hello  5
+Hi  1
+Hi  2
+Hi  3
+Hi  4
+Hi  5
+```
+
+`t1.do()` runs its whole loop. Only then does `t2.do()` start. The goal of the chapter is to make both run at the same time. The `if __name__ == '__main__':` line comes from [The Special Variable \_\_name\_\_](/docs/python-tutorial-2026/functional-python/special-variable-name). It becomes important in the last lesson of this chapter, [The GIL and Multiprocessing](/docs/python-tutorial-2026/exceptions-and-multithreading/gil-and-multiprocessing).
+
+<Callout type="info" title="Two spaces in the output">
+`"Hello "` ends with a space, and `print` puts one more space between its values. So the output has two spaces before the number.
+</Callout>
+
+## Processes and threads
+
+Every running program is a **process**. The lesson opens the Windows Task Manager to show them. On the Performance tab, the instructor's machine shows about 298 processes and more than 5,000 threads. When he starts one more application, both numbers go up.
+
+A process is heavy. It takes time to create and it has its own memory. A **thread** is a lighter unit of work inside a process. One process can have many threads, and they share the memory of that process.
+
+| | Process | Thread |
+| --- | --- | --- |
+| What it is | A running program | A line of execution inside a process |
+| Memory | Its own | Shared with the other threads of the process |
+| Cost to create | Higher | Lower |
+| Python module | `multiprocessing` | `threading` |
+
+The next lesson, [Creating and Running Threads](/docs/python-tutorial-2026/exceptions-and-multithreading/creating-and-running-threads), turns the two classes into threads.
+
+<Callout type="info" title="Checked for these docs">
+The program on this page was run with Python 3.13 on Windows and gave exactly the output shown. The two `TypeError` messages, the `can't open file` message and the empty output in the table below were produced by running the changed file.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `TypeError: Hello.do() takes 0 positional arguments but 1 was given` | `do` was written without `self` | Write `def do(self):` |
+| `TypeError: Hello.do() missing 1 required positional argument: 'self'` | The brackets after the class name are missing, as in `t1 = Hello`, so `t1` is the class and no object | `t1 = Hello()` |
+| `can't open file` with `No such file or directory` | The terminal is not in the folder of the file. The instructor moves to the `adv` folder before the first run | Change to the `adv` folder with `cd adv`, then run `python threads_demo.py` |
+| The file runs and prints nothing | The check is written as `'main'` without the underscores, so it is never true | `if __name__ == '__main__':` |
+
+## Try It Yourself
+
+1. Write two functions, `tick` and `tock`, that each print their word five times. Call them one after the other and note the output.
+2. In `threads_demo.py`, call `t2.do()` before `t1.do()`. Write down the output you expect, then run the file.
+3. Add a third class `Bye` with the same `do` method that prints "Bye " and the number. Create an object and call its `do` last. How many lines does the program print?
+4. Change `range(5)` to `range(3)` in `Hello` only. Guess the output before you run it.
+5. Open the Task Manager (or the system monitor of your operating system) and note the number of processes and threads. Start one more application and look again.
+6. Think of an application you use every day. Write down three things it does at the same time.
+
+## Official references
+
+- [Python tutorial: a first look at classes](https://docs.python.org/3/tutorial/classes.html#a-first-look-at-classes)
+- [Python library: \_\_main\_\_, the top-level code environment](https://docs.python.org/3/library/__main__.html)
+- [Python library: threading](https://docs.python.org/3/library/threading.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

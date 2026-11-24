@@ -1,0 +1,211 @@
+---
+title: The GIL and Multiprocessing
+description: Measure why two threads do not speed up a calculation, learn what the global interpreter lock is, and use the Process class from multiprocessing for CPU-heavy work.
+---
+
+In [The Thread join() Function](/docs/python-tutorial-2026/exceptions-and-multithreading/thread-join), three downloads that took 1.50 seconds one after the other took 0.50 seconds with three threads. It looks as if threads make everything faster.
+
+They do not. The download function did nothing but wait. This lesson gives the threads real work for the processor, measures again, and finds almost no gain. The reason is a part of Python called the GIL, and the way around it is the `multiprocessing` module.
+
+## I/O bound work
+
+A program that mostly waits, for a network, a disk or a user, is called **I/O bound**. I/O stands for input and output. Threads are a good fit for it.
+
+## Step 1: Work for the CPU
+
+Now a task that does not wait. `calculate` adds up the squares of all numbers in a range, 50 million of them. The result is not used. Only the time matters. The plan: split the range in two halves, give each half to a thread, and finish in half the time.
+
+{/* check: noout */}
+```python title="threads_demo.py"
+from threading import Thread
+from time import sleep, time
+
+
+def calculate(n1, n2):
+    sum = 0
+    for n in range(n1, n2):
+        sum += n*n
+
+
+
+if __name__ == '__main__':
+
+    num = 50_000_000
+
+    start = time()
+    calculate(0, num)
+    end = time()
+
+    print(f"serial time {end - start:.2f} seconds")
+
+    mid = num // 2
+
+    t1 = Thread(target=calculate, args = (0, mid))
+    t2 = Thread(target=calculate, args = (mid, num))
+
+    start = time()
+
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    end = time()
+
+    print(f"parallel with threads time {end - start:.2f} seconds")
+
+    print("Bye")
+```
+
+{/* check: skip */}
+```text
+serial time 1.67 seconds
+parallel with threads time 1.57 seconds
+Bye
+```
+
+`50_000_000` is 50 million. Python lets you put underscores into a number to make it readable. `num // 2` gives a whole number, which `range` needs.
+
+Two threads, and almost no gain. The instructor runs it five times, and the thread version stays between 1.49 and 1.57 seconds against 1.57 to 1.67 for the serial one.
+
+## The GIL
+
+The reason has a name: the **GIL**, the global interpreter lock. In the standard build of CPython, the Python you download from python.org, only one thread executes Python bytecode at a time. Bytecode is the form your code is translated into before it runs. A thread must hold the lock to run it. The others wait for their turn.
+
+So `t1` and `t2` do not run on two CPU cores at the same time. They take turns on the lock, and the switching costs a little time as well.
+
+Why did the downloads get faster then? A thread that waits, in `sleep` or for a network or a file, gives the lock away while it waits. Three threads can wait at the same time. They cannot calculate at the same time. A task like `calculate`, which keeps the processor busy, is called **CPU bound**.
+
+## Step 2: multiprocessing
+
+The answer of the lesson is to use processes. Each process has its own memory, its own Python interpreter and so its own GIL. The class `Process` from the `multiprocessing` module is used in almost the same way as `Thread`. This is the final file of the video:
+
+{/* check: noout */}
+```python title="threads_demo.py"
+from threading import Thread
+from time import sleep, time
+from multiprocessing import Process
+
+
+def calculate(n1, n2):
+    sum = 0
+    for n in range(n1, n2):
+        sum += n*n
+
+
+
+if __name__ == '__main__':
+
+    num = 50_000_000
+
+    start = time()
+    calculate(0, num)
+    end = time()
+
+    print(f"serial time {end - start:.2f} seconds")
+
+    mid = num // 2
+
+    t1 = Thread(target=calculate, args = (0, mid))
+    t2 = Thread(target=calculate, args = (mid, num))
+
+    start = time()
+
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    end = time()
+
+    print(f"parallel with threads time {end - start:.2f} seconds")
+
+    t1 = Process(target=calculate, args = (0, mid))
+    t2 = Process(target=calculate, args = (mid, num))
+
+    start = time()
+
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    end = time()
+
+    print(f"parallel with process time {end - start:.2f} seconds")
+
+    print("Bye")
+```
+
+{/* check: skip */}
+```text
+serial time 1.52 seconds
+parallel with threads time 1.55 seconds
+parallel with process time 0.88 seconds
+Bye
+```
+
+| Run | Video's machine | Machine used for these docs |
+| --- | --- | --- |
+| Serial | 1.52 seconds | 3.52 seconds |
+| Two threads | 1.55 seconds | 3.58 seconds |
+| Two processes | 0.88 seconds | 1.98 seconds |
+
+The numbers depend on the computer, and yours will be different again. The pattern is the same on both machines. Two threads are no faster than the serial run, and in this run a little slower. Two processes need a bit more than half the time. It is not exactly half, because starting a process takes time too.
+
+<Callout type="warn" title="Keep the __main__ check when you use Process">
+On Windows, every new process starts a fresh Python that reads your file again. Lines at the top level of the file would run again in each new process, including the lines that create processes. The line `if __name__ == '__main__':` stops that, because the name is `__main__` only in the process you started yourself. The file in the video has this check from the first version, so it runs correctly. Tested for these docs on Windows: a file that creates and starts a `Process` without the check stops in the new process with `RuntimeError: An attempt has been made to start a new process before the current process has finished its bootstrapping phase.`
+</Callout>
+
+## Which one to use
+
+| Situation | Choice in the lesson |
+| --- | --- |
+| The work mostly waits: downloads, files, network (I/O bound) | Threads |
+| Several things must go on side by side and speed is not the point | Threads |
+| The work is calculation (CPU bound) | Stay serial, or use processes |
+
+Processes cost more memory and more time to create. The instructor's summary is that the right choice depends on the situation.
+
+## Additions beyond the lesson
+
+**A Python without the GIL.** Since Python 3.13 there is a second, optional build of CPython called the free-threaded build, in which the GIL is disabled and threads can run Python code on several cores at once. In Python 3.13 it is experimental. From Python 3.14 it is officially supported. In both cases it is optional, and it is not what a normal installation gives you. It is a separate program, usually named `python3.13t`. Everything on this page describes the standard build, and the timings in the video match it.
+
+**The name `sum`.** `sum` is also the name of a built-in Python function. Inside `calculate` the variable hides it. Nothing breaks here, and in your own code a name such as `total` avoids the clash.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 on Windows and finished without an error. The output shown is the one from the video, because the times change from run to run and from machine to machine. The GIL description was compared with the Python glossary and the free-threading guide linked below. The `NameError` message in the table below and the `RuntimeError` in the callout above were produced by running the code. Exercises 4 and 5 were tried and run without an error.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `parallel with threads time 0.00 seconds` | Nothing stood between `start = time()` and `end = time()` yet. This happens in the lesson before the threads are written | Start and join the threads between the two lines |
+| `NameError: name 'Process' is not defined. Did you mean: 'process'?` | `process` was imported with a small p, and the code uses `Process`. The instructor types the import this way and corrects it before running | `from multiprocessing import Process` |
+| Threads give no speed-up for a calculation | The GIL lets one thread at a time execute Python bytecode | Use `Process`, or keep the code serial |
+
+## Try It Yourself
+
+1. Run the final file three times and write down the three times of each run. Which of the three values changes most?
+2. Change `num` to `10_000_000`. Are two processes still faster than the serial run on your machine?
+3. Say for each task whether it is I/O bound or CPU bound: downloading three files, adding up the squares of 50 million numbers, waiting for the user to type a name.
+4. Split the range into four parts and use four processes. Compare the time with the time of two processes.
+5. Take the download program from the previous lesson and use `Process` in place of `Thread`. Is the time still close to 0.50 seconds? Explain what you see.
+
+## Official references
+
+- [Python library: threading](https://docs.python.org/3/library/threading.html)
+- [Python library: multiprocessing](https://docs.python.org/3/library/multiprocessing.html)
+- [Python glossary: global interpreter lock](https://docs.python.org/3/glossary.html#term-global-interpreter-lock)
+- [Python HOWTO: free-threaded Python](https://docs.python.org/3/howto/free-threading-python.html)
+
+## Where to go next
+
+This is the last lesson of the course. The video ends with the final run of `threads_demo.py`. The instructor closes with "see you in the next part", but this is the last lecture of the course. There is no closing slide and no list of next topics.
+
+The pages of this section are a good place to repeat things. The [Getting Started](/docs/python-tutorial-2026/getting-started) page lists every lesson, and [Introduction to Python](/docs/python-tutorial-2026/python-basics/introduction-to-python) is the first one. The Try It Yourself exercises on each page are the quickest way to find out what you still need to practise.
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

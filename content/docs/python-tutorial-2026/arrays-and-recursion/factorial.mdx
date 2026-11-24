@@ -1,0 +1,265 @@
+---
+title: Factorial
+description: Write a function that calculates the factorial of a number with a for loop, use pass as a placeholder, and see how Python handles very large numbers.
+---
+
+This course is about code, and now the lesson turns to a bit of maths. There is a reason for it.
+
+A factorial is a small problem, and you still have to think about it before you type. Where does the calculation start? Where does it stop? What changes in every round? Working that out is good practice in logical thinking. It also uses several things you already know in one place: a function, a parameter, a `for` loop, `range` and `return`.
+
+There is a second reason. The next lesson is [Recursion](/docs/python-tutorial-2026/arrays-and-recursion/recursion), and the factorial is the classic first example for it. It helps to solve the problem with a plain loop first.
+
+## What a factorial is
+
+The factorial of a number is the product of all whole numbers from that number down to 1. It is written with an exclamation mark. The video shows it on screen like this:
+
+```text
+5! = 5*4*3*2*1
+```
+
+You can also write the numbers in ascending order, 1 times 2 times 3 times 4 times 5. The result is the same, 120. So a factorial is nothing more than repeated multiplication.
+
+| Number | Calculation | Factorial |
+| --- | --- | --- |
+| 1 | 1 | 1 |
+| 2 | 1 * 2 | 2 |
+| 3 | 1 * 2 * 3 | 6 |
+| 4 | 1 * 2 * 3 * 4 | 24 |
+| 5 | 1 * 2 * 3 * 4 * 5 | 120 |
+
+For the program this means: run a loop from 1 to the given number and multiply.
+
+## Step 1: Start with the call and a placeholder
+
+The lesson creates a new file, `fact_demo.py`, and begins with the outline: a function named `fact`, a call that passes 5, a variable that receives the result, and a `print`.
+
+At that moment the function has no body yet, and the editor shows an error. A `def` line must be followed by at least one indented line. If you run such a file, Python stops with `IndentationError: expected an indented block after function definition on line 1`.
+
+When you do not know yet what to write in a function, write the keyword `pass`:
+
+```python title="fact_demo.py"
+def fact():
+    pass
+```
+
+`pass` does nothing. It only fills the place where a statement is required, so the error goes away and you can write the real code later.
+
+This outline is not run in the video. The instructor knows what comes next and goes straight on.
+
+## Step 2: Accept the number and return a result
+
+The function has to accept the number that the call passes. That needs a parameter, here `num`. The function also needs a variable for the answer. The name `result` is already used outside the function, so the lesson picks `res` inside it, to keep the two apart. It starts at 1:
+
+```python title="fact_demo.py"
+def fact(num):
+    res = 1
+
+    return res
+
+
+result = fact(5)
+print(result)
+```
+
+```text
+1
+```
+
+The program runs and prints 1. That is not the factorial of 5. At this stage the function returns 1 whatever you pass. The calculation is still missing.
+
+<Callout type="info" title="Why res starts at 1 and not at 0">
+`res` will be multiplied again and again. Anything multiplied by 0 is 0, so a start value of 0 would give 0 at the end. Multiplying by 1 changes nothing, which makes 1 the right start for a product. For a sum, the right start is 0.
+</Callout>
+
+## Step 3: Multiply in a loop
+
+Now the loop. It has to go through the numbers 1, 2, 3, 4 and 5. `range` produces such a sequence, as you saw in [The for Loop](/docs/python-tutorial-2026/control-flow/for-loop).
+
+One detail needs care. `range(1, num)` starts at 1 and stops before `num`. With `num` equal to 5 it gives 1, 2, 3, 4, and the 5 is missing. To include the last number, the stop value has to be `num+1`.
+
+Inside the loop, `res` is multiplied by the loop variable `i`:
+
+```python title="fact_demo.py"
+def fact(num):
+    res = 1
+
+    for i in range(1, num+1):
+        res = res * i
+
+    return res
+
+
+result = fact(5)
+print(result)
+```
+
+```text
+120
+```
+
+Follow the loop round by round:
+
+| Round | `i` | `res` before | `res = res * i` | `res` after |
+| --- | --- | --- | --- | --- |
+| 1 | 1 | 1 | 1 * 1 | 1 |
+| 2 | 2 | 1 | 1 * 2 | 2 |
+| 3 | 3 | 2 | 2 * 3 | 6 |
+| 4 | 4 | 6 | 6 * 4 | 24 |
+| 5 | 5 | 24 | 24 * 5 | 120 |
+
+After the fifth round the loop ends, `return res` sends 120 back, and the call `fact(5)` is replaced by that value.
+
+![Factorial_Loop](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-factorial-loop.svg)
+
+<Callout type="warn" title="The digit 1 and the letter i">
+In the video the loop body is first typed as `res = res * 1`, with the digit one. The instructor notices it and changes it to `res = res * i` before running. It is a mistake to avoid, because Python does not report it. The line is valid, `res` stays 1 in every round, and the program prints `1` for every number.
+</Callout>
+
+## Step 4: Try bigger numbers
+
+The function works for any whole number, so change the argument in the call. The lesson tries 12, then 20, then 30. The table shows what `fact_demo.py` prints for each. In the video only the output for 20 is readable. The values for 12 and 30 come from a run for these docs.
+
+| Call | Output |
+| --- | --- |
+| `fact(5)` | `120` |
+| `fact(12)` | `479001600` |
+| `fact(20)` | `2432902008176640000` |
+| `fact(30)` | `265252859812191058636308480000000` |
+
+```python
+>>> def fact(num):
+...     res = 1
+...     for i in range(1, num+1):
+...         res = res * i
+...     return res
+...
+>>> fact(12)
+479001600
+>>> fact(20)
+2432902008176640000
+>>> fact(30)
+265252859812191058636308480000000
+```
+
+Factorials grow very fast. From 20 to 30 the result goes from 19 digits to 33 digits. The instructor checks the value for 20 against a web search, and it matches.
+
+In many programming languages a whole number has a fixed size, and a result like the one for 30 would not fit. A Python `int` has no fixed size. It grows as far as the memory of the computer allows.
+
+## Step 5: The factorial of 1000
+
+To see where it breaks, the lesson passes 1000:
+
+{/* check: noout */}
+```python title="fact_demo.py"
+def fact(num):
+    res = 1
+
+    for i in range(1, num+1):
+        res = res * i
+
+    return res
+
+
+result = fact(1000)
+print(result)
+```
+
+It does not break. The terminal fills with digits, row after row, and the number runs off the bottom of the screen. The first digits are 4023, and the web search in the video confirms that the factorial of 1000 starts that way and has 2568 digits.
+
+The whole number is too long to print here. This small change, which is not in the video, prints only the number of digits and the first 20 digits. `str` turns the number into a string, `len` counts its characters and `[:20]` takes the first 20, as in [Fetching Characters from a String](/docs/python-tutorial-2026/python-basics/fetching-characters-from-a-string):
+
+```python title="fact_demo.py"
+def fact(num):
+    res = 1
+
+    for i in range(1, num+1):
+        res = res * i
+
+    return res
+
+
+result = fact(1000)
+text = str(result)
+print(len(text))
+print(text[:20])
+```
+
+```text
+2568
+40238726007709377354
+```
+
+The answer comes at once. A thousand multiplications are very little work for a computer, even with numbers this long.
+
+## Additions beyond the lesson
+
+**The factorial of 0.** In maths, the factorial of 0 is defined as 1. The function already gives that answer. For `fact(0)` the loop is `range(1, 1)`, which is empty, so `res` is returned with its start value:
+
+```python
+>>> def fact(num):
+...     res = 1
+...     for i in range(1, num+1):
+...         res = res * i
+...     return res
+...
+>>> fact(0)
+1
+>>> fact(1)
+1
+```
+
+**Python has a factorial function.** The `math` module from [The math Module](/docs/python-tutorial-2026/functions-modules-and-input/the-math-module) contains `factorial`. In real programs you would use it. Writing your own version is still worth it for the practice.
+
+```python
+>>> import math
+>>> math.factorial(5)
+120
+>>> math.factorial(20)
+2432902008176640000
+```
+
+**Where it does stop.** The calculation itself has no limit apart from memory. Turning the result into text has one. By default Python refuses to turn a whole number with more than 4300 digits into text. The factorial of 2000 has 5736 digits, so `print(fact(2000))` ends with this error:
+
+```text
+ValueError: Exceeds the limit (4300 digits) for integer string conversion; use sys.set_int_max_str_digits() to increase the limit
+```
+
+The number was calculated correctly. Only the conversion to text was stopped, so `len(str(fact(2000)))` ends with the same error. The message names the function that raises the limit.
+
+<Callout type="info" title="Checked for these docs">
+Every program and prompt session on this page was run with Python 3.13 and gave the output shown. The values for `fact(12)` and `fact(30)` are not readable in the video and come from that run. The output of `fact(1000)` was compared with `math.factorial(1000)`: both give the same number with 2568 digits. The `IndentationError` and the `ValueError` were produced by running the code and are copied exactly.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| The editor marks the line after `def fact():`, and running gives `IndentationError: expected an indented block after function definition on line 1` | The function has no body. This happens in the lesson | Write the body, or `pass` as a placeholder |
+| `TypeError: fact() takes 0 positional arguments but 1 was given` | The call passes 5, and the `def` line has no parameter | Add the parameter, `def fact(num):` |
+| The output is `1` for every number | The loop body is `res = res * 1` with the digit one, or the loop is missing. Both states appear in the lesson | Multiply by the loop variable, `res = res * i` |
+| The output is `24` for `fact(5)` | The loop is `range(1, num)`, which stops at 4. The lesson types this first and corrects it | Use `range(1, num+1)` |
+| The output is `0` for every number | `res` starts at 0, or the loop starts at 0 with `range(num+1)` | Start `res` at 1 and the range at 1 |
+| The output is `None` | The function has no `return` line, or still contains only `pass` | End the function with `return res` |
+| `ValueError: Exceeds the limit (4300 digits) for integer string conversion` | A whole number with more than 4300 digits is being turned into text, by `print` or by `str` | Work with a smaller number, or raise the limit first with `import sys` and `sys.set_int_max_str_digits(10000)`, as the message says |
+
+## Try It Yourself
+
+1. Type the `fact` function yourself and print the factorials of 3, 6 and 10.
+2. Change the loop to `range(1, num)` and run `fact(5)`. Explain the result, then put the `+1` back.
+3. Add `print(i, res)` as the last line inside the loop and run `fact(6)`. Compare the lines with the table in Step 3.
+4. Rewrite the loop so that it counts down, 5, 4, 3, 2, 1, with `range(num, 0, -1)`. Check that the result is the same.
+5. Write the same function with a `while` loop.
+6. Ask the user for a number with `input()`, convert it with `int()`, and print its factorial.
+7. Write a function `total(num)` that adds the numbers from 1 to `num`. What must the start value be now?
+8. How many digits does the factorial of 100 have? Use `len(str(...))` to find out.
+
+## Official references
+
+- [Python tutorial: defining functions](https://docs.python.org/3/tutorial/controlflow.html#defining-functions)
+- [Python tutorial: pass statements](https://docs.python.org/3/tutorial/controlflow.html#pass-statements)
+- [Python tutorial: the range() function](https://docs.python.org/3/tutorial/controlflow.html#the-range-function)
+- [Python library: math.factorial](https://docs.python.org/3/library/math.html#math.factorial)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

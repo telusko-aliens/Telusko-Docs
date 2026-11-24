@@ -1,0 +1,530 @@
+---
+title: Inheritance and MRO
+description: Let one class take over the methods of another, build single level, multi level and multiple inheritance, and learn the order in which Python searches the classes for a method.
+---
+
+After class and object, the next big idea of object-oriented programming is **inheritance**.
+
+The word means the same as in real life. You may own a car or a house that you did not build yourself. You got it from your parents. Maybe they got it from their parents. And if your mother and your father each had a property, you may end up with both.
+
+Classes can do the same. A class can receive the methods of another class without a single line being copied. This lesson builds the three shapes of inheritance with tiny classes named `A`, `B` and `C`. Then it answers a question that comes up as soon as there are two parents: if both have a method with the same name, which one is used?
+
+## Step 1: One class with two methods
+
+The lesson creates a new file, `inheritance.py`, in the `oop` folder. Class `A` has two methods. Think of `f1` as "feature one".
+
+```python title="inheritance.py"
+class A:
+    def f1(self):
+        print("f1 works")
+
+    def f2(self):
+        print("f2 works")
+
+obj1 = A()
+obj1.f1()
+```
+
+```text
+f1 works
+```
+
+An object of `A` can call `f1` and `f2`. When you type `obj1.` in the editor, the list of suggestions shows these two, and a long list of other names below them. Where those come from is explained in [`__init__` and `super()` with Inheritance](/docs/python-tutorial-2026/object-oriented-python/init-and-super-with-inheritance).
+
+## Step 2: A second class that stands alone
+
+Now add a class `B` with two methods of its own, create an object of `B`, and try to call `f1` on it.
+
+{/* check: error */}
+```python title="inheritance.py"
+
+class A:
+    def f1(self):
+        print("f1 works")
+
+    def f2(self):
+        print("f2 works")
+
+class B:
+    def f3(self):
+        print("f3 works")
+
+    def f4(self):
+        print("f4 works")
+
+
+obj1 = B()
+obj1.f1()
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\inheritance.py", line 18, in <module>
+    obj1.f1()
+    ^^^^^^^
+AttributeError: 'B' object has no attribute 'f1'. Did you mean: 'f3'?
+```
+
+`f1` belongs to `A`. Class `B` knows nothing about it. Python even tries to help and asks whether you meant `f3`.
+
+One way out is to copy `f1` and `f2` into `B`. The lesson does that for a moment and it works. It is also a bad habit. The same code now exists twice, and every later change has to be made twice.
+
+## Step 3: Single level inheritance
+
+The better way takes one small change. Write the name of the other class in round brackets after the class name.
+
+```python title="inheritance.py"
+class A:
+    def f1(self):
+        print("f1 works")
+
+    def f2(self):
+        print("f2 works")
+
+class B(A):
+
+    def f3(self):
+        print("f3 works")
+
+    def f4(self):
+        print("f4 works")
+
+
+obj1 = B()
+obj1.f1()
+```
+
+```text
+f1 works
+```
+
+`class B(A):` means that `B` **inherits** from `A`.
+
+| Word | Meaning here |
+| --- | --- |
+| Parent class | `A`, the class that gives its methods |
+| Child class | `B`, the class that receives them |
+| Inherit | The child gets every method of the parent, and keeps its own |
+
+An object of `B` can now call `f1`, `f2`, `f3` and `f4`. One parent and one child is called **single level inheritance**.
+
+## Step 4: Multi level inheritance
+
+A child can be a parent too. Add a class `C` that inherits from `B`.
+
+{/* check: error */}
+```python title="inheritance.py"
+
+class A:
+    def f1(self):
+        print("f1 works")
+
+    def f2(self):
+        print("f2 works")
+
+class B(A):
+
+    def f3(self):
+        print("f3 works")
+
+    def f4(self):
+        print("f4 works")
+
+class C(B):
+    def f5(self):
+        print("f5 works")
+
+obj1 = B()
+obj1.f5()
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\inheritance.py", line 22, in <module>
+    obj1.f5()
+    ^^^^^^^
+AttributeError: 'B' object has no attribute 'f5'. Did you mean: 'f1'?
+```
+
+`B` inherits from `A`, and `C` inherits from `B`. That is grandparent, parent and child, and it is called **multi level inheritance**.
+
+The error shows an important rule. The object was created from `B`, and `f5` belongs to `C`, the child of `B`. A child has access to everything its parents have. A parent has no access to the methods of its child. Inheritance goes in one direction only.
+
+Create the object from `C` and it works. Only the last two lines of the file change:
+
+```python title="inheritance.py"
+class A:
+    def f1(self):
+        print("f1 works")
+
+    def f2(self):
+        print("f2 works")
+
+class B(A):
+
+    def f3(self):
+        print("f3 works")
+
+    def f4(self):
+        print("f4 works")
+
+class C(B):
+    def f5(self):
+        print("f5 works")
+
+obj1 = C()
+obj1.f5()
+```
+
+```text
+f5 works
+```
+
+An object of `C` can call all five methods, `f1` to `f5`. The suggestion list of the editor shows them all.
+
+## Step 5: Multiple inheritance
+
+Now a different shape. `B` no longer inherits from `A`. The two classes stand alone again, and `C` inherits from both of them. The parents are written in the brackets, separated by a comma.
+
+```python title="inheritance.py"
+class A:
+    def f1(self):
+        print("f1 works")
+
+    def f2(self):
+        print("f2 works")
+
+class B:
+
+    def f3(self):
+        print("f3 works")
+
+    def f4(self):
+        print("f4 works")
+
+class C(A,B):
+    def f5(self):
+        print("f5 works")
+
+obj1 = C()
+obj1.f1()
+obj1.f3()
+obj1.f5()
+```
+
+```text
+f1 works
+f3 works
+f5 works
+```
+
+This is **multiple inheritance**: one child with two parents. In the picture from real life, `A` is your father, `B` is your mother, and `C` is you.
+
+`C` still has all five methods. The difference to Step 4 is in `B`. An object of `B` can now call only `f3` and `f4`, because `B` has no parent any more.
+
+In the video the file has only the line `obj1 = C()` at this point, and the editor's suggestion list shows `f1` to `f5`. The three calls above were added for these docs to show the same thing as output.
+
+| Shape | Written as | Who gets what |
+| --- | --- | --- |
+| Single level | `class B(A):` | `B` gets the methods of `A` |
+| Multi level | `class B(A):` and `class C(B):` | `C` gets the methods of `B` and of `A` |
+| Multiple | `class C(A,B):` | `C` gets the methods of `A` and of `B` |
+
+## Step 6: Two parents with the same method
+
+Multiple inheritance has a twist. Give all three classes a method with the same name, `show`.
+
+```python title="inheritance.py"
+class A:
+    def f1(self):
+        print("f1 works")
+
+    def f2(self):
+        print("f2 works")
+
+    def show(self):
+        print("in A show")
+
+class B:
+
+    def f3(self):
+        print("f3 works")
+
+    def f4(self):
+        print("f4 works")
+
+    def show(self):
+        print("in B show")
+
+class C(A,B):
+    def f5(self):
+        print("f5 works")
+
+    def show(self):
+        print("in C show")
+
+obj1 = C()
+obj1.show()
+```
+
+```text
+in C show
+```
+
+The instructor compares `show` to a mobile phone. If you have your own phone, you use it. `C` has its own `show`, so that one runs.
+
+What if your phone is switched off or lost? You borrow one from your parents. The question is whose. Comment out the `show` of `C` and run the file again. The listings from here on are shortened. In the video the methods `f1` to `f4` stay in the file. Most of them are left out below, and the output is the same with them.
+
+```python title="inheritance.py"
+class A:
+    def show(self):
+        print("in A show")
+
+class B:
+    def show(self):
+        print("in B show")
+
+class C(A,B):
+    def f5(self):
+        print("f5 works")
+
+    # def show(self):
+    #     print("in C show")
+
+obj1 = C()
+obj1.show()
+```
+
+```text
+in A show
+```
+
+`A` wins. Now comment out the `show` of `A` as well:
+
+```python title="inheritance.py"
+class A:
+    def f1(self):
+        print("f1 works")
+
+    # def show(self):
+    #     print("in A show")
+
+class B:
+    def show(self):
+        print("in B show")
+
+class C(A,B):
+    def f5(self):
+        print("f5 works")
+
+    # def show(self):
+    #     print("in C show")
+
+obj1 = C()
+obj1.show()
+```
+
+```text
+in B show
+```
+
+Only `B` has a `show` left, so Python ends up there.
+
+## Method Resolution Order (MRO)
+
+The three runs show a fixed search order. Python calls it the **Method Resolution Order**, or **MRO**. To resolve a method means to find out which method a name stands for.
+
+When you call `obj1.show()` on an object of `C`, which is defined as `class C(A,B):`, Python searches like this:
+
+1. First in the object's own class, `C`. If `show` is there, it is used and the search ends.
+2. If not, in the first parent named in the brackets, `A`.
+3. If not there, in the next parent, `B`.
+
+The first class that has the method wins. The parents are searched from left to right, in the order in which you wrote them.
+
+![Inheritance_And_MRO](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-inheritance-mro.svg)
+
+| `show` exists in | `obj1.show()` prints |
+| --- | --- |
+| `C`, `A` and `B` | `in C show` |
+| `A` and `B` | `in A show` |
+| `B` only | `in B show` |
+
+<Callout type="info" title="The video shows the order through output">
+The video never prints the MRO as a list. It shows the order only through which `show` method runs, as in the table above. A way to print the list is in the additions at the end of this page.
+</Callout>
+
+## Step 7: Change the order of the parents
+
+Bring the `show` of `A` back. With `class C(A,B):` the output is `in A show` again. To get the method of `B`, swap the two names in the brackets.
+
+```python title="inheritance.py"
+class A:
+    def show(self):
+        print("in A show")
+
+class B:
+    def show(self):
+        print("in B show")
+
+class C(B,A):
+    def f5(self):
+        print("f5 works")
+
+    # def show(self):
+    #     print("in C show")
+
+obj1 = C()
+obj1.show()
+```
+
+```text
+in B show
+```
+
+`B` is now the first parent, so it is searched before `A`.
+
+## Step 8: Call the method of one parent directly
+
+Suppose you want to keep the order `class C(A,B):` and still run the `show` of `B`. The lesson uses a form you have seen in [Class and Object](/docs/python-tutorial-2026/object-oriented-python/class-and-object): call the method through the class name and pass the object yourself.
+
+```python title="inheritance.py"
+class A:
+    def show(self):
+        print("in A show")
+
+class B:
+    def show(self):
+        print("in B show")
+
+class C(A,B):
+    def f5(self):
+        print("f5 works")
+
+    # def show(self):
+    #     print("in C show")
+
+obj1 = C()
+
+B.show(obj1)
+
+# obj1.show()
+```
+
+```text
+in B show
+```
+
+`B.show(obj1)` names the class, so Python does not search at all. The object `obj1` is passed by hand and becomes `self` inside the method.
+
+## Additions beyond the lesson
+
+These points are not in the video. They were run for these docs.
+
+**1. Printing the MRO.** Every class has a method `mro()` that returns the search order as a list. The loop below prints only the names.
+
+```python title="mro.py"
+class A:
+    def show(self):
+        print("in A show")
+
+class B:
+    def show(self):
+        print("in B show")
+
+class C(A,B):
+    pass
+
+class D(B,A):
+    pass
+
+for c in C.mro():
+    print(c.__name__)
+
+print("---")
+
+for c in D.mro():
+    print(c.__name__)
+```
+
+```text
+C
+A
+B
+object
+---
+D
+B
+A
+object
+```
+
+The list starts with the class itself and then names the parents from left to right, exactly as the runs in the lesson showed. `pass` is a statement that does nothing. It is used here because a class needs at least one line in its body.
+
+**2. The last entry, `object`.** Every class in Python inherits from a built-in class named `object`, also when you do not write it. That is why it closes every list. The next lesson talks about it.
+
+**3. When two parents share an ancestor.** The left-to-right rule describes the lesson's example. When two parents inherit from the same class, Python works out the order with an algorithm named C3, which places the shared ancestor after both parents. The dependable way to see the order of any class is `ClassName.mro()`.
+
+```python title="diamond.py"
+class X:
+    pass
+
+class L(X):
+    pass
+
+class R(X):
+    pass
+
+class D(L, R):
+    pass
+
+for c in D.mro():
+    print(c.__name__)
+```
+
+```text
+D
+L
+R
+X
+object
+```
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown. The two tracebacks were produced by hand and match the video. The file path in them is the one from the video. In the video, the class header at the moment of the `in B show` run in Step 7 is `class C(B,A):`. It is visible only for a few seconds between two changes.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `AttributeError: 'B' object has no attribute 'f1'. Did you mean: 'f3'?` | `B` does not inherit from `A`. This happens in the lesson | Write `class B(A):` |
+| `AttributeError: 'B' object has no attribute 'f5'. Did you mean: 'f1'?` | The object was made from the parent `B`, and `f5` belongs to the child `C`. This happens in the lesson | Create the object from the child: `obj1 = C()` |
+| `TypeError: A.f1() takes 0 positional arguments but 1 was given` | The method was written as `def f1():` without `self`. The lesson types it this way at first and corrects it before running | Write `def f1(self):` |
+| The method of the "wrong" parent runs | With `class C(A,B):` the first parent `A` is searched first | Swap the order to `class C(B,A):`, or call `B.show(obj1)` |
+| `TypeError: B.show() missing 1 required positional argument: 'self'` | `B.show()` was called through the class without an object | Pass the object: `B.show(obj1)` |
+| `NameError: name 'A' is not defined` | The child class is written above its parent in the file | Define the parent class first |
+| The same output after an edit | The file was not run again after the change. This happens in the lesson | Save and run the file again |
+
+## Try It Yourself
+
+1. Write class `A` with `f1` and `f2`. Create an object and call both methods.
+2. Add a separate class `B` with `f3` and `f4`. Call `f1` on an object of `B` and read the error.
+3. Change the header to `class B(A):` and call all four methods on an object of `B`.
+4. Add `class C(B):` with `f5`. Which methods can an object of `A` call, which an object of `B`, and which an object of `C`? Check your answer by running.
+5. Change the code to multiple inheritance, `class C(A,B):`, with `B` standing alone. Which call on an object of `B` stops working now?
+6. Add a `show` method to `A`, `B` and `C`. Predict the output of `obj1.show()`, then comment out the methods one by one as in the lesson.
+7. Swap the parents to `class C(B,A):` and predict the output before you run the file.
+8. Keep `class C(A,B):` and call the `show` of `B` on `obj1` without changing the header.
+
+## Official references
+
+- [Python tutorial: inheritance](https://docs.python.org/3/tutorial/classes.html#inheritance)
+- [Python tutorial: multiple inheritance](https://docs.python.org/3/tutorial/classes.html#multiple-inheritance)
+- [Python how-to: the method resolution order](https://docs.python.org/3/howto/mro.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

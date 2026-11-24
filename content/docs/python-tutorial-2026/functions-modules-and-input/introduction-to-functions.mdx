@@ -1,0 +1,370 @@
+---
+title: Introduction to Functions
+description: Run several lines from a file, then write your own function with def, pass values to it, get a value back with return and describe it with a docstring.
+---
+
+The editor and the file `Demo.py` are ready from [Setting Up the IDE](/docs/python-tutorial-2026/functions-modules-and-input/setting-up-the-ide). This lesson uses them for the topic that the setup was made for.
+
+You have used functions since the first lesson. `print(...)` is one. `int(...)` and `float(...)` are two more. You know them by their shape: a name, then round brackets.
+
+So far those functions were written by someone else. This lesson shows what a function is, why programs need them, and how to write your own.
+
+The reason is repetition. A real program has many lines, and some groups of lines are needed again and again. Writing the same lines in ten places is slow, and when they need a change you must change all ten. A function lets you write the lines once, give them a name, and use that name wherever you need them.
+
+## Step 1: Several lines in one file
+
+Replace the test line `print('Hello')` from the previous lesson with a small program that adds two numbers:
+
+```python title="Demo.py"
+a = 5
+b = 4
+c = a + b
+
+print(c)
+```
+
+```text
+9
+```
+
+This is the first time the course runs several lines in one go. Python runs them from top to bottom. Nothing is shown unless you ask for it with `print`. In the prompt, typing `c` was enough. In a file it is not.
+
+Each statement sits on its own line, and pressing Enter ends it. Many other languages need a semicolon `;` at the end of every statement. Python accepts `a = 5;` without complaint, and the semicolon adds nothing, so nobody writes it.
+
+## A block of code with a name
+
+Suppose the program is hundreds of lines long, and the addition is needed again further down. You could copy the four lines. The lesson suggests a better idea and types it into the file as a sketch:
+
+```text
+add block
+----------------------
+a = 5
+b = 4
+c = a + b
+
+print(c)
+----------------------
+
+call add block
+```
+
+Put the lines in a box, give the box a name, and call it by that name whenever you need it. VS Code underlines all of this in red, because it is English and not Python. The idea is right. Only the spelling has to change.
+
+## Step 2: Define the function with def
+
+In Python the box is called a **function**, and it is created with the keyword `def`, short for "define":
+
+{/* check: noout */}
+```python title="Demo.py"
+def add():
+
+    a = 5
+    b = 4
+    c = a + b
+
+    print(c)
+```
+
+| Part | Meaning |
+| --- | --- |
+| `def` | Starts the definition of a function |
+| `add` | The name you choose for it |
+| `()` | Round brackets. They belong to every function |
+| `:` | The colon says that the lines of the function follow |
+| The lines moved to the right | The **body**, the code that belongs to the function |
+
+Python has no lines of hyphens and no curly brackets to mark where a function begins and ends. It uses **indentation**, the empty space at the start of a line. Every line that is moved to the right under `def add():` belongs to the function. The first line that starts at the left edge again is outside it.
+
+Press Tab once in front of each line of the body. VS Code turns that into four spaces. Any number of spaces works, even one, as long as every line of the body uses the same number. Four spaces is what almost all Python code uses.
+
+The instructor notes that this saves typing, and that it can be hard at first to see where a function ends. You get used to it quickly.
+
+<Callout type="info" title="Comments">
+While editing, the lesson keeps the sketch line in the file by putting a hash sign in front of it: `# call add block`. A line that starts with `#` is a **comment**. Python skips it. Comments are notes for the people who read the code.
+</Callout>
+
+## Step 3: Call the function
+
+Run the file from Step 2. There is no error, and there is no output either.
+
+Defining a function only stores it under its name. The body runs when the function is **called**. To call a function, write its name with round brackets:
+
+```python title="Demo.py"
+def add():
+
+    a = 5
+    b = 4
+    c = a + b
+
+    print(c)
+
+
+add()
+```
+
+```text
+9
+```
+
+The line `add()` has no indentation, so it is outside the function. Save the file before you run it. In the video the instructor forgets this more than once and gets the old output.
+
+A function can be called as often as you like:
+
+```python title="Demo.py"
+def add():
+
+    a = 5
+    b = 4
+    c = a + b
+
+    print(c)
+
+
+add()
+add()
+add()
+```
+
+```text
+9
+9
+9
+```
+
+Write once, call many times. That is the main reason functions exist.
+
+## Step 4: Pass values to the function
+
+Every call prints 9, because 5 and 4 are fixed inside the body. A useful `add` should add any two numbers. The natural thing to try is to put the numbers in the brackets of the call:
+
+{/* check: error */}
+```python title="Demo.py"
+def add():
+
+    a = 5
+    b = 4
+    c = a + b
+
+    print(c)
+
+
+add(2,3)
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\Users\navin\OneDrive\Documents\Python Course\FirstProject\Demo.py", line 10, in <module>
+    add(2,3)
+    ~~~^^^^^
+TypeError: add() takes 0 positional arguments but 2 were given
+```
+
+The call passes two values, and the function does not accept any. The values that a call passes are named **arguments**. To accept them, the function needs two variables in its brackets. These are named **parameters**:
+
+```python title="Demo.py"
+def add(x,y):
+
+    a = 5
+    b = 4
+    c = a + b
+
+    print(c)
+
+
+add(2,3)
+```
+
+```text
+9
+```
+
+The error is gone, and the answer is still 9. The 2 goes into `x` and the 3 goes into `y`, and then the body ignores them and uses 5 and 4 as before. VS Code hints at this with the message `"x" is not accessed`. Use the parameters in the body:
+
+```python title="Demo.py"
+def add(x,y):
+
+    a = x
+    b = y
+    c = a + b
+
+    print(c)
+
+
+add(2,3)
+```
+
+```text
+5
+```
+
+Parameter names are your choice, like any variable name.
+
+## Step 5: Give the result back with return
+
+This `add` always prints its answer. The caller may want something else: store the sum in a file, send it to a server, or use it in another calculation. The function should hand the value over and let the caller decide.
+
+A first attempt stores the result of the call in a variable:
+
+```python title="Demo.py"
+def add(x,y):
+
+    a = x
+    b = y
+    c = a + b
+
+    print(c)
+
+
+result = add(2,3)
+print("result is ", result)
+```
+
+```text
+5
+result is  None
+```
+
+The `5` comes from the `print(c)` inside the function. Then `result` turns out to be `None`. `None` is Python's value for "nothing". A function that does not say what it gives back gives back `None`.
+
+To give a value back, use the keyword `return`:
+
+```python title="Demo.py"
+def add(x,y):
+
+    a = x
+    b = y
+    c = a + b
+
+    return c
+
+
+result = add(2,3)
+print("result is ", result)
+
+
+result = add(5,8)
+print("result is ", result)
+```
+
+```text
+result is  5
+result is  13
+```
+
+`return c` ends the function and sends the value of `c` back to the place of the call. There it is stored in `result`. The same function now serves two calls with different values.
+
+![Function_Call_Flow](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-function-call.svg)
+
+<Callout type="info" title="Why there are two spaces after is">
+The text `"result is "` ends with a space. When `print` gets several values separated by commas, it puts one more space between them. That makes two.
+</Callout>
+
+## Step 6: Describe the function with a docstring
+
+Hover the mouse over `print` in VS Code. A small window shows how `print` is defined and a description that begins with "Prints the values to a stream, or to sys.stdout by default."
+
+Hover over `add`, and you see only this:
+
+```text
+(function) def add(x: Any, y: Any) -> Any
+```
+
+There is no description, because none was written. To add one, put a text in triple double quotes on the first line of the body:
+
+```python title="Demo.py"
+def add(x,y):
+    """ Adds 2 values """
+    a = x
+    b = y
+    c = a + b
+
+    return c
+
+
+result = add(2,3)
+print("result is ", result)
+
+
+result = add(5,8)
+print("result is ", result)
+```
+
+```text
+result is  5
+result is  13
+```
+
+This text is called a **docstring**, short for documentation string. Save the file and hover over `add` again. The window now shows "Adds 2 values" under the definition. The docstring does not change what the function does.
+
+## The parts of a function
+
+| Term | In the example | Meaning |
+| --- | --- | --- |
+| Definition | `def add(x,y):` | Creates the function and gives it a name |
+| Parameters | `x`, `y` | Variables that receive the values of a call |
+| Body | The indented lines | The code that runs on every call |
+| Docstring | `""" Adds 2 values """` | A description for the people who use the function |
+| Return value | `return c` | The value the function gives back |
+| Call | `add(2,3)` | Runs the body |
+| Arguments | `2`, `3` | The values that the call passes |
+
+Functions are a large topic. This lesson covers what the next lessons need. More follows in [Function Arguments](/docs/python-tutorial-2026/arrays-and-recursion/function-arguments) and [Global and Local Variables](/docs/python-tutorial-2026/arrays-and-recursion/global-and-local-variables).
+
+## Additions beyond the lesson
+
+The lesson copies `x` and `y` into `a` and `b` to keep the earlier lines. The parameters can be used directly, and the result of an expression can be returned without storing it first:
+
+```python title="Demo.py"
+def add(x,y):
+    """ Adds 2 values """
+    return x + y
+
+
+print("result is ", add(2,3))
+```
+
+```text
+result is  5
+```
+
+A call can stand anywhere a value can stand, for example inside `print(...)`, as the last line shows.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run as `Demo.py` with Python 3.13 and gave the output shown. The file from Step 2 was run to confirm that it prints nothing. The `TypeError` was produced with the code shown. Its line number matches the code on this page, and in the video it says line 12 because the file there has two more empty lines. The hover texts come from the video and depend on the editor.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| The old output appears after a change | The file was not saved before running. This happens in the lesson, more than once | Save with Ctrl+S, then run again |
+| No output at all | The function is defined and never called. This happens in the lesson | Add a call such as `add()` at the left edge, below the function |
+| `TypeError: add() takes 0 positional arguments but 2 were given` | The call passes values, and the definition has empty brackets. This happens in the lesson | Add parameters: `def add(x,y):` |
+| The answer is still `9` after adding `x,y` | The body does not use the parameters. This happens in the lesson | Use them: `a = x` and `b = y` |
+| `result is  None` | The function prints the value and does not return it. This happens in the lesson | Replace `print(c)` with `return c` |
+| `TypeError: add() missing 1 required positional argument: 'y'` | The call passes one value and the function expects two, as in `add(2)` | Pass one argument for each parameter |
+| `SyntaxError: expected ':'` | The colon after `def add()` is missing | End the `def` line with a colon |
+| `IndentationError: expected an indented block after function definition on line 1` | The lines under `def` start at the left edge | Indent every line of the body with four spaces |
+| `SyntaxError: invalid syntax` at `call add block` | Plain English in a Python file | Call the function with `add()`, or turn the line into a comment with `#` |
+
+## Try It Yourself
+
+1. Write a function `greet()` that prints `Hello` and call it three times.
+2. Define `greet()` and do not call it. Run the file and explain what you see.
+3. Write `subtract(x,y)` that prints `x - y`. Call it with `10` and `4`.
+4. Change `subtract` so that it returns the value. Store the result of `subtract(10,4)` in `result` and print it.
+5. Call `add(2,3)` on a function defined as `def add():`. Read the error message and fix the definition.
+6. Write `square(n)` that returns `n * n`. Print `square(4)` and `square(9)`.
+7. Add a docstring to `square` and hover over its name in your editor.
+
+## Official references
+
+- [Python tutorial: defining functions](https://docs.python.org/3/tutorial/controlflow.html#defining-functions)
+- [Python tutorial: documentation strings](https://docs.python.org/3/tutorial/controlflow.html#documentation-strings)
+- [Python reference: the return statement](https://docs.python.org/3/reference/simple_stmts.html#the-return-statement)
+- [Python reference: indentation](https://docs.python.org/3/reference/lexical_analysis.html#indentation)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

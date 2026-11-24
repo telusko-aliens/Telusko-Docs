@@ -1,0 +1,11 @@
+{
+  "title": "Functions, Modules and Input",
+  "pages": [
+    "setting-up-the-ide.mdx",
+    "introduction-to-functions.mdx",
+    "working-with-modules.mdx",
+    "the-math-module.mdx",
+    "swapping-variables.mdx",
+    "user-input.mdx"
+  ]
+}

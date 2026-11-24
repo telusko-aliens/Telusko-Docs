@@ -1,0 +1,321 @@
+---
+title: The for Loop
+description: Print every value of a list with a while loop first, then do the same in two lines with a for loop, and use range to loop over numbers.
+---
+
+The [while loop](/docs/python-tutorial-2026/control-flow/while-loop) repeats a block as long as a condition is true. It works, and it asks a lot from you: a counter, a condition and a line that changes the counter. Forget one of them and the loop never ends.
+
+Very often the job is simpler. You have a list, and you want to do something with each value in it. For that job Python has a second loop, the **for loop**.
+
+The lesson does not start with `for`. It first prints a list with a `while` loop, runs into an error on the way, and only then shows the `for` loop. After that the advantage is easy to see.
+
+## Two loops are enough
+
+The instructor has worked with four kinds of loops in different languages: while, do-while, for and until. Python keeps two of them, `while` and `for`.
+
+| Loop | When the condition is checked | In Python |
+| --- | --- | --- |
+| while | Before the block runs | Yes |
+| do-while | After the block has run once | No |
+| for | No condition, it walks through a collection | Yes |
+| until | Runs until the condition becomes true, known from shell scripts | No |
+
+A do-while loop does almost the same thing as a while loop. The only difference is the moment of the check. Whatever a do-while loop does can be written with a while loop, so Python leaves it out and keeps the language small.
+
+## Step 1: A list to work with
+
+Create a new file named `for_demo.py`. The lesson fills a list with a few unrelated values:
+
+```python title="for_demo.py"
+data = [2, 'Navin', 4.5, 8, 'Telusko', 'Python']
+
+print(data)
+```
+
+```text
+[2, 'Navin', 4.5, 8, 'Telusko', 'Python']
+```
+
+Printing the list shows everything at once, with brackets and quotes. To get one value you use its index number, as you learned in [Lists](/docs/python-tutorial-2026/data-structures-and-types/lists):
+
+```python title="for_demo.py"
+data = [2, 'Navin', 4.5, 8, 'Telusko', 'Python']
+
+print(data[0])
+```
+
+```text
+2
+```
+
+For all six values you could write six `print` lines, with `data[0]` up to `data[5]`. Doing the same thing many times is a job for a loop.
+
+## Step 2: Print every value with a while loop
+
+A while loop needs a counter. The counter is used as the index, so it starts at 0, because indexing starts at 0. The list has six values, so the last index is 5.
+
+```python title="for_demo.py"
+data = [2, 'Navin', 4.5, 8, 'Telusko', 'Python']
+
+i = 0
+
+while i <= 5:
+    print(data[i])
+    i += 1
+```
+
+```text
+2
+Navin
+4.5
+8
+Telusko
+Python
+```
+
+The line `i += 1` matters. Without it `i` stays 0, the condition stays true, and the loop prints the first value again and again without end.
+
+## Step 3: Let len() find the end
+
+The number 5 is written by hand. That only works for this list. A list can have 100 values. It can also come from a user, from a file or from a database, and then you do not know its length while you write the code.
+
+`len(data)` gives the number of values, so the lesson stores it in `n` and uses `n` in the condition:
+
+{/* check: error */}
+```python title="for_demo.py"
+data = [2, 'Navin', 4.5, 8, 'Telusko', 'Python']
+
+i = 0
+n = len(data)
+
+while i <= n:
+    print(data[i])
+    i += 1
+```
+
+{/* check: skip */}
+```text
+2
+Navin
+4.5
+8
+Telusko
+Python
+Traceback (most recent call last):
+  File "C:\Users\navin\OneDrive\Documents\Python Course\FirstProject\for_demo.py", line 7, in <module>
+    print(data[i])
+          ~~~~^^^
+IndexError: list index out of range
+```
+
+All six values are printed, and then the program stops with an error. This happens in the lesson.
+
+The length `n` is 6. The condition `i <= n` lets `i` become 6, and `data[6]` does not exist. Six values have the indexes 0 to 5. The loop has to stop one step before `n`, so the condition must be `i < n`:
+
+```python title="for_demo.py"
+data = [2, 'Navin', 4.5, 8, 'Telusko', 'Python']
+
+i = 0
+n = len(data)
+
+while i < n:
+    print(data[i])
+    i += 1
+```
+
+```text
+2
+Navin
+4.5
+8
+Telusko
+Python
+```
+
+<Callout type="info" title="The output in the video">
+In the video the terminal is partly hidden for this run and the output is visible only up to `8`. The complete output above comes from running the same code.
+</Callout>
+
+Now the loop adjusts to any length. Count what it took:
+
+| Line | Job |
+| --- | --- |
+| `i = 0` | Create a counter |
+| `n = len(data)` | Find the length |
+| `while i < n:` | Check the condition |
+| `data[i]` | Fetch the value with the index |
+| `i += 1` | Move the counter |
+
+Five things to get right, and one of them went wrong a moment ago.
+
+## Step 4: The same job with a for loop
+
+The lesson comments out the while version and writes two new lines above it:
+
+```python title="for_demo.py"
+data = [2, 'Navin', 4.5, 8, 'Telusko', 'Python']
+
+for value in data:
+    print(value)
+
+# i = 0
+# n = len(data)
+
+# while i < n:
+#     print(data[i])
+#     i += 1
+```
+
+```text
+2
+Navin
+4.5
+8
+Telusko
+Python
+```
+
+The output is the same. Read the first line of the loop almost like a sentence: for each value in data.
+
+| Part | Meaning |
+| --- | --- |
+| `for` | The keyword that starts the loop |
+| `value` | A variable. In every round it holds one value from the collection. The name is your choice |
+| `in` | A keyword that stands between the variable and the collection |
+| `data` | The collection to walk through. It can be a list, a range or another collection |
+| `:` and the indented lines | The block that runs once for every value |
+
+The for loop goes to the collection and hands you its values one by one. It starts at the first value and stops by itself after the last. There is no counter, no length and no index, so there is nothing to forget and no index that can run out of range.
+
+![For_Loop_Over_A_List](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-for-loop.svg)
+
+## Step 5: Watch it in the debugger
+
+To see the values arrive one at a time, the lesson runs the file in the debugger, the tool introduced in [else and Debugging](/docs/python-tutorial-2026/control-flow/else-and-debugging).
+
+1. Click to the left of the line number of the `for` line to set a breakpoint. A red dot appears.
+2. Open the menu next to the run button and choose **Python Debugger: Debug Python File**.
+3. Press **Step Over** again and again and watch `value` in the Variables panel.
+
+| Round | `value` in the Variables panel | Printed in the terminal |
+| --- | --- | --- |
+| 1 | `2` | `2` |
+| 2 | `'Navin'` | `Navin` |
+| 3 | `4.5` | `4.5` |
+| 4 | `8` | `8` |
+| 5 | `'Telusko'` | `Telusko` |
+| 6 | `'Python'` | `Python` |
+
+After the sixth round there is no value left, and the loop ends.
+
+## Step 6: Loop over numbers with range
+
+A for loop does not need a list that you typed yourself. To print the ten numbers from 0 to 9, the lesson puts `range(10)` in the place of `data`. It has used `range` before.
+
+```python title="for_demo.py"
+data = [2, 'Navin', 4.5, 8, 'Telusko', 'Python']
+
+for value in range(10):
+    print(value)
+```
+
+```text
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+```
+
+`range(10)` gives the numbers from 0 up to 9. The 10 itself is not included, in the same way that the last index of a list is one less than its length. `value` receives one of these numbers in each round. The list `data` is still in the file and is not used any more.
+
+## while or for
+
+| | `while` | `for` |
+| --- | --- | --- |
+| Needs | A condition | A collection or a range |
+| Counter | You create it and change it yourself | Not needed |
+| Ends when | The condition becomes false | The values are used up |
+| Typical use | Repeat until something happens, for example read characters from a file one by one until the end | Do something with every value of a list or a range |
+| Risk | An endless loop if the counter is never changed | Very small |
+
+The first line of a for loop has no place for a condition. You can still check conditions inside the block with `if`, and the next lesson, [break and continue](/docs/python-tutorial-2026/control-flow/break-and-continue), does exactly that.
+
+## Additions beyond the lesson
+
+**A string is a collection too.** A for loop over a string gives one character per round:
+
+```python title="letters.py"
+for ch in 'Navin':
+    print(ch)
+```
+
+```text
+N
+a
+v
+i
+n
+```
+
+**The loop variable stays after the loop.** When the loop is over, `value` still holds the last value it received:
+
+```python title="after_loop.py"
+data = [2, 'Navin', 4.5, 8, 'Telusko', 'Python']
+
+for value in data:
+    print(value)
+
+print('Last value:', value)
+```
+
+```text
+2
+Navin
+4.5
+8
+Telusko
+Python
+Last value: Python
+```
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown. The version with `while i <= n:` was run to confirm the `IndexError`. The traceback is shown with the file path from the video and with the line number that matches the listing on this page. In the video the file starts with an empty line, so the same error is reported there for line 8. The error messages in the table below were produced by running the faulty code. The debugger steps are described from the video. The listing in Step 6 leaves out the commented-out while loop, which is still at the bottom of the file in the video and is not used.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `IndexError: list index out of range` after all values are printed | `while i <= n:` with `n = len(data)` lets the index reach 6, and the last index is 5. This happens in the lesson | Use `while i < n:` |
+| The first value is printed without end | `i += 1` is missing, so the condition never becomes false | Add `i += 1` inside the loop. Stop a running program with Ctrl+C |
+| `IndentationError: expected an indented block after 'for' statement on line 1` | The line under `for` is not indented | Indent the block with four spaces |
+| `SyntaxError: expected ':'` | The colon at the end of the `for` line is missing | Write `for value in data:` |
+| `TypeError: 'int' object is not iterable` | `for value in 10:` gives the loop a single number, and a number is not a collection | Use `for value in range(10):` |
+| `range(10)` stops at 9 | The stop value is not included | Use `range(11)` to reach 10 |
+
+## Try It Yourself
+
+1. Create a list of five city names and print each one with a for loop.
+2. Print the same list with a while loop, using `len()` and the condition `i < n`. Then change `<` to `<=`, run it and read the error.
+3. Print the numbers from 0 to 20 with `range`.
+4. `range(1, 11)` gives the numbers from 1 to 10. Use a for loop over it to print the table of 7, one line for each number such as `7 x 3 = 21`.
+5. Add up all numbers in `[4, 8, 15, 16, 23, 42]` with a for loop and a variable `total`, then print the total.
+6. Ask the user for a word with `input()` and print its characters one per line.
+7. Loop over `data` from the lesson and print only the values that are of type `str`. Use `type(value) == str` in an `if`.
+8. Set a breakpoint inside one of your loops, debug the file and watch the loop variable change in every round.
+
+## Official references
+
+- [Python tutorial: for statements](https://docs.python.org/3/tutorial/controlflow.html#for-statements)
+- [Python tutorial: the range() function](https://docs.python.org/3/tutorial/controlflow.html#the-range-function)
+- [Python reference: the for statement](https://docs.python.org/3/reference/compound_stmts.html#the-for-statement)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

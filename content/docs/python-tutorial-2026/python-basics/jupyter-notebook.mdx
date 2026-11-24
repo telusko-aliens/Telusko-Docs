@@ -1,0 +1,74 @@
+---
+title: Jupyter Notebook
+description: Try a Jupyter notebook in the browser without installing anything, run Python in a cell, tell code cells from Markdown cells, and compare the notebook with VS Code and PyCharm.
+---
+
+VS Code and PyCharm both have to be installed before you can type a single line. The previous lesson, [PyCharm Setup](/docs/python-tutorial-2026/python-basics/pycharm-setup), finished the second of them. One tool is left, and it can be tried without any installation.
+
+**Jupyter** is the third option. You can install it on your machine. The lesson tries it in the browser, where nothing has to be installed.
+
+## Step 1: Open a notebook in the browser and run code
+
+1. Go to [jupyter.org](https://jupyter.org/) and scroll to Jupyter Notebook. Click **Try it in your browser**, then choose **Jupyter Notebook** on the next page.
+2. A sample notebook opens. Choose **File**, then **New**, then **Notebook**.
+3. A dialog named Select Kernel appears. A **kernel** is the engine that runs the code of a notebook. Keep **Python (Pyodide)** and click **Select**.
+4. Type the code into the empty box, which is called a **cell**, and click the Run button in the toolbar.
+
+```text
+[1]: print('Hello')
+Hello
+```
+
+The output appears directly under the cell, and a new empty cell is added below. The number in square brackets counts the runs.
+
+## Step 2: Code cells and Markdown cells
+
+A notebook is a list of such cells. Each cell has a type, shown in the toolbar.
+
+| Cell type | Holds |
+| --- | --- |
+| Code | Python code that you can run |
+| Markdown | Notes and explanations in plain text |
+
+So you can keep code, its output and your notes on one page. That makes a notebook a good place for learning, for short pieces of code and for work with graphs and data. The new notebook in the video is named `Untitled2.ipynb`. Yours will probably have another number.
+
+## Which one should you use?
+
+| | VS Code | PyCharm | Jupyter Notebook |
+| --- | --- | --- | --- |
+| Good for | Projects of any size, in many languages | Python projects of any size | Short code, learning, graphs and data |
+| Weight | Light | Heavier, with more built in | Runs in a browser |
+| Python support | Through the Python extension | Built in | Built in |
+| In this course | Used most of the time | Used now and then | Shown here |
+
+For a big project, choose VS Code or PyCharm. For exploring and learning, a notebook is a pleasant place to be.
+
+<Callout type="info" title="Checked for these docs">
+The Jupyter output is copied from the video. The line `print('Hello')` was also run with Python 3.13 for these docs and printed `Hello`. The steps on the Jupyter website are described as the video shows them. Websites and buttons change over time.
+</Callout>
+
+## Mistakes and fixes
+
+No error message appears in this lesson. These are the things most likely to puzzle a beginner in a notebook.
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| Jupyter asks you to select a kernel | Every new notebook needs an engine to run its code | Keep Python (Pyodide) and click Select |
+| The code is typed, and no output appears | The cell was not run | Click the Run button in the toolbar |
+| A cell does not run your Python code | The type of the cell is Markdown, which holds notes | Set the cell type in the toolbar to Code |
+
+## Try It Yourself
+
+1. Open Jupyter in the browser, create a new notebook and run `print('Hello')` in a cell.
+2. In the same notebook, change the second cell to Markdown and write one sentence about what you learned.
+3. In an empty code cell, run `print('welcome to telusko')`. Where does the output appear?
+4. Click into the first cell and run it again. What happens to the number in square brackets?
+
+## Official references
+
+- [Project Jupyter](https://jupyter.org/)
+- [Python library: the print function](https://docs.python.org/3/builtins/functions.html#print)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

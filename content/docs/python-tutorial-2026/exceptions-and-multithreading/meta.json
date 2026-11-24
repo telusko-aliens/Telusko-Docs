@@ -1,0 +1,12 @@
+{
+  "title": "Exceptions and Multithreading",
+  "pages": [
+    "introduction-to-exceptions.mdx",
+    "handling-exceptions-with-try-except.mdx",
+    "specific-exceptions-and-finally.mdx",
+    "why-and-what-are-threads.mdx",
+    "creating-and-running-threads.mdx",
+    "thread-join.mdx",
+    "gil-and-multiprocessing.mdx"
+  ]
+}

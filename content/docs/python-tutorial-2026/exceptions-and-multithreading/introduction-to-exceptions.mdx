@@ -1,0 +1,203 @@
+---
+title: Introduction to Exceptions
+description: Learn the three kinds of errors a program can have, compile-time, logical and run-time, and watch a division by zero crash a program that has no mistake in its code.
+---
+
+Every program so far was written for the good case. The numbers were correct, the input was what the code expected, and the program ran to its last line.
+
+Real users do not behave like that. When you use an app, you expect it to work and you expect it not to crash. If a calculator app crashes, you are annoyed, you open it again and type the numbers once more. The lesson then points at software you cannot see: the software in a car, in a plane, in an MRI machine, in a bank. These are critical. Things will go wrong there too, and the software must keep working when they do.
+
+The things that go wrong while a program runs are called **exceptions**, and a careful program **handles** them. This lesson starts with the kinds of errors a program can have, and then makes one of them happen. The next two lessons handle it step by step.
+
+## Three kinds of errors
+
+The lesson opens an older file, `fact_recursion.py` from [Factorial Using Recursion](/docs/python-tutorial-2026/arrays-and-recursion/factorial-using-recursion), and breaks it in three ways.
+
+```python title="fact_recursion.py"
+def fact(num):
+
+    if num == 1:
+        return 1
+
+    return num * fact(num - 1)
+
+
+result = fact(5)
+print(result)
+```
+
+```text
+120
+```
+
+### Compile-time error
+
+Change `def` to `deff`. The editor marks the file with red lines at once. This is a mistake in the **syntax**, the grammar of the language. The video only shows the red lines. If you run the file, Python reports the error like this:
+
+{/* check: error */}
+```python title="fact_recursion.py"
+deff fact(num):
+
+    if num == 1:
+        return 1
+
+    return num * fact(num - 1)
+
+
+result = fact(5)
+print(result)
+```
+
+{/* check: skip */}
+```text
+  File "C:\PythonCourse\FirstProject\basics\fact_recursion.py", line 1
+    deff fact(num):
+         ^^^^
+SyntaxError: invalid syntax
+```
+
+The instructor calls this the easiest kind of error. You see it while you type, and Python refuses to start the program until it is fixed.
+
+<Callout type="info" title="Compile time in Python">
+Python reads the whole file and checks its syntax before it runs the first line. That check is what the lesson calls compile time. A syntax error anywhere in the file means that no line of it runs.
+</Callout>
+
+The instructor also types the word `pas` inside the `if`, a `pass` with a missing letter. The editor shows only a yellow warning: `"pas" is not defined`. For Python, `pas` is a valid name that nobody has defined, so the syntax check passes. The error comes when that line runs. Running the file for these docs ended with `NameError: name 'pas' is not defined`. So this one belongs to the third kind below.
+
+### Logical error
+
+Put `def` back and change `return 1` to `return 2`:
+
+```python title="fact_recursion.py"
+def fact(num):
+
+    if num == 1:
+        return 2
+
+    return num * fact(num - 1)
+
+
+result = fact(5)
+print(result)
+```
+
+```text
+240
+```
+
+No red lines, no error message, and a wrong answer. The factorial of 5 is 120. This is a **logical error**. The syntax is fine and the thinking is wrong.
+
+The lesson calls this kind tricky. Here you know that 120 is expected. Often you do not know the expected answer. If a program fetches the employee with ID 5 from a database and shows the name "Navin", you may be happy to see a name, even when the right one was "Harsh". This is why developers test their code, and why testing teams test it again before it goes to users.
+
+### Run-time error
+
+The third kind appears only while the program runs, and often the developer did nothing wrong. Two examples from the lesson:
+
+- The program divides two numbers that the user types, and the user types zero as the second one.
+- The program needs a file on the C drive. It worked for a few days. One day the user frees some disk space and deletes that file.
+
+In both cases the code is correct and the program still stops. These run-time errors are the **exceptions**.
+
+| Kind | When it shows | Example in the lesson | Who notices |
+| --- | --- | --- | --- |
+| Compile-time (syntax) error | Before the program starts | `deff` for `def` | The editor and Python |
+| Logical error | Never by itself, the output is wrong | `return 2` gives 240 | Testing |
+| Run-time error (exception) | While the program runs | Division by zero | The user, unless the code handles it |
+
+## Step 1: A program that works
+
+Create a folder `adv` and in it a file `exception_demo.py`:
+
+```python title="exception_demo.py"
+a = 5
+b = 2
+
+result = a / b
+print("Result is:", result)
+
+print("End of program")
+```
+
+```text
+Result is: 2.5
+End of program
+```
+
+Run it from the `adv` folder with `python exception_demo.py`. The last line stands for everything a real program still has to do after the division.
+
+## Step 2: Divide by zero
+
+Set `b` to zero. The lesson also changes the last message to "End of execution".
+
+{/* check: error */}
+```python title="exception_demo.py"
+a = 5
+b = 0
+
+result = a / b
+print("Result is:", result)
+
+print("End of execution")
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\adv\exception_demo.py", line 4, in <module>
+    result = a / b
+             ~~^~~
+ZeroDivisionError: division by zero
+```
+
+Read the report from the bottom:
+
+| Part | Meaning |
+| --- | --- |
+| `ZeroDivisionError` | The type of the exception |
+| `division by zero` | The message that belongs to it |
+| `line 4` and `result = a / b` | Where it happened |
+| `~~^~~` | The marker under the operation. The `/` itself is fine. The trouble is that `b` is 0 |
+
+One line is missing from the output: "End of execution". The program stopped at the division and never reached the last line. That is what a crash is.
+
+<Callout type="info" title="Line numbers in the video">
+The files in the video begin with an empty line, so the video shows `line 5` here. The code on this page starts on line 1, so every line number is one lower than on screen.
+</Callout>
+
+## Normal and critical statements
+
+How do you stop the crash? The instructor explains the idea with his son in a restaurant. In a closed restaurant inside a mall, a child who leaves the table is no reason to panic. In an open restaurant next to a highway, the same thing is critical, and the father jumps up at once.
+
+Statements are like that too. `a = 5` and `b = 0` are normal statements. Nothing can go wrong in them. The division is a **critical statement**.
+
+The next lesson, [Handling Exceptions with try and except](/docs/python-tutorial-2026/exceptions-and-multithreading/handling-exceptions-with-try-except), puts the critical statement in a block that handles the failure, so that the program reaches its last line.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown. The error messages are the real text from those runs. Only the folder in the `File` line is written as in the video, and line numbers are those of the code on this page. The `SyntaxError` for `deff` and the `NameError` for `pas` were not run in the video and were run for these docs. The exercises were also run. Exercise 5 gives `SyntaxError: '(' was never closed`.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `SyntaxError: invalid syntax` at `deff fact(num):` | A misspelled keyword. This happens in the lesson, on purpose | Write `def` |
+| `NameError: name 'pas' is not defined` | `pas` is read as a name. The lesson types it on purpose and the editor only warns | Write `pass`, or remove the line |
+| The output is `240` and 120 was expected | A logical error, `return 2` for `return 1`. This happens in the lesson, on purpose | Test with values whose answer you know, then correct the logic |
+| `ZeroDivisionError: division by zero` | The denominator is 0 and nothing handles the error. This happens in the lesson, on purpose | Handle the exception. The next lesson shows how |
+
+## Try It Yourself
+
+1. In `fact_recursion.py`, make one syntax error and one logical error of your own. Note which one Python tells you about.
+2. Write a program that stores 10 and 0 in two variables and divides them. Read the traceback from the bottom and name the type, the message and the line.
+3. In `exception_demo.py` from Step 1, set `a = 10` and `b = 4`. Work out both output lines before you run it.
+4. Add `print("Start")` as the first line of the Step 2 program and run it. Is "Start" printed before the traceback? Then remove the closing bracket of the last `print` line and run it again. Is "Start" still printed? Explain the difference with the callout "Compile time in Python".
+5. Write a file with the single line `print("Hello"` and leave out the closing bracket. Run it. Which of the three kinds of error is this, and what does Python say?
+
+## Official references
+
+- [Python tutorial: errors and exceptions](https://docs.python.org/3/tutorial/errors.html)
+- [Python library: ZeroDivisionError](https://docs.python.org/3/builtins/exceptions.html#ZeroDivisionError)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

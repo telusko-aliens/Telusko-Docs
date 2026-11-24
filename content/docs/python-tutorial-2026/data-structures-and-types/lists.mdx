@@ -1,0 +1,219 @@
+---
+title: Lists
+description: Store many values in one variable with a list, read them by index and slice, mix values of different types, and combine two lists as a list of lists or with the plus sign.
+---
+
+Storing one value is easy. You pick a name and assign the value, as in `num1 = 65`. You have done that since [Introduction to Variables](/docs/python-tutorial-2026/python-basics/introduction-to-variables).
+
+Real programs rarely deal with one value. They deal with the marks of a whole class, the names of all users, the prices of every item in a cart. Creating a separate variable for each value does not work when there are hundreds of them.
+
+Python has a type for this job, the **list**. A list is a collection of values kept in one variable. This lesson creates lists, reads values out of them and combines them. The next two lessons change them in every way a list allows.
+
+<Callout type="info" title="This lesson uses IDLE">
+Until now the lesson typed into the Python prompt inside the terminal. From here it uses **IDLE**, the small Python window you met earlier. The prompt is the same `>>>`, and every line on this page works in both places.
+
+Two things are different from the terminal. In a fresh IDLE the up arrow key does not bring back the previous line. The keys for that are Alt+P for the previous line and Alt+N for the next one. And you cannot clear the IDLE window, so the lesson presses Enter a few times to get some space.
+</Callout>
+
+## Step 1: Create a list
+
+One number in one variable looks like this:
+
+```python
+>>> num1 = 65
+>>> num1
+65
+```
+
+For many numbers, write them between **square brackets**, separated by commas:
+
+```python
+>>> nums = [45,87,21,24,99]
+>>> nums
+[45, 87, 21, 24, 99]
+```
+
+`nums` is one variable that holds five values. The name does not matter. The square brackets make it a list.
+
+Python prints the list with a space after each comma. You can type it with or without those spaces. The result is the same list.
+
+<Callout type="info" title="What happens without the brackets">
+The instructor first types `nums = 45,87,21,24,99` and adds the brackets before pressing Enter. He mentions that the line also works without them, and that it then creates a different data type. That type is the tuple, the topic of the lesson [Tuples](/docs/python-tutorial-2026/data-structures-and-types/tuples).
+</Callout>
+
+## Step 2: Fetch one value with its index
+
+Printing the whole list is easy. To get one value out of it, use its **index**, the position number of the value. You saw index numbers with strings in [Fetching Characters from a String](/docs/python-tutorial-2026/python-basics/fetching-characters-from-a-string). A string is a collection of characters, a list is a collection of values, and both number their positions the same way.
+
+Write the name of the list, then the index in square brackets:
+
+```python
+>>> nums = [45,87,21,24,99]
+>>> nums[0]
+45
+```
+
+Counting starts at 0, so `nums[0]` is the first value. To print the 99, the instructor tries index 5, because the list has five values:
+
+{/* check: skip */}
+```python
+>>> nums = [45,87,21,24,99]
+>>> nums[5]
+Traceback (most recent call last):
+  File "<python-input-1>", line 1, in <module>
+    nums[5]
+    ~~~~^^^
+IndexError: list index out of range
+```
+
+Five values have the indexes 0, 1, 2, 3 and 4. There is no index 5, and Python says so: `list index out of range`. The last index is always one less than the number of values.
+
+```python
+>>> nums = [45,87,21,24,99]
+>>> nums[4]
+99
+>>> nums[-1]
+99
+```
+
+Negative indexes count from the end. `-1` is the last value, `-2` the one before it, and so on. This is handy when you do not know how long the list is.
+
+![List_Index_Numbers](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-list-index.svg)
+
+<Callout type="info" title="Which bracket goes where">
+The instructor's advice here: programming is close to English, and a large part of the work is remembering which bracket to use where. For a list it is square brackets, both to create the list and to ask for an index.
+</Callout>
+
+## Step 3: Take a slice
+
+A **slice** is a part of a list. You write the index where the part starts, a colon, and the index where it stops. The stop index itself is not included.
+
+```python
+>>> nums = [45,87,21,24,99]
+>>> nums[2:4]
+[21, 24]
+>>> nums[2:]
+[21, 24, 99]
+```
+
+To get 21 and 24, which sit at index 2 and 3, the slice is `[2:4]`, because 4 is excluded. If you leave out the stop index, the slice runs to the end of the list.
+
+A single index gives you one value. A slice always gives you a list, even a short one.
+
+## Step 4: Strings and mixed values
+
+A list is not limited to numbers. Here is a list of strings:
+
+```python
+>>> names = ['navin','harsh','kiran']
+>>> names
+['navin', 'harsh', 'kiran']
+```
+
+Every string needs its own quotes.
+
+One list can also hold values of different types, here a string, a whole number and a float:
+
+```python
+>>> mix = ['navin',67,6.5]
+>>> mix
+['navin', 67, 6.5]
+```
+
+Some languages demand that all values in a collection have the same type. A Python list has no such rule.
+
+## Step 5: Combine two lists
+
+"Combine" can mean two different things, and the lesson shows both.
+
+### A list inside a list
+
+```python
+>>> nums = [45,87,21,24,99]
+>>> names = ['navin','harsh','kiran']
+>>> mix = [nums, names]
+>>> mix
+[[45, 87, 21, 24, 99], ['navin', 'harsh', 'kiran']]
+>>> mix[0]
+[45, 87, 21, 24, 99]
+>>> len(mix)
+2
+```
+
+Look at the brackets in the output. There is one outer list, and inside it there are two lists. So `mix` has two elements only, and `len(mix)` confirms it. That is why `mix[0]` is not 45. It is the whole first list.
+
+To reach a value inside an inner list, use two indexes. The first one picks the inner list, the second one picks the value in it:
+
+```python
+>>> nums = [45,87,21,24,99]
+>>> names = ['navin','harsh','kiran']
+>>> mix = [nums, names]
+>>> mix[0][0]
+45
+>>> mix[1][2]
+'kiran'
+```
+
+| Expression | Read it as | Result |
+| --- | --- | --- |
+| `mix[0]` | The first element of `mix` | `[45, 87, 21, 24, 99]` |
+| `mix[0][0]` | The first element of `mix`, then its first value | `45` |
+| `mix[1]` | The second element of `mix` | `['navin', 'harsh', 'kiran']` |
+| `mix[1][2]` | The second element of `mix`, then its value at index 2 | `'kiran'` |
+
+### One flat list with +
+
+If you want a single list with all the values, add the two lists:
+
+```python
+>>> nums = [45,87,21,24,99]
+>>> names = ['navin','harsh','kiran']
+>>> mix = nums + names
+>>> mix
+[45, 87, 21, 24, 99, 'navin', 'harsh', 'kiran']
+>>> len(mix)
+8
+```
+
+The last line is an addition to the lesson. It shows the difference from the list of lists: this `mix` has eight elements.
+
+## List operations in this lesson
+
+| Code | What it does | Changes the list |
+| --- | --- | --- |
+| `nums[0]`, `nums[-1]` | Reads one value by index | No |
+| `nums[2:4]` | Reads a slice | No |
+| `len(nums)` | Number of elements | No |
+| `nums + names` | A new list with the values of both | No |
+
+Nothing on this page changes a list after it is created. That is the topic of the next lesson, [List Functions](/docs/python-tutorial-2026/data-structures-and-types/list-functions).
+
+<Callout type="info" title="Checked for these docs">
+Every prompt session on this page was run again with Python 3.13, and each line gave the result shown. The session that ends in an error was run by hand. The lesson runs it in IDLE. This page shows it as the plain Python 3.13 prompt prints it, so the middle lines can look a little different from the video. The last line, which names the error, is the same in both. The number in `<python-input-1>` counts the lines you have typed, so yours may differ.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `IndexError: list index out of range` | The index does not exist, such as `nums[5]` in a list of five values. This happens in the lesson | Use an index from 0 to the length minus 1, or `-1` for the last value |
+| `mix[0]` gives a whole list and not 45 | `mix` is a list of lists, so its first element is a list | Use two indexes, `mix[0][0]` |
+| `nums` is not a list after `nums = 45,87,21` | Without square brackets Python creates a tuple. The instructor starts to type this in the lesson | Put the values in `[ ]` |
+| The up arrow does not bring back the last line in IDLE | IDLE uses other keys by default. This happens in the lesson | Press Alt+P for the previous line and Alt+N for the next |
+
+## Try It Yourself
+
+1. Create a list `marks` with the values 72, 85, 64, 91 and 58. Print the first value, the last value with a negative index, and the number of values with `len`.
+2. From `marks`, print a slice with the second and third value. Then print everything from index 2 to the end.
+3. Create `cities` with three city names. Build `both = [marks, cities]` and fetch the second city with two indexes. What does `len(both)` give, and why?
+4. Build `flat = marks + cities` and compare `len(flat)` with `len(both)`.
+5. Type `marks[10]`. Read the error message and say in your own words what it means.
+
+## Official references
+
+- [Python tutorial: lists](https://docs.python.org/3/tutorial/introduction.html#lists)
+- [Python library: lists](https://docs.python.org/3/builtins/stdtypes.html#lists)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

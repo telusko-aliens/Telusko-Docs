@@ -1,0 +1,234 @@
+---
+title: Specific Exceptions and the finally Block
+description: Write one except block for each kind of error, keep a general block as the last safety net, and use finally for clean-up code that runs with or without an exception.
+---
+
+At the end of [Handling Exceptions with try and except](/docs/python-tutorial-2026/exceptions-and-multithreading/handling-exceptions-with-try-except), the program no longer crashed. But its one `except` block printed "Division by zero is not allowed." for every error, also when the user typed a letter.
+
+Different errors need different answers. This lesson gives each kind of error its own `except` block. Then it adds a block for the work that must be done in every case, whether the `try` block failed or not.
+
+## Step 1: One except block for each kind of error
+
+The instructor compares this with the days before a board exam at his school. With a maths doubt you went to the maths teacher, with a science doubt to the science teacher. With anything else, a lost hall pass for example, you went to the class teacher.
+
+{/* check: stdin=4|t; noout */}
+```python title="exception_demo.py"
+try:
+    a = int(input("Enter numerator: "))
+    b = int(input("Enter denominator: "))
+    result = a / b
+    print("Result is:", result)
+
+except ZeroDivisionError as zde:
+    print("An error occurred: Division by zero is not allowed.", zde)
+except ValueError as ve:
+    print("An error occurred: Invalid input. Please enter numeric values only.", ve)
+except Exception as e:
+    print("An unexpected error occurred:", e)
+
+print("End of execution")
+```
+
+{/* check: skip */}
+```text
+Enter numerator: 4
+Enter denominator: t
+An error occurred: Invalid input. Please enter numeric values only. invalid literal for int() with base 10: 't'
+End of execution
+```
+
+With 4 and 0 the first block answers:
+
+```text
+Enter numerator: 4
+Enter denominator: 0
+An error occurred: Division by zero is not allowed. division by zero
+End of execution
+```
+
+Only one `except` block runs: the first one, from the top, that matches the exception. The last block, `except Exception`, is the class teacher. It is there for safety, for anything the first two do not cover.
+
+![Try_Except_Finally_Flow](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-try-except-finally.svg)
+
+## Step 2: finally, the block that always runs
+
+Larger programs open files, database connections and network connections. These are called **resources**, and a program that opens a resource must close it. This program has no real resource, so the lesson pretends with two messages. The closing message goes into a `finally` block:
+
+{/* check: stdin=3|4; noout */}
+```python title="exception_demo.py"
+print("Resource opened successfully.")
+
+try:
+    a = int(input("Enter numerator: "))
+    b = int(input("Enter denominator: "))
+    result = a / b
+    print("Result is:", result)
+
+except ZeroDivisionError as zde:
+    print("An error occurred: Division by zero is not allowed.", zde)
+except ValueError as ve:
+    print("An error occurred: Invalid input. Please enter numeric values only.", ve)
+except Exception as e:
+    print("An unexpected error occurred:", e)
+
+finally:
+    print("Resource closed.")
+
+print("End of execution")
+```
+
+{/* check: skip */}
+```text
+Resource opened successfully.
+Enter numerator: 3
+Enter denominator: 4
+Result is: 0.75
+Resource closed.
+End of execution
+```
+
+With 4 and 0 there is an exception, and the resource is closed all the same:
+
+```text
+Resource opened successfully.
+Enter numerator: 4
+Enter denominator: 0
+An error occurred: Division by zero is not allowed. division by zero
+Resource closed.
+End of execution
+```
+
+| Block | Runs when |
+| --- | --- |
+| `try` | Always starts. Stops at the first line that raises an exception |
+| `except` | Only when an exception of its kind was raised in the `try` block |
+| `finally` | Always, with or without an exception |
+
+Now the hard test. The instructor deletes the `ValueError` and `Exception` blocks and types `t`, so that nothing handles the error:
+
+{/* check: stdin=4|t; error */}
+```python title="exception_demo.py"
+print("Resource opened successfully.")
+
+try:
+    a = int(input("Enter numerator: "))
+    b = int(input("Enter denominator: "))
+    result = a / b
+    print("Result is:", result)
+
+except ZeroDivisionError as zde:
+    print("An error occurred: Division by zero is not allowed.", zde)
+
+
+finally:
+    print("Resource closed.")
+
+print("End of execution")
+```
+
+{/* check: skip */}
+```text
+Resource opened successfully.
+Enter numerator: 4
+Enter denominator: t
+Resource closed.
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\adv\exception_demo.py", line 5, in <module>
+    b = int(input("Enter denominator: "))
+ValueError: invalid literal for int() with base 10: 't'
+```
+
+The program crashes, and "End of execution" is missing. But "Resource closed." is there, before the traceback. The `finally` block ran before the program stopped. That is why clean-up code belongs in `finally`.
+
+### try with finally only
+
+A `try` needs at least one `except` block or a `finally` block. It may have both. The last version in the lesson has `finally` only:
+
+{/* check: stdin=3|4; noout */}
+```python title="exception_demo.py"
+print("Resource opened successfully.")
+
+try:
+    a = int(input("Enter numerator: "))
+    b = int(input("Enter denominator: "))
+    result = a / b
+    print("Result is:", result)
+
+finally:
+    print("Cleaning up resources...")
+
+print("End of execution")
+```
+
+The video does not run this version. Run for these docs with 3 and 4, it gives:
+
+{/* check: skip */}
+```text
+Resource opened successfully.
+Enter numerator: 3
+Enter denominator: 4
+Result is: 0.75
+Cleaning up resources...
+End of execution
+```
+
+With 4 and 0 it prints "Cleaning up resources..." and then stops with the `ZeroDivisionError` traceback. A `finally` block cleans up. It does not handle the exception.
+
+## Additions beyond the lesson
+
+**The else block.** The lesson uses `try`, `except` and `finally`. A `try` statement can also have an `else` block, placed after the `except` blocks and before `finally`. It runs only when the `try` block raised no exception:
+
+{/* check: stdin=3|4; noout */}
+```python title="else_demo.py"
+try:
+    a = int(input("Enter numerator: "))
+    b = int(input("Enter denominator: "))
+    result = a / b
+except ZeroDivisionError as zde:
+    print("An error occurred: Division by zero is not allowed.", zde)
+else:
+    print("Result is:", result)
+finally:
+    print("Resource closed.")
+```
+
+{/* check: skip */}
+```text
+Enter numerator: 3
+Enter denominator: 4
+Result is: 0.75
+Resource closed.
+```
+
+With 4 and 0 the `except` block runs and the `else` block is skipped.
+
+**Specific blocks first.** Python checks the `except` blocks from top to bottom. If `except Exception` stood first, it would match a `ZeroDivisionError` too, and the specific blocks below it would never run. Keep the general block last, as the lesson does.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13, with the inputs shown, and gave the output shown. The error messages are the real text from those runs. Only the folder in the `File` line is written as in the video, and line numbers are those of the code on this page. The last `try` and `finally` version and the `else` example were not run in the video and were run for these docs. The two added rows of the table below were also checked by running the code.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| "End of execution" is not printed | An exception that no `except` block matched stopped the program | Handle that kind of exception, or add `except Exception` as the last block |
+| "An unexpected error occurred: division by zero" for the input 0 | `except Exception` stands above `except ZeroDivisionError`, so the general block matches first | Put the specific blocks first and `except Exception` last |
+| `SyntaxError: invalid syntax` at an `except` line | The `except` block was written after the `finally` block | Write the `except` blocks first and `finally` as the last block |
+
+## Try It Yourself
+
+1. Write a program that reads two numbers with `int(input(...))` inside a `try` block and divides them. Add `except ZeroDivisionError` with a message of your own. Run it with 8 and 0.
+2. Add `except ValueError as ve` and print `ve`. Which block runs for the input `x`?
+3. Make a list of three numbers and print the item at index 5 inside the `try` block. Does one of your `except` blocks handle it? Then add `except Exception as e` as the last block, run it again and print `e` to see the message.
+4. Add a `finally` block that prints "Done". Run the program three times, with 8 and 2, with 8 and 0, and with 8 and `x`, and check that "Done" appears in all three runs.
+5. Remove every `except` block and keep `finally`. Type 8 and 0. Which appears first, "Done" or the traceback?
+
+## Official references
+
+- [Python reference: the try statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
+- [Python tutorial: defining clean-up actions](https://docs.python.org/3/tutorial/errors.html#defining-clean-up-actions)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

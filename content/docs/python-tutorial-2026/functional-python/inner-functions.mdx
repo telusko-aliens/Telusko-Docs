@@ -1,0 +1,342 @@
+---
+title: Inner Functions
+description: Define a function inside another function, see where it can be called from, and learn how a function can return another function with and without round brackets.
+---
+
+So far, a function has returned values: a number, a string, a list. In [Higher Order Functions](/docs/python-tutorial-2026/functional-python/higher-order-functions) you saw that a function can also be passed to another function, like any other value.
+
+This lesson asks the next two questions. Can a function be written inside another function? And can a function return a function? Returning a function is different from returning the value that a function produces, and the difference is a pair of round brackets.
+
+Both ideas are needed for the next lesson, [Decorators](/docs/python-tutorial-2026/functional-python/decorators). That is why the course covers them here.
+
+## Step 1: Start with an ordinary function
+
+The lesson creates a new file, `inner.py`, with one function that prints a line, and a call to it:
+
+```python title="inner.py"
+def outer():
+    print("In Outer function")
+
+outer()
+```
+
+```text
+In Outer function
+```
+
+Without the last line, nothing would be printed. Defining a function only creates it. The call runs it.
+
+## Step 2: Define a function inside it
+
+An **inner function** is a function that is defined inside another function. The `def` line of `inner` is indented, so it belongs to the body of `outer`:
+
+```python title="inner.py"
+def outer():
+    print("In Outer function")
+
+    def inner():
+        print("In Inner function")
+
+outer()
+```
+
+```text
+In Outer function
+```
+
+The body of `outer` now has two parts: a `print` statement and a function definition. When `outer` runs, it prints its line, and then it creates the function `inner`. Creating is all it does. Nobody calls `inner`, so `In Inner function` does not appear.
+
+The editor gives a hint about this. In the video, the name `outer` is bright and the name `inner` is faded. That is the editor's way of saying that `inner` is defined and never used.
+
+## Step 3: Try to call inner from outside
+
+`outer` is called from the bottom of the file. Can `inner` be called from there too?
+
+{/* check: error */}
+```python title="inner.py"
+def outer():
+    print("In Outer function")
+
+    def inner():
+        print("In Inner function")
+
+outer()
+inner()
+```
+
+{/* check: skip */}
+```text
+In Outer function
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\inner.py", line 9, in <module>
+    inner()
+    ^^^^^
+NameError: name 'inner' is not defined. Did you mean: 'iter'?
+```
+
+The editor underlines the last line before the program is even run, with the message `"inner" is not defined`. Running the file gives the same answer as a `NameError`.
+
+The reason is the rule from [Global and Local Variables](/docs/python-tutorial-2026/arrays-and-recursion/global-and-local-variables). A name that is created inside a function is local to that function. `def inner():` creates the name `inner` inside `outer`, so the name exists only there. In the instructor's words, `inner` is hiding inside `outer`.
+
+Two details of the output:
+
+- `In Outer function` is printed first. The call `outer()` on the line before works, and the program stops only at the next line.
+- `Did you mean: 'iter'?` is a guess. Python looks for a known name with a similar spelling and finds the built-in function `iter`. It has nothing to do with this program. The file path and the line number in your traceback depend on your own file. The video's file begins with an empty line, which is why it says line 9.
+
+## Step 4: Call inner inside outer
+
+`outer` knows `inner`, so the call can go inside `outer`. It must come after the definition and be indented by one level, so that it is part of `outer` and not part of `inner`:
+
+```python title="inner.py"
+def outer():
+    print("In Outer function")
+
+    def inner():
+        print("In Inner function")
+
+    inner()
+
+outer()
+```
+
+```text
+In Outer function
+In Inner function
+```
+
+Now `outer` prints its line, creates `inner` and calls it.
+
+This is the simple use of an inner function. `outer` has a helper that only `outer` can use. No other part of the program can call it by mistake.
+
+## Step 5: Return inner() with brackets
+
+Is there a way to use `inner` from outside after all? A function can hand things back with `return`. So the lesson tries to return `inner`.
+
+The first attempt has round brackets after the name. The call from Step 4 is commented out, and the result of `outer()` is stored in a variable named `something` and printed:
+
+```python title="inner.py"
+def outer():
+    print("In Outer function")
+
+    def inner():
+        print("In Inner function")
+
+    # inner()
+    return inner()
+
+something = outer()
+print(something)
+```
+
+```text
+In Outer function
+In Inner function
+None
+```
+
+Read `return inner()` from right to left. `inner()` has brackets, so `inner` is **called** right there, inside `outer`. That prints `In Inner function`. Then `return` sends back whatever that call produced.
+
+`inner` has no `return` statement. A function without one gives back `None`. So `outer` returns `None`, and that is what `something` holds.
+
+To make this visible, the instructor lets `inner` return a number for a moment:
+
+```python title="inner.py"
+def outer():
+    print("In Outer function")
+
+    def inner():
+        print("In Inner function")
+        return 5
+    # inner()
+    return inner()
+
+something = outer()
+print(something)
+```
+
+```text
+In Outer function
+In Inner function
+5
+```
+
+Now `something` is 5. In both runs, `something` is a plain value: the result of `inner`. The function itself never left `outer`. The lesson removes `return 5` again, because this is not the goal.
+
+## Step 6: Return inner without brackets
+
+To return the function itself, write its name without brackets:
+
+{/* check: noout */}
+```python title="inner.py"
+def outer():
+    print("In Outer function")
+
+    def inner():
+        print("In Inner function")
+
+    # inner()
+    return inner
+
+something = outer()
+print(something)
+```
+
+{/* check: skip */}
+```text
+In Outer function
+<function outer.<locals>.inner at 0x000001D0398DC180>
+```
+
+Two things changed in the output.
+
+`In Inner function` is gone. Without brackets there is no call, so `inner` does not run.
+
+And `something` is no longer `None`. Python describes it as a function, with the name `outer.<locals>.inner`. Read that as: the function `inner` that is local to `outer`. The number after `at` is a memory address. It is different on every run and on every computer.
+
+This is the same rule you used when you passed `square` to `operate` in the higher order functions lesson. There the function name went in without brackets. Here it comes out without brackets.
+
+![return_inner_With_and_Without_Brackets](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-inner-functions.svg)
+
+| | `return inner()` | `return inner` |
+| --- | --- | --- |
+| Is `inner` called inside `outer`? | Yes, at once | No |
+| What `outer` gives back | The result of `inner`, here `None` | The function `inner` itself |
+| Output of `something = outer()` | `In Outer function`, then `In Inner function` | `In Outer function` only |
+| What `print(something)` shows | `None` | `<function outer.<locals>.inner at 0x...>` |
+| Can you write `something()`? | No, `None` cannot be called | Yes, it runs `inner` |
+
+## Step 7: Call the returned function
+
+`something` now holds a function. A function can be called by putting brackets after it:
+
+```python title="inner.py"
+def outer():
+    print("In Outer function")
+
+    def inner():
+        print("In Inner function")
+
+    # inner()
+    return inner
+
+something = outer()
+something()
+```
+
+```text
+In Outer function
+In Inner function
+```
+
+There is no `def something` anywhere in the file, and still `something()` works. `outer` returned the function `inner`, and the assignment gave that function a second name. Calling `something()` runs the body of `inner`.
+
+So `inner` is used from outside after all. The name `inner` is still unknown outside `outer`. The function travels out as a return value and is called through the name `something`.
+
+The order of the output is worth a look:
+
+| Line | What runs | What is printed |
+| --- | --- | --- |
+| `something = outer()` | `outer` runs, creates `inner` and returns it | `In Outer function` |
+| `something()` | `inner` runs | `In Inner function` |
+
+The instructor asks you to type this code and run it yourself, and not to take his word for it. It is good advice. This idea becomes clear when you change a line and watch the output change.
+
+## Step 8: Pass a value to the returned function
+
+Because `something()` is really a call to `inner`, any value you put in the brackets goes to `inner`. So `inner` needs a parameter to receive it:
+
+```python title="inner.py"
+def outer():
+    print("In Outer function")
+
+    def inner(num):
+        print("In Inner function ", num)
+
+    # inner()
+    return inner
+
+something = outer()
+something(5)
+```
+
+```text
+In Outer function
+In Inner function  5
+```
+
+The 5 travels from `something(5)` into `num`. There are two spaces before the 5: one is inside the string, and `print` adds one between its arguments.
+
+## Why use an inner function?
+
+The lesson is honest about this: inner functions are not used very often in everyday projects. They have two main uses.
+
+- **A helper that belongs to one function.** If `outer` needs a small piece of processing that nothing else needs, the helper can live inside `outer`. It is restricted to that function.
+- **Decorators.** A decorator is built from an outer function that returns an inner function. That is the next lesson, and everything on this page is preparation for it.
+
+The lesson ends with one more point. A function can return any function, not only one that is defined inside it. Returning an inner function is the most common case.
+
+## Additions beyond the lesson
+
+**An inner function remembers the variables of its outer function.** The lesson does not cover this, and you will see it at work in decorators. An inner function can read the parameters and local variables of the function around it. It can still do so after the outer function has finished. In this example, `outer` takes a parameter:
+
+```python title="closure_demo.py"
+def outer(msg):
+
+    def inner():
+        print("In Inner function ", msg)
+
+    return inner
+
+first = outer("Hello")
+second = outer("Bye")
+
+first()
+second()
+first()
+```
+
+```text
+In Inner function  Hello
+In Inner function  Bye
+In Inner function  Hello
+```
+
+When `first()` runs, the call `outer("Hello")` ended long ago. Its `msg` is still there, because the returned function keeps it. Each call of `outer` creates a new `inner` with its own `msg`, so `first` and `second` do not disturb each other. A function that carries variables of its outer function with it like this is called a **closure**.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown. The program in Step 3 was run and stops with the `NameError` shown. The traceback text is the one from the video. On another computer the file path differs. The video's file starts with an empty line, so its traceback says line 9, and the file as shown on this page gives line 8. The program in Step 6 was run too. Its output is not compared automatically because of the memory address, and the line shown is the one from the video. The other error messages in the table below were produced with Python 3.13. The closure example is an addition and is not in the video.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| Only `In Outer function` is printed | `inner` is defined and never called. This happens in the lesson | Call `inner()` inside `outer`, or return it and call the result |
+| `NameError: name 'inner' is not defined. Did you mean: 'iter'?` | `inner()` was called from outside `outer`. This happens in the lesson | Call it inside `outer`, or use the returned function |
+| `None` printed after the two lines | `return inner()` returned the result of `inner`, and `inner` returns nothing. This happens in the lesson | Write `return inner` without brackets |
+| `<function outer.<locals>.inner at 0x...>` | The function itself was printed and not called | Call it: `something()` |
+| `TypeError: 'NoneType' object is not callable` | `something()` was used with `return inner()` in `outer`, so `something` is `None` | Remove the brackets in the `return` line |
+| `TypeError: outer.<locals>.inner() missing 1 required positional argument: 'num'` | `inner` has the parameter `num` and was called as `something()` | Pass a value: `something(5)` |
+| `TypeError: outer.<locals>.inner() takes 0 positional arguments but 1 was given` | `something(5)` was called while `inner` has no parameter | Add the parameter: `def inner(num):` |
+| Only `In Outer function` is printed, although the file contains `inner()` | The call is indented by 8 spaces, so it sits inside the body of `inner` and never runs | Give the call 4 spaces, the same as `def inner():` |
+
+## Try It Yourself
+
+1. Type the program from Step 2 and run it. Explain why only one line is printed.
+2. Add the call `inner()` at the bottom of the file, outside `outer`. Read the full traceback. Which line number does it name?
+3. Move the call into `outer` as in Step 4. Then add a second `inner()` call below the first one. How many lines are printed now?
+4. Write `return inner()` and print the result of `outer()`. Then let `inner` return the string `'done'` and run again.
+5. Change the line to `return inner`. Print `something`, then call `something()`. Compare the two outputs.
+6. With `return inner` in place, call `outer()()` in one line. Explain what each pair of brackets does.
+7. Give `inner` two parameters, `a` and `b`, and let it print their sum. Call it through `something` with two numbers.
+8. Write a function `greeter()` that defines an inner function `hello(name)`, which prints `Hello` and the name. Return the inner function, store it in `say`, and call `say('navin')`.
+
+## Official references
+
+- [Python tutorial: defining functions](https://docs.python.org/3/tutorial/controlflow.html#defining-functions)
+- [Python tutorial: scopes and namespaces](https://docs.python.org/3/tutorial/classes.html#python-scopes-and-namespaces)
+- [Python reference: function definitions](https://docs.python.org/3/reference/compound_stmts.html#function-definitions)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,148 @@
+---
+title: Nested if
+description: Put one if inside the block of another if, so that a second question is asked only when the first one was answered with yes, and see how the indentation decides which else belongs to which if.
+---
+
+One `if` with one `else` answers a question with two possible answers. Even or odd. Yes or no.
+
+Real programs ask harder questions. Sometimes a second question only makes sense after the first one was answered with yes.
+
+This lesson covers that case. It puts an `if` inside another `if`, which is called a **nested if**.
+
+## Step 1: An if inside an if
+
+The lesson continues with `if_demo.py` from [else and Debugging](/docs/python-tutorial-2026/control-flow/else-and-debugging). It prints `Even` or `Odd` for a number.
+
+Now a second value comes in, a salary. The currency does not matter here. The new rule is:
+
+- If the salary is more than 5, print `Great Job`.
+- Otherwise print `Better luck next time`.
+- Do this **only when the number is even**.
+
+The last line is the important one. If the message had to appear for every number, the salary check could stand on its own below the first `if`. Because it belongs to the even case only, it has to go inside the block of the first `if`:
+
+```python title="if_demo.py"
+num = 6
+salary = 5
+
+
+if num % 2 == 0:
+    print("Even")
+    if salary > 5:
+        print("Great Job")
+    else:
+        print("Better luck next time")
+
+else:
+    print("Odd")
+
+print("Bye")
+```
+
+```text
+Even
+Better luck next time
+Bye
+```
+
+**Nested** means one inside the other. An `if` or an `if` with `else` that sits inside the block of another `if` is a nested if. There is no new keyword. Only the indentation is new:
+
+| Lines | Indentation | Belongs to |
+| --- | --- | --- |
+| `if num % 2 == 0:` and the last `else:` | None | The outer `if` |
+| `print("Even")`, `if salary > 5:` and the first `else:` | 4 spaces | The block of the outer `if` |
+| `print("Great Job")`, `print("Better luck next time")` | 8 spaces | The blocks of the inner `if` and `else` |
+
+Each `else` belongs to the `if` that starts in the same column. That is how Python knows which one is meant.
+
+The salary is 5, and 5 is not more than 5, so the program prints `Better luck next time`.
+
+## Step 2: Try the other paths
+
+Change the salary to 7:
+
+```python title="if_demo.py"
+num = 6
+salary = 7
+
+
+if num % 2 == 0:
+    print("Even")
+    if salary > 5:
+        print("Great Job")
+    else:
+        print("Better luck next time")
+
+else:
+    print("Odd")
+
+print("Bye")
+```
+
+```text
+Even
+Great Job
+Bye
+```
+
+Now make the number odd and leave the salary at 7:
+
+```python title="if_demo.py"
+num = 5
+salary = 7
+
+
+if num % 2 == 0:
+    print("Even")
+    if salary > 5:
+        print("Great Job")
+    else:
+        print("Better luck next time")
+
+else:
+    print("Odd")
+
+print("Bye")
+```
+
+```text
+Odd
+Bye
+```
+
+The salary is 7, which is more than 5, and still no `Great Job` appears. The outer condition is false, so Python skips the whole block of the outer `if`, including the inner `if`. The salary is never looked at.
+
+| `num` | `salary` | Output |
+| --- | --- | --- |
+| 6 | 5 | `Even`, `Better luck next time`, `Bye` |
+| 6 | 7 | `Even`, `Great Job`, `Bye` |
+| 5 | 7 | `Odd`, `Bye` |
+
+A nested `if` handles a second question. The next lesson, [elif](/docs/python-tutorial-2026/control-flow/elif), handles one question with many possible answers.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown. The error message in the table below was produced with Python 3.13. The outputs named in exercises 3 and 4 were produced by running the programs. The listings leave out the empty first line that the file in the video has.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `Great Job` does not appear although the salary is 7 | The number is odd, so the outer block with the inner `if` is skipped | Nothing to fix. This is how a nested `if` works |
+| `IndentationError: unindent does not match any outer indentation level` | An inner `else` does not start in the same column as its `if` | Line up each `else` with its own `if` |
+
+## Try It Yourself
+
+1. In `if_demo.py`, try all four combinations of an even or odd `num` with a salary of 3 or 9. Predict each output before you run it.
+2. Add a nested `if` and `else` inside the outer `else` of `if_demo.py`, so that odd numbers also get a message that depends on the salary.
+3. Set `num = 6` and `salary = 5` in `if_demo.py` and change the inner condition to `salary >= 5`. The program now prints `Great Job`. Explain why.
+4. Write a new program with `marks = 80` and `attendance = 60`. If the marks are 50 or more, print `Pass`, and only in that case print `Full attendance` when the attendance is 75 or more and `Attend more classes` otherwise. For lower marks print `Fail`. With these values the output is `Pass` and `Attend more classes`. Then try `marks = 40` with `attendance = 90`.
+
+## Official references
+
+- [Python reference: the if statement](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
+- [Python reference: indentation](https://docs.python.org/3/reference/lexical_analysis.html#indentation)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

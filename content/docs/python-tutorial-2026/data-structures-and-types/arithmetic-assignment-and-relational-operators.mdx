@@ -1,0 +1,210 @@
+---
+title: Arithmetic, Assignment and Relational Operators
+description: Work with arithmetic, assignment, unary and relational operators in Python, from the += shorthand to comparisons that answer with True or False.
+---
+
+You have used operators since the first time you typed `2 + 3`. An **operator** is a symbol or a word that does something with values. The values it works on are called **operands**.
+
+This lesson collects the operators into groups. Arithmetic operators calculate. Assignment operators store. Relational operators compare two values and answer with `True` or `False`.
+
+The last group is the one to watch. A program that can compare values can make decisions, and that is where the course is heading.
+
+## Step 1: Arithmetic operators
+
+```python
+>>> a = 3
+>>> b = 2
+>>> a + b
+5
+>>> a - b
+1
+>>> a * b
+6
+>>> a / b
+1.5
+>>> a // b
+1
+>>> a % b
+1
+```
+
+These are the operators from [IDLE and Number Operations](/docs/python-tutorial-2026/python-basics/idle-and-number-operations), now used with variables. `/` gives the exact result as a float, `//` gives the quotient, and `%`, called mod, gives the remainder.
+
+## Step 2: Assignment and its shortcuts
+
+To raise `a` by 2, calculate `a + 2` and store the result in `a` again:
+
+```python
+>>> a = 3
+>>> a = a + 2
+>>> a
+5
+```
+
+The line uses two operators. `+` adds, and `=` assigns. The `=` is the **assignment operator**. It was already at work in `a = 3`. Python first works out the right side, 3 plus 2, and then puts the result into the name on the left.
+
+Because the pattern "change a variable by some amount" is so common, there is a shorter way to write it:
+
+```python
+>>> a = 5
+>>> a += 2
+>>> a
+7
+```
+
+`a += 2` means the same as `a = a + 2`. The instructor calls it a shortcut or shorthand.
+
+Many languages have an even shorter form for adding 1, written `a++`. Python does not:
+
+{/* check: skip */}
+```python
+>>> a++
+  File "<python-input-230>", line 1
+    a++
+       ^
+SyntaxError: invalid syntax
+```
+
+To add 1, use the same shorthand as before:
+
+```python
+>>> a = 7
+>>> a += 1
+>>> a
+8
+```
+
+The shorthand exists for the other arithmetic operators too. This table is an addition to the lesson. Each row starts again from `a = 7`:
+
+| Shorthand | Same as | `a` afterwards |
+| --- | --- | --- |
+| `a += 2` | `a = a + 2` | `9` |
+| `a -= 2` | `a = a - 2` | `5` |
+| `a *= 2` | `a = a * 2` | `14` |
+| `a /= 2` | `a = a / 2` | `3.5` |
+| `a //= 2` | `a = a // 2` | `3` |
+| `a %= 2` | `a = a % 2` | `1` |
+
+## Step 3: Assign two variables in one line
+
+Giving values to `x` and `y` normally takes two lines. Python can do it in one:
+
+```python
+>>> x,y = 6,5
+>>> x
+6
+>>> y
+5
+```
+
+The first value goes to the first name and the second value to the second name. The number of names on the left must match the number of values on the right.
+
+## Binary and unary operators
+
+In `a + b` and `a - b` the operator stands between two operands. Such an operator is called a **binary operator**. Binary here means "with two operands".
+
+An operator can also work on a single operand. Then it is a **unary operator**. The minus sign in front of a value is the usual example:
+
+```python
+>>> a = 8
+>>> -a
+-8
+>>> a
+8
+>>> a = -a
+>>> a
+-8
+```
+
+`-a` gives the negated value and leaves `a` as it is. The third line proves it: `a` is still 8. To change the variable itself, assign the result back to it with `a = -a`.
+
+## Step 4: Relational operators
+
+**Relational operators** compare two values. The answer is always a boolean, the type with the two values `True` and `False` from [Data Types](/docs/python-tutorial-2026/data-structures-and-types/data-types).
+
+```python
+>>> a = 4
+>>> b = 3
+>>> a > b
+True
+>>> a < b
+False
+>>> a <= b
+False
+```
+
+Maths has one symbol for "less than or equal to". The keyboard does not, so Python writes it with two characters, `<=`. With 4 and 3 the answer is `False`: 4 is not less than 3, and it is not equal to 3.
+
+Now make both values the same:
+
+```python
+>>> a = 4
+>>> b = 4
+>>> a <= b
+True
+>>> a >= b
+True
+>>> a == b
+True
+>>> a != b
+False
+```
+
+`a <= b` is `True` now. 4 is not less than 4, and it is equal to 4, and one of the two is enough.
+
+To test whether two values are equal, write a double equals sign. A single `=` is already taken. It assigns. `!=` asks the opposite question, and the exclamation mark in it stands for "not".
+
+| Operator | Question | With `a = 4`, `b = 4` |
+| --- | --- | --- |
+| `a > b` | Is `a` greater than `b`? | `False` |
+| `a < b` | Is `a` less than `b`? | `False` |
+| `a >= b` | Is `a` greater than or equal to `b`? | `True` |
+| `a <= b` | Is `a` less than or equal to `b`? | `True` |
+| `a == b` | Are they equal? | `True` |
+| `a != b` | Are they different? | `False` |
+
+The first two answers in the table were worked out for these docs. The lesson runs `>` and `<` with `b = 3`.
+
+## Operators in this lesson
+
+| Group | Operators | Result |
+| --- | --- | --- |
+| Arithmetic | `+`, `-`, `*`, `/`, `//`, `%` | A number |
+| Assignment | `=`, `+=` and the other shorthands | Nothing is shown. A value is stored |
+| Unary | `-a` | A number with the opposite sign |
+| Relational | `>`, `<`, `>=`, `<=`, `==`, `!=` | `True` or `False` |
+
+Each relational operator checks one condition. The next lesson, [Logical Operators](/docs/python-tutorial-2026/data-structures-and-types/logical-operators), joins several conditions into one answer with `and`, `or` and `not`.
+
+<Callout type="info" title="Checked for these docs">
+Every prompt session on this page was run with Python 3.13 and gave the output shown. The `SyntaxError` message was reproduced by hand. The number in `<python-input-230>` is from the video. Such a number counts the entries typed so far in that prompt session, so your number will be different. The line `a += 1`, which is on screen for only a moment in the video, was confirmed from the video itself. Every value in the tables, including the shorthand table, was calculated by running the code.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `SyntaxError: invalid syntax` after `a++` | Python has no `++` operator. This is shown in the lesson | Write `a += 1` |
+| Typing `a = b` shows nothing, and `a` has changed | A single `=` assigns. It does not compare | Use `a == b` to compare |
+| `SyntaxError: invalid syntax` after `a => b` or `a =< b` | The equals sign comes second in these operators | Write `a >= b` or `a <= b` |
+| `a =+ 2` makes `a` equal to 2 | The two characters are in the wrong order, so Python reads `a = +2` | Write `a += 2` |
+| `TypeError: cannot unpack non-iterable int object` after `x,y = 6` | Two names on the left and one value on the right | Give one value for each name: `x,y = 6,5` |
+| `-a` shows the negative value, and `a` is unchanged | A unary minus does not store anything | Write `a = -a` |
+
+## Try It Yourself
+
+1. Assign `a = 17` and `b = 5`. Run all six arithmetic operators from Step 1 on them. Predict each result first.
+2. Start with `score = 10`. Add 5 with the long form, then add 5 again with the shorthand. Print `score`.
+3. Type `score++`. Read the error, then add 1 the way Python wants it.
+4. Assign `p` and `q` in one line with the values 12 and 20. Print both.
+5. Assign `t = 9`. Show its negative without changing `t`. Then change `t` itself to the negative value.
+6. With `a = 7` and `b = 7`, write down the result of each of the six relational operators. Then check in the prompt.
+
+## Official references
+
+- [Python library: comparisons](https://docs.python.org/3/builtins/stdtypes.html#comparisons)
+- [Python reference: augmented assignment statements](https://docs.python.org/3/reference/simple_stmts.html#augmented-assignment-statements)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

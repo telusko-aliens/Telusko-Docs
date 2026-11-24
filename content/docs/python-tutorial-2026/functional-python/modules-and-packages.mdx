@@ -1,0 +1,322 @@
+---
+title: Modules and Packages
+description: Split code into files and folders, write your own module, use it with the different forms of import, and learn where Python looks for a module.
+---
+
+Look at the project folder after 39 chapters of the course. It holds a long list of files, one for every topic. That is how real projects look too. Nobody keeps a whole application in a single file.
+
+The lesson explains why with an example. Imagine you build an online shop, your own Amazon. You need functions for products: add a product, delete it, update it. You need functions for users: add a user, delete a user, record what a user buys. All of them could go into one file, and that file could grow to 12,000 lines. It would still run. The trouble starts on the day you have to fix a bug and search for one function in all of that.
+
+So code is split by feature. The product functions go into `product.py`, the user functions into `user_info.py`, and so on. Files of this kind are called **modules**, and folders that group them are called **packages**. This lesson builds one of each.
+
+## Modules and packages in one minute
+
+| Word | What it is | Example in this lesson |
+| --- | --- | --- |
+| Module | A Python file whose functions are meant to be used by other files | `calc.py` |
+| Package | A folder that groups related modules | `calculator` |
+| Import | The statement that makes a module available in another file | `import calc` |
+
+You have already used a module that comes with Python, in [Working with Modules](/docs/python-tutorial-2026/functions-modules-and-input/working-with-modules). This time you write the module yourself.
+
+<Callout type="info" title="Is only a file without calls a module?">
+The instructor describes a module as a file that only holds functions and is not run by itself. That is the typical case. To be exact, every `.py` file is a module and can be imported. The file you start with `python` is also a module, and Python gives it a special name, which is the topic of [The Special Variable `__name__`](/docs/python-tutorial-2026/functional-python/special-variable-name).
+</Callout>
+
+## Step 1: Create a package and a module
+
+In the Explorer of VS Code, click the New Folder icon and name the folder `calculator`. Everything related to the calculator will live there. That folder is the package.
+
+Inside `calculator`, create a file named `calc.py`:
+
+```python title="calculator/calc.py"
+def add():
+    return "addition"
+```
+
+The function returns a piece of text and adds nothing. The real logic is not the point of this lesson. The point is that the file defines a function and does not call it. It is written so that some other file can use it. That makes `calc.py` a module.
+
+## Step 2: Use the module from another file
+
+In the same folder, create a second file named `demo.py` (with a small d). The project now looks like this:
+
+{/* check: skip */}
+```text
+FirstProject
+    calculator
+        calc.py
+        demo.py
+    Demo.py
+    deco.py
+    ... the files of the earlier lessons
+```
+
+In `demo.py`, the lesson first calls the function as if it were defined right there:
+
+{/* check: error */}
+```python title="calculator/demo.py"
+result = add()
+print(result)
+```
+
+VS Code underlines `add` and says `"add" is not defined`. The video shows only this editor warning. If you run the file, Python says the same thing:
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\calculator\demo.py", line 1, in <module>
+    result = add()
+             ^^^
+NameError: name 'add' is not defined
+```
+
+You know that `add` exists in `calc.py`. Why does Python not go and find it? The instructor's answer: suppose Python did search all your files. The product module may have an `add` function, the user module too, and the calculator has one as well. Python could not know which one you mean. So Python does not guess. You say which module you are talking about.
+
+The next try is `calc.add()`. The module name is the file name without `.py`. Now the editor says `"calc" is not defined`. From the code alone, `calc` could be a variable or any other name. You have to state that it is a module, with an `import` line at the top:
+
+```python title="calculator/demo.py"
+import calc
+
+result = calc.add()
+print(result)
+```
+
+```text
+addition
+```
+
+## Step 3: Run the right file
+
+The first run in the lesson does not print `addition`:
+
+```text
+PS C:\PythonCourse\FirstProject> python demo.py
+Enter a character
+```
+
+The terminal is in `FirstProject`, the root folder of the project. That folder contains an old file from an earlier lesson named `Demo.py`, with a capital D, which asks for a character. The new `demo.py` is one level deeper, inside `calculator`.
+
+File names on Windows are not case sensitive. For Windows, `demo.py` and `Demo.py` in the same folder are the same name. So `python demo.py`, typed in `FirstProject`, started the old `Demo.py`.
+
+The instructor stops that program, moves into the folder with `cd`, and runs the command again:
+
+```text
+PS C:\PythonCourse\FirstProject> cd .\calculator\
+PS C:\PythonCourse\FirstProject\calculator> python demo.py
+addition
+```
+
+The prompt always shows the folder you are in. The command `ls` lists the files in it, which is a quick way to check that you are in the right place.
+
+<Callout type="info" title="The new __pycache__ folder">
+After this run, a folder named `__pycache__` appears inside `calculator`. Python creates it when a module is imported, and keeps a prepared copy of the module there so that the next import is faster. You can ignore it. Do not edit the files in it.
+</Callout>
+
+## Step 4: More functions, more ways to import
+
+Add a second function to the module:
+
+```python title="calculator/calc.py"
+def add():
+    return "addition"
+
+def sub():
+    return "substraction"
+```
+
+The text is spelled `substraction` in the video. The usual spelling is "subtraction". The page keeps the spelling from the video so that your output matches.
+
+`sub` belongs to `calc`, so it can be called the same way:
+
+```python title="calculator/demo.py"
+import calc
+
+result = calc.sub()
+print(result)
+```
+
+```text
+substraction
+```
+
+Writing `calc.` before every call gets tiring. To use a function by its bare name, import the function itself:
+
+```python title="calculator/demo.py"
+# import calc
+
+from calc import sub
+
+result = sub()
+print(result)
+```
+
+```text
+substraction
+```
+
+Does `add()` work now too? No. Only `sub` was imported. The editor underlines `add`. The video does not run this state. Running it gives:
+
+{/* check: error */}
+```python title="calculator/demo.py"
+# import calc
+
+from calc import sub
+
+result = add()
+print(result)
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\calculator\demo.py", line 5, in <module>
+    result = add()
+             ^^^
+NameError: name 'add' is not defined
+```
+
+List every function you need, separated by commas:
+
+```python title="calculator/demo.py"
+# import calc
+
+from calc import sub, add
+
+result = add()
+print(result)
+```
+
+```text
+addition
+```
+
+To import all functions of a module at once, use a star. It is called a wildcard and means "everything":
+
+```python title="calculator/demo.py"
+# import calc
+
+from calc import *
+
+result = add()
+print(result)
+```
+
+```text
+addition
+```
+
+| Import line | How you call the function | What is available |
+| --- | --- | --- |
+| `import calc` | `calc.add()` | Everything in `calc`, always with the prefix `calc.` |
+| `from calc import sub` | `sub()` | Only `sub` |
+| `from calc import sub, add` | `sub()`, `add()` | The names you list |
+| `from calc import *` | `sub()`, `add()` | All names of the module |
+
+## Step 5: Import from outside the package
+
+Now the twist of the lesson. The instructor opens the old `Demo.py` in the root folder, deletes its code and pastes the code of `calculator/demo.py` into it. The editor reports two problems at once: it cannot find `calc`, and so it cannot find `add`.
+
+{/* check: error */}
+```python title="Demo.py"
+# import calc
+
+from calc import *
+
+result = add()
+print(result)
+```
+
+The video shows only the editor warnings. Running this file gives:
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\Demo.py", line 3, in <module>
+    from calc import *
+ModuleNotFoundError: No module named 'calc'
+```
+
+The same line worked in `calculator/demo.py`, because that file sits next to `calc.py`. The file in the root folder is outside the package and does not know where `calc` is. Tell it: `calc` belongs to the package `calculator`. Write the package name, a dot, and the module name.
+
+```python title="Demo.py"
+# import calc
+
+from calculator.calc import *
+
+result = add()
+print("result ",result)
+```
+
+```text
+result  addition
+```
+
+The print line was changed so that the two files give different output. In the lesson this matters at once. The first run after the change still prints only `addition`, and the instructor notices that the wrong file is running. The terminal is still inside `calculator`, so `python demo.py` starts the file in that folder. Go back up one level and run again:
+
+```text
+PS C:\PythonCourse\FirstProject\calculator> python demo.py
+addition
+PS C:\PythonCourse\FirstProject\calculator> cd..
+PS C:\PythonCourse\FirstProject> python demo.py
+result  addition
+```
+
+`cd ..` moves to the parent folder. PowerShell also accepts it without the space, as typed in the video. Once more Windows ignores the capital letter, and this time that is what we want: `python demo.py` starts `Demo.py`.
+
+## How Python finds a module
+
+When Python reaches an `import` line, it searches a list of folders, in order. The first folder on that list is the folder of the file you started. After that come the folders of Python itself, where modules such as `math` live.
+
+![Where_Python_Looks_For_A_Module](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-modules-packages.svg)
+
+| File you run | First folder searched | Line that works | Why |
+| --- | --- | --- | --- |
+| `calculator\demo.py` | `calculator` | `from calc import *` | `calc.py` is in that folder |
+| `Demo.py` in the root | `FirstProject` | `from calculator.calc import *` | `FirstProject` contains the folder `calculator`, and that folder contains `calc.py` |
+
+This also explains two things that do not work. `from calc import *` fails in the root file, because there is no `calc.py` in `FirstProject`. And `from calculator.calc import *` fails in `calculator\demo.py`, because there is no folder named `calculator` inside `calculator`.
+
+## Additions beyond the lesson
+
+**The file `__init__.py`.** In many projects a package folder contains a file named `__init__.py`, often empty. It marks the folder as a regular package, and it runs when the package is first imported. The `calculator` folder in the video has no such file, and the import still works, because Python 3 can also import a plain folder (the documentation calls this a namespace package). For a package of your own that you plan to keep, adding an empty `__init__.py` is the normal practice.
+
+**Be careful with the star.** `from calc import *` brings in every name of the module. If two modules both have an `add`, the one imported later replaces the other without any warning. That is the same confusion the instructor described at the start. In larger programs, import the module or list the names you need.
+
+<Callout type="info" title="Checked for these docs">
+The folder layout of the lesson was rebuilt for these docs, and every version of `calc.py`, `calculator/demo.py` and the root `Demo.py` on this page was run with Python 3.13 and gave the output shown. The three tracebacks come from those runs, with the folder replaced by the path from the video. The run of the old `Demo.py` and the two import lines that fail were tried on Windows. The second function of `calc.py` was read from a frame of the video.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `"add" is not defined` in the editor, or `NameError: name 'add' is not defined` | The function lives in another file and was not imported. This happens in the lesson | Import the module and call `calc.add()`, or import the function by name |
+| `"calc" is not defined` in the editor, or `NameError: name 'calc' is not defined` | `calc.add()` was written without `import calc`. This happens in the lesson | Add `import calc` at the top |
+| `python demo.py` asks `Enter a character` | The terminal is in the root folder, and Windows treats `demo.py` and `Demo.py` as the same name. This happens in the lesson | Move into the folder with `cd calculator`, then run the file |
+| `add()` is underlined after `from calc import sub` | Only `sub` was imported. This happens in the lesson | Write `from calc import sub, add` |
+| `ModuleNotFoundError: No module named 'calc'` | The file that was run is not in the same folder as `calc.py`. The lesson shows this as an editor warning | Write `from calculator.calc import *` |
+| The output is still `addition` after `Demo.py` was changed | The terminal is still inside `calculator`, so the other `demo.py` runs. This happens in the lesson | Go up with `cd ..` and run again |
+| `ModuleNotFoundError: No module named 'calculator'` | `from calculator.calc import ...` is used in a file that is located inside `calculator` | In that file write `from calc import ...` |
+| `ModuleNotFoundError: No module named 'calc.py'; 'calc' is not a package` | The import line says `import calc.py` | Leave out the extension: `import calc` |
+
+## Try It Yourself
+
+1. Create the folder `calculator` with `calc.py` and `demo.py` as in the lesson, and run `demo.py` from inside the folder.
+2. Add a function `mul()` to `calc.py` that returns the text `multiplication`. Call it from `demo.py` with `import calc`.
+3. Change `demo.py` to `from calc import mul` and call `mul()` without the prefix. Then call `add()` as well and read the error.
+4. Fix the error from exercise 3 in two ways: by listing the names, and with the star.
+5. In the root folder, create `shop.py` that prints the results of `add()` and `sub()`, using `from calculator.calc import add, sub`. Run it from the root folder.
+6. In `shop.py`, replace the import with `import calculator.calc` and work out how the call to `add` has to be written now.
+7. Create a second module `calculator/area.py` with a function `square()` that returns the text `square`. Use functions from both modules in `shop.py`.
+8. From the root folder, run `python calculator\demo.py` without using `cd` first. It works. Explain why, using the rule about the first folder that is searched.
+
+## Official references
+
+- [Python tutorial: modules](https://docs.python.org/3/tutorial/modules.html)
+- [Python tutorial: the module search path](https://docs.python.org/3/tutorial/modules.html#the-module-search-path)
+- [Python tutorial: packages](https://docs.python.org/3/tutorial/modules.html#packages)
+- [Python reference: the import system](https://docs.python.org/3/reference/import.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

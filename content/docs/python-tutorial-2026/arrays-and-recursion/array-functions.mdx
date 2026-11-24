@@ -1,0 +1,347 @@
+---
+title: Array Functions
+description: Add a value with append, turn an array around with reverse, and learn why the equals sign does not copy an array and how to make a real copy.
+---
+
+The previous lesson, [Arrays](/docs/python-tutorial-2026/arrays-and-recursion/arrays), created an array, printed it and looked at its buffer info. An array can do more than that. It comes with a set of functions of its own.
+
+A function that belongs to a value and is called with a dot, as in `arr1.append(77)`, is called a **method**. This lesson tries two of them, `append` and `reverse`.
+
+Then it asks a question that sounds too easy: how do you make a second array with the same values? The obvious answer, `arr2 = arr1`, does not do what most people expect. Finding out why, and what to write instead, takes up the larger part of the lesson.
+
+## Step 1: Add a value with append
+
+Open `array_demo.py` from the previous lesson. Remove the `buffer_info()` line, type `arr1.` and stop after the dot. VS Code shows a list of everything the array offers. The lesson picks `append`:
+
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = array('i',[33,4,55,5,66])
+
+arr1.append(77)
+
+for n in arr1:
+    print(n)
+```
+
+```text
+33
+4
+55
+5
+66
+77
+```
+
+`append` adds one value at the end of the array. The loop now prints six values, and the last one is 77.
+
+## Step 2: Turn the array around with reverse
+
+The list after the dot also contains `reverse`. Take care to pick `reverse` and not `remove`, which stands right next to it. The lesson replaces the `append` line:
+
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = array('i',[33,4,55,5,66])
+
+arr1.reverse()
+
+for n in arr1:
+    print(n)
+```
+
+```text
+66
+5
+55
+4
+33
+```
+
+The values are the same, in the opposite order. 66 was the last value and is now the first.
+
+`reverse()` changes the array itself. It does not create a new one.
+
+There are many more methods in that list, and the instructor asks you to explore them on your own. A few of them are shown under [Additions beyond the lesson](#additions-beyond-the-lesson).
+
+## Step 3: A second array with the same values?
+
+The task now: create another array, `arr2`, with the same values as `arr1`. With numbers you have done something like this before. You assign one variable to another.
+
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = array('i',[33,4,55,5,66])
+arr2 = arr1
+
+print(arr1)
+print(arr2)
+```
+
+```text
+array('i', [33, 4, 55, 5, 66])
+array('i', [33, 4, 55, 5, 66])
+```
+
+No error, and two identical lines. Same type code, same values.
+
+The output cannot answer the real question, though. Are there two arrays now? Or is there one array with two variables that refer to it?
+
+## Step 4: Change one and look at both
+
+There is a simple test. Change a value through `arr1` and print both again. The lesson replaces the 55 at index 2 with 54:
+
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = array('i',[33,4,55,5,66])
+arr2 = arr1
+
+arr1[2] = 54
+
+print(arr1)
+print(arr2)
+```
+
+```text
+array('i', [33, 4, 54, 5, 66])
+array('i', [33, 4, 54, 5, 66])
+```
+
+`arr1` shows 54, as expected. `arr2` shows 54 as well, and nobody touched `arr2`.
+
+So there is one array only. `arr2 = arr1` did not copy anything. It gave the same array a second name. This is the behaviour you met in [Variable Storage](/docs/python-tutorial-2026/data-structures-and-types/variable-storage): a variable refers to a value, and an assignment makes another variable refer to the same value.
+
+![Array_Copy_Vs_Second_Name](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-array-copy.svg)
+
+## Step 5: Create a new, empty array
+
+For a real copy, `arr2` has to be a new array. The lesson first tries `array()` with nothing in the brackets:
+
+{/* check: error */}
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = array('i',[33,4,55,5,66])
+arr2 = array()
+
+arr1[2] = 54
+
+print(arr1)
+print(arr2)
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\array_demo.py", line 5, in <module>
+    arr2 = array()
+TypeError: array() takes at least 1 argument (0 given)
+```
+
+This happens in the lesson. An array always needs its type code, even when it has no values yet. With the type code, the program runs:
+
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = array('i',[33,4,55,5,66])
+arr2 = array('i')
+
+arr1[2] = 54
+
+print(arr1)
+print(arr2)
+```
+
+```text
+array('i', [33, 4, 54, 5, 66])
+array('i')
+```
+
+`array('i')` is an empty array of integers. It is a separate array, which is good. It has no values, which is not what we want.
+
+You could type the five numbers a second time. That is not copying. It is a second array that was filled by hand, and it stops matching as soon as the first array gets its values from somewhere else.
+
+## Step 6: Copy the values with tolist()
+
+The second argument of `array()` is the list of values. `arr1` is an array and not a list, and the lesson turns it into one with `tolist()`, the method from the previous lesson:
+
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = array('i',[33,4,55,5,66])
+arr2 = array('i', arr1.tolist())
+
+arr1[2] = 54
+
+print(arr1)
+print(arr2)
+```
+
+```text
+array('i', [33, 4, 54, 5, 66])
+array('i', [33, 4, 55, 5, 66])
+```
+
+Now the two lines differ. `arr1` has the new 54, and `arr2` still has the 55. A change to one array no longer shows in the other, so these are two separate arrays.
+
+## Step 7: Take the type code from the first array
+
+The type code `'i'` in the line for `arr2` is still typed by hand. You can see the right code here, because `arr1` is created one line above. Often you cannot, because the array comes from another part of the program.
+
+Every array knows its own type code. It is stored in `typecode`:
+
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = array('i',[33,4,55,5,66])
+arr2 = array(arr1.typecode, arr1.tolist())
+
+arr1[2] = 54
+
+print(arr1)
+print(arr2)
+```
+
+```text
+array('i', [33, 4, 54, 5, 66])
+array('i', [33, 4, 55, 5, 66])
+```
+
+`arr1.typecode` is written without brackets. It is a stored value, not a method. Here it is `'i'`, so `arr2` becomes an array of integers. If `arr1` had another type, `arr2` would follow.
+
+## Step 8: Copy without the extra list
+
+The copy works. The instructor calls it one way and not the best way. Look at what `arr1.tolist()` does: it builds a complete list of all values. The list is used once, to fill `arr2`, and then thrown away. For a short moment the values exist three times: in `arr1`, in the list and in `arr2`. With a very large array that is wasted memory.
+
+The last version of the lesson avoids the list. It is the for loop from Step 1, written inside round brackets:
+
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = array('i',[33,4,55,5,66])
+arr2 = array(arr1.typecode, (n for n in arr1))
+
+arr1[2] = 54
+
+print(arr1)
+print(arr2)
+```
+
+```text
+array('i', [33, 4, 54, 5, 66])
+array('i', [33, 4, 55, 5, 66])
+```
+
+The part `(n for n in arr1)` is called a **generator expression**. Read it from the middle: `for n in arr1` goes through `arr1`, and `n` holds one value at a time. The `n` at the front says what to hand over for each round, which here is the value itself.
+
+A generator expression does not build a list. It hands the values to the new array one by one, and each value is added to `arr2` as it arrives. This takes a few more steps than copying a ready-made list, and it saves the memory for that list.
+
+<Callout type="info" title="The output in the video">
+The versions of Step 7 and Step 8 are saved in the video and not visibly run. The terminal keeps showing the output of Step 6. The outputs above come from running the same code. They are the same as in Step 6.
+</Callout>
+
+## Three ways to get arr2
+
+| Line | Result | Change through `arr1` shows in `arr2` |
+| --- | --- | --- |
+| `arr2 = arr1` | One array with two names | Yes |
+| `arr2 = array(arr1.typecode, arr1.tolist())` | A separate copy, made through a temporary list | No |
+| `arr2 = array(arr1.typecode, (n for n in arr1))` | A separate copy, filled value by value | No |
+
+## Additions beyond the lesson
+
+**The array can be passed directly.** The second argument of `array()` accepts a list, a tuple, another array or any other series of numbers that fit the type code. So `arr1` itself is enough. No list is built here either:
+
+```python title="copy_direct.py"
+from array import *
+
+
+arr1 = array('i',[33,4,55,5,66])
+arr2 = array(arr1.typecode, arr1)
+
+arr1[2] = 54
+
+print(arr1)
+print(arr2)
+```
+
+```text
+array('i', [33, 4, 54, 5, 66])
+array('i', [33, 4, 55, 5, 66])
+```
+
+**More methods to explore.** These are some of the other entries in the list that appears after `arr1.`:
+
+```python
+>>> from array import *
+>>> arr1 = array('i',[33,4,55,5,66])
+>>> arr1.count(5)
+1
+>>> arr1.index(55)
+2
+>>> arr1.insert(1, 99)
+>>> arr1
+array('i', [33, 99, 4, 55, 5, 66])
+>>> arr1.pop()
+66
+>>> arr1.remove(99)
+>>> arr1
+array('i', [33, 4, 55, 5])
+```
+
+| Method | What it does |
+| --- | --- |
+| `count(x)` | Counts how often `x` occurs |
+| `index(x)` | Gives the index of the first `x` |
+| `insert(i, x)` | Puts `x` in front of the value at index `i` |
+| `pop()` | Removes the last value and gives it back |
+| `remove(x)` | Removes the first `x` |
+
+<Callout type="info" title="Checked for these docs">
+Every program and prompt session on this page was run with Python 3.13 and gave the output shown. This includes the two last versions of the lesson, which are not run on screen. The `TypeError` for `array()` was reproduced by running the code. Its traceback is shown with the file path from the video and with the line number that matches the listing on this page. In the video the file starts with an empty line, so the error is reported there for line 6. The Python error messages in the table below were produced by running the faulty code, and the PowerShell message by typing the misspelled command.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| A change to `arr1` also appears in `arr2` | `arr2 = arr1` gives one array a second name. This happens in the lesson | Create a new array: `arr2 = array(arr1.typecode, arr1.tolist())` |
+| `TypeError: array() takes at least 1 argument (0 given)` | `array()` was called without a type code. This happens in the lesson | Pass the type code: `array('i')` |
+| `array('i')` is printed for `arr2` | The new array was created without values | Pass the values as the second argument |
+| `clkear : The term 'clkear' is not recognized as the name of a cmdlet, function, script file, or operable program.` | A typing mistake in the terminal. The instructor types `clkear` in place of `clear`. The video cuts before any message appears. The message shown here is what PowerShell prints for such a typo. It does not come from Python | Type `clear` |
+| `TypeError: 'float' object cannot be interpreted as an integer` | `arr1.append(7.5)` on an array of integers | Append an integer, or use an array with the type code `'d'` |
+| `None` is printed | `print(arr1.append(77))`. `append` changes the array and gives nothing back | Call `arr1.append(77)` on a line of its own, then print `arr1` |
+| The array is not reversed | `arr1.reverse` without brackets does not call the method | Write `arr1.reverse()` |
+| `TypeError: 'str' object is not callable` | `arr1.typecode()` with brackets. `typecode` is a stored value | Write `arr1.typecode` |
+| `IndexError: array assignment index out of range` | `arr1[9] = 1` on an array with five values | Use an index from 0 to 4 |
+
+## Try It Yourself
+
+1. The instructor's exercise: create an empty array of integers. Ask the user how many values they want to add. Run a loop that many times, read one number with `input()` in each round, convert it with `int()` and add it with `append`. Print the array at the end.
+2. Create an array, append two more values and print it in reverse order.
+3. Write `arr2 = arr1`, then call `arr2.append(100)` and print `arr1`. Explain the result.
+4. Repeat exercise 3 with a real copy and compare the output.
+5. Create `arr1 = array('d',[1.5,2.5,3.5])` and copy it with `arr1.typecode`. Print the copy and check its type code.
+6. Change the generator expression to `(n * 2 for n in arr1)`. What does `arr2` contain now?
+7. Print `arr1 is arr2` once after `arr2 = arr1` and once after a real copy. The `is` operator tells you whether two names refer to the same object.
+8. Try `count`, `index`, `insert`, `pop` and `remove` on an array of your own and print the array after each call.
+
+## Official references
+
+- [Python library: array, efficient arrays of numeric values](https://docs.python.org/3/library/array.html)
+- [Python tutorial: generator expressions](https://docs.python.org/3/tutorial/classes.html#generator-expressions)
+- [Python reference: assignment statements](https://docs.python.org/3/reference/simple_stmts.html#assignment-statements)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

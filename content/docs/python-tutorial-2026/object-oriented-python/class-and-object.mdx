@@ -1,0 +1,373 @@
+---
+title: Class and Object
+description: Write your first class, create objects from it, add a method and understand what self is and how Python passes the object to a method.
+---
+
+The previous lesson, [OOPs Introduction](/docs/python-tutorial-2026/object-oriented-python/oops-introduction), gave you two words. An **object** is a thing that knows something and does something. A **class** is the blueprint that objects are created from.
+
+This lesson turns both words into code. You will write a class named `computer`, create objects from it and give it a method that prints the configuration of a computer.
+
+On the way you will meet a small word that confuses almost every beginner: `self`. The lesson does not hand you a rule for it. It breaks the code on purpose, reads the error and lets the meaning of `self` come out of that. This page follows the same path.
+
+## Step 1: Tidy the project
+
+By now the project folder holds a long list of files, and the instructor admits that even he no longer knows which file contains what. So he sorts them first:
+
+| Folder | Contents |
+| --- | --- |
+| `basics` | All the loose `.py` files from the earlier lessons |
+| `calculator` | The package from [Modules and Packages](/docs/python-tutorial-2026/functional-python/modules-and-packages) |
+| `oop` | New. Everything about object-oriented programming goes here |
+
+Inside `oop` he creates a new file named `demo.py`. This is optional housekeeping. If your files are in a different place, the code works the same way.
+
+The terminal has to be in the folder of the file before you run it:
+
+```text
+PS C:\PythonCourse\FirstProject> cd oop
+PS C:\PythonCourse\FirstProject\oop> python demo.py
+```
+
+## Step 2: You have used objects all along
+
+Before the first class, the lesson looks at an ordinary number:
+
+```python title="demo.py"
+a = 18
+print(type(a))
+```
+
+```text
+<class 'int'>
+```
+
+You saw this output in [Data Types](/docs/python-tutorial-2026/data-structures-and-types/data-types). Now look at the first word in it: `class`. The value `18` is an **object**, and it was created from a class named `int`. The name `a` refers to that object, as explained in [Variable Storage](/docs/python-tutorial-2026/data-structures-and-types/variable-storage).
+
+Everything you have used so far is an object: numbers, strings, lists, and functions too.
+
+An object has methods. In VS Code, type `a.` and the editor lists what an `int` can do, for example `bit_length`, `bit_count` and `to_bytes`. The instructor then opens the definition of `int` in the editor. It starts with the line `class int:`, and below it are lines such as `def bit_length(self)`.
+
+That one screen shows the whole pattern of this lesson:
+
+| Part | Meaning |
+| --- | --- |
+| `class` | The keyword that starts a class |
+| `int` | The name of the class |
+| `:` | A colon, as after `def` |
+| `def bit_length(self)` | A function inside the class, which is called a method. Its first parameter is `self` |
+
+Python has no built-in class named `computer`. When the class you need does not exist, you write it yourself.
+
+## Step 3: Create a class
+
+```python title="demo.py"
+class computer:
+    pass
+
+com1 = computer
+print(type(com1))
+
+a = 18
+print(type(a))
+```
+
+```text
+<class 'type'>
+<class 'int'>
+```
+
+The class is two lines. The keyword `class`, a name, a colon, and then the body, indented by four spaces. A class can hold variables and methods. This one should stay empty for now, and Python does not allow an empty body, so the word `pass` fills it. `pass` means "do nothing".
+
+The output is a surprise, though. The lesson wanted `com1` to be a computer, and Python reports `<class 'type'>`.
+
+### The round brackets create the object
+
+The line `com1 = computer` does not create anything. It gives the class a second name. You know this from functions:
+
+```python
+def abc():
+    pass
+
+xyz = abc
+```
+
+`abc` without brackets does not call the function. It only hands the function over, so `xyz` becomes another name for the same function. In the same way, `com1` became another name for the class. And the type of a class is `type`, which is what Python printed.
+
+To create an object, add round brackets, exactly as you do to call a function:
+
+```python title="demo.py"
+class computer:
+    pass
+
+com1 = computer()
+print(type(com1))
+
+a = 18
+print(type(a))
+```
+
+```text
+<class '__main__.computer'>
+<class 'int'>
+```
+
+Now `com1` refers to an object of the class `computer`. The part `__main__` is the name of the module in which the class was written, which is the file you are running. You met that name in [The Special Variable `__name__`](/docs/python-tutorial-2026/functional-python/special-variable-name).
+
+| Line | What `com1` is | `type(com1)` |
+| --- | --- | --- |
+| `com1 = computer` | The class itself, under a second name | `<class 'type'>` |
+| `com1 = computer()` | A new object of the class | `<class '__main__.computer'>` |
+
+The instructor calls `computer()` a constructor here, because it constructs the object. The exact meaning of that word comes two lessons later, in [Constructor with `__new__`](/docs/python-tutorial-2026/object-oriented-python/constructor-with-new).
+
+## Step 4: Add a method
+
+What matters about a computer when you buy one? For the instructor it is the configuration: the processor, the memory and the storage. The colour does not matter. So the class gets a behavior that prints the configuration.
+
+```python
+class computer:
+
+    def config(self):
+        print("i7, 16GB, 1TB")
+
+com1 = computer()
+```
+
+`config` looks like a function, and it is one. A function written inside a class is called a **method**. The `pass` line is gone, because the class is no longer empty.
+
+The method has one parameter, `self`. The instructor asks you to accept it for a moment. Then he does something better than explaining it. He removes it, to find out why it is needed.
+
+## Step 5: Call the method through the class
+
+With `self` removed, the first idea is to call the method by its name alone, like any function.
+
+{/* check: error */}
+```python title="demo.py"
+class computer:
+
+    def config():
+        print("i7, 16GB, 1TB")
+
+com1 = computer()
+config()
+```
+
+In the video the line is not run. The editor already underlines it with the message `"config" is not defined`. If you run it, Python says the same:
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\demo.py", line 7, in <module>
+    config()
+    ^^^^^^
+NameError: name 'config' is not defined
+```
+
+The method exists, but it lives inside the class. From outside you have to say where to find it:
+
+```python title="demo.py"
+class computer:
+
+    def config():
+        print("i7, 16GB, 1TB")
+
+com1 = computer()
+computer.config()
+```
+
+```text
+i7, 16GB, 1TB
+```
+
+It works. So why would anyone need `self`? Put it back, change nothing else, and run again:
+
+{/* check: error */}
+```python title="demo.py"
+class computer:
+
+    def config(self):
+        print("i7, 16GB, 1TB")
+
+com1 = computer()
+computer.config()
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\demo.py", line 7, in <module>
+    computer.config()
+    ~~~~~~~~~~~~~~~^^
+TypeError: computer.config() missing 1 required positional argument: 'self'
+```
+
+This is an error you know from [Function Arguments](/docs/python-tutorial-2026/arrays-and-recursion/function-arguments). The method has one parameter, and the call passes no value for it. Python wants an argument for `self`. Which value should that be?
+
+<Callout type="info" title="Line numbers in the tracebacks">
+The file in the video starts with an empty line, so the video shows `line 8` where this page shows `line 7`. The same holds for the other tracebacks in this section. Everything else is identical.
+</Callout>
+
+## Why a method needs to know its object
+
+One class can have many objects. The lesson gives two pictures for this.
+
+The studio has three lights and three remotes. All three remotes came from the same design. If the instructor sits on one by mistake and breaks it, only that one remote is broken. The other two still work. Each object is a separate thing.
+
+Now imagine three people standing in front of you: Kiran, Harsh and Sushil. All three are humans. If you say "human, walk", nobody knows who is meant. You have to say which human: `human.walk(harsh)` or `human.walk(sushil)`.
+
+A method is in the same position. It is written once, in the class, and it works for every object of that class. When it runs, it has to be told which object it is working for.
+
+## Step 6: Pass the object yourself
+
+So create a second computer and tell `config` which one you mean:
+
+```python title="demo.py"
+class computer:
+
+    def config(self):
+        print("i7, 16GB, 1TB")
+
+com1 = computer()
+com2 = computer()
+
+
+computer.config(com1)
+computer.config(com2)
+```
+
+```text
+i7, 16GB, 1TB
+i7, 16GB, 1TB
+```
+
+`computer.config(com1)` reads as: go to the class `computer`, find `config`, and run it for the object `com1`. The object in the brackets is assigned to the parameter `self`. That is all `self` is:
+
+**`self` is the object the method is working for.** In the first call `self` is `com1`. In the second call `self` is `com2`.
+
+Both lines print the same text, because `config` prints a fixed string and does not use `self` yet. The next lesson stores different values in each object, and then `self` starts to matter.
+
+<Callout type="info" title="self is a name chosen by convention">
+The name `self` is not special to Python. The instructor renames the parameter to `this`, the word that Java uses, and the program still works. What counts is the position: the first parameter of a method receives the object. Every Python programmer names that parameter `self`, so use `self` too. Your code will be read by others.
+</Callout>
+
+## Step 7: The usual way, object dot method
+
+Nobody writes `computer.config(com1)` in daily work. There is a shorter form:
+
+```python title="demo.py"
+class computer:
+
+    def config(self):
+        print("i7, 16GB, 1TB")
+
+com1 = computer()
+com2 = computer()
+
+
+# computer.config(com1)
+# computer.config(com2)
+
+com1.config()
+```
+
+```text
+i7, 16GB, 1TB
+```
+
+At first sight this should fail. `config` expects one argument, and the brackets are empty. It works because Python passes the object for you. When you write an object, a dot and a method, the object before the dot becomes the first argument.
+
+| You write | Python treats it as | `self` is |
+| --- | --- | --- |
+| `com1.config()` | `computer.config(com1)` | `com1` |
+| `com2.config()` | `computer.config(com2)` | `com2` |
+
+In the words of the lesson: you can say `human.walk(kiran)`, or you can say `kiran.walk()`. The second is easier to read, and behind the scenes it is still the first.
+
+![Self_And_Method_Call](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-self-method-call.svg)
+
+From here on the course uses the form `com1.config()`.
+
+## Summary
+
+| Idea | Code |
+| --- | --- |
+| Define a class | `class computer:` |
+| An empty class body | `pass` |
+| Create an object | `com1 = computer()` |
+| Define a method | `def config(self):` inside the class |
+| Call a method | `com1.config()` |
+| The same call, written out in full | `computer.config(com1)` |
+
+## Additions beyond the lesson
+
+**Class names usually start with a capital letter.** The lesson names its class `computer`, and that works. The Python style guide recommends capitalised words for class names, such as `Computer` or `BankAccount`. The built-in classes `int`, `str` and `list` are old exceptions. This page keeps `computer` so that it matches the video. In your own projects, prefer `Computer`.
+
+**Printing an object.** If you print the object itself, you get its class and the place where it lives in memory:
+
+{/* check: skip */}
+```python title="demo.py"
+class computer:
+    pass
+
+com1 = computer()
+print(com1)
+```
+
+{/* check: skip */}
+```text
+<__main__.computer object at 0x0000021F9B5D7380>
+```
+
+The number after `at` is a memory address. It is different on every computer and on every run, so your output will not match this one exactly.
+
+**Two objects are two separate things.** `com1` and `com2` come from the same class, and they are still different objects, like the three remotes:
+
+```python title="demo.py"
+class computer:
+    pass
+
+com1 = computer()
+com2 = computer()
+print(com1 is com2)
+```
+
+```text
+False
+```
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output or the error shown. The `NameError` in Step 5 is not run in the video, where only the editor warning is visible, so its traceback comes from running the code for these docs. The tracebacks show the folder path from the video. The memory address in the additions is from one run and cannot be reproduced.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `<class 'type'>` when you print `type(com1)` | `com1 = computer` without brackets. `com1` is the class, and no object was created. This happens in the lesson | Write `com1 = computer()` |
+| `NameError: name 'config' is not defined` | The method was called by its name alone. It lives inside the class. The lesson shows the editor warning for this | Call it through an object, `com1.config()` |
+| `TypeError: computer.config() missing 1 required positional argument: 'self'` | The method was called through the class with empty brackets. This happens in the lesson | Call `com1.config()`, or pass the object, `computer.config(com1)` |
+| `TypeError: computer.config() takes 0 positional arguments but 1 was given` | The method was defined without `self` and called as `com1.config()`. Python passes the object, and the method has no parameter for it | Write `def config(self):` |
+| `IndentationError: expected an indented block after class definition on line 1` | The class has no body | Indent the body by four spaces, or write `pass` |
+| `AttributeError: 'computer' object has no attribute 'confg'. Did you mean: 'config'?` | The method name is misspelled in the call | Use the exact name from the class |
+
+## Try It Yourself
+
+1. Create a class `phone` with `pass` as its body. Create one object and print its type.
+2. Remove the round brackets from the line that creates the object and run again. Explain the new output.
+3. Add a method `ring` that prints `Ring ring`. Call it with `p1.ring()`.
+4. Call the same method in the long form, through the class, and pass the object yourself.
+5. Create three objects of your class and call `ring` on each one. How many times is the method written, and how many times does it run?
+6. Rename `self` to `this` in your method and run the program. Then change it back to `self`.
+7. Remove `self` from the method and call `p1.ring()`. Read the error message and explain where the "1 was given" comes from.
+8. Print `type(print)` and `type("hello")`. What do the outputs tell you about functions and strings?
+
+## Official references
+
+- [Python tutorial: a first look at classes](https://docs.python.org/3/tutorial/classes.html#a-first-look-at-classes)
+- [Python tutorial: method objects](https://docs.python.org/3/tutorial/classes.html#method-objects)
+- [Python FAQ: why must self be used explicitly in method definitions and calls](https://docs.python.org/3/faq/design.html#why-must-self-be-used-explicitly-in-method-definitions-and-calls)
+- [Python library: the type function](https://docs.python.org/3/builtins/functions.html#type)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

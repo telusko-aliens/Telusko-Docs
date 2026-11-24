@@ -1,0 +1,262 @@
+---
+title: Working with Strings
+description: Write text in Python with single and double quotes, print it, handle quotes and backslashes inside a string, and join or repeat strings.
+---
+
+So far the prompt has only seen numbers, and numbers behave well. You type `45` and Python answers `45`.
+
+Programs also need text: a name, a message, a file path. In programming, a piece of text is called a **string**. The moment you type a word into the prompt, Python has a question that it never had with numbers. Is this word a piece of text, or is it the name of something?
+
+This lesson shows how to tell Python "this is text", and what to do when the text itself contains the characters that Python treats as special.
+
+## Step 1: A number works, a bare word does not
+
+Start the Python prompt and type a number, then a name:
+
+{/* check: skip */}
+```python
+>>> 45
+45
+>>> navin
+Traceback (most recent call last):
+  File "<python-input-1>", line 1, in <module>
+    navin
+NameError: name 'navin' is not defined
+```
+
+Python tries to make sense of every line you type. Each such line is called a **statement**. Normally one statement takes one line. The video comes back to statements later.
+
+`45` is a number, so Python shows it. `navin` is not a number. A word without quotes can only be one thing in Python: a name, for example the name of a variable. No variable named `navin` exists, so Python reports a `NameError`.
+
+Compare this with a word that is a variable:
+
+```python
+>>> num = 8
+>>> num
+8
+```
+
+`num` works because a value was assigned to it one line earlier. Python knows `num`. It has no idea what `navin` is.
+
+## Step 2: Put the text in quotes
+
+To say "this is text, take it as it is", put a single quote at the start and at the end:
+
+```python
+>>> 'navin'
+'navin'
+```
+
+The first quote marks where the string starts. The second quote marks where it ends. Everything between them is the string. It can be one word or many words.
+
+`print` also needs the quotes. Without them, the word is a name again, and the same error comes back:
+
+{/* check: skip */}
+```python
+>>> print(navin)
+Traceback (most recent call last):
+  File "<python-input-5>", line 1, in <module>
+    print(navin)
+          ^^^^^
+NameError: name 'navin' is not defined
+```
+
+With quotes it works:
+
+```python
+>>> print('navin')
+navin
+>>> 'navin'
+'navin'
+>>> print('navin telusko')
+navin telusko
+```
+
+Look at the difference between the first two results.
+
+| You type | You see | Why |
+| --- | --- | --- |
+| `'navin'` | `'navin'` | The prompt shows the value as you would write it in code, with quotes, so you can see it is a string |
+| `print('navin')` | `navin` | `print` shows only the text |
+
+Typing a value alone to see it is a feature of the prompt. In a program file, a line that holds only `'navin'` shows nothing. When you write programs with many lines, you will always use `print`.
+
+## Step 3: An apostrophe inside the string
+
+Now the lesson wants to be grammatically correct and print `navin's telusko`. Guess what happens before you read on.
+
+{/* check: skip */}
+```python
+>>> print('navin's telusko')
+  File "<python-input-9>", line 1
+    print('navin's telusko')
+                          ^
+SyntaxError: unterminated string literal (detected at line 1)
+```
+
+A **string literal** is a string written directly in the code, between quotes. "Unterminated" means it was started and never ended.
+
+Read the line the way Python reads it. The first quote starts a string. The next quote ends it, and the next quote is the apostrophe after `navin`. So the string is `'navin'`. After it comes `s telusko`, which Python cannot place. Then one more quote starts a new string, and that string never ends.
+
+![Where_Does_the_String_End](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-string-quotes.svg)
+
+Adding another quote at the end does not help. It closes the last string and leaves the middle part broken, so Python gives a different error:
+
+{/* check: skip */}
+```python
+>>> print('navin's telusko'')
+  File "<python-input-10>", line 1
+    print('navin's telusko'')
+          ^^^^^^^^
+SyntaxError: invalid syntax. Perhaps you forgot a comma?
+```
+
+The marks now point at `'navin's`. A string followed directly by the letter `s` is not valid Python.
+
+### The fix: double quotes
+
+A string can be written with single quotes or with double quotes. Both work. If the text contains an apostrophe, use double quotes outside:
+
+```python
+>>> print("navin's telusko")
+navin's telusko
+```
+
+The string starts with a double quote, so only a double quote can end it. The single quote inside is ordinary text.
+
+## Step 4: Both kinds of quote in one string
+
+What if the output should be `navin's "telusko"`, with an apostrophe and with double quotes?
+
+- With single quotes outside, the apostrophe ends the string too early.
+- With double quotes outside, the double quote before `telusko` ends the string too early.
+
+One of the two has to lose its special meaning. Put a **backslash** `\` directly before it:
+
+```python
+>>> print('navin\'s "telusko"')
+navin's "telusko"
+```
+
+The first and the last single quote start and end the string. The quote after the backslash is treated as plain text. The backslash itself is not printed. This is called **escaping** a character.
+
+<Callout type="info" title="Slash and backslash">
+The instructor says "slash" while typing this character. The key used on screen is the backslash `\`. The forward slash `/` is the division operator and does not escape anything.
+</Callout>
+
+| You want to print | Write | Idea |
+| --- | --- | --- |
+| `navin` | `'navin'` or `"navin"` | Both kinds of quote work |
+| `navin's telusko` | `"navin's telusko"` | Double quotes outside, apostrophe inside |
+| `navin's "telusko"` | `'navin\'s "telusko"'` | Escape the inner quote with a backslash |
+
+## Step 5: Join and repeat strings
+
+Two string literals written next to each other become one string:
+
+```python
+>>> 'navin'
+'navin'
+>>> 'navin ' 'navin '
+'navin navin '
+```
+
+Each of the two strings ends with a space inside the quotes. That is why the words do not stick together.
+
+To get the name ten times this way, you would have to type it ten times. Python has a shorter way. Multiply the string by a number:
+
+```python
+>>> 'navin ' * 10
+'navin navin navin navin navin navin navin navin navin navin '
+```
+
+The `*` operator that multiplies numbers repeats a string. The next lesson, [String Concatenation](/docs/python-tutorial-2026/python-basics/string-concatenation), shows more ways to join strings.
+
+## Step 6: Backslashes in a path
+
+A Windows folder path looks harmless. It has no quotes in it:
+
+{/* check: skip */}
+```python
+>>> print('c:\users\navin')
+  File "<python-input-19>", line 1
+    print('c:\users\navin')
+          ^^^^^^^^^^^^^^^^
+SyntaxError: (unicode error) 'unicodeescape' codec can't decode bytes in position 2-3: truncated \uXXXX escape
+```
+
+The problem is the backslash again. Inside a string, a backslash together with the character after it can have a special meaning. Such a pair is called an **escape sequence**.
+
+| In the string | Meaning |
+| --- | --- |
+| `\'` | A single quote as plain text |
+| `\"` | A double quote as plain text |
+| `\n` | A new line |
+| `\u` | The start of a Unicode character code. Four digits of the code must follow |
+| `\\` | One backslash as plain text |
+
+"Position 2-3" in the message counts the characters of the string from zero: `c` is 0, `:` is 1, the backslash is 2 and `u` is 3. Python reads `\u` as the start of a character code and does not find the rest. The `\n` in `\navin` would cause trouble too, because it means a new line.
+
+The fix uses the same idea as before. To cancel the special meaning of a backslash, put one more backslash before it:
+
+```python
+>>> print('c:\\users\\navin')
+c:\users\navin
+```
+
+Each `\\` in the code prints as one backslash.
+
+## Additions beyond the lesson
+
+These two points are not in the video. They save time when you practise.
+
+**Raw strings.** Put the letter `r` directly before the opening quote, and backslashes in that string lose their special meaning. This is convenient for Windows paths:
+
+```python
+>>> print(r'c:\users\navin')
+c:\users\navin
+```
+
+**The prompt chooses the quotes it shows.** When a string contains an apostrophe, the prompt shows it with double quotes. The string is the same either way:
+
+```python
+>>> "navin's telusko"
+"navin's telusko"
+```
+
+<Callout type="info" title="Checked for these docs">
+Every prompt session on this page was run again with Python 3.13, and each line gave the result shown. The five error messages were produced with Python 3.13 and copied from its output. The numbers in `<python-input-9>` and similar names count the lines typed since the prompt started, so they will differ on your machine.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `NameError: name 'navin' is not defined` | A word without quotes is read as a variable name. This happens in the lesson, with `navin` and with `print(navin)` | Put the text in quotes: `'navin'`, `print('navin')` |
+| `SyntaxError: unterminated string literal (detected at line 1)` | A quote was opened and never closed. In the lesson, the apostrophe in `'navin's telusko'` ends the string too early | Use double quotes outside, or escape the apostrophe with `\'` |
+| `SyntaxError: invalid syntax. Perhaps you forgot a comma?` | One more quote was added at the end, as in `'navin's telusko''`. This happens in the lesson | Fix the quote in the middle. An extra quote at the end does not repair it |
+| `SyntaxError: (unicode error) 'unicodeescape' codec can't decode bytes in position 2-3: truncated \uXXXX escape` | The string contains `\u`, as in `'c:\users\navin'`. This happens in the lesson | Double every backslash: `'c:\\users\\navin'` |
+| The quotes show in the result: `'navin'` | The string was typed alone in the prompt | Use `print('navin')` to see only the text |
+| The words stick together: `'navinnavin'` | No space inside the quotes | Put the space inside a string: `'navin ' 'navin'` |
+| A path prints on two lines | The path contains `\n`, which means a new line | Write `\\n`, or double every backslash in the path |
+
+## Try It Yourself
+
+1. Type your first name in the prompt without quotes and read the error. Then type it with quotes.
+2. Type `'hello'` and then `print('hello')`. Describe the difference between the two results.
+3. Print the sentence `It's a good day` in two ways: once with double quotes outside, and once with single quotes outside and a backslash.
+4. Print this line exactly, with both kinds of quote in it: `She said "it's fine"`.
+5. Type `'ab' 'cd'` and guess the result first. Then change it so that the result is `'ab cd'`.
+6. Print a line of 30 dashes with one short statement. Use `*`.
+7. Print the path `c:\new\table`. Try it with single backslashes first, look at the output, then fix it.
+8. Type `print('navin)` with the closing quote missing. Read the error and say which part of it tells you what is wrong.
+
+## Official references
+
+- [Python tutorial: text](https://docs.python.org/3/tutorial/introduction.html#text)
+- [Python reference: escape sequences](https://docs.python.org/3/reference/lexical_analysis.html#escape-sequences)
+- [Python library: text sequence type str](https://docs.python.org/3/builtins/stdtypes.html#text-sequence-type-str)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

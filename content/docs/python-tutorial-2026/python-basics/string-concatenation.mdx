@@ -1,0 +1,101 @@
+---
+title: String Concatenation
+description: Join two strings by writing them side by side, see why that fails with a variable, and use the plus operator to join a variable and a string.
+---
+
+The previous lesson, [Working with Strings](/docs/python-tutorial-2026/python-basics/working-with-strings), showed how to write text so that Python accepts it.
+
+Real programs rarely keep a text as it is. They join a name to a greeting, or a first name to a last name.
+
+This lesson joins strings in two ways. The first way works only for text written directly in the code. The second way also works when the text is stored in a variable.
+
+## Step 1: Join two strings
+
+Start with what you know. A string can hold one word or several:
+
+```python
+>>> 'navin'
+'navin'
+>>> 'navin telusko'
+'navin telusko'
+```
+
+Now write two separate strings side by side:
+
+```python
+>>> 'navin' 'telusko'
+'navintelusko'
+>>> 'navin ' 'telusko'
+'navin telusko'
+```
+
+Python joins them into one string. Joining strings is called **concatenation**. Python adds nothing between the two parts. If you want a space, put it inside one of the strings, as in the second line.
+
+## Step 2: Join a variable and a string
+
+Store the name in a variable and try the same trick:
+
+{/* check: skip */}
+```python
+>>> name = 'navin'
+>>> name 'telusko'
+  File "<python-input-6>", line 1
+    name 'telusko'
+         ^^^^^^^^^
+SyntaxError: invalid syntax
+```
+
+It worked a moment ago, and now it fails. The difference is what stands on the left.
+
+A string written directly in the code, between quotes, is a **string literal**. Writing two string literals side by side is allowed. A variable next to a string literal is not. Python sees `name`, then finds `'telusko'` after it, and does not know what you intend.
+
+So tell Python what you intend. Use the `+` operator:
+
+```python
+>>> name = 'navin'
+>>> name + 'telusko'
+'navintelusko'
+>>> name + ' telusko '
+'navin telusko '
+```
+
+The `+` operator looks at what it is given. With two numbers it adds. With two strings it concatenates.
+
+| You write | Result | Works? |
+| --- | --- | --- |
+| `'navin' 'telusko'` | `'navintelusko'` | Yes, two literals |
+| `name 'telusko'` | `SyntaxError` | No, a variable and a literal |
+| `name + 'telusko'` | `'navintelusko'` | Yes, `+` works for both |
+
+Joining works with whole strings. The next lesson, [Fetching Characters from a String](/docs/python-tutorial-2026/python-basics/fetching-characters-from-a-string), goes inside a string and takes out single characters and parts.
+
+<Callout type="info" title="Checked for these docs">
+Every prompt session on this page was run again with Python 3.13, and each line gave the result shown. The two error messages were produced with Python 3.13 and copied from its output. The number in the name `<python-input-6>` counts the lines typed since the prompt started, so it will differ on your machine. The block with `+` repeats the assignment `name = 'navin'`, so that it can be run by itself. In the video the assignment is typed once.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `SyntaxError: invalid syntax` after `name 'telusko'` | A variable and a string literal were written side by side. This happens in the lesson | Use `+`: `name + 'telusko'` |
+| `'navintelusko'` with no space | Concatenation adds nothing between the parts. This happens in the lesson | Put the space inside a string: `name + ' telusko'` |
+| `TypeError: can only concatenate str (not "int") to str` | `+` was used with a string and a number, such as `name + 5` | Join strings with strings: `name + '5'` |
+
+## Try It Yourself
+
+1. Store your first name in `first` and your last name in `last`. Show your full name with a space between the two parts, using `+`.
+2. Type `'good' 'morning'` and guess the result first. Then change it so that the result is `'good morning'`.
+3. Set `city = 'mumbai'`. Type `city 'india'` and read the error. Then fix the line so that the result is `'mumbai india'`.
+4. Set `greeting = 'hello'` and `name = 'navin'`. Build `'hello navin!'` from the two variables and two string literals, using `+`.
+5. Guess the results of `5 + 6` and `'5' + '6'`. Run both and explain the difference.
+6. Try `name + 5` with `name = 'navin'` and read the error. Then change the line so that the result is `'navin5'`.
+
+## Official references
+
+- [Python tutorial: text](https://docs.python.org/3/tutorial/introduction.html#text)
+- [Python reference: string literal concatenation](https://docs.python.org/3/reference/expressions.html#string-literal-concatenation)
+- [Python reference: binary arithmetic operations](https://docs.python.org/3/reference/expressions.html#binary-arithmetic-operations)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

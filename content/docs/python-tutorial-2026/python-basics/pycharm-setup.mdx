@@ -1,0 +1,82 @@
+---
+title: PyCharm Setup
+description: Install PyCharm, create a Pure Python project with its own interpreter, add a Python file, run it with the Run button and read what the Run panel shows.
+---
+
+In [VS Code Setup](/docs/python-tutorial-2026/python-basics/vs-code-setup), VS Code needed an extension before it could work with Python. The second tool needs none. **PyCharm** comes from JetBrains and is made for Python.
+
+This lesson installs PyCharm, creates a project and runs one file in it. The free and paid sides of PyCharm are described in [IDEs for Python](/docs/python-tutorial-2026/python-basics/ides-for-python).
+
+## Step 1: Install PyCharm and create a project
+
+1. Download PyCharm from [jetbrains.com/pycharm](https://www.jetbrains.com/pycharm/) and run the installer with the default choices. PyCharm is available for macOS and Linux as well, from the same website. The installer is not shown in the video.
+2. Open PyCharm. On the Welcome screen, click **New Project**. On a fresh installation the list of projects is empty.
+3. Leave the project type on **Pure Python**. Give the project a name in the Location field. In the lesson it is `PythonProject2`.
+4. Under the interpreter settings, keep **Project venv** and choose the Python you installed. The list of environment types can look different in a newer PyCharm, and Project venv is the one to keep. The lesson picks Python 3.13.
+5. Click **Create**.
+
+Project venv means that PyCharm makes a folder named `.venv` inside the project, with a private copy of the Python setup for this project only. That is why the new project is not completely empty. You can leave that folder alone.
+
+The video also shows prices. They are from the middle of 2025 and they change, so this page does not repeat them. See the [official PyCharm page](https://www.jetbrains.com/pycharm/) for the current editions and prices.
+
+## Step 2: Create a file and run it
+
+1. Right-click the project name in the Project panel at the left and choose **New**, then **Python File**.
+2. Type the name `Demo` and press Enter. PyCharm adds the extension by itself, so the file is `Demo.py`.
+3. Type the code:
+
+{/* check: noout */}
+```python title="Demo.py"
+print('Hello')
+```
+
+4. Click the green Run button in the toolbar at the top. A Run panel opens at the bottom:
+
+```text
+C:\Users\navin\PycharmProjects\PythonProject2\.venv\Scripts\python.exe C:\Users\navin\PycharmProjects\PythonProject2\Demo.py
+Hello
+
+Process finished with exit code 0
+```
+
+The first line is the command PyCharm ran for you: the Python interpreter of the project, followed by your file. Then comes your output. The last line is added by PyCharm, and exit code 0 means the program finished without an error.
+
+Two small things from the video, so that they do not confuse you. While the instructor types, PyCharm offers `World')` in grey as a suggestion. He does not accept it. And the code on his screen is `print('Hello ')`, with a space left over before the closing quote, so his output has an invisible space at the end. The code above leaves that space out.
+
+## PyCharm or VS Code?
+
+The instructor finds PyCharm the better-looking one and VS Code the lighter one. Both are very good, and the choice is a personal preference. The course uses VS Code because many people already know it. If you like PyCharm, use it.
+
+One tool is left. It runs in the browser, and it is the topic of [Jupyter Notebook](/docs/python-tutorial-2026/python-basics/jupyter-notebook).
+
+<Callout type="info" title="Checked for these docs">
+The Python file on this page was run with Python 3.13 and printed the text shown. The listing leaves out the empty first line that the file in the video has. The PyCharm output is copied from the video. The installer of PyCharm is not shown in the video and was not run for these docs, so it is described only in general terms. Websites, buttons and editions change over time.
+</Callout>
+
+## Mistakes and fixes
+
+No error message appears in this lesson. These are the things most likely to puzzle a beginner in PyCharm.
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| PyCharm prints `Hello` with a space after it | The text was typed as `'Hello '`. This happens in the lesson | Remove the space inside the quotes |
+| Grey text such as `World')` appears while you type | PyCharm offers a suggestion. This happens in the lesson | Keep typing your own text, as the instructor does |
+| A folder named `.venv` in a project you just created | Project venv makes a private copy of the Python setup for the project | Leave that folder alone |
+
+## Try It Yourself
+
+PyCharm is optional for this course. Do these exercises if you installed it.
+
+1. Install PyCharm, create a project with a file `Demo.py` and run it. Compare the Run panel with the VS Code terminal.
+2. Read the first line of your Run panel. Which two paths does it contain, and what is each one for?
+3. Find the `.venv` folder in the Project panel. Do not change anything in it.
+4. Change the text in `Demo.py` to `welcome to telusko` and run again. What is the last line of the Run panel?
+
+## Official references
+
+- [JetBrains: PyCharm](https://www.jetbrains.com/pycharm/)
+- [Python tutorial: virtual environments and packages](https://docs.python.org/3/tutorial/venv.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>
