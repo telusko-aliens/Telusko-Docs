@@ -1,0 +1,305 @@
+---
+title: IDLE and Number Operations
+description: Open the Python prompt, use it as a calculator, and learn the arithmetic operators, the order of operations, the two kinds of division, the underscore and your first variables.
+---
+
+<Video id="j_JuhAWlEaI" title="IDLE and Number Operations" start={1852} />
+
+---
+
+Python is installed and the editors are ready. It is tempting to open VS Code and start a project. The lesson does something simpler first: it opens a plain prompt and types numbers into it.
+
+That is a good way to begin any language. A prompt answers every line at once. You type something, you see what Python makes of it, and you learn the grammar one line at a time.
+
+## Command Prompt, PowerShell and Python
+
+Before Python, the lesson shows what the ordinary Windows terminals do with a sum.
+
+**Command Prompt** understands commands, for example `dir` to list files and `cls` to clear the screen. It does not understand arithmetic:
+
+```text
+C:\Users\navin>2+3
+'2+3' is not recognized as an internal or external command,
+operable program or batch file.
+```
+
+**PowerShell** looks similar and can do more. It is a shell from Microsoft with its own scripting language, so the same line works there, and `echo` prints text:
+
+```text
+PS C:\Users\navin> 2+3
+5
+PS C:\Users\navin> echo 'navin'
+navin
+```
+
+| | Command Prompt | PowerShell | Python prompt |
+| --- | --- | --- | --- |
+| Lists files with `dir` | Yes | Yes, and with `ls` | No |
+| Clears the screen | `cls` | `cls` or `clear` | Depends on the terminal |
+| `2+3` | Error | `5` | `5` |
+| Runs Python code | No | No | Yes |
+
+We are not here to learn shell scripting. The point is only that each prompt speaks one language, and the one we want speaks Python.
+
+## Step 1: Start the Python prompt
+
+Type `python` in Command Prompt or in PowerShell and press Enter:
+
+```text
+C:\Users\navin>python
+Python 3.13.5 (tags/v3.13.5:6cb20a2, Jun 11 2025, 16:15:46) [MSC v.1943 64 bit (AMD64)] on win32
+Type "help", "copyright", "credits" or "license" for more information.
+>>>
+```
+
+The first line shows the Python version, 3.13.5 in the video. The three arrows `>>>` are the Python prompt. Whatever you type after them goes to Python.
+
+This kind of prompt is called a **REPL**, which stands for read, evaluate, print, loop:
+
+| Letter | Step |
+| --- | --- |
+| **R**ead | Python reads the line you typed |
+| **E**valuate | It works out the result |
+| **P**rint | It prints the result |
+| **L**oop | It shows `>>>` again and waits for the next line |
+
+![Python_REPL](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-repl.svg)
+
+### IDLE, the same prompt in a window
+
+Python also installs a small program named **IDLE**. It opens the same prompt in a window of its own, with menus to create a file, edit it, run it and change settings.
+
+The lesson opens IDLE, looks at the menus and closes it again. The rest of this lesson uses the prompt in the terminal. The calculations shown here give the same results in IDLE. One key behaves differently there: in IDLE the up arrow moves the cursor, and an earlier line is brought back with Alt+P.
+
+<Callout type="info" title="What IDLE stands for">
+The caption in the video reads "Integrated Development Learning Environment". The official Python documentation spells it out as "Integrated Development and Learning Environment". It is a tool for trying things and for learning, which is exactly how the first lessons use the prompt.
+</Callout>
+
+## Step 2: Add, subtract, multiply
+
+```python
+>>> 2 + 3
+5
+>>> 6 - 3
+3
+>>> 5 * 2
+10
+>>> 5 + 9 - 4
+10
+```
+
+The spaces around the operators are not required. `2+3` works too. The spaces only make the line easier to read.
+
+A line can hold more than one operation, as the last one shows.
+
+### Python has a grammar
+
+Now leave out the last number:
+
+{/* check: skip */}
+```python
+>>> 8 + 9 -
+  File "<python-input-4>", line 1
+    8 + 9 -
+           ^
+SyntaxError: invalid syntax
+```
+
+A minus sign needs something after it. Without it the line is not valid Python, and Python says so: `SyntaxError: invalid syntax`. The small `^` points at the place where Python gave up.
+
+Every language has rules for what a correct sentence looks like. In programming these rules are called the **syntax**. You will see this error often while you learn. It always means the same thing: the line is not written the way Python expects.
+
+## Step 3: The order of operations
+
+What is `9 + 2 * 3`?
+
+Read from left to right, it would be 9 plus 2, which is 11, times 3, which is 33. With the rule you learned at school, multiplication comes first: 2 times 3 is 6, plus 9 is 15.
+
+```python
+>>> 9 + 2 * 3
+15
+>>> (9 + 2) * 3
+33
+```
+
+Python follows the school rule, known as **BODMAS**. If you want the addition first, put it in brackets.
+
+| Letter | Meaning | In Python |
+| --- | --- | --- |
+| B | Brackets | `( )` |
+| O | Orders, such as powers | `**` |
+| D, M | Divide and multiply | `/`, `//`, `%`, `*` |
+| A, S | Add and subtract | `+`, `-` |
+
+When you are not sure about the order, use brackets. They cost nothing and make the line clear to the next reader.
+
+## Step 4: Powers
+
+The cube of 8 is 8 times 8 times 8:
+
+```python
+>>> 8 * 8 * 8
+512
+```
+
+For 8 to the power 10 that would be a lot of typing. Many people expect the caret sign `^` to do it:
+
+```python
+>>> 8 ^ 10
+2
+```
+
+That is not a power. The caret is a different operator in Python. It works on the bits of a number. The instructor says that he will come back to it later. A short section at the end of [Operators](/docs/python-one-shot/data-structures-and-types/operators) shows what it does. The power operator is a **double star**:
+
+```python
+>>> 8 ** 10
+1073741824
+>>> 8 ** 3
+512
+```
+
+`8 ** 3` gives the same 512 as `8 * 8 * 8`, so we can trust the large number above too.
+
+## Step 5: Division, quotient and remainder
+
+```python
+>>> 8 / 2
+4.0
+>>> 9 / 2
+4.5
+```
+
+8 divided by 2 is 4, and Python prints `4.0`. The reason shows in the second line. A division can produce a number with a decimal point, as 9 divided by 2 does. So the `/` operator always answers with such a number, even when the division comes out even. Numbers with a decimal point are called **float** numbers.
+
+When you divide by hand, you get two results:
+
+| | 9 divided by 2 |
+| --- | --- |
+| Quotient | 4 |
+| Remainder | 1 |
+
+Python has one operator for each:
+
+```python
+>>> 9 // 2
+4
+>>> 9 % 2
+1
+```
+
+| Operator | Name | Gives |
+| --- | --- | --- |
+| `/` | Division | The exact result, always a float |
+| `//` | Floor division, written as a double slash | The quotient |
+| `%` | Modulus, also called mod | The remainder |
+
+The remainder looks like a curiosity now. It becomes very useful later, for example to check whether a number is even or odd.
+
+## Step 6: The underscore remembers the last result
+
+Press the up arrow key and the prompt brings back the line you typed before. That is how the lesson repeats `8 ** 3`. Now suppose you want to use that result in the next line:
+
+{/* check: skip */}
+```python
+>>> 8 ** 3
+512
+>>> 5 + _
+517
+>>> 2 + _
+519
+```
+
+In the prompt, the underscore `_` holds the result of the last line that produced one. So `5 + _` is 5 plus 512.
+
+Look at the third line. The idea was 2 plus 512, and the answer is 519. The underscore had moved on. After the second line, the last result was 517.
+
+The underscore is handy for a quick calculation, and it is fragile. It changes with every result. It is also a feature of the prompt only. Do not rely on it in a program file.
+
+## Step 7: Variables, boxes with a name
+
+To keep a value for as long as you need it, give it a name:
+
+```python
+>>> num1 = 8 ** 3
+>>> num1
+512
+>>> print(num1)
+512
+```
+
+Think of a **variable** as a box with a name on it. `num1` is the name, and the box holds a value.
+
+| Part | Meaning |
+| --- | --- |
+| `num1` | The name of the variable |
+| `=` | Assignment. It puts the value on the right into the variable on the left |
+| `8 ** 3` | Worked out first. The result, 512, is what gets stored |
+
+The first line prints nothing. An assignment only stores the value. To see it, type the name. In the prompt, typing a name shows its value. In a program file you will use `print(...)`, which works in both places. What `print` really is comes later, in [Introduction to Functions](/docs/python-one-shot/functions-modules-and-input/introduction-to-functions).
+
+Now the value stays put, whatever else you calculate in between:
+
+```python
+>>> num1 = 8 ** 3
+>>> 4 + 8
+12
+>>> 5 + num1
+517
+>>> num2 = 8
+>>> num1 + num2
+520
+>>> num3 = num1 + num2
+>>> num3
+520
+```
+
+After `4 + 8`, the underscore would be 12. `num1` is still 512. And the result of a calculation with variables can go into another variable, as `num3` shows.
+
+<Callout type="info" title="Checked for these docs">
+Every prompt session on this page was run again for these docs with Python 3.13, and each line gave the result shown. The last block repeats the line `num1 = 8 ** 3`, which the video types only once, so that the block can be run by itself. The `SyntaxError` and the underscore session were typed into a real prompt, because they cannot be replayed automatically.
+</Callout>
+
+## Operators in this lesson
+
+| Operator | Meaning | Example | Result |
+| --- | --- | --- | --- |
+| `+` | Add | `2 + 3` | `5` |
+| `-` | Subtract | `6 - 3` | `3` |
+| `*` | Multiply | `5 * 2` | `10` |
+| `**` | Power | `8 ** 3` | `512` |
+| `/` | Divide | `9 / 2` | `4.5` |
+| `//` | Quotient | `9 // 2` | `4` |
+| `%` | Remainder | `9 % 2` | `1` |
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `'2+3' is not recognized as an internal or external command` | The line was typed in Command Prompt, not in Python | Type `python` first and wait for `>>>` |
+| `SyntaxError: invalid syntax` | The line is incomplete or not valid Python, such as `8 + 9 -` | Complete the expression |
+| `8 ^ 10` gives `2` | `^` is not the power operator | Use `8 ** 10` |
+| `8 / 2` gives `4.0` and not `4` | `/` always gives a float | Use `8 // 2` when you want a whole number |
+| `2 + _` gives an unexpected number | `_` holds the most recent result, not the one you had in mind | Store the value in a variable |
+| Nothing is printed after `num1 = 8 ** 3` | An assignment stores a value and prints nothing | Type `num1` or `print(num1)` |
+
+## Try It Yourself
+
+1. Start the Python prompt and calculate `7 + 5`, `7 - 5` and `7 * 5`.
+2. Guess the result of `10 - 4 * 2` before you press Enter. Then add brackets so that the subtraction happens first.
+3. Calculate 2 to the power 20 with `**`. Then try `2 ^ 20` and compare.
+4. For 17 divided by 5, find the exact result, the quotient and the remainder with the three division operators.
+5. Check that `17 // 5 * 5 + 17 % 5` gives back 17. Why must that be so?
+6. Type `10 * 3`, then `_ + 1`, then `_ + 1` again. Explain each result.
+7. Store the price `250` in `price` and the quantity `4` in `qty`. Store their product in `total` and print it.
+8. Type `8 + ` and press Enter. Read the error, then fix the line.
+
+## Official references
+
+- [Python tutorial: using Python as a calculator](https://docs.python.org/3/tutorial/introduction.html#using-python-as-a-calculator)
+- [Python tutorial: using the Python interpreter](https://docs.python.org/3/tutorial/interpreter.html)
+- [Python documentation: IDLE](https://docs.python.org/3/library/idle.html)
+- [Python reference: operator precedence](https://docs.python.org/3/reference/expressions.html#operator-precedence)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

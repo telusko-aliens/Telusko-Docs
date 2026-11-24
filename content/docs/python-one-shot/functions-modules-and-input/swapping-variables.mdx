@@ -1,0 +1,260 @@
+---
+title: Swapping Variables
+description: Exchange the values of two variables in four ways, with a third variable, with addition and subtraction, with XOR and with the one-line Python swap, and see why the obvious attempt fails.
+---
+
+<Video id="j_JuhAWlEaI" title="Swapping Variables" start={10008} />
+
+---
+
+Take two variables, `a` with the value 5 and `b` with the value 6. To **swap** them means to exchange their values, so that `a` holds 6 and `b` holds 5.
+
+It sounds like a toy problem. It turns up in real work all the time, whenever data has to be rearranged. Sorting is the best known case. Most sorting methods work by swapping two values again and again until everything is in order.
+
+Every language can swap. Python has a way of its own that fits in one line. The lesson first goes through the methods used in other languages, because each one teaches something about how variables behave. Then it shows the Python way.
+
+## Step 1: Two variables and a way to see them
+
+Clear `Demo.py` and start with this:
+
+```python title="Demo.py"
+a = 5
+b = 6
+
+print("a : ",a)
+print("b : ",b)
+```
+
+```text
+a :  5
+b :  6
+```
+
+The two `print` lines stay at the bottom for the whole lesson. Each swap method goes between the assignments and the prints. There are two spaces after the colon in the output. One is inside the quotes, and `print` adds one more between its two values.
+
+## Step 2: The obvious attempt
+
+Said in plain words, the swap is: let `a` get the value of `b`, and let `b` get the value of `a`.
+
+```python title="Demo.py"
+a = 5
+b = 6
+
+a = b
+b = a
+
+print("a : ",a)
+print("b : ",b)
+```
+
+```text
+a :  6
+b :  6
+```
+
+Both are 6. Go through the lines one at a time:
+
+| Line | `a` | `b` | Note |
+| --- | --- | --- | --- |
+| Start | 5 | 6 | |
+| `a = b` | 6 | 6 | The 5 is overwritten |
+| `b = a` | 6 | 6 | `a` is already 6 |
+
+Python runs one line after the other. After `a = b`, the 5 is gone, and no later line can bring it back.
+
+## Step 3: Use a third variable
+
+The fix is to keep the 5 somewhere safe before it is overwritten:
+
+```python title="Demo.py"
+a = 5
+b = 6
+
+c = a
+a = b
+b = c
+
+print("a : ",a)
+print("b : ",b)
+```
+
+```text
+a :  6
+b :  5
+```
+
+| Line | `a` | `b` | `c` |
+| --- | --- | --- | --- |
+| Start | 5 | 6 | |
+| `c = a` | 5 | 6 | 5 |
+| `a = b` | 6 | 6 | 5 |
+| `b = c` | 6 | 5 | 5 |
+
+It is the same as swapping the contents of two glasses. You need a third, empty glass.
+
+This method works with every kind of value and is easy to read. Its cost is one extra variable. The instructor puts it this way: if one variable takes x amount of space, two take 2x, and the swap needs 3x for a moment. In the video the three lines are then moved to the bottom of the file as comments, to keep them for reference.
+
+## Step 4: Addition and subtraction
+
+The second method needs no third variable. It uses arithmetic:
+
+```python title="Demo.py"
+a = 5
+b = 6
+
+a = a + b
+b = a - b
+a = a - b
+
+print("a : ",a)
+print("b : ",b)
+```
+
+```text
+a :  6
+b :  5
+```
+
+| Line | Calculation | `a` | `b` |
+| --- | --- | --- | --- |
+| Start | | 5 | 6 |
+| `a = a + b` | 5 + 6 | 11 | 6 |
+| `b = a - b` | 11 - 6 | 11 | 5 |
+| `a = a - b` | 11 - 5 | 6 | 5 |
+
+After the first line, `a` holds the sum. The sum minus one of the numbers gives the other number, and the method uses that fact twice.
+
+Nothing is free. The method saves a variable and does three calculations in return. The instructor calls this a trade-off. With little memory and a fast processor you would pick this method. With plenty of memory and a slow processor you would pick the third variable. Neither one is the best in every case.
+
+There is one more weak point. The sum is larger than both numbers, 11 here, so for a moment `a` holds a number that needs more room than 5 or 6.
+
+## Step 5: XOR
+
+The third method removes that weak point. It uses the operator `^`, which is named XOR. XOR is a bitwise operator: it works on the single bits of a number. Bitwise operators are part of [Operators](/docs/python-one-shot/data-structures-and-types/operators).
+
+```python title="Demo.py"
+a = 5
+b = 6
+
+a = a ^ b
+b = a ^ b
+a = a ^ b
+
+print("a : ",a)
+print("b : ",b)
+```
+
+```text
+a :  6
+b :  5
+```
+
+XOR compares two numbers bit by bit. Where the bits differ, the result has a 1. Where they are the same, it has a 0.
+
+| Line | In bits | `a` | `b` |
+| --- | --- | --- | --- |
+| Start | `a` is 101, `b` is 110 | 5 | 6 |
+| `a = a ^ b` | 101 ^ 110 = 011 | 3 | 6 |
+| `b = a ^ b` | 011 ^ 110 = 101 | 3 | 5 |
+| `a = a ^ b` | 011 ^ 101 = 110 | 6 | 5 |
+
+The pattern is the same as in Step 4. The first line mixes both numbers into `a`, and the next two lines take them out again, one at a time. The mixed value 3 does not need more bits than 5 or 6 do, so no extra room is used at any point.
+
+## Step 6: The Python way
+
+All three methods come from other languages. In Python the swap is one line:
+
+```python title="Demo.py"
+a = 5
+b = 6
+
+a,b = b,a
+
+print("a : ",a)
+print("b : ",b)
+```
+
+```text
+a :  6
+b :  5
+```
+
+The instructor learned C, C++ and Java first, and wondered every time why a swap could not be written in one line. In Python it can.
+
+This looks like the failed attempt from Step 2 squeezed into one line, where `a` is overwritten before `b` reads it. It works because Python does not go from left to right here:
+
+1. Python first works out the whole right side, `b,a`. It reads both values, 6 and 5.
+2. It packs them together into one tuple, `(6, 5)`. This is called **tuple packing**.
+3. Then it takes the tuple apart and gives the first value to `a` and the second to `b`. This is called **tuple unpacking**.
+
+By the time anything is assigned, both old values have already been read. Nothing is lost.
+
+![Swap_With_Tuple_Packing](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-swap.svg)
+
+A tuple is a fixed group of values, written with commas. See [Tuples](/docs/python-one-shot/data-structures-and-types/tuples) for more.
+
+## The four methods side by side
+
+| Method | Code | Extra variable | Works with |
+| --- | --- | --- | --- |
+| Third variable | `c = a`, `a = b`, `b = c` | Yes | Any values |
+| Add and subtract | `a = a + b`, `b = a - b`, `a = a - b` | No | Numbers |
+| XOR | `a = a ^ b`, `b = a ^ b`, `a = a ^ b` | No | Whole numbers |
+| Python swap | `a,b = b,a` | No | Any values |
+
+## Additions beyond the lesson
+
+**See the packing yourself.** Put the right side into a variable of its own and print it:
+
+```python
+>>> a = 5
+>>> b = 6
+>>> t = b,a
+>>> t
+(6, 5)
+>>> a,b = t
+>>> a
+6
+>>> b
+5
+```
+
+**The tricks need numbers.** The third variable and the Python swap work with strings, lists and everything else. The arithmetic method does not. With `a = "navin"` and `b = "telusko"`, the line `b = a - b` stops with `TypeError: unsupported operand type(s) for -: 'str' and 'str'`. XOR works only with whole numbers.
+
+**Which one to use in Python.** Use `a,b = b,a`. It is the shortest, the clearest and works with every type. The memory reasoning in Steps 3 to 5 comes from languages such as C, where a number sits in a fixed number of bits. It is worth knowing, and the other methods are popular interview questions.
+
+<Callout type="info" title="Checked for these docs">
+Every program and the prompt session on this page were run with Python 3.13 and gave the output shown. In the video, the output of the addition method and of the XOR method cannot be told apart from the run before them, because the terminal shows the same two lines. Both versions were run again for these docs. The bit values in Step 5 and both error messages were also checked by running the code. The listings leave out the empty first line of the video's file and the three commented lines `# c = a`, `# a = b` and `# b = c`, which stay at the bottom of that file after Step 3.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `a :  6` and `b :  6` | `a = b` followed by `b = a`. The first line overwrites the old value of `a`. This happens in the lesson | Use `a,b = b,a` or a third variable |
+| Both values are the same with a third variable | The last line is still `b = a`. The instructor has this on screen for a moment and corrects it before running | The last line must be `b = c` |
+| `ValueError: too many values to unpack (expected 2)` | More values on the right than names on the left, as in `a, b = 1, 2, 3` | Use the same number on both sides |
+| `TypeError: unsupported operand type(s) for -: 'str' and 'str'` | The addition and subtraction method was used with strings | Use `a,b = b,a` |
+| Wrong values after the arithmetic or XOR method | The three lines are in the wrong order, or one has the wrong name on the left | Copy the order exactly: `a`, then `b`, then `a` |
+| The old output after a change | The file was not saved | Save with Ctrl+S and run again |
+
+## Try It Yourself
+
+1. Set `a = 10` and `b = 20`. Swap them with a third variable and print both.
+2. Run the failed attempt from Step 2 with your values. Write down the value of `a` and `b` after each line.
+3. Swap `10` and `20` with addition and subtraction. Make a table like the one in Step 4.
+4. Swap `x = 12` and `y = 7` with XOR and print the result.
+5. Swap two strings, `a = "navin"` and `b = "telusko"`, with `a,b = b,a`.
+6. Try to swap the same two strings with addition and subtraction. Read the error and explain it.
+7. With `a = 1`, `b = 2` and `c = 3`, write one line that makes `a` 3, `b` 1 and `c` 2.
+8. Put `b,a` into a variable `t` and print `t`. What type of value is it? Check with `type(t)`.
+
+## Official references
+
+- [Python tutorial: tuples and sequences](https://docs.python.org/3/tutorial/datastructures.html#tuples-and-sequences)
+- [Python reference: assignment statements](https://docs.python.org/3/reference/simple_stmts.html#assignment-statements)
+- [Python reference: evaluation order](https://docs.python.org/3/reference/expressions.html#evaluation-order)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

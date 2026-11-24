@@ -1,0 +1,12 @@
+{
+  "title": "Python Basics",
+  "pages": [
+    "introduction-to-python.mdx",
+    "first-code-in-python.mdx",
+    "python-setup.mdx",
+    "ide-installation.mdx",
+    "idle-and-number-operations.mdx",
+    "working-with-strings.mdx",
+    "more-on-strings.mdx"
+  ]
+}

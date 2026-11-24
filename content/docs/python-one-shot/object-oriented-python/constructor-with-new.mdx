@@ -1,0 +1,350 @@
+---
+title: "Constructor with __new__"
+description: See which special method really creates an object in Python, how creating and initialising are two separate steps, and what goes wrong when the constructor does not return the object.
+---
+
+<Video id="j_JuhAWlEaI" title="Constructor with __new__" start={23340} />
+
+---
+
+In [The `__init__` Method](/docs/python-one-shot/object-oriented-python/init-method) you saw that `__init__` runs every time an object is created. Many people call `__init__` the constructor for that reason. The instructor said in passing that the constructor is something else.
+
+This lesson shows what that something else is. Python has a second special method, `__new__`. It runs before `__init__`, and it is the one that creates the object.
+
+You will almost never write `__new__` yourself, and the instructor says so more than once. The goal here is to understand the order of events, so that the words "constructor" and "`__init__`" stop being confusing.
+
+## Step 1: A small class to experiment with
+
+The lesson leaves the `computer` class alone and creates a new file, `cons.py`, in the `oop` folder. It holds a class named `Abc` with one method.
+
+```python title="cons.py"
+class Abc:
+
+    def show(self):
+        print("in show")
+
+
+obj1 = Abc()
+obj1.show()
+```
+
+```text
+in show
+```
+
+Nothing new so far. `Abc()` creates an object, and `obj1.show()` calls the method on it.
+
+## Step 2: Add `__init__` and watch the order
+
+Now the class gets an `__init__` method that prints a line.
+
+```python title="cons.py"
+class Abc:
+
+    def __init__(self):
+        print("init called")
+
+    def show(self):
+        print("in show")
+
+
+obj1 = Abc()
+obj1.show()
+```
+
+```text
+init called
+in show
+```
+
+The line `obj1 = Abc()` creates the object, and Python calls `__init__` on it. Then `show` runs. That is the behaviour you already know.
+
+## Step 3: Create an object with `__new__`
+
+There is a second way to get an object. Type `Abc.` in the editor and the list of suggestions contains a method named `__new__`. Every class has it. It needs the class as its argument, so the lesson passes `Abc`.
+
+```python title="cons.py"
+class Abc:
+
+    def __init__(self):
+        print("init called")
+
+    def show(self):
+        print("in show")
+
+
+obj1 = Abc()
+obj1.show()
+
+obj2 = Abc.__new__(Abc)
+obj2.show()
+```
+
+```text
+init called
+in show
+in show
+```
+
+`in show` is printed twice, so `obj2` is a real object of `Abc`. `Abc.__new__(Abc)` created it.
+
+Look at the output once more. `init called` appears only once. For `obj2`, `__init__` did not run. Calling `__new__` directly creates the object and does nothing else.
+
+Where does `__new__` come from, when the class does not define it? The lesson opens a file of the editor to show it: Python has a built-in class named `object`, and it contains both `__new__` and `__init__`. Every class you write gets these two methods from `object`. How a class receives methods from another class is the topic of [Inheritance and MRO](/docs/python-one-shot/object-oriented-python/inheritance-and-mro).
+
+## Step 4: Write your own `__new__`
+
+To see when `__new__` runs, the lesson defines it inside `Abc`. The call `Abc.__new__(Abc)` passes a class, so the method must accept one. The parameter is named `cls`, short for class.
+
+{/* check: error */}
+```python title="cons.py"
+
+class Abc:
+
+    def __new__(cls):
+        print("constructor called")
+
+    def __init__(self):
+        print("init called")
+
+    def show(self):
+        print("in show")
+
+
+obj1 = Abc()
+obj1.show()
+
+obj2 = Abc.__new__(Abc)
+obj2.show()
+```
+
+{/* check: skip */}
+```text
+constructor called
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\cons.py", line 15, in <module>
+    obj1.show()
+    ^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'show'
+```
+
+The program stops with an error. Before reading the error, look at the first line of the output: `constructor called`. The line `obj1 = Abc()` called `__new__`. So the ordinary way of creating an object also goes through `__new__`, and it does so before `__init__`. This is why the instructor calls `__new__` the constructor.
+
+Now the error. Three things happened:
+
+1. `Abc()` called this `__new__`. It printed a line and returned nothing. A function that returns nothing gives back `None`.
+2. Python received `None` and no object of `Abc`, so it did not call `__init__`. That is why `init called` is missing from the output.
+3. `obj1` is now `None`. The line `obj1.show()` asks `None` for a method named `show`, and `None` has no such method.
+
+The error is raised on line 15, at `obj1`. The program never reaches the lines for `obj2`.
+
+![New_And_Init_Sequence](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-new-and-init.svg)
+
+<Callout type="info" title="Who calls the initialiser?">
+In the video the instructor says that `__new__` calls `__init__` behind the scenes. The exact picture is a little different. `__new__` only creates the object and returns it. When you write `Abc()`, Python itself calls `__new__` first, and then calls `__init__` on the object that `__new__` returned. The run in Step 3 shows this: `Abc.__new__(Abc)` created an object, and `__init__` did not run.
+</Callout>
+
+## Step 5: Return the object from `__new__`
+
+The rule follows from the error. If you write `__new__`, it is your job to create the object and return it. The real work of creating an object is done by the `__new__` of the built-in class `object`, so your method asks for that one and returns its result.
+
+```python title="cons.py"
+class Abc:
+
+    def __new__(cls):
+        print("constructor called")
+        return super(Abc, cls).__new__(cls)
+
+    def __init__(self):
+        print("init called")
+
+    def show(self):
+        print("in show")
+
+
+obj1 = Abc()
+obj1.show()
+
+obj2 = Abc.__new__(Abc)
+obj2.show()
+```
+
+```text
+constructor called
+init called
+in show
+constructor called
+in show
+```
+
+`super(Abc, cls)` means "the class above `Abc`", which is `object` here. So the `return` line calls the original `__new__`, which builds the object, and hands that object back. The instructor asks you not to study this syntax yet. `super` comes back in [`__init__` and `super()` with Inheritance](/docs/python-one-shot/object-oriented-python/init-and-super-with-inheritance).
+
+Read the output in two parts:
+
+| Line of code | What is printed | Why |
+| --- | --- | --- |
+| `obj1 = Abc()` | `constructor called`, then `init called` | Python calls `__new__`, gets an object back, and calls `__init__` on it |
+| `obj1.show()` | `in show` | The object exists |
+| `obj2 = Abc.__new__(Abc)` | `constructor called` | Only `__new__` runs. Nobody calls `__init__` |
+| `obj2.show()` | `in show` | The object exists, although it was never initialised |
+
+## Step 6: Call `__init__` by hand
+
+`obj2` was created by `__new__` alone, so `__init__` has not run on it. If you create an object this way, you have to call `__init__` yourself.
+
+```python title="cons.py"
+class Abc:
+
+    def __new__(cls):
+        print("constructor called")
+        return super(Abc, cls).__new__(cls)
+
+    def __init__(self):
+        print("init called")
+
+    def show(self):
+        print("in show")
+
+
+obj1 = Abc()
+obj1.show()
+
+obj2 = Abc.__new__(Abc)
+obj2.__init__()
+obj2.show()
+```
+
+```text
+constructor called
+init called
+in show
+constructor called
+init called
+in show
+```
+
+Now both objects print the same three lines. The two lines `Abc.__new__(Abc)` and `obj2.__init__()` together do what the single line `Abc()` does for you.
+
+## `__new__` and `__init__` side by side
+
+| | `__new__` | `__init__` |
+| --- | --- | --- |
+| Job | Creates the object | Sets up the object that was created |
+| Runs | First | Second |
+| First parameter | `cls`, the class | `self`, the new object |
+| Must return | The new object | Nothing |
+| Called "the constructor" in the lesson | Yes | No. It is the initialiser |
+| How often you write it | Very rarely | In most classes |
+
+## When would you write `__new__`?
+
+Very rarely. The instructor gives two cases:
+
+- A class that must have only one object. Every attempt to create a new object returns the same one. Such a class is called a **singleton**.
+- A class that needs to control how its objects are created, depending on the values that are passed.
+
+For everything else, create objects with `Abc()` and put the setup code in `__init__`. The `cons.py` file is not used again in the course.
+
+## Additions beyond the lesson
+
+These points are not in the video. They were run for these docs.
+
+**1. A shorter way to write the `return` line.** In current Python, `super()` works without arguments inside a method. This version behaves the same as the one from the lesson:
+
+```python title="short.py"
+class Abc:
+
+    def __new__(cls):
+        print("constructor called")
+        return super().__new__(cls)
+
+    def __init__(self):
+        print("init called")
+
+
+obj1 = Abc()
+```
+
+```text
+constructor called
+init called
+```
+
+**2. `__init__` runs only for an object of the class.** If `__new__` returns something that is not an object of the class, Python skips `__init__`. Returning `None` in Step 4 was one example. Here `__new__` returns the number `5`:
+
+```python title="skip.py"
+class Abc:
+
+    def __new__(cls):
+        return 5
+
+    def __init__(self):
+        print("init called")
+
+
+obj1 = Abc()
+print(obj1)
+```
+
+```text
+5
+```
+
+`init called` is not printed, and `obj1` is the number 5.
+
+**3. Arguments go to both methods.** When a class takes values, as `computer("i5", "16GB", "512GB")` did, the same values are passed to `__new__` and to `__init__`. A `__new__` of your own must accept them too:
+
+```python title="args.py"
+class Abc:
+
+    def __new__(cls, name):
+        print("new got", name)
+        return super().__new__(cls)
+
+    def __init__(self, name):
+        print("init got", name)
+
+
+obj1 = Abc("navin")
+```
+
+```text
+new got navin
+init got navin
+```
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown. The traceback in Step 4 was produced by hand. It matches the video, and the file path in it is the one from the video, so yours will show your own folder.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `AttributeError: 'NoneType' object has no attribute 'show'` | Your `__new__` does not return the object, so `Abc()` gives `None`. This happens in the lesson | End `__new__` with `return super().__new__(cls)` |
+| `init called` is not printed for an object | The object was created with `Abc.__new__(Abc)`, or `__new__` did not return an object of the class. This happens in the lesson | Create the object with `Abc()`, or call `obj2.__init__()` yourself |
+| `TypeError: Abc.__new__() takes 0 positional arguments but 1 was given` | The method was written as `def __new__():` without a parameter. When an object is created with `Abc()`, Python passes the class to `__new__` | Write `def __new__(cls):` |
+| `TypeError: object.__new__(): not enough arguments` | `Abc.__new__()` was called with empty brackets, on a class without a `__new__` of its own | Pass the class: `Abc.__new__(Abc)` |
+| `TypeError: Abc.__new__() takes 1 positional argument but 2 were given` | The class is called with a value, and `__new__` accepts only `cls` | Add the same parameters to `__new__` as `__init__` has |
+| The methods are not recognised as special | `_new_` or `_init_` was written with one underscore on each side | Use two underscores on each side: `__new__`, `__init__` |
+
+## Try It Yourself
+
+1. Write the class `Abc` with only `show`, create an object and call `show`.
+2. Add `__init__` with a `print`. Predict the output before you run the file.
+3. Create a second object with `Abc.__new__(Abc)` and call `show` on it. How many times is `init called` printed?
+4. Add a `__new__` that only prints a line. Run the file, read the error, and explain why `init called` is missing.
+5. Fix `__new__` with a `return` line and run the file again. Explain each line of the output.
+6. Call `obj2.__init__()` by hand and compare the output for `obj1` and `obj2`.
+7. Add `print(obj1)` after the broken version from exercise 4, in place of `obj1.show()`. What is printed, and why?
+8. In the fixed version, create three objects with `Abc()`. How many times is `constructor called` printed?
+
+## Official references
+
+- [Python reference: `object.__new__`](https://docs.python.org/3/reference/datamodel.html#object.__new__)
+- [Python reference: `object.__init__`](https://docs.python.org/3/reference/datamodel.html#object.__init__)
+- [Python tutorial: classes](https://docs.python.org/3/tutorial/classes.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

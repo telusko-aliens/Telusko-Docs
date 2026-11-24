@@ -1,0 +1,517 @@
+---
+title: "The __init__ Method"
+description: Give every object its own values with instance variables, set them in the special init method that runs each time an object is created, and pass the values in when you create the object.
+---
+
+<Video id="j_JuhAWlEaI" title="The __init__ Method" start={22679} />
+
+---
+
+In [Class and Object](/docs/python-one-shot/object-oriented-python/class-and-object) you wrote a class `computer` with a method `config`, created two objects and called the method with `com1.config()`.
+
+There is a problem with that class. `config` prints a fixed text. Think of the class as the design you hand to a factory. The factory can build thousands of computers from it, and every one of them reports the same processor, the same memory and the same storage. Real computers of one design are sold in many configurations.
+
+So each object needs values of its own. The natural idea is to pass them in the brackets when the object is created, as in `computer("i5","16GB","512GB")`. The open questions are where the class accepts those values and where it keeps them. The answer is a special method named `__init__`.
+
+## What "dunder" means
+
+The name `__init__` has two underscores before the word and two after it. Programmers say **dunder** for this, short for "double underscore". So `__init__` is read as "dunder init".
+
+You have seen such a name already, in [The Special Variable `__name__`](/docs/python-one-shot/functional-python/special-variable-name). Names of this shape belong to Python. Python gives them a special meaning and uses them by itself at certain moments. `__name__` is a variable. `__init__` is a method.
+
+## Step 1: Ask an object for a value it does not have
+
+The starting point is the class from the last lesson. It has one method and no variables. What happens if you ask an object for its processor?
+
+{/* check: error */}
+```python title="demo.py"
+class computer:
+
+    def config(self):
+        print("i7, 16GB, 1TB")
+
+com1 = computer()
+com2 = computer()
+
+print(com1.cpu)
+
+com1.config()
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\demo.py", line 9, in <module>
+    print(com1.cpu)
+          ^^^^^^^^
+AttributeError: 'computer' object has no attribute 'cpu'
+```
+
+An **attribute** is anything you reach with a dot after an object: a variable that belongs to it, or a method. Python looked for `cpu` in the object and in its class, found nothing, and raised an `AttributeError`.
+
+<Callout type="info" title="Line numbers in the tracebacks">
+The file in the video starts with an empty line, so every line number in the video is one higher than on this page. The video shows `line 10` here.
+</Callout>
+
+## Step 2: Add the attribute from outside
+
+Python lets you attach a new attribute to an object that already exists:
+
+```python title="demo.py"
+class computer:
+
+    def config(self):
+        print("i7, 16GB, 1TB")
+
+com1 = computer()
+com2 = computer()
+
+com1.cpu = "i5"
+
+print(com1.cpu)
+
+com1.config()
+```
+
+```text
+i5
+i7, 16GB, 1TB
+```
+
+The instructor compares this to a laptop he once bought that had no webcam. He bought an external one and plugged it in. It works, but only that one laptop has it. Ask the other object:
+
+{/* check: error */}
+```python title="demo.py"
+class computer:
+
+    def config(self):
+        print("i7, 16GB, 1TB")
+
+com1 = computer()
+com2 = computer()
+
+com1.cpu = "i5"
+
+print(com2.cpu)
+
+com1.config()
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\demo.py", line 11, in <module>
+    print(com2.cpu)
+          ^^^^^^^^
+AttributeError: 'computer' object has no attribute 'cpu'
+```
+
+`cpu` was attached to `com1` only. You could repeat the line for every object, but then nothing guarantees that every computer has a `cpu`. The variable should come from the class.
+
+## Step 3: A class variable is shared by all objects
+
+A class can hold two kinds of variables: **class variables** and **instance variables**. A variable written directly in the class body is a class variable:
+
+```python title="demo.py"
+class computer:
+
+    cpu = "i5"
+
+    def config(self):
+        print("i7, 16GB, 1TB")
+
+com1 = computer()
+com2 = computer()
+
+
+print(com2.cpu)
+
+com1.config()
+```
+
+```text
+i5
+i7, 16GB, 1TB
+```
+
+The error is gone. A class variable belongs to the class, and all objects share its one value. You can read it through any object, or through the class itself. `print(computer.cpu)` prints `i5` too.
+
+When is that useful? For something that is common to all objects, such as the brand. A factory builds computers with different configurations, and the brand on all of them is the same.
+
+For `cpu` it is the wrong tool, because every computer should be able to have a different processor. So the lesson removes the class variable again and turns to the second kind.
+
+## Step 4: `__init__` runs when an object is created
+
+An **instance variable** belongs to one object. Each object has its own copy, and the copies can hold different values. The place to create instance variables is the method `__init__`. First, a version that only prints a message, to see when it runs:
+
+{/* check: error */}
+```python title="demo.py"
+class computer:
+
+    def __init__():
+        print("init called")
+
+    def config(self):
+        print("i7, 16GB, 1TB")
+
+com1 = computer()
+com2 = computer()
+
+
+print(com1.cpu)
+
+com1.config()
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\demo.py", line 9, in <module>
+    com1 = computer()
+TypeError: computer.__init__() takes 0 positional arguments but 1 was given
+```
+
+Nobody calls `__init__` in this file. Python calls it by itself, every time an object is created. That is why the error appears at the line `com1 = computer()`.
+
+The message says that one argument was given, although the brackets of `computer()` are empty. That one argument is the new object. Python creates the object and then hands it to `__init__`, in the same way that `com1.config()` hands `com1` to `config`. A method needs a parameter to receive it, and by convention that parameter is named `self`:
+
+{/* check: error */}
+```python title="demo.py"
+class computer:
+
+    def __init__(self):
+        print("init called")
+
+    def config(self):
+        print("i7, 16GB, 1TB")
+
+com1 = computer()
+com2 = computer()
+
+
+print(com1.cpu)
+
+com1.config()
+```
+
+{/* check: skip */}
+```text
+init called
+init called
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\demo.py", line 13, in <module>
+    print(com1.cpu)
+          ^^^^^^^^
+AttributeError: 'computer' object has no attribute 'cpu'
+```
+
+`init called` appears twice, because two objects are created. Three objects would print it three times, and ten objects ten times. Inside `__init__`, `self` is the object that is being created at that moment.
+
+The `AttributeError` is still there, which is fair. Nothing has created `cpu` yet.
+
+## Step 5: `self.cpu` makes the variable belong to the object
+
+The first attempt is to create the variable inside `__init__` like any other variable:
+
+{/* check: error */}
+```python title="demo.py"
+class computer:
+
+    def __init__(self):
+        print("init called")
+        cpu = "i5"
+
+    def config(self):
+        print("i7, 16GB, 1TB")
+
+com1 = computer()
+com2 = computer()
+
+
+print(com1.cpu)
+
+com1.config()
+```
+
+{/* check: skip */}
+```text
+init called
+init called
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\demo.py", line 14, in <module>
+    print(com1.cpu)
+          ^^^^^^^^
+AttributeError: 'computer' object has no attribute 'cpu'
+```
+
+Still the same error. `cpu = "i5"` inside a method creates a **local variable**. As you saw in [Global and Local Variables](/docs/python-one-shot/arrays-and-recursion/global-and-local-variables), a local variable exists only while the function runs. It does not belong to the object, and it is gone when `__init__` ends. The editor in the video even marks it with the hint `"cpu" is not accessed`.
+
+To make the variable belong to the object, write the object in front of it. Inside the method, the object is `self`:
+
+```python title="demo.py"
+class computer:
+
+    def __init__(self):
+        print("init called")
+        self.cpu = "i5"
+
+    def config(self):
+        print("i7, 16GB, 1TB")
+
+com1 = computer()
+com2 = computer()
+
+print(com1.cpu)
+
+com1.config()
+```
+
+```text
+init called
+init called
+i5
+i7, 16GB, 1TB
+```
+
+`self.cpu = "i5"` does the same thing as `com1.cpu = "i5"` did in Step 2. The difference is that it now happens inside `__init__`, so it happens for every object that is created. Every computer gets a `cpu`.
+
+| Line inside `__init__` | Kind of variable | Lives |
+| --- | --- | --- |
+| `cpu = "i5"` | Local variable | Until `__init__` ends |
+| `self.cpu = "i5"` | Instance variable | As long as the object exists |
+
+## Step 6: Use the values in `config`
+
+The lesson adds two more instance variables, `self.ram` and `self.ssd`. `config` still prints its old fixed text, so it has to change as well. The first attempt uses the bare name `cpu`:
+
+{/* check: error */}
+```python title="demo.py"
+class computer:
+
+    def __init__(self):
+        print("init called")
+        self.cpu = "i5"
+        self.ram = "16GB"
+        self.ssd = "1TB"
+
+    def config(self):
+        print("config : ",cpu)
+
+com1 = computer()
+com2 = computer()
+
+print(com1.cpu)
+
+com1.config()
+```
+
+{/* check: skip */}
+```text
+init called
+init called
+i5
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\demo.py", line 17, in <module>
+    com1.config()
+    ~~~~~~~~~~~^^
+  File "C:\PythonCourse\FirstProject\oop\demo.py", line 10, in config
+    print("config : ",cpu)
+                      ^^^
+NameError: name 'cpu' is not defined. Did you mean: 'self.cpu'?
+```
+
+In the video the last lines of this traceback are below the edge of the terminal. The block above shows the complete message from Python 3.13.
+
+Inside `config` there is no variable named `cpu`. The value lives in the object. Python even suggests the fix. As the instructor puts it: if the variable belongs to the object, use the object.
+
+```python title="demo.py"
+class computer:
+
+    def __init__(self):
+        print("init called")
+        self.cpu = "i5"
+        self.ram = "16GB"
+        self.ssd = "1TB"
+
+    def config(self):
+        print("config : ",self.cpu, self.ram, self.ssd)
+
+com1 = computer()
+com2 = computer()
+
+print(com1.cpu)
+
+com1.config()
+com2.config()
+```
+
+```text
+init called
+init called
+i5
+config :  i5 16GB 1TB
+config :  i5 16GB 1TB
+```
+
+This is where `self` pays off. In `com1.config()`, `self` is `com1`, so `self.cpu` is the `cpu` of `com1`. In `com2.config()`, `self` is `com2`. One method reads the values of whichever object it was called on.
+
+The two spaces after `config :` are correct. One is inside the string, and `print` adds another between its arguments.
+
+Both computers still print the same configuration, because `__init__` stores the same fixed values in every object.
+
+## Step 7: Pass the values when you create the object
+
+To give each computer its own values, pass them in the brackets:
+
+{/* check: error */}
+```python title="demo.py"
+class computer:
+
+    def __init__(self):
+        print("init called")
+        self.cpu = "i5"
+        self.ram = "16GB"
+        self.ssd = "1TB"
+
+    def config(self):
+        print("config : ",self.cpu, self.ram, self.ssd)
+
+com1 = computer("i5","16GB","512GB")
+com2 = computer("i9","96GB","2TB")
+
+
+com1.config()
+com2.config()
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\demo.py", line 12, in <module>
+    com1 = computer("i5","16GB","512GB")
+TypeError: computer.__init__() takes 1 positional argument but 4 were given
+```
+
+The values are passed, and nothing accepts them. Whatever you write in the brackets of `computer(...)` goes to `__init__`. Count the arguments: the new object and the three strings make four. `__init__` has one parameter, `self`.
+
+So `__init__` gets three more parameters, and it stores what it receives:
+
+```python title="demo.py"
+class computer:
+
+    def __init__(self, cpu, ram, ssd):
+        print("init called")
+        self.cpu = cpu
+        self.ram = ram
+        self.ssd = ssd
+
+    def config(self):
+        print("config : ",self.cpu, self.ram, self.ssd)
+
+com1 = computer("i5","16GB","512GB")
+com2 = computer("i9","96GB","2TB")
+
+
+com1.config()
+com2.config()
+```
+
+```text
+init called
+init called
+config :  i5 16GB 512GB
+config :  i9 96GB 2TB
+```
+
+Two objects from one class, each with its own values. That was the goal from the start.
+
+Read the line `self.cpu = cpu` slowly, because two different variables share one name in it:
+
+| Part | What it is |
+| --- | --- |
+| `cpu` on the right | The parameter. A local variable that holds the value passed in, and disappears when `__init__` ends |
+| `self.cpu` on the left | The instance variable. It is stored in the object and stays there |
+
+![Init_Method_Flow](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-init-flow.svg)
+
+## Is `__init__` a constructor?
+
+In object-oriented languages, the thing that is called automatically when an object is created is called a **constructor**. `__init__` is called automatically when an object is created. Is it the constructor of Python?
+
+The instructor's answer is no. `__init__` does not create the object. When `__init__` starts, the object already exists. It is passed in as `self`. The job of `__init__` is to **initialize** the object, which means to give its variables their first values. The method that really creates the object is the topic of the next lesson, [Constructor with `__new__`](/docs/python-one-shot/object-oriented-python/constructor-with-new).
+
+<Callout type="info" title="You will hear both">
+Many books, tutorials and interview questions call `__init__` "the constructor", because it plays the role that constructors play in languages such as Java. The Python documentation describes `__init__` as the method that is called after the instance has been created. The instructor's wording follows what the two methods do: `__new__` creates the object and `__init__` initialises it.
+</Callout>
+
+## Summary
+
+| Kind of variable | Where it is written | Belongs to | How to read it |
+| --- | --- | --- | --- |
+| Class variable | In the class body, such as `cpu = "i5"` | The class. One value shared by all objects | `computer.cpu` or `com1.cpu` |
+| Instance variable | In `__init__`, such as `self.cpu = cpu` | One object. Each object has its own value | `com1.cpu`, and `self.cpu` inside a method |
+| Local variable | In a method, without `self.` | Nobody. Gone when the method ends | Only inside that method |
+
+## Additions beyond the lesson
+
+**Forgetting a value.** Once `__init__` has the parameters `cpu`, `ram` and `ssd`, every object must be created with three values. If one is missing, Python names it:
+
+{/* check: error */}
+```python title="demo.py"
+class computer:
+
+    def __init__(self, cpu, ram, ssd):
+        self.cpu = cpu
+        self.ram = ram
+        self.ssd = ssd
+
+com1 = computer("i5","16GB")
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\demo.py", line 8, in <module>
+    com1 = computer("i5","16GB")
+TypeError: computer.__init__() missing 1 required positional argument: 'ssd'
+```
+
+**More about class variables.** This lesson only touches class variables. They return in [Types of Methods](/docs/python-one-shot/object-oriented-python/types-of-methods).
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output or the error shown. The line numbers in the tracebacks are those of the code as printed here, one lower than in the video, and the folder path is the one from the video. The end of the `NameError` traceback in Step 6 is not visible in the video and was taken from the run for these docs.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `AttributeError: 'computer' object has no attribute 'cpu'` | The object has no such variable. In the lesson this happens three times: with no variable at all, with a variable added to another object only, and with `cpu = "i5"` as a local variable in `__init__` | Create it in `__init__` with `self.cpu = ...` |
+| `TypeError: computer.__init__() takes 0 positional arguments but 1 was given` | `def __init__():` without `self`. Python passes the new object. This happens in the lesson | Write `def __init__(self):` |
+| `NameError: name 'cpu' is not defined. Did you mean: 'self.cpu'?` | A method uses the bare name `cpu`. This happens in the lesson | Write `self.cpu` |
+| `TypeError: computer.__init__() takes 1 positional argument but 4 were given` | Three values were passed to `computer(...)`, and `__init__` accepts only `self`. This happens in the lesson | Add the parameters: `def __init__(self, cpu, ram, ssd):` |
+| `TypeError: computer.__init__() missing 1 required positional argument: 'ssd'` | Fewer values were passed than `__init__` expects | Pass every value |
+| `TypeError: computer() takes no arguments` | Values were passed, and the class has no `__init__` that Python can find. Often the name is misspelled, for example with one underscore on each side | Write `__init__` with two underscores before and two after |
+| Every object prints the same values | `__init__` stores fixed values, such as `self.cpu = "i5"` | Store the parameter: `self.cpu = cpu` |
+
+## Try It Yourself
+
+1. Write a class `phone` with an `__init__` that only prints `init called`. Create three objects and count the lines of output.
+2. Add `brand = "telusko"` as a class variable. Print it through an object and through the class.
+3. In `__init__`, write `model = "X1"` without `self.` and try to print `p1.model`. Read the error, then fix the line.
+4. Change `__init__` so that it accepts `model` and `storage` and stores both in the object.
+5. Add a method `show` that prints the model and the storage of the phone it is called on. Call it on two phones with different values.
+6. Create a phone and pass only one value. Read the error message and say which parameter is missing.
+7. Remove `self` from the parameter list of `__init__` and run the program. Explain the numbers in the error message.
+8. After creating `p1`, add `p1.color = "black"` from outside. Create `p2` and try to print `p2.color`. Explain the result.
+
+## Official references
+
+- [Python tutorial: class objects, with the `__init__` method](https://docs.python.org/3/tutorial/classes.html#class-objects)
+- [Python tutorial: class and instance variables](https://docs.python.org/3/tutorial/classes.html#class-and-instance-variables)
+- [Python reference: `object.__init__`](https://docs.python.org/3/reference/datamodel.html#object.__init__)
+- [Python library: AttributeError](https://docs.python.org/3/builtins/exceptions.html#AttributeError)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

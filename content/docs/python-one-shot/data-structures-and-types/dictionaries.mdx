@@ -1,0 +1,270 @@
+---
+title: Dictionaries
+description: Store values under keys of your own choice, read them safely with get, build a dictionary from two collections with zip, remove items and nest one dictionary inside another.
+---
+
+<Video id="j_JuhAWlEaI" title="Dictionaries" start={5996} />
+
+---
+
+A list keeps many values in one place, and you pick a value by its index number. That works well when the position means something. Often it does not.
+
+Think of a phone book. If the phone numbers sit in a list, you need to know that your friend is at position 2 before you can find the number. Nobody remembers that. You remember the name.
+
+A printed dictionary solves the same problem for words. You look up a word and you find its meaning. Python has a type built on that idea. You store each **value** under a **key**, and you ask for the value by its key. The type is called a **dictionary**, written `dict` in Python.
+
+## Step 1: From a list to a dictionary
+
+The lesson starts with a list, `data = [34,35,67,8]`, and changes it in two moves. First the square brackets become curly brackets. That alone would make a set, as you saw in [Sets](/docs/python-one-shot/data-structures-and-types/sets). Then every value gets a key in front of it, with a colon between the two:
+
+```python
+>>> data = {0:34,1:35,2:67,3:8}
+>>> data[2]
+67
+```
+
+Now `data` is a dictionary. Each `key: value` pair is one item. `0` is the key for 34, `1` is the key for 35, and so on. `data[2]` asks for the value that is stored under the key `2`.
+
+<Callout type="info" title="Why empty curly brackets make a dictionary">
+In the lesson on sets, `{}` turned out to be a dictionary and not an empty set. The curly brackets belong to the dictionary first. Python treats them as a set only when it finds plain values inside and no `key: value` pairs.
+</Callout>
+
+So far this looks like a list with extra typing. The difference is that a list decides the index numbers for you, and in a dictionary you choose the keys.
+
+## Step 2: Use names as keys
+
+```python
+>>> data = {'kiran':34,'sushil':35,'harsh':67,'navin':8}
+>>> data['harsh']
+67
+```
+
+The keys are strings now. The values can stand for anything, such as ages, roll numbers or phone numbers. To fetch a value you give the key in square brackets.
+
+![Dictionary_Key_And_Value](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-dict-key-value.svg)
+
+Index numbers no longer work, because a dictionary does not look at positions. The video runs this failing line first and `data['harsh']` after it, and the order is swapped here to show the working lookup first:
+
+{/* check: skip */}
+```python
+>>> data = {'kiran':34,'sushil':35,'harsh':67,'navin':8}
+>>> data[1]
+Traceback (most recent call last):
+  File "<python-input-49>", line 1, in <module>
+    data[1]
+    ~~~~^^^
+KeyError: 1
+```
+
+A `KeyError` means: there is no such key in this dictionary. Python looked for a key equal to `1` and did not find one.
+
+The lookup also goes in one direction only. You give a key and get its value. You cannot put a value such as `67` in the square brackets and get `'harsh'` back.
+
+## Step 3: Read safely with get()
+
+A dictionary has a method named `get` that does the same lookup:
+
+```python
+>>> data = {'kiran':34,'sushil':35,'harsh':67,'navin':8}
+>>> data.get('harsh')
+67
+>>> data.get(1)
+>>> print(data.get(1))
+None
+```
+
+For a key that exists, `data.get('harsh')` and `data['harsh']` give the same value. The two differ when the key is missing. The square brackets stop with a `KeyError`. `get` returns `None`, the Python value for "nothing here". The prompt shows nothing for `None`, which is why `data.get(1)` seems to do nothing. `print` makes it visible.
+
+`None` is not a friendly thing to show to a user. So `get` accepts a second value, which it returns when the key is missing:
+
+```python
+>>> data = {'kiran':34,'sushil':35,'harsh':67,'navin':8}
+>>> data.get('kiran', 'not found')
+34
+>>> data.get('gaurav', 'not found')
+'not found'
+```
+
+| Way to read | Key exists | Key is missing |
+| --- | --- | --- |
+| `data['harsh']` | The value | `KeyError` |
+| `data.get('harsh')` | The value | `None` |
+| `data.get('harsh', 'not found')` | The value | `'not found'` |
+
+Use `get` when the dictionary is filled while the program runs and you cannot be sure which keys it has.
+
+## Step 4: Keys are unique, values can repeat
+
+What happens when a key appears two times?
+
+```python
+>>> data = {'kiran':34,'sushil':35,'harsh':67,'navin':8, 'harsh': 34}
+>>> data
+{'kiran': 34, 'sushil': 35, 'harsh': 34, 'navin': 8}
+```
+
+There is no error, and `'harsh'` is in the dictionary only once. It kept its first place and took the last value, 34. The earlier value 67 is gone. The value 34 now appears two times, under `'kiran'` and under `'harsh'`, and Python has no problem with that.
+
+The lesson sums it up like this: the keys behave like a set, and the values behave like a list. Every key is unique, as every element of a set is. Values may repeat freely, as they may in a list.
+
+<Callout type="info" title="One difference from a set">
+The comparison is about uniqueness. A dictionary does keep its items in the order in which you added them, as the output above shows. A set makes no promise about order. That difference matters in the next step.
+</Callout>
+
+## Step 5: Build a dictionary from two collections
+
+Suppose the keys and the values arrive separately. The lesson builds on the idea above and makes the keys a set and the values a list:
+
+{/* check: skip */}
+```python
+>>> keys = {'navin','hitesh','shramik'}
+>>> values = [34,64,87]
+>>> dict1 = dict(zip(keys, values))
+>>> dict1
+{'hitesh': 34, 'navin': 64, 'shramik': 87}
+```
+
+Two built-in functions do the work:
+
+| Function | What it does |
+| --- | --- |
+| `zip(keys, values)` | Walks through both collections together and makes pairs: first with first, second with second, and so on |
+| `dict(...)` | Turns those pairs into a dictionary |
+
+Now look at the result. `'navin'` was typed first and 34 was typed first, yet 34 went to `'hitesh'`. The instructor points this out: the sequence is not maintained.
+
+The reason is the curly brackets in the first line. They make `keys` a set, and a set has no fixed order. `zip` takes the names in whatever order the set hands them out. For strings that order can change every time Python starts. Running the same four lines several times for these docs gave, among others:
+
+```text
+{'navin': 34, 'shramik': 64, 'hitesh': 87}
+{'shramik': 34, 'navin': 64, 'hitesh': 87}
+{'shramik': 34, 'hitesh': 64, 'navin': 87}
+```
+
+So the output in the video is one possible result, and yours will probably differ. A phone book that hands numbers to random people is of no use. The fix is the one the instructor names: keep the keys in a list, which has a fixed order.
+
+```python
+>>> keys = ['navin','hitesh','shramik']
+>>> values = [34,64,87]
+>>> dict1 = dict(zip(keys, values))
+>>> dict1
+{'navin': 34, 'hitesh': 64, 'shramik': 87}
+```
+
+This version is an addition to the lesson. It gives the same result on every run.
+
+<Callout type="warn" title="Pair things only from ordered collections">
+Use a list or a tuple for both sides of `zip` when the pairing matters. Also keep both sides the same length. `zip` stops at the end of the shorter one and says nothing about the values left over.
+</Callout>
+
+## Step 6: Remove items with pop() and del
+
+The lesson goes back to `data` and removes two items in two ways:
+
+```python
+>>> data = {'kiran':34,'sushil':35,'harsh':67,'navin':8, 'harsh': 34}
+>>> data.pop('navin')
+8
+>>> data
+{'kiran': 34, 'sushil': 35, 'harsh': 34}
+>>> del data['sushil']
+>>> data
+{'kiran': 34, 'harsh': 34}
+```
+
+| Way to remove | What you get back |
+| --- | --- |
+| `data.pop('navin')` | The value that was removed, here 8 |
+| `del data['sushil']` | Nothing. The item is removed silently |
+
+Both need the key of the item. You saw `del` and `pop` with index numbers in [Lists](/docs/python-one-shot/data-structures-and-types/lists). With a dictionary you give a key in the same place.
+
+## Step 7: A dictionary inside a dictionary
+
+A value can be any object, including a list or another dictionary. The lesson stores which editor is used for which language:
+
+```python
+>>> data = {'js':'vscode', 'python':['vscode','pycharm'], 'java':{'core':'vscode','spring':'iij'}}
+>>> data
+{'js': 'vscode', 'python': ['vscode', 'pycharm'], 'java': {'core': 'vscode', 'spring': 'iij'}}
+>>> data['js']
+'vscode'
+>>> data['python']
+['vscode', 'pycharm']
+>>> data['python'][0]
+'vscode'
+>>> data['java']
+{'core': 'vscode', 'spring': 'iij'}
+>>> data['java']['spring']
+'iij'
+```
+
+The string `'iij'` is the instructor's short form for IntelliJ IDEA.
+
+| Key | Type of the value | How to go one level deeper |
+| --- | --- | --- |
+| `'js'` | String | Nothing more to open |
+| `'python'` | List | An index: `data['python'][0]` |
+| `'java'` | Dictionary | A key: `data['java']['spring']` |
+
+Read such a line from left to right. `data['java']` gives the inner dictionary, and `['spring']` then looks up a key in that inner dictionary.
+
+## Additions beyond the lesson
+
+The lesson creates and reads dictionaries and removes items. Two more things belong to everyday use.
+
+**Add or change an item.** Assign to a key. A new key adds an item, and an existing key gets a new value:
+
+```python
+>>> data = {'kiran':34,'sushil':35,'harsh':67,'navin':8}
+>>> data['gaurav'] = 50
+>>> data['kiran'] = 40
+>>> data
+{'kiran': 40, 'sushil': 35, 'harsh': 67, 'navin': 8, 'gaurav': 50}
+```
+
+**Check for a key with `in`.** The check looks at the keys, not at the values:
+
+```python
+>>> data = {'kiran':34,'sushil':35,'harsh':67,'navin':8}
+>>> 'kiran' in data
+True
+>>> 34 in data
+False
+```
+
+<Callout type="info" title="Checked for these docs">
+Every prompt session on this page was run with Python 3.13 and gave the output shown. The `KeyError` was reproduced by hand. The number in `<python-input-49>` is from the video. It counts the entries typed so far in that prompt session, so your number will be different. The video's `dict(zip(keys, values))` output with a set cannot be reproduced on demand, so that block shows the video's screen, and the three other pairings listed under it came from real runs.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `KeyError: 1` | `data[1]` was used on a dictionary that has no key `1`. This happens in the lesson | Use an existing key, such as `data['harsh']`, or use `data.get(1)` |
+| `data.get(1)` shows nothing | `get` returned `None` and the prompt does not display `None`. This happens in the lesson | Use `print(data.get(1))`, or give a default: `data.get(1, 'not found')` |
+| A value has disappeared after creating the dictionary | The same key was written two times, and the last value replaced the first. The lesson shows this on purpose | Give every item its own key |
+| `dict(zip(keys, values))` pairs the wrong name with the wrong number | `keys` was written with curly brackets, so it is a set and has no fixed order. This happens in the lesson | Write the keys as a list: `['navin','hitesh','shramik']` |
+| `KeyError: 'gaurav'` from `data.pop('gaurav')` or `del data['gaurav']` | The key to remove is not in the dictionary | Check with `'gaurav' in data` first, or use `data.pop('gaurav', None)` |
+| `TypeError: unhashable type: 'list'` | A list was used as a key. Keys must be values that cannot change, such as strings, numbers or tuples | Use a string, a number or a tuple as the key |
+
+## Try It Yourself
+
+1. Create a dictionary `marks` with three names as keys and three numbers as values. Print the whole dictionary.
+2. Read one value with square brackets and the same value with `get`.
+3. Ask for a name that is not in `marks` with square brackets. Read the error. Then ask again with `get` and a default text of your choice.
+4. Create a dictionary in which one key appears two times with different values. Which value survives?
+5. Make a list of three city names and a list of three pin codes. Build a dictionary from them with `zip` and `dict`.
+6. Repeat exercise 5 with the city names in curly brackets. Close the prompt, open it again and repeat. Compare the results.
+7. Remove one item from `marks` with `pop` and another with `del`. What does each of them show?
+8. Build a dictionary `course` with the keys `'name'` (a string), `'topics'` (a list of three strings) and `'trainer'` (a dictionary with the keys `'name'` and `'city'`). Print the second topic and the trainer's city.
+
+## Official references
+
+- [Python tutorial: dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
+- [Python library: mapping types, dict](https://docs.python.org/3/builtins/stdtypes.html#typesmapping)
+- [Python library: the zip function](https://docs.python.org/3/builtins/functions.html#zip)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

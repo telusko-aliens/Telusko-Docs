@@ -1,0 +1,311 @@
+---
+title: Sets
+description: Create sets with curly brackets, see how they drop duplicates and keep no order, make an empty set, and combine two sets with difference, union, intersection and symmetric difference.
+---
+
+<Video id="j_JuhAWlEaI" title="Sets" start={5546} />
+
+---
+
+You now know two ways to keep many values in one variable. A [list](/docs/python-one-shot/data-structures-and-types/lists) can be changed, a [tuple](/docs/python-one-shot/data-structures-and-types/tuples) cannot. Both remember the order of their values, and both are happy to hold the same value several times.
+
+Sometimes repeated values are exactly what you do not want. Think of the visitors of a website: one person may come ten times, and you want to count that person once. For this, Python has the **set**. The idea comes from mathematics, where a set is a group of distinct things.
+
+The lesson builds the definition in three steps:
+
+1. A set is a collection of values.
+2. A set is a collection of unique elements.
+3. A set is a collection of **unordered, unique** elements.
+
+Unique means that no value occurs twice. Unordered means that the values have no fixed position. The rest of the lesson shows what both words mean in practice.
+
+<Callout type="info" title="Is a set a sequence?">
+At the start of the video the instructor calls the set "one more sequence", next to the list and the tuple. In everyday speech that is fine. In Python's own terms, a sequence is a type whose values have positions and can be read by index, such as a list, a tuple or a string. A set has no positions, so the Python documentation does not count it among the sequence types. It is a collection.
+</Callout>
+
+## Step 1: Create a set
+
+The lesson is back in the plain Python prompt. Square brackets are taken by the list and round brackets by the tuple. A set uses **curly brackets**, the same brackets that mathematics uses for sets.
+
+| Type | Brackets | Example |
+| --- | --- | --- |
+| List | Square | `[23, 56, 78]` |
+| Tuple | Round | `(23, 56, 78)` |
+| Set | Curly | `{23, 56, 78}` |
+
+The value 56 is typed twice on purpose:
+
+```python
+>>> set1 = {23,56,78,21,56}
+>>> set1
+{56, 21, 78, 23}
+```
+
+Two things happened.
+
+**The duplicate is gone.** Five values went in and four came out. The set kept one 56.
+
+**The order changed.** 23 was typed first and is printed last. 56 is printed first. The result is not in the order you typed and it is not sorted either.
+
+### Why the order changes
+
+A list stores its values one after the other, in the order you give them. A set stores them in a different way. For every value, Python works out a number called its **hash**, and that number decides where the value is kept. This is called **hashing**.
+
+The benefit is speed. Because the place of a value follows from the value itself, Python can store a value and find it again very quickly, without looking through the whole collection. The price is that a set has no order you can rely on. The next lesson, [Dictionaries](/docs/python-one-shot/data-structures-and-types/dictionaries), uses the same technique.
+
+<Callout type="warn" title="Your order can be different">
+With these five numbers you will most likely see the same order as in the video. Do not build on it. The order of a set is not a promise, and for sets of strings it changes every time you start Python, as Step 4 shows.
+</Callout>
+
+## Step 2: Membership, length and type
+
+The keyword `in` from the tuple lesson works on a set. In the video the first attempt has a typing mistake in the name:
+
+{/* check: skip */}
+```python
+>>> set1 = {23,56,78,21,56}
+>>> set1
+{56, 21, 78, 23}
+>>> 21 in set12
+Traceback (most recent call last):
+  File "<python-input-2>", line 1, in <module>
+    21 in set12
+          ^^^^^
+NameError: name 'set12' is not defined. Did you mean: 'set1'?
+```
+
+A `NameError` means that Python does not know the name you used. There is no variable `set12`. Python 3.13 even suggests the name you probably meant.
+
+With the right name:
+
+```python
+>>> set1 = {23,56,78,21,56}
+>>> 21 in set1
+True
+>>> 22 in set1
+False
+>>> len(set1)
+4
+>>> type(set1)
+<class 'set'>
+```
+
+`len` gives 4, not 5, because the second 56 was never stored.
+
+The instructor thinks about `count` for a moment and chooses `len`. A set has no `count` method. Counting how often a value occurs makes no sense when every value occurs once.
+
+## Step 3: An empty set
+
+How do you create a set with no values in it? The obvious guess is a pair of empty curly brackets:
+
+```python
+>>> set2 = {}
+>>> type(set2)
+<class 'dict'>
+```
+
+No error, and not a set. `dict` stands for dictionary, another type that is written with curly brackets and the topic of the next lesson. Empty curly brackets belong to the dictionary.
+
+For an empty set, call the function `set` with nothing in its brackets:
+
+```python
+>>> set2 = set()
+>>> type(set2)
+<class 'set'>
+>>> set2
+set()
+```
+
+Python also prints an empty set as `set()`, so that it cannot be confused with an empty dictionary.
+
+## Step 4: Sets from strings
+
+The function `set` can also build a set from a string. Every character becomes one element:
+
+{/* check: skip */}
+```python
+>>> set2 = set('abcdmnop')
+>>> set3 = set('aeioupd')
+>>> set2
+{'o', 'b', 'm', 'a', 'p', 'c', 'd', 'n'}
+>>> set3
+{'o', 'u', 'e', 'a', 'p', 'i', 'd'}
+```
+
+`set2` holds the eight letters a, b, c, d, m, n, o, p. `set3` holds the five vowels plus p and d.
+
+<Callout type="warn" title="You will see another order">
+The output above is copied from the video. When you run the same lines, you get the same letters in a different order, and after you close Python and start it again, the order changes once more. That is normal. Compare the letters, not their positions.
+</Callout>
+
+You could write the same set with curly brackets, one quoted letter at a time. Passing a string to `set` is less typing.
+
+## Step 5: Set operations
+
+In school mathematics, sets come with Venn diagrams, unions and intersections. Python has an operator for each of these. All four examples use `set2` and `set3` from Step 4.
+
+![Set_Operations](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-set-operations.svg)
+
+### Difference with -
+
+The instructor first types `set1 - set2`, which mixes the number set with a letter set:
+
+{/* check: skip */}
+```python
+>>> set1 = {23,56,78,21,56}
+>>> set2 = set('abcdmnop')
+>>> set1 - set2
+{56, 21, 78, 23}
+```
+
+Nothing was removed, because the two sets have no value in common. He notices that he picked the wrong sets and moves on to the two letter sets:
+
+{/* check: skip */}
+```python
+>>> set2 = set('abcdmnop')
+>>> set3 = set('aeioupd')
+>>> set2 - set3
+{'m', 'n', 'c', 'b'}
+```
+
+The minus takes `set2` and removes every value that is also in `set3`. The letters a, d, o and p are in both sets, so they go. The letters b, c, m and n stay.
+
+### Union with |
+
+{/* check: skip */}
+```python
+>>> set2 = set('abcdmnop')
+>>> set3 = set('aeioupd')
+>>> set2 | set3
+{'o', 'u', 'b', 'e', 'm', 'a', 'p', 'i', 'c', 'd', 'n'}
+```
+
+The pipe sign gives every value that is in `set2`, in `set3`, or in both. A value that is in both appears once, because the result is a set.
+
+### Intersection with &
+
+{/* check: skip */}
+```python
+>>> set2 = set('abcdmnop')
+>>> set3 = set('aeioupd')
+>>> set2 & set3
+{'o', 'p', 'd', 'a'}
+```
+
+The `&` sign keeps the common values only, the ones that are in both sets.
+
+### Symmetric difference with ^
+
+{/* check: skip */}
+```python
+>>> set2 = set('abcdmnop')
+>>> set3 = set('aeioupd')
+>>> set2 ^ set3
+{'u', 'b', 'e', 'm', 'i', 'c', 'n'}
+```
+
+The caret sign is the opposite of `&`. It keeps the values that are in one of the two sets and drops the ones that are in both.
+
+| Operator | Mathematical name | Result contains | With `set2` and `set3` |
+| --- | --- | --- | --- |
+| `-` | Difference | Values of the first set that are not in the second | b, c, m, n |
+| `\|` | Union | Values that are in either set | a, b, c, d, e, i, m, n, o, p, u |
+| `&` | Intersection | Values that are in both sets | a, d, o, p |
+| `^` | Symmetric difference | Values that are in one set and not in both | b, c, e, i, m, n, u |
+
+The video uses the words union and intersection. The names difference and symmetric difference are added here from the Python documentation.
+
+For difference the order of the two sets matters. `set2 - set3` and `set3 - set2` give different results. For the other three operators the order makes no difference.
+
+## A leftover from the tuple lesson
+
+Before the lesson ends, the instructor returns to one detail he missed in the tuple video: a tuple with a single value.
+
+```python
+>>> tup = (45)
+>>> type(tup)
+<class 'int'>
+>>> tup = (45,)
+>>> type(tup)
+<class 'tuple'>
+```
+
+Round brackets around one value do not create a tuple. Python ignores them and stores the plain number. A comma after the value makes it a tuple. The explanation is on the [Tuples](/docs/python-one-shot/data-structures-and-types/tuples) page.
+
+## Additions beyond the lesson
+
+**A fixed order for comparing.** The built-in function `sorted` takes a collection and returns a list of its values in sorted order. Wrap a set in it and you get the same output on every run, which makes your results easy to compare with this page:
+
+```python
+>>> set2 = set('abcdmnop')
+>>> set3 = set('aeioupd')
+>>> sorted(set2 - set3)
+['b', 'c', 'm', 'n']
+>>> sorted(set2 | set3)
+['a', 'b', 'c', 'd', 'e', 'i', 'm', 'n', 'o', 'p', 'u']
+>>> sorted(set2 & set3)
+['a', 'd', 'o', 'p']
+>>> sorted(set2 ^ set3)
+['b', 'c', 'e', 'i', 'm', 'n', 'u']
+>>> sorted(set3 - set2)
+['e', 'i', 'u']
+```
+
+**Repeated letters.** The instructor remarks that he should have repeated a letter in his strings. Here is a string with a repeated letter. The two `l` become one:
+
+```python
+>>> sorted(set('hello'))
+['e', 'h', 'l', 'o']
+```
+
+**No index.** Because a set has no positions, you cannot ask for the value at an index:
+
+{/* check: skip */}
+```python
+>>> set1 = {23,56,78,21,56}
+>>> set1[0]
+Traceback (most recent call last):
+  File "<python-input-1>", line 1, in <module>
+    set1[0]
+    ~~~~^^^
+TypeError: 'set' object is not subscriptable
+```
+
+"Subscriptable" means "can be used with an index in square brackets".
+
+<Callout type="info" title="Checked for these docs">
+Every prompt session on this page was run with Python 3.13. The sessions with number sets, the empty set, the one-value tuple and `sorted` gave exactly the output shown on every run. The sessions that print a set of letters show the output from the video. They were run by hand: the letters in each result were the same and their order was different, as explained above. The two error sessions were also run by hand. The number in `<python-input-2>` counts the lines you have typed, so yours may differ.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `NameError: name 'set12' is not defined. Did you mean: 'set1'?` | A typing mistake in the variable name. This happens in the lesson | Use the exact name, `set1` |
+| `type(set2)` gives `<class 'dict'>` | `set2 = {}` creates an empty dictionary. This is shown in the lesson | Use `set2 = set()` for an empty set |
+| A value you typed twice appears once | A set keeps unique values. This is shown in the lesson | Nothing to fix. Use a list if you need duplicates |
+| The values are printed in another order than you typed, or than the video shows | A set is unordered | Compare the values, or print `sorted(set1)` |
+| `set1 - set2` gives back the whole of `set1` | The two sets have no common value. This happens in the lesson | Check that you used the sets you meant |
+| `TypeError: 'set' object is not subscriptable` | An index was used on a set, such as `set1[0]` | Use `in` to test for a value, or use a list if you need positions |
+| `type(tup)` gives `<class 'int'>` after `tup = (45)` | Brackets around one value do not make a tuple. This is shown in the lesson | Add a comma: `tup = (45,)` |
+
+## Try It Yourself
+
+1. Create `nums = {5,3,5,9,3,1}`. Guess what `len(nums)` gives before you run it. Then print the set.
+2. Check with `in` whether 9 and 4 are in `nums`.
+3. Assign `a = {}` and `b = set()`. Use `type` on both and explain the difference.
+4. Create `s1 = set('python')` and `s2 = set('typing')`. Print both a few times, closing and starting Python in between. What changes and what stays the same?
+5. Work out on paper which letters `s1 & s2` and `s1 - s2` contain. Then check with Python.
+6. Print `s1 | s2` and `s1 ^ s2`. Which letters are in the first result and missing from the second? Which operator gives exactly those letters?
+7. Compare `s1 - s2` with `s2 - s1`. Why are they different?
+8. Create a tuple with the single value 7. Check its type, then remove the comma and check again.
+
+## Official references
+
+- [Python tutorial: sets](https://docs.python.org/3/tutorial/datastructures.html#sets)
+- [Python library: set types](https://docs.python.org/3/builtins/stdtypes.html#set-types-set-frozenset)
+- [Python library: sequence types](https://docs.python.org/3/builtins/stdtypes.html#sequence-types-list-tuple-range)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

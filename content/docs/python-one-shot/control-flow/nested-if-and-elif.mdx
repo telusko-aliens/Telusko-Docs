@@ -1,0 +1,426 @@
+---
+title: Nested if and elif
+description: Put one if inside another, then replace a row of separate if statements with one if, elif, else chain and watch in the debugger how Python walks through it.
+---
+
+<Video id="j_JuhAWlEaI" title="Nested if and elif" start={11746} />
+
+---
+
+One `if` with one `else` answers a question with two possible answers. Even or odd. Yes or no.
+
+Real programs ask harder questions. Sometimes a second question only makes sense after the first one was answered with yes. Sometimes there are five possible answers and exactly one of them is right.
+
+This lesson covers both cases. The first part puts an `if` inside another `if`, which is called a **nested if**. The second part introduces `elif`, which lets one `if` have as many branches as you need.
+
+## Step 1: An if inside an if
+
+The lesson continues with `if_demo.py` from [else and Debugging](/docs/python-one-shot/control-flow/else-and-debugging). It prints `Even` or `Odd` for a number.
+
+Now a second value comes in, a salary. The currency does not matter here. The new rule is:
+
+- If the salary is more than 5, print `Great Job`.
+- Otherwise print `Better luck next time`.
+- Do this **only when the number is even**.
+
+The last line is the important one. If the message had to appear for every number, the salary check could stand on its own below the first `if`. Because it belongs to the even case only, it has to go inside the block of the first `if`:
+
+```python title="if_demo.py"
+num = 6
+salary = 5
+
+
+if num % 2 == 0:
+    print("Even")
+    if salary > 5:
+        print("Great Job")
+    else:
+        print("Better luck next time")
+
+else:
+    print("Odd")
+
+print("Bye")
+```
+
+```text
+Even
+Better luck next time
+Bye
+```
+
+**Nested** means one inside the other. An `if` or an `if` with `else` that sits inside the block of another `if` is a nested if. There is no new keyword. Only the indentation is new:
+
+| Lines | Indentation | Belongs to |
+| --- | --- | --- |
+| `if num % 2 == 0:` and the last `else:` | None | The outer `if` |
+| `print("Even")`, `if salary > 5:` and the first `else:` | 4 spaces | The block of the outer `if` |
+| `print("Great Job")`, `print("Better luck next time")` | 8 spaces | The blocks of the inner `if` and `else` |
+
+Each `else` belongs to the `if` that starts in the same column. That is how Python knows which one is meant.
+
+The salary is 5, and 5 is not more than 5, so the program prints `Better luck next time`.
+
+## Step 2: Try the other paths
+
+Change the salary to 7:
+
+```python title="if_demo.py"
+num = 6
+salary = 7
+
+
+if num % 2 == 0:
+    print("Even")
+    if salary > 5:
+        print("Great Job")
+    else:
+        print("Better luck next time")
+
+else:
+    print("Odd")
+
+print("Bye")
+```
+
+```text
+Even
+Great Job
+Bye
+```
+
+Now make the number odd and leave the salary at 7:
+
+```python title="if_demo.py"
+num = 5
+salary = 7
+
+
+if num % 2 == 0:
+    print("Even")
+    if salary > 5:
+        print("Great Job")
+    else:
+        print("Better luck next time")
+
+else:
+    print("Odd")
+
+print("Bye")
+```
+
+```text
+Odd
+Bye
+```
+
+The salary is 7, which is more than 5, and still no `Great Job` appears. The outer condition is false, so Python skips the whole block of the outer `if`, including the inner `if`. The salary is never looked at.
+
+| `num` | `salary` | Output |
+| --- | --- | --- |
+| 6 | 5 | `Even`, `Better luck next time`, `Bye` |
+| 6 | 7 | `Even`, `Great Job`, `Bye` |
+| 5 | 7 | `Odd`, `Bye` |
+
+## Step 3: A number as a word
+
+The second part of the lesson starts with a new file, `elif_demo.py`, and a new task. For a number from 1 to 5, print its name. For 1 print `One`, for 2 print `Two`, and so on.
+
+A first attempt with five `print` lines prints all five words, whatever the number is:
+
+```python title="elif_demo.py"
+num = 1
+
+print("One")
+print("Two")
+print("Three")
+print("Four")
+print("Five")
+```
+
+```text
+One
+Two
+Three
+Four
+Five
+```
+
+Only one of them should appear. You already know the tool for that. Each `print` gets its own `if`:
+
+```python title="elif_demo.py"
+num = 3
+
+if num == 1:
+    print("One")
+
+if num == 2:
+    print("Two")
+
+if num == 3:
+    print("Three")
+
+if num == 4:
+    print("Four")
+
+if num == 5:
+    print("Five")
+```
+
+```text
+Three
+```
+
+With `num = 5` the same file prints `Five`.
+
+## Step 4: A number that has no word
+
+What happens with `num = 6`? There is no `if` for 6, so no condition is true and the program prints nothing at all. The terminal shows the next prompt and that is it.
+
+A program that stays silent is confusing. The lesson first tries one more `if` at the end:
+
+```python title="elif_demo.py"
+num = 6
+
+if num == 1:
+    print("One")
+
+if num == 2:
+    print("Two")
+
+if num == 3:
+    print("Three")
+
+if num == 4:
+    print("Four")
+
+if num == 5:
+    print("Five")
+
+if num > 5:
+    print("Incorrect")
+```
+
+```text
+Incorrect
+```
+
+That helps for 6, and the instructor points out the gap straight away. A negative number such as `-2` is not 1 to 5 and it is not more than 5 either, so the program is silent again. The same is true for 0. This will be solved in Step 6.
+
+## The problem with separate if statements
+
+There is a second problem, and it is the bigger one. These six `if` statements know nothing about each other. Python checks every one of them, every time.
+
+Take `num = 2`. The second condition is true and `Two` is printed. After that Python still checks whether 2 is 3, whether 2 is 4, whether 2 is 5 and whether 2 is more than 5. All four checks are wasted, because a number that is 2 can never be 3.
+
+What the program needs to say is: if the first condition is true, do not look at the others.
+
+`else` does that, but an `if` can have only one `else`. For several conditions in a row, other languages write `else if`. Python has a shorter word for it: **`elif`**.
+
+## Step 5: Change if to elif
+
+Every `if` after the first one becomes `elif`:
+
+```python title="elif_demo.py"
+num = 2
+
+if num == 1:
+    print("One")
+
+elif num == 2:
+    print("Two")
+
+elif num == 3:
+    print("Three")
+
+elif num == 4:
+    print("Four")
+
+elif num == 5:
+    print("Five")
+
+elif num > 5:
+    print("Incorrect")
+```
+
+```text
+Two
+```
+
+The first one must stay `if`. An `elif` means "otherwise, if", and that only makes sense when there is an `if` before it.
+
+Now the six parts form one statement, a **chain**. Python goes through the conditions from the top. At the first condition that is true, it runs that block and leaves the whole chain. The conditions below it are not checked.
+
+![If_Statements_Versus_Elif_Chain](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-elif-chain.svg)
+
+## Step 6: Finish the chain with else
+
+The last branch still asks `num > 5`, and that still leaves out 0 and the negative numbers. What is really meant is: anything that did not match above. That is exactly what `else` says.
+
+```python title="elif_demo.py"
+num = 2
+
+if num == 1:
+    print("One")
+
+elif num == 2:
+    print("Two")
+
+elif num == 3:
+    print("Three")
+
+elif num == 4:
+    print("Four")
+
+elif num == 5:
+    print("Five")
+
+else:
+    print("Incorrect")
+```
+
+```text
+Two
+```
+
+With `num = 6` this prints `Incorrect`, and it does the same for `-2`, for 0 and for 100.
+
+The full shape of the statement:
+
+| Part | How many | Role |
+| --- | --- | --- |
+| `if` | Exactly one, at the start | The first condition |
+| `elif` | None, one or many, in the middle | A further condition. Checked only when all conditions above it were false |
+| `else` | None or one, at the end | Runs when no condition was true. It has no condition of its own |
+
+## Step 7: Watch the chain in the debugger
+
+The lesson checks this with the debugger from [else and Debugging](/docs/python-one-shot/control-flow/else-and-debugging). Put a breakpoint on the line `if num == 1:`, choose **Python Debugger: Debug Python File** from the menu next to the Run button, and move on with **Step Over**.
+
+With `num = 2`:
+
+| Python stops at | What happens |
+| --- | --- |
+| `if num == 1:` | False. The block is skipped |
+| `elif num == 2:` | True |
+| `print("Two")` | `Two` appears in the terminal |
+| End of the file | The chain is left. `elif num == 3:` and everything below it is never visited |
+
+With `num = 6` the yellow arrow visits every condition, `if num == 1:` and then all four `elif` lines. None is true, so it lands in `else` and prints `Incorrect`. In the video this second debug session stays paused on `elif num == 5:` until the chapter ends. The last part, landing in `else` and printing `Incorrect`, is said by the instructor and not shown on screen.
+
+<Callout type="info" title="When the debugger asks for a configuration">
+In the second debug run of the video, a list named "Select a debug configuration" opens. The first entry, **Python File**, is the one highlighted in the list. It debugs the file that is open in the editor.
+</Callout>
+
+## Step 8: Nesting works inside a chain too
+
+A branch of a chain is a normal block, so it can hold another `if`. The lesson brings back the salary and puts a nested `if` and `else` into the branch for 3:
+
+```python title="elif_demo.py"
+num = 3
+salary = 5
+
+if num == 1:
+    print("One")
+
+elif num == 2:
+    print("Two")
+
+elif num == 3:
+    if salary >= 5:
+        print("Three")
+    else:
+        print("Thri")
+
+elif num == 4:
+    print("Four")
+
+elif num == 5:
+    print("Five")
+
+else:
+    print("Incorrect")
+```
+
+```text
+Three
+```
+
+With a salary of 5 or more, 3 is spelled correctly. With less, the program prints the misspelled `Thri`. The odd spelling is the instructor's joke: with less salary, the work gets sloppy.
+
+Note the operator. Here it is `>=`, greater than or equal to, so a salary of exactly 5 counts. In `if_demo.py` it was `>`, and there 5 did not count.
+
+<Callout type="info" title="This version is not run in the video">
+The video writes this version while the debugger is still paused with `num = 6`, and does not run it. With `num = 6` it prints `Incorrect`, because the branch for 3 is never entered. The page uses `num = 3` so that you can see the nested part work. Both results were produced by running the file.
+</Callout>
+
+## if, nested if and elif side by side
+
+| You want to | Use | Example from the lesson |
+| --- | --- | --- |
+| Do something or skip it | `if` | Print `Even` when the number is even |
+| Choose between two paths | `if` and `else` | `Even` or `Odd` |
+| Ask a second question only after a first one is true | Nested `if` | Check the salary only for even numbers |
+| Choose one path out of many | `if`, `elif`, `else` | `One` to `Five`, or `Incorrect` |
+
+## Additions beyond the lesson
+
+**The order of the conditions matters.** In the lesson only one condition can be true at a time, so the order does not change the result. When conditions overlap, the first true one wins and the others are never reached:
+
+```python title="order_demo.py"
+marks = 95
+
+if marks >= 50:
+    print("Pass")
+elif marks >= 90:
+    print("Excellent")
+else:
+    print("Fail")
+```
+
+```text
+Pass
+```
+
+95 is at least 90, and still `Excellent` never appears, because `marks >= 50` is checked first and is true. Put the strictest condition first: check `marks >= 90` before `marks >= 50`.
+
+**A chain does not need an else.** Without `else`, a value that matches no condition prints nothing, as in Step 4.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown. The runs with other values that are described in the text (`num = 5` and `num = 6` in the five `if` version, `num = 6`, `-2`, `0` and `100` in the chain with `else`, `num = 6` in the nested version) were run as well. The order in which the debugger visits the lines was confirmed with a line trace of the same files. The error messages in the table below were produced with Python 3.13. The listings leave out the empty first line that the files in the video have.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| The program prints nothing | No condition was true and there is no `else`. This happens in the lesson with `num = 6` and five `if` statements | End the chain with `else` |
+| `Incorrect` is missing for `-2` or `0` | The last branch asks `num > 5`. The instructor names this gap in the lesson | Use `else` for "everything that did not match" |
+| Every condition is checked although one already matched | Separate `if` statements do not know about each other | Change every `if` after the first to `elif` |
+| `Great Job` does not appear although the salary is 7 | The number is odd, so the outer block with the inner `if` is skipped | Nothing to fix. This is how a nested `if` works |
+| `SyntaxError: invalid syntax` at an `elif` line | The `elif` has no `if` before it, or it comes after `else` | Start with `if`. Keep `else` as the last branch |
+| `SyntaxError: expected ':'` at `else if num == 2:` | `else if` is how C and Java write it | Write `elif` |
+| `IndentationError: expected an indented block after 'if' statement on line 3` | The line under the `if` is not indented. The number is the line of your `if`. In the lesson the editor underlines such a line in red while it is being typed | Indent the block with 4 spaces |
+| `IndentationError: unindent does not match any outer indentation level` | An inner `else` does not start in the same column as its `if` | Line up each `else` with its own `if` |
+| `SyntaxError: invalid syntax. Maybe you meant '==' or ':=' instead of '='?` | A single `=` in a condition, as in `elif num = 2:` | Compare with `==` |
+
+## Try It Yourself
+
+1. In `if_demo.py`, try all four combinations of an even or odd `num` with a salary of 3 or 9. Predict each output before you run it.
+2. Add a nested `if` and `else` inside the outer `else` of `if_demo.py`, so that odd numbers also get a message that depends on the salary.
+3. Extend `elif_demo.py` so that it knows the words up to `Ten`.
+4. Read the number with `input` and convert it with `int`, as in [User Input](/docs/python-one-shot/functions-modules-and-input/user-input), and print its word. Both steps can be written in one line: `num = int(input("Enter a number: "))`.
+5. Write a program that stores marks in a variable and prints `A` for 90 or more, `B` for 75 or more, `C` for 50 or more and `Fail` for everything else. Test it with 95, 80, 60 and 20.
+6. Change the order of the conditions in exercise 5 so that `marks >= 50` comes first. Run it with 95 and explain the result.
+7. Put a breakpoint on the first `if` of `elif_demo.py`, set `num = 4` and step through it. Count how many conditions are checked. Then do the same with the version from Step 4, which has six separate `if` statements and no `else`, and count again.
+8. Write a program with a variable `day` from 1 to 7 that prints the name of the day, and `Invalid day` for any other number.
+
+## Official references
+
+- [Python tutorial: if statements](https://docs.python.org/3/tutorial/controlflow.html#if-statements)
+- [Python reference: the if statement](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
+- [Python reference: comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,387 @@
+---
+title: Operator Overloading
+description: See how Python turns an operator such as + or > into a method call, and write the special methods that make print, + and > work with objects of your own class.
+---
+
+<Video id="j_JuhAWlEaI" title="Operator Overloading" start={25673} />
+
+---
+
+`5 + 6` gives `11`. That was one of the first lines of the course, so why come back to it in the middle of object-oriented programming?
+
+Because the plus sign does not always do the same thing. With two numbers it adds. With two strings it joins. The operator is the same and the behaviour changes with the values around it. That is polymorphism again, one thing with many forms, and this form has its own name: **operator overloading**.
+
+This lesson first looks at how Python makes that work for its own types. Then it does the same for a class of your own, a small bank account, so that two accounts can be printed, added and compared.
+
+## Step 1: One operator, two behaviours
+
+Create a new file in the `oop` folder and name it `oper.py`.
+
+```python title="oper.py"
+a = 5
+b = 6
+c = a + b
+
+print(c)
+```
+
+```text
+11
+```
+
+Now turn both values into strings:
+
+```python title="oper.py"
+a = '5'
+b = '6'
+c = a + b
+
+print(c)
+```
+
+```text
+56
+```
+
+The values on both sides of an operator are called its **operands**. When the operands are integers, `+` adds them. When they are strings, `+` puts them next to each other. The operator behaves according to the type of its operands.
+
+## Step 2: What the plus sign really does
+
+`5` and `6` are objects. Their type is the class `int`, as you saw in [Class and Object](/docs/python-one-shot/object-oriented-python/class-and-object). A class has methods, and `int` has many whose names start and end with two underscores. The instructor calls them **magic methods**. One of them is `__add__`.
+
+Change the values back to integers, comment out the line with `+`, and call that method directly:
+
+```python title="oper.py"
+a = 5
+b = 6
+# c = a + b
+
+c = int.__add__(a,b)
+c = a.__add__(b)
+
+print(c)
+```
+
+```text
+11
+```
+
+Both new lines give 11, the same result as `a + b`. They are two spellings of one call:
+
+| Line | How it reads |
+| --- | --- |
+| `int.__add__(a,b)` | Call the method through the class and pass both objects. `a` becomes `self`, `b` is the other value |
+| `a.__add__(b)` | Call the method on the object `a` and pass `b` |
+| `a + b` | What you write. Python turns it into the call above |
+
+When you write `a + b`, Python calls `__add__` behind the scenes. The plus sign is **syntactic sugar**: a nicer way to write something that could also be written in a longer form.
+
+<Callout type="warn" title="Keep writing a + b">
+The lesson calls `__add__` directly only to show what happens inside. In your own code, write `a + b`. Calling the method by hand makes the code harder to read.
+</Callout>
+
+So `+` works on integers because the class `int` has an `__add__` method, and it works on strings because the class `str` has its own `__add__` that joins. Can a class of your own do the same?
+
+![Operator_To_Method_Call](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-operator-overloading.svg)
+
+## Step 3: A class of your own and what print shows
+
+A real bank account has many fields: an account number, the type of account, a location. The lesson keeps two, the name and the balance. Both are set in `__init__`, as in [The `__init__` Method](/docs/python-one-shot/object-oriented-python/init-method). In the video the lines from Step 1 and 2 are commented out for the first run of this step. After that, `a = 5` is active again and `print(a)` (later `print(a.__str__())`) stays in the file until the end of Step 4, so each of those runs on screen prints `5` first, before the Account lines. This page leaves those lines and that first output line out.
+
+```python title="oper.py"
+class Account:
+    def __init__(self, name, balance):
+        self.name = name
+        self.balance = balance
+
+user1 = Account('navin',1000)
+user2 = Account('kiran',2000)
+
+print(user1)
+print(user2)
+```
+
+{/* check: skip */}
+```text
+<__main__.Account object at 0x00000225989C6A50>
+<__main__.Account object at 0x0000022598C54A50>
+```
+
+Printing an object shows its class and the place in memory where it lives. The numbers after `0x` are memory addresses. They are different on every computer and on every run, so yours will not match these.
+
+The intention was to see the values. `print(user1.name, user1.balance)` would do that. It would be nicer if `print(user1)` showed them by itself.
+
+Compare with an integer. `a = 5` is an object too, and `print(a)` shows `5`, not "int object at some address". The reason is another special method, `__str__`. When you print an object, Python calls its `__str__` method and prints the string that comes back:
+
+```python
+>>> a = 5
+>>> print(a)
+5
+>>> print(a.__str__())
+5
+```
+
+For an integer, `__str__` returns the digits. Does `Account` have such a method? The lesson tries `print(user1.__str__())`. There is no error, and the output is the same class name and address as before. So the method exists, although the class does not define it. Every class gets it from `object`, the class that all classes inherit from. The version in `object` returns that default text.
+
+## Step 4: Your own `__str__`
+
+Define `__str__` in the class and return the string you want to see. The lesson uses an f-string, a string with the letter `f` in front in which every name in curly brackets is replaced by its value:
+
+```python title="oper.py"
+class Account:
+    def __init__(self, name, balance):
+        self.name = name
+        self.balance = balance
+
+    def __str__(self):
+        return f'{self.name} : {self.balance}'
+
+user1 = Account('navin',1000)
+user2 = Account('kiran',2000)
+
+print(user1.__str__())
+print(user2)
+```
+
+```text
+navin : 1000
+kiran : 2000
+```
+
+The first line calls `__str__` by hand. The second line only prints the object, and the result has the same form. That confirms it: `print` calls `__str__` for you. The lesson then changes the first line back to `print(user1)`.
+
+`__str__` must **return** a string. It does not print anything itself.
+
+Replacing a method that a class inherited with a version of your own is called method overriding. It is the topic of the next lesson, [Method Overriding](/docs/python-one-shot/object-oriented-python/method-overriding).
+
+## Step 5: Add two accounts
+
+Suppose navin and kiran want to buy something and need to know their combined balance. It would be natural to write `user1 + user2`:
+
+{/* check: error */}
+```python title="oper.py"
+class Account:
+    def __init__(self, name, balance):
+        self.name = name
+        self.balance = balance
+
+    def __str__(self):
+        return f'{self.name} : {self.balance}'
+
+
+user1 = Account('navin',1000)
+user2 = Account('kiran',2000)
+
+combined = user1 + user2
+
+print(user1)
+print(user2)
+print(combined)
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\oper.py", line 13, in <module>
+    combined = user1 + user2
+               ~~~~~~^~~~~~~
+TypeError: unsupported operand type(s) for +: 'Account' and 'Account'
+```
+
+Python says that `+` is not supported for two `Account` objects. You know why now. `+` means a call to `__add__`, and `Account` has no such method. `object` does not provide one either.
+
+So write it. The method gets two objects: the one on the left of the `+` and the one on the right. It returns a new `Account` named `combined` whose balance is the sum of both balances:
+
+```python title="oper.py"
+class Account:
+    def __init__(self, name, balance):
+        self.name = name
+        self.balance = balance
+
+    def __str__(self):
+        return f'{self.name} : {self.balance}'
+
+    def __add__(self, other):
+        return Account('combined', self.balance + other.balance)
+
+
+user1 = Account('navin',1000)
+user2 = Account('kiran',2000)
+
+combined = user1 + user2
+
+print(user1)
+print(user2)
+print(combined)
+```
+
+```text
+navin : 1000
+kiran : 2000
+combined : 3000
+```
+
+For `user1 + user2`, Python calls `user1.__add__(user2)`. Inside the method `self` is `user1` and `other` is `user2`. The result is an `Account` object, so `print(combined)` uses the `__str__` from Step 4.
+
+<Callout type="info" title="me and you, self and other">
+In the video the method is first written as `def __add__(me, you):` with `me.balance + you.balance`, and that version runs fine. The parameter names are free. The instructor then renames them to `self` and `other`, because those are the names you will see everywhere else. Use `self` and `other`.
+</Callout>
+
+This is operator overloading in your own class: the same `+`, with a new behaviour for a new type of operand.
+
+## Step 6: Compare two accounts
+
+The couple goes out for dinner. Whoever has the greater balance pays the bill. Comparing `user1.balance > user2.balance` would be easy, because those are numbers. The lesson compares the objects themselves:
+
+{/* check: error */}
+```python title="oper.py"
+class Account:
+    def __init__(self, name, balance):
+        self.name = name
+        self.balance = balance
+
+    def __str__(self):
+        return f'{self.name} : {self.balance}'
+
+    def __add__(self, other):
+        return Account('combined', self.balance + other.balance)
+
+
+user1 = Account('navin',1000)
+user2 = Account('kiran',2000)
+
+combined = user1 + user2
+
+print(user1)
+print(user2)
+print(combined)
+
+if user1 > user2:
+    print("navin pays the bill")
+else:
+    print("kiran pays the bill")
+```
+
+{/* check: skip */}
+```text
+navin : 1000
+kiran : 2000
+combined : 3000
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\oper.py", line 22, in <module>
+    if user1 > user2:
+       ^^^^^^^^^^^^^
+TypeError: '>' not supported between instances of 'Account' and 'Account'
+```
+
+The three `print` lines still run. The program stops at the comparison, because Python does not know what "greater" means for two accounts.
+
+The comparison operators have special methods too. The lesson types `a.__` in the editor and scrolls through the list for an integer: `__gt__` for greater than, `__lt__` for less than, `__le__` for less than or equal, `__mul__` for multiplication and many more. For `>` the method is `__gt__`. It returns `True` or `False`:
+
+```python title="oper.py"
+class Account:
+    def __init__(self, name, balance):
+        self.name = name
+        self.balance = balance
+
+    def __str__(self):
+        return f'{self.name} : {self.balance}'
+
+    def __add__(self, other):
+        return Account('combined', self.balance + other.balance)
+
+    def __gt__(self, other):
+        return self.balance > other.balance
+
+
+user1 = Account('navin',1000)
+user2 = Account('kiran',2000)
+
+combined = user1 + user2
+
+print(user1)
+print(user2)
+print(combined)
+
+if user1 > user2:
+    print("navin pays the bill")
+else:
+    print("kiran pays the bill")
+```
+
+```text
+navin : 1000
+kiran : 2000
+combined : 3000
+kiran pays the bill
+```
+
+1000 is not greater than 2000, so `__gt__` returns `False` and the `else` branch runs. Then navin gets some money. Change one line to `user1 = Account('navin',4000)` and run again:
+
+```text
+navin : 4000
+kiran : 2000
+combined : 6000
+navin pays the bill
+```
+
+## The special methods of this lesson
+
+| You write | Python calls | Defined in `Account` to |
+| --- | --- | --- |
+| `print(user1)` | `user1.__str__()` | Return the text `name : balance` |
+| `user1 + user2` | `user1.__add__(user2)` | Return a new account with both balances added |
+| `user1 > user2` | `user1.__gt__(user2)` | Return `True` when the first balance is greater |
+
+The lesson says "magic methods". The official Python documentation calls them **special methods**, and many people say **dunder methods**, short for double underscore. All three names mean the same thing.
+
+## Additions beyond the lesson
+
+**More operators.** Every operator has its own method. These are the ones you will need most often, all from the list the lesson scrolls through or its neighbours in the documentation:
+
+| Operator | Method | Operator | Method |
+| --- | --- | --- | --- |
+| `+` | `__add__` | `<` | `__lt__` |
+| `-` | `__sub__` | `<=` | `__le__` |
+| `*` | `__mul__` | `>=` | `__ge__` |
+| `>` | `__gt__` | `==` | `__eq__` |
+
+**`==` works without any method.** Unlike `+` and `>`, the `==` operator gives no error for objects of a new class. By default it is `True` only when both sides are the very same object. Two accounts with the same name and balance are not equal until you define `__eq__`.
+
+<Callout type="info" title="Checked for these docs">
+Every program and the prompt session on this page were run with Python 3.13 and gave the output or the error shown. The line `c = a.__add__(b)` in Step 2 is typed in the video but not run there. It was run for these docs. The two memory addresses in Step 3 are copied from the video and are different on every run. In the tracebacks the folder is written as in the video. The line numbers are those of the files on this page. In the video they are higher (24 and 33), because the file there still has the commented lines from Steps 1 and 2 at the top. The end of the lesson does not show the top of the file, so the final program here was put together from the visible parts and run.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `'5' + '6'` gives `56` | Both operands are strings, so `+` joins them. Shown in the lesson | Use integers, `5 + 6`, when you want a sum |
+| `<__main__.Account object at 0x...>` | The class has no `__str__`, so `print` shows the default text from `object`. This happens in the lesson | Define `__str__` and return a string |
+| `TypeError: unsupported operand type(s) for +: 'Account' and 'Account'` | The class has no `__add__` method. This happens in the lesson | Define `__add__(self, other)` |
+| `TypeError: '>' not supported between instances of 'Account' and 'Account'` | The class has no `__gt__` method. This happens in the lesson | Define `__gt__(self, other)` |
+| `TypeError: __str__ returned non-string (type NoneType)` | `__str__` prints the text and returns nothing | Use `return`, not `print`, inside `__str__` |
+| `AttributeError: 'int' object has no attribute 'balance'` | `user1 + 5` was written. `__add__` expects another account on the right | Add two `Account` objects |
+| `print(combined)` shows `None` | `__add__` has no `return` | Return the new `Account` object |
+
+## Try It Yourself
+
+1. Run `oper.py` with `a = 5`, `b = 6` and then with `a = '5'`, `b = '6'`. Explain the two results.
+2. Print `a.__add__(b)` for the integers and for the strings. Compare with `a + b`.
+3. Write the `Account` class with `__init__` only, create an account with your name and print it. Then add `__str__` and print it again.
+4. Change `__str__` so that an account prints as `navin has 1000`.
+5. Add `__add__` and print the combined account of three users: `user1 + user2 + user3`. Why does this work with one `__add__` method?
+6. Add `__gt__` and test it with two balances of your choice. Then make both balances equal. Who pays the bill, and why?
+7. Define `__sub__` so that `user2 - user1` returns an account named `difference` with the difference of the two balances.
+8. Remove `__gt__` again and run the program. Read the error message and say which operator and which class it names.
+
+## Official references
+
+- [Python reference: special method names](https://docs.python.org/3/reference/datamodel.html#special-method-names)
+- [Python reference: emulating numeric types](https://docs.python.org/3/reference/datamodel.html#emulating-numeric-types)
+- [Python library: the operator module, mapping operators to methods](https://docs.python.org/3/library/operator.html)
+- [Python tutorial: classes](https://docs.python.org/3/tutorial/classes.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,361 @@
+---
+title: Recursion
+description: Learn what happens when a function calls itself, why Python stops it after 1000 calls, and how a base case turns recursion into a working factorial function.
+---
+
+<Video id="j_JuhAWlEaI" title="Recursion" start={16581} />
+
+---
+
+Recursion is a function calling itself. If you create a function named `hello` and the body of `hello` calls `hello`, that is recursion.
+
+It sounds strange at first. Why would a function call itself? The answer comes in the second half of this page, where the factorial from the lesson [Factorial](/docs/python-one-shot/arrays-and-recursion/factorial) is written again without a loop.
+
+Before that, the lesson does something simpler. It writes a tiny function, lets it call itself, and watches what Python does about it.
+
+## Step 1: A function that is never called
+
+Create a new file named `recursion.py` with one function:
+
+```python title="recursion.py"
+def greet():
+    print("Hello")
+```
+
+Run it with `python recursion.py`. Nothing is printed. The file defines `greet` and never calls it.
+
+Add the call below the function, outside of it:
+
+```python title="recursion.py"
+def greet():
+    print("Hello")
+
+greet()
+```
+
+```text
+Hello
+```
+
+## Step 2: Let the function call itself
+
+Now add one more call, this time inside the function, after the `print`:
+
+{/* check: skip */}
+```python title="recursion.py"
+def greet():
+    print("Hello")
+    greet()
+
+greet()
+```
+
+The terminal fills with `Hello`, line after line, and then the run ends with an error:
+
+```text
+Hello
+Hello
+Hello
+...
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\recursion.py", line 5, in <module>
+    greet()
+    ~~~~~^^
+  File "C:\PythonCourse\FirstProject\recursion.py", line 3, in greet
+    greet()
+    ~~~~~^^
+  File "C:\PythonCourse\FirstProject\recursion.py", line 3, in greet
+    greet()
+    ~~~~~^^
+  File "C:\PythonCourse\FirstProject\recursion.py", line 3, in greet
+    greet()
+    ~~~~~^^
+  [Previous line repeated 996 more times]
+RecursionError: maximum recursion depth exceeded
+```
+
+Here is what happened:
+
+1. The last line of the file calls `greet`.
+2. `greet` prints `Hello` and then calls `greet`.
+3. That second `greet` prints `Hello` and calls `greet` again.
+4. No call ever finishes, because each one is waiting for the call it started.
+
+This is recursion. Nothing in this function tells it when to stop, so it would go on forever.
+
+The traceback is long, because Python lists the calls that are still open. To keep it readable it prints the first few and then one line that says how many more there were: `Previous line repeated 996 more times`. The line numbers in the video are two higher than here, because the file in the video starts with two empty lines.
+
+## Why Python sets a limit
+
+Every call that has not finished needs some memory. A function that calls itself without end would use more and more memory until the program, or the whole computer, gets into trouble.
+
+Think of a real application. You write a function, by mistake it calls itself, and a user clicks the button that runs it. Python protects you from that. It counts how deep the calls go, and when the count reaches a limit, it stops the program with a `RecursionError`.
+
+The default limit is **1000**. You can ask Python for it. The function is in the `sys` module, so the file needs `import sys` (importing is covered in [The math Module](/docs/python-one-shot/functions-modules-and-input/the-math-module)). Comment out the call to `greet` first, or the number will be buried under a thousand lines of `Hello`:
+
+```python title="recursion.py"
+import sys
+
+print(sys.getrecursionlimit())
+
+
+def greet():
+    print("Hello")
+    greet()
+
+# greet()
+```
+
+```text
+1000
+```
+
+The 996 in the traceback fits this number. The traceback shows four calls in full, one from the file itself and three from `greet`, and then 996 more. That makes 1000.
+
+## Step 3: Change the limit
+
+`sys.setrecursionlimit` sets a new limit:
+
+```python title="recursion.py"
+import sys
+
+sys.setrecursionlimit(10000)
+print(sys.getrecursionlimit())
+
+
+def greet():
+    print("Hello")
+    greet()
+
+# greet()
+```
+
+```text
+10000
+```
+
+When the lesson removes the `#` and runs the file again, `Hello` is printed many more times and the traceback ends with:
+
+```text
+  [Previous line repeated 9996 more times]
+RecursionError: maximum recursion depth exceeded
+```
+
+The instructor then tries one lakh, which is 100000. The run takes a moment and ends the same way, this time with `Previous line repeated 99996 more times`.
+
+<Callout type="warn" title="Do not raise the limit to make an error go away">
+The limit is a safety net. On the instructor's machine a limit of 100000 worked. That is not guaranteed. The Python documentation says that the highest safe value depends on the platform and that a limit that is too high can crash Python itself, without a readable error. If you see a `RecursionError`, look for the missing stop condition first.
+</Callout>
+
+## Step 4: Slow it down and count
+
+To watch the calls one by one, the lesson adds a short pause after each `print`. The function `sleep` from the `time` module waits for the given number of seconds, and `0.02` seconds is 20 milliseconds. Without the import line, the editor underlines `sleep`, because the name is not known yet.
+
+The run is slow now, so the instructor stops it by hand. In the terminal you do that with Ctrl+C, and Python ends with a `KeyboardInterrupt`.
+
+Next, the lesson wants a number after each `Hello`. It creates a variable `count` outside the function and prints it. That alone prints `Hello  1` every time, so the function also has to add 1:
+
+{/* check: skip */}
+```python title="recursion.py"
+import sys
+from time import sleep
+sys.setrecursionlimit(100000)
+print(sys.getrecursionlimit())
+
+count = 1
+
+def greet():
+    print("Hello ", count)
+    count = count + 1
+    sleep(0.02)
+    greet()
+
+greet()
+```
+
+```text
+100000
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\recursion.py", line 14, in <module>
+    greet()
+    ~~~~~^^
+  File "C:\PythonCourse\FirstProject\recursion.py", line 9, in greet
+    print("Hello ", count)
+                    ^^^^^
+UnboundLocalError: cannot access local variable 'count' where it is not associated with a value
+```
+
+The line `count = count + 1` assigns to `count` inside the function. As you saw in [Global and Local Variables](/docs/python-one-shot/arrays-and-recursion/global-and-local-variables), an assignment inside a function creates a local variable. So everywhere in `greet`, the name `count` now means a local variable, and the `print` line tries to read it before it has a value.
+
+The fix is a keyword that the video has not used so far: `global`. These docs already show it in a short section under Additions beyond the lesson in [Global and Local Variables](/docs/python-one-shot/arrays-and-recursion/global-and-local-variables). The line `global count` tells Python that `count` in this function is the global variable, and that no local one should be created.
+
+{/* check: skip */}
+```python title="recursion.py"
+import sys
+from time import sleep
+sys.setrecursionlimit(100000)
+print(sys.getrecursionlimit())
+
+count = 1
+
+def greet():
+    global count
+    print("Hello ", count)
+    count = count + 1
+    sleep(0.02)
+    greet()
+
+greet()
+```
+
+A moment from the middle of the run in the video:
+
+```text
+Hello  326
+Hello  327
+Hello  328
+Hello  329
+```
+
+There are two spaces before the number. One is inside the string `"Hello "`, and `print` adds one more between its two values. The instructor does not wait for the count to reach one lakh, and you should not either. Stop the program with Ctrl+C.
+
+## Factorial, one step at a time
+
+Recursion becomes useful when each call works on a smaller piece of the problem.
+
+The factorial of 5 is 5 * 4 * 3 * 2 * 1, which is 120. In [Factorial](/docs/python-one-shot/arrays-and-recursion/factorial) a `for` loop did the multiplication. Now look at the same product in a different way. The part 4 * 3 * 2 * 1 is the factorial of 4. So:
+
+| Question | Answer |
+| --- | --- |
+| 5! | 5 * 4! |
+| 4! | 4 * 3! |
+| 3! | 3 * 2! |
+| 2! | 2 * 1! |
+| 1! | 1 |
+
+The instructor describes it as asking yourself for help. To find the factorial of 5, you ask for the factorial of 4 and multiply by 5. The one who was asked for 4 asks for 3, and so on. The one who is asked for the factorial of 1 knows the answer at once. Then the answers travel back: 1, then 2, then 6, then 24, then 120.
+
+## Step 5: Write fact with recursion
+
+Create `fact_recursion.py`. The function name, the call and the `print` stay the same as in the loop version. Only the body changes. The lesson uses 5 and not 1000, so that the result is easy to check.
+
+The table above translates almost word for word. The factorial of `num` is `num` times the factorial of `num - 1`:
+
+{/* check: skip */}
+```python title="fact_recursion.py"
+def fact(num):
+
+    return num * fact(num - 1)
+
+
+result = fact(5)
+print(result)
+```
+
+The lesson does not run this version, and there is a reason. `fact(5)` calls `fact(4)`, which calls `fact(3)`, then 2, 1, 0, -1 and so on. Nothing stops it. This is `greet` all over again:
+
+```text
+  [Previous line repeated 996 more times]
+RecursionError: maximum recursion depth exceeded
+```
+
+The missing piece is the last row of the table. When `num` is 1, the answer is 1, and no further call is needed. This stop condition is commonly called the **base case**:
+
+```python title="fact_recursion.py"
+def fact(num):
+
+    if num == 1:
+        return 1
+
+    return num * fact(num - 1)
+
+
+result = fact(5)
+print(result)
+```
+
+```text
+120
+```
+
+A recursive function always needs these two parts:
+
+| Part | In `fact` | Job |
+| --- | --- | --- |
+| Base case | `if num == 1:` and `return 1` | Answers directly and ends the chain of calls |
+| Recursive call | `return num * fact(num - 1)` | Passes a smaller problem to the same function |
+
+![Factorial_With_Recursion](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-recursion.svg)
+
+## Step 6: Watch it in the debugger
+
+The result is right, but did the function really call itself five times? The debugger from [else and Debugging](/docs/python-one-shot/control-flow/else-and-debugging) can show it.
+
+1. Click to the left of the line `result = fact(5)` to set a breakpoint.
+2. Open the menu next to the run button and choose **Python Debugger: Debug Python File**.
+3. Use **Step Into** to go into the function. **Step Over** would run the whole call at once and show only the result, `120`. The instructor clicks it by mistake the first time and starts again.
+
+Keep pressing **Step Into** and watch two panels on the left:
+
+| Panel | What it shows |
+| --- | --- |
+| Variables | `num` is 5, then 4, 3, 2 and 1 |
+| Call Stack | One more `fact` entry with every call, until there are five |
+
+The **call stack** is the list of calls that have started and not finished yet. With `num` at 1 it holds five `fact` entries. Each one is waiting for the one above it. Click an older entry and the Variables panel shows the `num` of that call, for example 3. Every call has its own `num`.
+
+Then the base case returns 1 and the stack shrinks, one entry at a time:
+
+| Return value shown | Returned by |
+| --- | --- |
+| 1 | `fact(1)` |
+| 2 | `fact(2)` |
+| 6 | `fact(3)` |
+| 24 | `fact(4)` |
+| 120 | `fact(5)` |
+
+At the end `result` is 120, and that is what `print` shows.
+
+## Additions beyond the lesson
+
+- **Zero and negative numbers.** With the base case `num == 1`, the call `fact(0)` skips the base case, continues with -1, -2 and so on, and ends in a `RecursionError`. The factorial of 0 is defined as 1. Writing the base case as `if num <= 1:` covers 0 and 1 and also stops negative input.
+- **Loop or recursion?** Both versions of `fact` give the same result for 5. The loop version from the previous lesson also handled `fact(1000)`. The recursive version stops with a `RecursionError` for `fact(1000)`, because that needs more open calls than the default limit allows. For plain counting work, a loop is the safer tool in Python.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page that ends by itself was run with Python 3.13 and gave the output shown. The endless `greet` was run once by hand in a terminal with the default limit, and it gave the traceback shown, with 996 repeats. The `UnboundLocalError` and the `RecursionError` of `fact` without a base case were reproduced by hand too. The run with a limit of 10000 was repeated and gave 9996 repeats. The runs with a limit of 100000 were not repeated. Their results are described as they appear in the video. The debugger steps are described from the video.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| Nothing is printed | The function is defined and never called. This happens in the lesson | Call it below the function: `greet()` |
+| The output belongs to another program | An older command, for another file, was run again. This happens in the lesson | Type `python recursion.py` |
+| `RecursionError: maximum recursion depth exceeded` | The function calls itself and nothing stops it. Shown on purpose in the lesson | Add a base case that returns without another call |
+| `sleep` is underlined in the editor, or `NameError: name 'sleep' is not defined` | `sleep` was used before it was imported. This happens in the lesson | Add `from time import sleep` at the top |
+| `KeyboardInterrupt` at the end of a traceback | The program was stopped with Ctrl+C | Nothing to fix. This is how you stop a long run |
+| `UnboundLocalError: cannot access local variable 'count' where it is not associated with a value` | The function assigns to `count`, so Python treats it as local. This happens in the lesson | Add `global count` as the first line of the function |
+| The debugger shows `120` at once and never enters `fact` | Step Over was used. This happens in the lesson | Start again and use Step Into |
+| `fact(0)` ends in a `RecursionError` | The base case `num == 1` is never reached | Use `if num <= 1:` |
+
+## Try It Yourself
+
+1. Write `greet` so that it calls itself, run it, and find the line in the traceback that tells you how often the call was repeated.
+2. Print `sys.getrecursionlimit()`. Then set the limit to 2000 and print it again.
+3. Give `greet` a parameter `n`. Let it print `Hello` and the value of `n`, and call `greet(n - 1)` only if `n` is greater than 1. Call `greet(5)`. How many lines do you get, and why does it stop?
+4. Type `fact` with recursion from memory and check `fact(5)`, `fact(6)` and `fact(1)`.
+5. Change the base case to `if num <= 1:` and call `fact(0)`.
+6. Add `print(num)` as the first line of `fact` and call `fact(5)`. Explain the order of the printed numbers.
+7. Write a recursive function `total(num)` that returns the sum 1 + 2 + ... + `num`. Use the same two parts: a base case and a call with `num - 1`.
+8. Run `fact_recursion.py` in the debugger with Step Into and write down the largest number of `fact` entries you see in the call stack.
+
+## Official references
+
+- [Python tutorial: defining functions](https://docs.python.org/3/tutorial/controlflow.html#defining-functions)
+- [Python documentation: sys.setrecursionlimit](https://docs.python.org/3/library/sys.html#sys.setrecursionlimit)
+- [Python documentation: RecursionError](https://docs.python.org/3/builtins/exceptions.html#RecursionError)
+- [Python reference: the global statement](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

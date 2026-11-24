@@ -1,0 +1,203 @@
+---
+title: First Code in Python
+description: Run your first Python statement in an online compiler, compare it with the same program in C, Java and VB, and learn what print, the brackets and the quotes do.
+---
+
+<Video id="j_JuhAWlEaI" title="First Code in Python" start={315} />
+
+---
+
+To run Python you need two things. You need a place to write the code, and you need something that converts the code so that the machine can run it. A plain Notepad covers the first part. The second part needs software on your machine.
+
+Installing software takes a few minutes, and the lesson does that next. But what if you want to try some code right now, before anything is installed?
+
+For that there are **online compilers**. An online compiler is a website with an editor and a Run button. You type the code in the browser, and the site runs it for you. This lesson uses one to run the first Python code of the course.
+
+## Why we write code at all
+
+The lesson starts with one sentence about the IT industry: it is all about **data**. Software does three things with data.
+
+| Job | Meaning |
+| --- | --- |
+| Store | Keep the data somewhere safe |
+| Fetch | Get the data back when it is needed |
+| Process | Work on the data to produce a result |
+
+To make software do these things, somebody has to write code. That can be done in many languages. In this course the language is Python.
+
+## Step 1: Open an online compiler
+
+The lesson uses **OnlineGDB**, at [onlinegdb.com](https://www.onlinegdb.com/). The lesson uses it straight away, without signing in.
+
+At the top right of the editor there is a **Language** selector. Choose **Python 3**. The editor then shows a file named `main.py` that already contains some text. You did not type it. It is the default code of the site:
+
+- a block of welcome text between two lines of three quotes `'''`,
+- one line of code below it.
+
+The instructor calls the welcome block the **comment**. A comment is text for people. Python does not do anything with it. The code is the last line.
+
+<Callout type="info" title="A small detail about that comment">
+The welcome block is text between triple quotes. Strictly speaking, Python reads it as a piece of text that is never used, so it has the same effect as a comment. A real Python comment starts with the `#` sign. Both forms appear again later in the course.
+</Callout>
+
+## Step 2: Look at the same program in other languages
+
+OnlineGDB is not only for Python. Change the Language selector and the editor shows the same program, printing Hello World, in another language. The lesson looks at three.
+
+C, in a file named `main.c`:
+
+```c
+#include <stdio.h>
+
+int main()
+{
+    printf("Hello World");
+
+    return 0;
+}
+```
+
+Java, in a file named `Main.java`:
+
+```java
+public class Main
+{
+    public static void main(String[] args) {
+        System.out.println("Hello World");
+    }
+}
+```
+
+VB, in a file named `main.vb`:
+
+```vb
+Module VBModule
+    Sub Main()
+        Console.WriteLine("Hello World")
+    End Sub
+End Module
+```
+
+You do not need to understand any of these. You are not learning C, Java or VB here. Only count the lines.
+
+| Language | Lines needed to print Hello World, without empty lines |
+| --- | --- |
+| C | 6 |
+| Java | 6 |
+| VB | 5 |
+| Python | 1 |
+
+The instructor remarks that all these extra words are what scares people away from Java. Python asks for one line.
+
+## Step 3: Read the Python code
+
+Switch the Language back to **Python 3**. The lesson removes the welcome block, so that only the code is left:
+
+```python title="main.py"
+print ('Hello World')
+```
+
+```text
+Hello World
+```
+
+This one line is a complete Python program. It has three parts.
+
+| Part | What it is |
+| --- | --- |
+| `print` | A **function**. It shows something on the screen |
+| `( )` | Brackets. What you want to print goes between them |
+| `'Hello World'` | The text to print, written between quotes |
+
+What a function really is, and what the brackets mean, comes later in [Introduction to Functions](/docs/python-one-shot/functions-modules-and-input/introduction-to-functions). The instructor says he loves surprises. For now it is enough to know that `print` shows whatever you give it.
+
+![First_Python_Code_Online](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-first-code.svg)
+
+<Callout type="info" title="The space before the bracket">
+The site writes `print ('Hello World')` with a space between `print` and the bracket. Python accepts that. In the rest of the course the instructor writes `print('Hello World')` without the space, which is the usual style. Use that style in your own code.
+</Callout>
+
+## Python 3 and Python 2
+
+The selector says Python 3, and not only Python. There is a reason.
+
+Python has had several major versions. **Python 2** was in use for many years and has reached its **end of life**. That means it gets no more updates or fixes. Its support ended on 1 January 2020.
+
+**Python 3** is the version everybody uses now, and it is the only one you should learn. Python 3 itself comes in many releases, such as 3.12 or 3.13. The site does not show which exact release it runs, and the instructor says he is not sure either. For this first program it makes no difference.
+
+## Step 4: Run it
+
+Click the green **Run** button in the toolbar. The site sends your code to its own servers, Python runs there, and the output comes back to the panel at the bottom of the page:
+
+```text
+Hello World
+
+
+...Program finished with exit code 0
+Press ENTER to exit console.
+```
+
+Only the first line comes from your program. The last two lines are added by OnlineGDB. An **exit code** of 0 is the usual way of saying that a program finished without an error.
+
+Next to Run there is a small arrow with one more choice, "Run with display screen (beta)". The instructor clicks it, a separate window opens and shows a loading message, and then he uses the normal Run. You only need the normal Run.
+
+You can now change the text between the quotes, click Run again, and see your own message. Whatever code you write there, the site will run it.
+
+## Do not worry about the black screen
+
+The output appears as plain text on a black panel. Some beginners find that disappointing. They expected a window, buttons, colours.
+
+The instructor's answer: you are learning a language here. Later you may build web applications or applications with a graphical user interface. In many projects Python does the work in the background, which is called the **back end**, and the part that people see, the **front end**, is built with HTML, CSS and JavaScript.
+
+So the output matters. Where it is printed does not.
+
+## Why install Python if this works?
+
+An online compiler is a good place to try a few lines. It is not where you want to stay. The code runs on somebody else's server, you need an internet connection, and you have little control over files, versions and tools.
+
+On your own machine you have full control. The next lesson, [Python Setup](/docs/python-one-shot/python-basics/python-setup), installs Python from the official website and runs the same kind of code locally.
+
+## Additions beyond the lesson
+
+**Capital letters matter.** Python treats `print` and `Print` as two different names. Only the first one exists. The table below shows what happens with the second.
+
+**Quotes come in pairs.** The text must start and end with the same kind of quote. `'Hello World'` and `"Hello World"` both work. The lesson [Working with Strings](/docs/python-one-shot/python-basics/working-with-strings) explains quotes in detail.
+
+## Mistakes and fixes
+
+The lesson shows no error. These are the ones a beginner is most likely to meet when changing the code. The last line of the error message is the important one. The exact wording of these messages is from Python 3.13. An online compiler that runs an older Python words some of them differently.
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `NameError: name 'Print' is not defined. Did you mean: 'print'?` | `Print` was written with a capital P | Write `print` in small letters |
+| `SyntaxError: unterminated string literal (detected at line 1)` | The closing quote is missing, as in `print('Hello World)` | End the text with the same quote that started it |
+| `SyntaxError: '(' was never closed` | The closing bracket is missing, as in `print('Hello World'` | Add the `)` |
+| `SyntaxError: Missing parentheses in call to 'print'. Did you mean print(...)?` | The brackets were left out, as in `print 'Hello World'`. That was the Python 2 way | Put the text in brackets |
+| `SyntaxError: invalid syntax. Perhaps you forgot a comma?` | The quotes were left out, as in `print(Hello World)` | Put the text between quotes |
+| C, Java or VB code in the editor | The Language selector is not on Python 3 | Choose Python 3 at the top right |
+| Extra lines such as `...Program finished with exit code 0` | They are added by OnlineGDB | Nothing to fix. Your output is the part above them |
+
+## Try It Yourself
+
+1. Open OnlineGDB, choose Python 3 and run the default code. Check that you get `Hello World`.
+2. Change the text so that the program prints your own name. Run it again.
+3. Remove the space between `print` and the bracket. Does the output change?
+4. Switch the Language to C, then to Java, and read the code. You do not have to understand it. Which words do you recognise?
+5. Write `Print` with a capital P and run the program. Read the last line of the error, then fix the code.
+6. Remove the closing quote and run the program. Which error from the table above do you get?
+7. Replace the single quotes with double quotes and run the program. Is the output the same?
+8. Add a second line with another `print` and a different text. In what order do the two lines appear in the output?
+
+<Callout type="info" title="Checked for these docs">
+The Python program on this page and every error in the table were run with Python 3.13, and the messages are copied from those runs. The C, Java and VB programs are the default code that OnlineGDB shows in the video. They were not run for these docs. The two extra lines after the output are printed by OnlineGDB as shown in the video, and the site may change them. The listing leaves out the empty first line that the file in the video has.
+</Callout>
+
+## Official references
+
+- [Python tutorial: an informal introduction to Python](https://docs.python.org/3/tutorial/introduction.html)
+- [Python documentation: the print function](https://docs.python.org/3/builtins/functions.html#print)
+- [python.org: sunsetting Python 2](https://www.python.org/doc/sunset-python-2/)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

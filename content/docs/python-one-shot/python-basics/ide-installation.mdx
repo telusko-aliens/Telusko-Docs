@@ -1,0 +1,261 @@
+---
+title: IDE Installation
+description: Learn what an IDE is, set up VS Code with the Python extension, create and run a Python file in VS Code and PyCharm, and try a Jupyter notebook in the browser.
+---
+
+<Video id="j_JuhAWlEaI" title="IDE Installation" start={1063} />
+
+---
+
+You know where to write code and how to run it. Type the code in Notepad, save it, and run it in a terminal with the Python interpreter. For one line of code that is enough.
+
+Building software is more than typing code. You also have to **debug** it, which means finding and removing the bugs. A bug is a mistake that makes the program give a strange output or stop running. Later you may want to write documentation, or pack your work into a **package** that can be deployed on the cloud.
+
+Doing all of this with Notepad and a separate terminal means a lot of switching between windows. It is better to have everything in one place. That place is an **IDE**.
+
+## What an IDE is
+
+IDE stands for **Integrated Development Environment**. It is one program that brings together the tools a developer needs.
+
+| Job | With Notepad and a terminal | In an IDE |
+| --- | --- | --- |
+| Write code | Plain text, no help | Colours, suggestions, mistakes marked as you type |
+| Run code | Switch to the terminal and type a command | A Run button, and a terminal inside the same window |
+| Debug | Read the code and guess | Stop the program at a line and look at the values |
+| Manage files | File Explorer | A list of your project files at the side |
+
+The lesson presents three popular choices for Python.
+
+![Three_Places_To_Write_Python](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-ide-choices.svg)
+
+| Tool | Made by | In short |
+| --- | --- | --- |
+| VS Code | Microsoft | A light editor for many languages, such as JavaScript, C, C#, TypeScript, Java and Python. Each language is added with an extension |
+| PyCharm | JetBrains | An IDE made for Python. JetBrains builds developer tools for many other languages too |
+| Jupyter Notebook | Project Jupyter | A notebook that runs in the browser. Very popular in the AI world |
+
+The course uses **VS Code** most of the time, and opens PyCharm now and then. The instructor does that on purpose. You should not depend on one IDE. The Python code is the same in all of them.
+
+## Step 1: Install VS Code
+
+1. Go to [code.visualstudio.com](https://code.visualstudio.com/).
+2. Click the download button for Windows. The button changes with your operating system.
+3. Run the downloaded installer and accept the default choices.
+
+The installer is not shown in the video, because VS Code is already on the instructor's machine. He describes it as next, next, next.
+
+<Callout type="info" title="Is VS Code open source?">
+The instructor says VS Code is built by Microsoft and is open source. To be exact: the source code of the editor is open source, and the ready-made program that you download from Microsoft is free to use under Microsoft's own licence. For learning Python this makes no difference.
+</Callout>
+
+## Step 2: Find your way around VS Code
+
+When VS Code opens, look at the column of icons at the far left. It is called the **Activity Bar**.
+
+| Icon | Shortcut | What it is for |
+| --- | --- | --- |
+| Explorer | `Ctrl+Shift+E` | Your folder and its files |
+| Search | | Find a file or a word in your files |
+| Source Control | | Work with Git, a tool that keeps the history of your code |
+| Run and Debug | `Ctrl+Shift+D` | Run a program and debug it |
+| Extensions | `Ctrl+Shift+X` | Add support for languages and other features |
+
+VS Code works with many languages, and it does not ship with all of them built in. Support for a language arrives as an **extension**. Why not include everything from the start? There are so many languages and tools that VS Code would become very heavy. So you add only what you need. For this course that is one extension, in Step 5.
+
+## Step 3: Open a folder and create a file
+
+VS Code works on a folder. Create a folder for your code first, or use the one from [Python Setup](/docs/python-one-shot/python-basics/python-setup).
+
+1. Click the **Explorer** icon, then **Open Folder**, and choose your folder. The lesson opens a folder named `PythonCodes` on the Desktop.
+2. In the Explorer, click the **New File** button next to the folder name.
+3. Type the name `Demo1.py` and press Enter. The empty file opens in the editor.
+4. Type the code and save with `Ctrl+S`.
+
+{/* check: noout */}
+```python title="Demo1.py"
+print('welcome to telusko')
+```
+
+<Callout type="warn" title="Always end the name with .py">
+In the video the file is named `Demo1`, without an extension, and it is run with `python Demo1`. That works on the instructor's machine. Name your own files with `.py`, as the instructor himself advises a moment later. The `.py` ending tells VS Code that the file is a Python program, so it switches on the colours and suggestions for Python and shows the Run button.
+</Callout>
+
+## Step 4: Run the file
+
+There are two ways.
+
+### In the terminal inside VS Code
+
+Open the menu **Terminal** and choose **New Terminal**. A terminal panel opens at the bottom of the window. It already stands in your folder, so there is no `cd` to type.
+
+If you do not see Terminal in the menu bar, the window is too narrow for the whole menu. Click the three dots `...` at the end of the menu bar. That is what the instructor does, because his VS Code is zoomed in for the recording.
+
+Type `python` and the file name:
+
+```text
+PS C:\Users\navin\OneDrive\Desktop\PythonCodes> python Demo1.py
+welcome to telusko
+```
+
+### With the Run button
+
+At the top right of the editor there is a play button, **Run Python File**. Click it. VS Code types a command into the terminal for you, made of the path of the Python interpreter and the path of your file, and the output appears below it:
+
+```text
+welcome to telusko
+```
+
+If the Run button is missing, check two things: the file name ends with `.py`, and the Python extension from Step 5 is installed.
+
+That is the point of an IDE. You type the code here, you run it here, and you can debug it here.
+
+## Step 5: Install the Python extension
+
+1. Click the **Extensions** icon.
+2. Type `python` in the search box.
+3. Choose the extension named **Python** from **Microsoft**.
+4. Click **Install**. If VS Code asks you to restart, do that.
+
+In the video the extension is already installed, so the buttons there read Disable and Uninstall and no Install button is visible. On a fresh VS Code you will see Install.
+
+The instructor's list of installed extensions has four entries.
+
+| Extension | From | Do you need to install it? |
+| --- | --- | --- |
+| Python | Microsoft | Yes. This is the one to install |
+| Pylance | Microsoft | No. It normally arrives together with the Python extension |
+| Python Debugger | Microsoft | No. It is installed automatically with the Python extension |
+| GitHub Theme | GitHub | No. It only gives the dark colours you see in the video |
+
+<Callout type="info" title="The Python version at the bottom of the window">
+When a Python file is open, VS Code shows a Python version at the bottom right, in the status bar. That is the interpreter the Run button uses. On the instructor's screen it reads 3.13.0, taken from one of his earlier projects, and yours will show the Python you installed. To change it, click that version number and pick another one from the list.
+</Callout>
+
+## Step 6: PyCharm
+
+**PyCharm** comes from JetBrains and is made for Python. The instructor is a fan of JetBrains tools and adds that this is not a paid promotion.
+
+### Free and paid
+
+PyCharm has a free tier and paid features. In the video the download page offers two products, a unified PyCharm and a separate Community Edition. JetBrains has since made PyCharm one product. The core features are free. The Pro features are free for a trial period and then need a subscription. Students and teachers can apply for a free licence.
+
+The video also shows prices. They are from the middle of 2025 and they change, so this page does not repeat them. See the [official PyCharm page](https://www.jetbrains.com/pycharm/) for the current editions and prices.
+
+Everything in this course can be done with the free features.
+
+### Install it and create a project
+
+1. Download PyCharm from [jetbrains.com/pycharm](https://www.jetbrains.com/pycharm/) and run the installer with the default choices. The installer is not shown in the video.
+2. Open PyCharm. On the Welcome screen, click **New Project**. On a fresh installation the list of projects is empty.
+3. Leave the project type on **Pure Python**. Give the project a name in the Location field. In the lesson it is `PythonProject2`.
+4. Under the interpreter settings, keep **Project venv** and choose the Python you installed. The list of environment types can look different in a newer PyCharm, and Project venv is the one to keep. The lesson picks Python 3.13.
+5. Click **Create**.
+
+Project venv means that PyCharm makes a folder named `.venv` inside the project, with a private copy of the Python setup for this project only. That is why the new project is not completely empty. You can leave that folder alone.
+
+### Create a file and run it
+
+1. Right-click the project name in the Project panel at the left and choose **New**, then **Python File**.
+2. Type the name `Demo` and press Enter. PyCharm adds the extension by itself, so the file is `Demo.py`.
+3. Type the code:
+
+{/* check: noout */}
+```python title="Demo.py"
+print('Hello')
+```
+
+4. Click the green Run button in the toolbar at the top. A Run panel opens at the bottom:
+
+```text
+C:\Users\navin\PycharmProjects\PythonProject2\.venv\Scripts\python.exe C:\Users\navin\PycharmProjects\PythonProject2\Demo.py
+Hello
+
+Process finished with exit code 0
+```
+
+The first line is the command PyCharm ran for you: the Python interpreter of the project, followed by your file. Then comes your output. The last line is added by PyCharm, and exit code 0 means the program finished without an error.
+
+Two small things from the video, so that they do not confuse you. While the instructor types, PyCharm offers `World')` in grey as a suggestion. He does not accept it. And the code on his screen is `print('Hello ')`, with a space left over before the closing quote, so his output has an invisible space at the end. The code above leaves that space out.
+
+## Step 7: Jupyter Notebook in the browser
+
+**Jupyter** is the third option. You can install it on your machine. The lesson tries it in the browser, where nothing has to be installed.
+
+1. Go to [jupyter.org](https://jupyter.org/) and scroll to Jupyter Notebook. Click **Try it in your browser**, then choose **Jupyter Notebook** on the next page.
+2. A sample notebook opens. Choose **File**, then **New**, then **Notebook**.
+3. A dialog named Select Kernel appears. A **kernel** is the engine that runs the code of a notebook. Keep **Python (Pyodide)** and click **Select**.
+4. Type the code into the empty box, which is called a **cell**, and click the Run button in the toolbar.
+
+```text
+[1]: print('Hello')
+Hello
+```
+
+The output appears directly under the cell, and a new empty cell is added below. The number in square brackets counts the runs.
+
+A notebook is a list of such cells. Each cell has a type, shown in the toolbar.
+
+| Cell type | Holds |
+| --- | --- |
+| Code | Python code that you can run |
+| Markdown | Notes and explanations in plain text |
+
+So you can keep code, its output and your notes on one page. That makes a notebook a good place for learning, for short pieces of code and for work with graphs and data. The new notebook in the video is named `Untitled2.ipynb`. Yours will probably have another number.
+
+## Which one should you use?
+
+| | VS Code | PyCharm | Jupyter Notebook |
+| --- | --- | --- | --- |
+| Good for | Projects of any size, in many languages | Python projects of any size | Short code, learning, graphs and data |
+| Weight | Light | Heavier, with more built in | Runs in a browser |
+| Python support | Through the Python extension | Built in | Built in |
+| In this course | Used most of the time | Used now and then | Shown here |
+
+The instructor finds PyCharm the better-looking one and VS Code the lighter one. Both are very good, and the choice is a personal preference. The course uses VS Code because many people already know it. If you like PyCharm, use it. For a big project, choose VS Code or PyCharm. For exploring and learning, a notebook is a pleasant place to be.
+
+## Additions beyond the lesson
+
+**macOS and Linux.** VS Code and PyCharm are available for macOS and Linux as well, from the same websites. The steps inside the programs are the same. In the terminal, type `python3 Demo1.py` if `python` is not found on your system.
+
+**The official VS Code guide.** Microsoft has a short tutorial for exactly this setup, [Getting Started with Python in VS Code](https://code.visualstudio.com/docs/python/python-tutorial). It is a good second source if a screen looks different from the video, because VS Code is updated every month.
+
+## Mistakes and fixes
+
+No error message appears in this lesson. These are the problems a beginner is most likely to meet during the setup.
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| No Run button at the top right in VS Code | The file name has no `.py` ending, or the Python extension is missing. In the lesson the file is named `Demo1` and the instructor gives this advice | Name the file `Demo1.py` and install the Python extension |
+| No colours and no suggestions in the editor | VS Code does not know that the file is Python | Use the `.py` ending |
+| `can't open file ... [Errno 2] No such file or directory` | The file name in the command is not the name of the file, for example `python Demo1` for a file named `Demo1.py`, or the terminal is in another folder | Type the full name with `.py`, and open the folder of the file in VS Code |
+| `Python was not found; run without arguments to install from the Microsoft Store, ...` in the VS Code terminal | Python is not installed, or VS Code was open while Python was being installed | Install Python as in [Python Setup](/docs/python-one-shot/python-basics/python-setup), then close VS Code and open it again |
+| The output shows old text after you changed the code | The file was not saved. A dot on the file tab marks unsaved changes | Save with `Ctrl+S`, then run again |
+| No Terminal in the VS Code menu bar | The window is narrow or zoomed in. This happens in the lesson | Click the three dots at the end of the menu bar |
+| PyCharm prints `Hello` with a space after it | The text was typed as `'Hello '`. This happens in the lesson | Remove the space inside the quotes |
+| Jupyter asks you to select a kernel | Every new notebook needs an engine to run its code | Keep Python (Pyodide) and click Select |
+
+## Try It Yourself
+
+1. Install VS Code and find the five icons of the Activity Bar: Explorer, Search, Source Control, Run and Debug, Extensions.
+2. Install the Python extension from Microsoft. Which other extensions appear in your installed list afterwards?
+3. Open a folder in VS Code, create `Welcome.py` and make it print `welcome to telusko`.
+4. Run `Welcome.py` in two ways: with `python Welcome.py` in the VS Code terminal and with the Run button. Compare what appears in the terminal each time.
+5. Change the text, do not save, and run the file from the terminal. Then save and run again. What is the difference?
+6. Open Jupyter in the browser, create a new notebook and run `print('Hello')` in a cell.
+7. In the same notebook, change the second cell to Markdown and write one sentence about what you learned.
+8. Optional: install PyCharm, create a project with a file `Demo.py` and run it. Compare the Run panel with the VS Code terminal.
+
+<Callout type="info" title="Checked for these docs">
+The two Python files on this page were run with Python 3.13 and printed the text shown. Running a file without an extension, as in the video, was also tried and works. The two listings leave out the empty first line that the files in the video have. The VS Code terminal line is the one from the video with `.py` added to the file name, and the PyCharm and Jupyter outputs are copied from the video. The installers of VS Code and PyCharm are not shown in the video and were not run for these docs, so they are described only in general terms. The notes on the Python extension and on the PyCharm editions were checked against the official VS Code and JetBrains pages when this page was written. Websites, buttons and editions change over time.
+</Callout>
+
+## Official references
+
+- [VS Code documentation: getting started with Python in VS Code](https://code.visualstudio.com/docs/python/python-tutorial)
+- [JetBrains: PyCharm](https://www.jetbrains.com/pycharm/)
+- [Python tutorial: using the Python interpreter](https://docs.python.org/3/tutorial/interpreter.html)
+- [Python documentation: using Python on Windows](https://docs.python.org/3/using/windows.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

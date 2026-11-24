@@ -6,6 +6,7 @@ const TOPIC_ORDER = [
   'java',
   'javascript',
   'python',
+  'python-one-shot',
   'fastapi',
   'spring-ai',
   'langchain4j',

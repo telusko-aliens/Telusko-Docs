@@ -1,0 +1,256 @@
+---
+title: Polymorphism and Duck Typing
+description: Learn what polymorphism means, and how duck typing lets one method work with objects of different classes as long as they have the method it calls.
+---
+
+<Video id="j_JuhAWlEaI" title="Polymorphism and Duck Typing" start={25169} />
+
+---
+
+So far the object-oriented lessons covered two ideas. A class is the blueprint for objects, and with inheritance one class can take over the behaviour of another. The next idea is **polymorphism**.
+
+The word has two parts. "Poly" means many and "morphism" means forms. So polymorphism means one thing, many forms.
+
+The instructor explains it with himself. In the videos he may look like an extrovert. At home, in the office with colleagues and with friends he behaves differently each time. It is the same person with a different behaviour, depending on where he is. In a program the same can happen: one piece of code behaves differently depending on the object it works with.
+
+Python has more than one way to get polymorphism. This lesson shows the first one, **duck typing**. The next lesson, [Operator Overloading](/docs/python-one-shot/object-oriented-python/operator-overloading), shows another.
+
+## What duck typing means
+
+The lesson gives the definition in one line: if a bird quacks like a duck, it is a duck.
+
+A duck quacks, that is clear. Now take a crow. If the crow quacks, the lesson treats that crow as a duck. If a sparrow can quack, it counts as a duck too. Nobody asks what kind of bird it is. The only question is whether it can quack.
+
+In Python terms: a piece of code does not ask which class an object belongs to. It calls a method on the object. If the object has that method, the code works.
+
+The lesson then moves from birds to machines.
+
+## Step 1: A Laptop and an Alien
+
+Create a new file in the `oop` folder and name it `poly.py`. The name can be anything.
+
+A developer builds things with a laptop, so the class `Laptop` gets a method `build`. The instructor calls programmers aliens, and an alien uses a machine to code. "Code" stands for everything here: designing, writing, testing and maintaining a project.
+
+The method `code` cannot call `build()` by itself, because `build` belongs to a laptop object. So `code` takes that object as a parameter named `machine`, and calls `machine.build()`.
+
+{/* check: error */}
+```python title="poly.py"
+class Laptop:
+    def build(self):
+        print("Laptop builds")
+
+class Alien:
+    def code(self, machine: Laptop):
+        print("Alien Building..")
+        machine.build()
+
+navin = Alien()
+navin.code()
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\poly.py", line 11, in <module>
+    navin.code()
+    ~~~~~~~~~~^^
+TypeError: Alien.code() missing 1 required positional argument: 'machine'
+```
+
+The first run fails, and the instructor shows this on purpose. `code` needs a machine, and the call passes none.
+
+<Callout type="info" title="The type hint and the line numbers">
+`machine: Laptop` is a **type hint**. It tells the reader, and the editor, that `machine` is meant to be a `Laptop` object. The video types it with a space before the colon, `machine : Laptop`. Both forms work. This page uses the usual spelling without that space.
+
+The file in the video starts with an empty line, so the line numbers in its error messages are one higher than on this page.
+</Callout>
+
+## Step 2: Pass a laptop
+
+There is no machine yet, so build one. The instructor's own laptop is an Asus ROG, which gives the object its name:
+
+```python title="poly.py"
+class Laptop:
+    def build(self):
+        print("Laptop builds")
+
+class Alien:
+    def code(self, machine: Laptop):
+        print("Alien Building..")
+        machine.build()
+
+asus_rog = Laptop()
+
+navin = Alien()
+navin.code(asus_rog)
+```
+
+```text
+Alien Building..
+Laptop builds
+```
+
+`code` prints its own line and then calls `build` on the object it received. Nothing surprising so far, and no duck typing yet. Think of `Laptop` as the duck: the method expects a duck. In the video the instructor writes the comment `#Duck` next to the class as a reminder.
+
+## Step 3: Pass a desktop instead
+
+Some companies hand a machine to every new employee. It may be a laptop, and it may be a desktop. So add a class `Desktop` with its own `build` method. The desktop used for the recording is called beast.
+
+The call with the laptop is turned into a comment, and `beast` is passed instead:
+
+```python title="poly.py"
+class Laptop:     #Duck
+    def build(self):
+        print("Laptop builds")
+
+class Desktop:  #crow
+    def build(self):
+        print("Desktop builds")
+
+class Alien:
+    def code(self, machine: Laptop):
+        print("Alien Building..")
+        machine.build()
+
+asus_rog = Laptop()
+beast = Desktop()
+
+navin = Alien()
+# navin.code(asus_rog)
+navin.code(beast)
+```
+
+Will this work? Looking only at the code, you might say no. The method says it expects a `Laptop`, and it gets a `Desktop`. `Desktop` does not inherit from `Laptop` either. The two classes have nothing to do with each other.
+
+```text
+Alien Building..
+Desktop builds
+```
+
+It works. This is duck typing. The method expected a duck and got a crow, and this crow quacks. `code` needs a machine that can `build`. `Desktop` has a `build` method, so the job is done.
+
+<Callout type="warn" title="Python does not enforce type hints">
+The hint `machine: Laptop` did not stop the `Desktop` object. Python ignores type hints when the program runs. They help people and tools, such as the editor's autocomplete, and they are not a check.
+</Callout>
+
+![Duck_Typing](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-duck-typing.svg)
+
+## Step 4: Pass a tablet that cannot build
+
+To make the point clearer, the lesson adds a third machine. A tablet is mostly used for reading, so `Tablet` has a method `open_pdf` and no `build`. The instructor's tablet is from Lenovo, hence `lenovo_tab`. The call with `beast` is commented out as well:
+
+{/* check: error */}
+```python title="poly.py"
+class Laptop:     #Duck
+    def build(self):
+        print("Laptop builds")
+
+class Desktop:  #crow
+    def build(self):
+        print("Desktop builds")
+
+class Tablet:
+    def open_pdf(self):
+        print("Opening PDF")
+
+class Alien:
+    def code(self, machine: Laptop):
+        print("Alien Building..")
+        machine.build()
+
+asus_rog = Laptop()
+beast = Desktop()
+lenovo_tab = Tablet()
+
+navin = Alien()
+# navin.code(asus_rog)
+# navin.code(beast)
+navin.code(lenovo_tab)
+```
+
+{/* check: skip */}
+```text
+Alien Building..
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\poly.py", line 25, in <module>
+    navin.code(lenovo_tab)
+    ~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\PythonCourse\FirstProject\oop\poly.py", line 16, in code
+    machine.build()
+    ^^^^^^^^^^^^^
+AttributeError: 'Tablet' object has no attribute 'build'
+```
+
+This bird does not quack. In this example quacking means `build`, and the tablet has no `build`.
+
+Read the output from the top. `Alien Building..` is printed first, so the call itself was accepted. Python did not complain that a `Tablet` is not a `Laptop`. The program fails one line later, at `machine.build()`, when Python looks for `build` on the tablet and does not find it. The traceback has two parts for that reason: the call on line 25, and the line inside `code` where it went wrong.
+
+## Where the polymorphism is
+
+`code` is one method. What it does depends on the object you pass:
+
+| Object passed to `code` | Has `build`? | Result |
+| --- | --- | --- |
+| `asus_rog`, a `Laptop` | Yes | `Laptop builds` |
+| `beast`, a `Desktop` | Yes | `Desktop builds` |
+| `lenovo_tab`, a `Tablet` | No | `AttributeError` |
+
+The same line, `machine.build()`, behaves in more than one way. That is one thing with many forms, which is polymorphism. Duck typing is how it comes about here: `Laptop` and `Desktop` are both ducks because both can `build`.
+
+## Additions beyond the lesson
+
+**Checking before calling.** The built-in function `hasattr` tells you whether an object has a certain attribute or method. With it you can see in advance which machine would work:
+
+```python
+>>> class Laptop:
+...     def build(self):
+...         print("Laptop builds")
+...
+>>> class Tablet:
+...     def open_pdf(self):
+...         print("Opening PDF")
+...
+>>> hasattr(Laptop(), 'build')
+True
+>>> hasattr(Tablet(), 'build')
+False
+```
+
+**A stricter way.** Duck typing finds a missing method only when the call happens. The lesson [Abstraction](/docs/python-one-shot/object-oriented-python/abstraction) shows how a class can be forced to have a method, so that the mistake shows up earlier.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output or the error shown. In the tracebacks the folder is written as it appears in the video. On your computer the path will be your own. The terminal in the video is cut off before the last lines of the final error, so the traceback in Step 4 was produced by running the code. The part that is visible in the video matches.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `TypeError: Alien.code() missing 1 required positional argument: 'machine'` | `navin.code()` was called without an object. This happens in the lesson | Create a machine and pass it: `navin.code(asus_rog)` |
+| `AttributeError: 'Tablet' object has no attribute 'build'` | The object passed to `code` has no `build` method. This happens in the lesson | Pass an object that has `build`, or add a `build` method to the class |
+| A yellow line under `build()` in the editor, and `NameError: name 'build' is not defined` when run | `build()` was called by itself inside `code`. The lesson types this first and corrects it before running | Call it on the object: `machine.build()` |
+| A `Desktop` is accepted although the hint says `Laptop` | Type hints are not enforced when the program runs | Nothing to fix. Remember that a hint is only a hint |
+| `TypeError: Laptop.build() takes 0 positional arguments but 1 was given` | `self` is missing in `def build():` | Write `def build(self):` |
+| The program stops after `Alien Building..` | The error happens inside `code`, after its first `print` | Read the last line of the traceback. It names the missing method |
+
+## Try It Yourself
+
+1. Type the program from Step 2 and run it. Then call `navin.code()` without an argument and read the error.
+2. Add the class `Desktop`, create `beast` and pass it to `code`. Check that the hint `machine: Laptop` does not stop it.
+3. Remove the hint, so that the line reads `def code(self, machine):`. Run the program with the laptop and with the desktop. Does anything change?
+4. Add the class `Tablet` from Step 4 and pass `lenovo_tab`. Which lines are printed before the error?
+5. Give `Tablet` a `build` method that prints `Tablet builds`. Run the program again.
+6. Activate all three calls at the same time, one after the other, and predict the full output before you run it.
+7. Write a class `Duck` and a class `Crow`, each with a method `quack` that prints something different. Write a function `make_it_quack(bird)` that calls `bird.quack()`, and call it with both objects.
+8. Add a class `Sparrow` without `quack` and pass a sparrow to `make_it_quack`. Read the error message and name the class and the method it mentions.
+
+## Official references
+
+- [Python glossary: duck-typing](https://docs.python.org/3/glossary.html#term-duck-typing)
+- [Python tutorial: classes](https://docs.python.org/3/tutorial/classes.html)
+- [Python library: hasattr](https://docs.python.org/3/builtins/functions.html#hasattr)
+- [Python library: typing, support for type hints](https://docs.python.org/3/library/typing.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

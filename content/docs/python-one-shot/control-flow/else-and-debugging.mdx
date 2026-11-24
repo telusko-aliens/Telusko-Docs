@@ -1,0 +1,321 @@
+---
+title: else and Debugging
+description: Replace the second if with else, tell a syntax error from a logical error, and watch Python choose a block line by line with a breakpoint and Step Over in the VS Code debugger.
+---
+
+<Video id="j_JuhAWlEaI" title="else and Debugging" start={11276} />
+
+---
+
+[The if Statement](/docs/python-one-shot/control-flow/if-statement) ended with a program that works and a remark from the instructor that it is not the best way. It uses two separate `if` statements, one for even and one for odd.
+
+Think about the number 6. The first condition is true, so `Even` is printed. Python then checks the second condition too. That check is wasted work. A number that is even is not going to be odd. There are two possible answers, and when one is true the other is settled.
+
+This lesson fixes that with `else`. Then it asks a fair question: how do you know that Python really skips the other block? To prove it, the lesson opens the debugger and runs the program one line at a time.
+
+## Step 1: Replace the second if with else
+
+In plain English you would say: if the number is even, print even, else print odd. Python uses the same word.
+
+<Callout type="info" title="Line numbers on this page">
+In the video, the first line of `if_demo.py` is empty. The code blocks on this page keep that empty line, so that the line numbers match the ones on screen: `num` is on line 2, `if` on line 4 and `else` on line 7. The debugging steps below use these numbers.
+</Callout>
+
+The lesson changes `num` back to 6 and replaces the whole line `if num % 2 == 1:` with `else:`.
+
+```python title="if_demo.py"
+
+num = 6
+
+if num % 2 == 0:
+    print("Even")
+
+else:
+    print("Odd")
+
+print("Bye")
+```
+
+```text
+Even
+Bye
+```
+
+Then the instructor changes the number to 7:
+
+```python title="if_demo.py"
+
+num = 7
+
+if num % 2 == 0:
+    print("Even")
+
+else:
+    print("Odd")
+
+print("Bye")
+```
+
+```text
+Odd
+Bye
+```
+
+There is one condition now. If it is true, the first block runs. In every other case the `else` block runs. Exactly one of the two blocks runs, never both and never neither.
+
+| Rule for `else` | In the example |
+| --- | --- |
+| It has no condition of its own | `else:` and nothing more |
+| It ends with a colon, like `if` | `else:` |
+| It starts at the same indentation as its `if` | Both start at the left edge |
+| Its block is indented, like the `if` block | Four spaces before `print("Odd")` |
+| It cannot stand alone | It always belongs to the `if` above it |
+
+![If_Else_Line_By_Line](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-if-else.svg)
+
+## Two kinds of mistakes
+
+The output looks right. Still, how can you be sure that for 6 the `else` block was skipped, and not run in some hidden way? To see inside a running program you need **debugging**. First the lesson explains what debugging is for, with two kinds of mistakes.
+
+### Syntax errors
+
+A **syntax error** breaks the grammar of the language. The instructor removes the colon after `else` to show one:
+
+{/* check: error */}
+```python title="if_demo.py"
+
+num = 7
+
+if num % 2 == 0:
+    print("Even")
+
+else
+    print("Odd")
+
+print("Bye")
+```
+
+VS Code complains before the file is run. In the video there is a red wavy line after `else`, the file name turns red, and the Problems tab shows a `1`. Running the file gives:
+
+{/* check: skip */}
+```text
+PS> python if_demo.py
+  File "C:\Users\navin\OneDrive\Documents\Python Course\FirstProject\if_demo.py", line 7
+    else
+        ^
+SyntaxError: expected ':'
+```
+
+The path in the second line is the folder of the project, so it will be different on your computer. The rest is the same. Python names the line, points at the place with `^` and says what it expected. Notice also that `Bye` is not printed. With a syntax error, Python does not run a single line of the file.
+
+Such errors are the easy ones. The editor and Python both tell you where to look. The instructor puts the colon back.
+
+### Logical errors
+
+A **logical error** is different. The code is valid Python and it runs. It does the wrong thing.
+
+The lesson shows one for a moment, by changing the `0` in the condition to `1`:
+
+```python title="if_demo.py"
+
+num = 7
+
+if num % 2 == 1:
+    print("Even")
+
+else:
+    print("Odd")
+
+print("Bye")
+```
+
+```text
+Even
+Bye
+```
+
+The video does not run this version. The output above comes from running it for these docs. There is no red line and no error message. The program says that 7 is even.
+
+With one small number you can see that the answer is wrong. In a large program you often do not notice that an output is wrong, and that makes logical errors hard. They are the reason why software gets tested.
+
+| | Syntax error | Logical error |
+| --- | --- | --- |
+| Is the code valid Python? | No | Yes |
+| Does the program run? | No | Yes |
+| Who finds it? | The editor and Python | You |
+| What you get | An error message with a line number | A wrong result |
+| Example in the lesson | `else` without the colon | `== 1` where `== 0` was meant |
+
+A logical error in a program is called a **bug**. Finding and removing bugs is called **debugging**. The instructor adds a joke that is worth remembering: if debugging is removing bugs, then coding is adding them. Every line you write is a place where a bug can hide.
+
+The lesson changes the condition back to `num % 2 == 0` before going on.
+
+<Callout type="info" title="About the word compiler">
+The video says that the compiler or the IDE reports the missing colon. In everyday Python you do not run a separate compiler. Python reads the whole file first and checks its grammar, and only then starts to run it. That is why the syntax error above appears before any output.
+</Callout>
+
+## Step 2: Start the debugger
+
+A **debugger** is a tool that runs your program under your control. You can stop it at a line, look at the variables and continue one line at a time.
+
+In VS Code, look at the Run button, the small triangle at the top right of the editor. Next to it is a small arrow. Click the arrow to open a list. The list has more entries. These are the two that matter here:
+
+| Entry in the list | What it does |
+| --- | --- |
+| Run Python File | Runs the file in the normal way |
+| Python Debugger: Debug Python File | Runs the file under the debugger |
+
+The lesson picks **Python Debugger: Debug Python File**. A long command appears in the terminal, and then:
+
+```text
+Odd
+Bye
+```
+
+That is the normal output for 7. The program ran from the first line to the last without a stop. The debugger was working, but nobody told it where to stop.
+
+### Another way in, and what to check if the entry is missing
+
+The instructor also points to the **Run and Debug** icon in the bar on the left side of the window, a triangle with a small bug. It opens a view with a **Run and Debug** button. In the video a list named `Select debugger` is on screen there, and its first entry is `Python Debugger`.
+
+If you do not find these Python entries, the Python extension is probably missing. Open the Extensions view, search for `Python` and make sure the extension named Python from Microsoft is installed. This is the extension from [IDE Installation](/docs/python-one-shot/python-basics/ide-installation). The video says to restart the editor after installing it. Do that if the entries still do not appear.
+
+<Callout type="info" title="Other editors">
+The video mentions that PyCharm has one plain debug button, because PyCharm is built for Python only. VS Code works with many languages, so it first asks which debugger you want.
+</Callout>
+
+## Step 3: Set a breakpoint
+
+A **breakpoint** is a mark on a line that tells the debugger: run everything up to here, then stop and wait.
+
+Move the mouse to the left of the line numbers. A faint red circle follows the mouse. Click to the left of line 4, the line `if num % 2 == 0:`. The circle turns into a solid red dot. That is the breakpoint.
+
+Line 4 is the right place, because the decision is made there. It does not matter how many lines come before the breakpoint. They all run in the normal way.
+
+## Step 4: Run to the breakpoint
+
+Open the list beside the Run button again and choose **Python Debugger: Debug Python File**. This time the program stops. The window changes in several places:
+
+| Where | What the video shows |
+| --- | --- |
+| Line 4 in the editor | A yellow arrow in the margin, and the line is highlighted |
+| End of line 4 | The current value in grey: `num = 7` |
+| Top of the window | A small toolbar with the debugger buttons |
+| Left side | The panels Variables, Watch, Call Stack and Breakpoints |
+| Breakpoints panel | `if_demo.py` with the line number 4 |
+
+The yellow arrow marks the line that Python will run next. Line 4 has not run yet. Lines 1 to 3 have, so `num` already exists.
+
+### The Variables panel
+
+The **Variables** panel on the left lists the variables of the program and their present values. Under **Locals** the video shows two entries:
+
+| Entry | Meaning |
+| --- | --- |
+| `special variables` | Variables that Python creates by itself for every program |
+| `num = 7` | The variable that this program created |
+
+With one variable this is not exciting. In a program with many variables, and above all in the loops that come later in the course, this panel shows how the values change at every step.
+
+Below it is the **Watch** panel. The instructor leaves it for a later lesson.
+
+## Step 5: Step Over
+
+To run one line and stop again, use **Step Over**. It is the second button on the debug toolbar, a curved arrow over a dot. When the mouse rests on it, the video shows its name and key: `Step Over (F10)`.
+
+When you debug for real you will use F10, so that your hands stay on the keyboard. The instructor uses the mouse in the video.
+
+Click Step Over once. The yellow arrow jumps from line 4 to line 8, `print("Odd")`.
+
+Line 5 was never touched. Python worked out the condition on line 4, got `False` for 7, skipped the `if` block and went into the `else` block. This is the proof the lesson was looking for, and you can watch it happen.
+
+To end the session, click **Stop**, the red square at the end of the toolbar. Its tooltip in the video reads `Stop (Shift+F5)`.
+
+## Step 6: The same walk with an even number
+
+Now the other case. The session is stopped and `num` is changed to 6:
+
+```python title="if_demo.py"
+
+num = 6
+
+if num % 2 == 0:
+    print("Even")
+
+else:
+    print("Odd")
+
+print("Bye")
+```
+
+```text
+Even
+Bye
+```
+
+The breakpoint on line 4 is still there. Start the debugger again. The instructor mentions that the button in the Run and Debug view and the F5 key start it too.
+
+| Action | Yellow arrow on | What happened |
+| --- | --- | --- |
+| Debugger starts | Line 4, `if num % 2 == 0:` | Stopped at the breakpoint. Variables shows `num = 6` |
+| Step Over | Line 5, `print("Even")` | The condition was true, so Python entered the `if` block |
+| Step Over | Line 10, `print("Bye")` | `Even` is printed in the terminal. Lines 7 and 8 were skipped |
+
+When the condition is true, Python runs the `if` block and jumps over the whole `else` part. For 7 it was the other way round. Each time, one block runs and the other is skipped.
+
+The video stops the session here, with the arrow on line 10. `Bye` is not printed in that session, because line 10 never ran. A stopped program does not finish its remaining lines.
+
+### The debugger controls used in this lesson
+
+| Control | Where | What it does |
+| --- | --- | --- |
+| Breakpoint | Red dot left of a line number | Makes the debugger pause before that line |
+| Python Debugger: Debug Python File | List beside the Run button | Starts the file under the debugger |
+| Run and Debug | Icon in the left bar, and the button in its view | Another way to start the debugger |
+| Step Over, F10 | Debug toolbar | Runs the current line and pauses at the next one |
+| Stop, Shift+F5 | Debug toolbar | Ends the debugging session |
+| Variables panel | Left side while paused | Shows every variable with its current value |
+
+## Additions beyond the lesson
+
+**The other toolbar buttons.** The toolbar in the video has more buttons, which the lesson does not use. **Continue** runs on until the next breakpoint or the end of the program. **Step Into** and **Step Out** become useful when your code calls functions that you wrote yourself. **Restart** starts the session again from the first line.
+
+**Removing a breakpoint.** Click the red dot again and it disappears. A breakpoint has no effect when you run the file in the normal way with `python if_demo.py`.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown, including the version with the logical error, which the video does not run. The `SyntaxError` was reproduced, and its message is the same as on screen apart from the folder path. The debugger steps cannot be replayed automatically. They are described from the frames of the video: the positions of the yellow arrow, the values in the Variables panel and the names in the tooltips. The names Continue, Step Into, Step Out and Restart in the additions are the standard VS Code names of the buttons. The video does not show their tooltips.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `SyntaxError: expected ':'` with a `^` after `else`. This happens in the lesson | The colon after `else` is missing | Write `else:` |
+| `SyntaxError: expected ':'` on a line such as `else num % 2 == 1:` | A condition was written after `else` | `else` takes no condition. Write `else:` alone |
+| `SyntaxError: invalid syntax` on the `else` line | `else` has no `if` at the same indentation above it. It is indented into the `if` block, or an unindented line stands between the `if` block and the `else` | Put `else` at the same indentation as its `if`, directly after the `if` block |
+| `IndentationError: expected an indented block after 'else' statement on line 7` | The line under `else:` is not indented | Indent it with four spaces |
+| The program says that 7 is even. This is shown in the lesson | A logical error, `== 1` in the condition | Read the condition again, or step through it with the debugger |
+| The debugger runs to the end without stopping. This happens in the lesson | No breakpoint is set | Click left of a line number to set one, then debug again |
+| No `Python Debugger` entries in the list | The Python extension is not installed | Install the extension named Python from Microsoft |
+| The program seems frozen and the window has changed | The debugger is paused at a breakpoint | Use Step Over to go on, or Stop to end the session |
+
+## Try It Yourself
+
+1. Rewrite the even and odd program with one `if` and one `else`. Test it with 6, 7 and 0.
+2. Remove the colon after `else`, run the file and read the message. Then put the colon back.
+3. Change `== 0` to `== 1` without changing the prints. Run it with 7. Is there an error message? What kind of mistake is this?
+4. Write a program with `age = 20` that prints `Adult` when `age >= 18` and `Minor` in every other case. Test it with 20, 18 and 12.
+5. Set a breakpoint on the `if` line of your age program and start the debugger. Find `age` in the Variables panel.
+6. Use Step Over and note the line that the yellow arrow jumps to. Change `age` so that the arrow takes the other path, and debug again.
+7. Start the debugger without any breakpoint. Explain what you see.
+8. Ask the user for a number with `int(input("Enter a number "))`, print `Even` or `Odd`, and follow the program with the debugger. Watch where you have to type the number.
+
+## Official references
+
+- [Python tutorial: if statements](https://docs.python.org/3/tutorial/controlflow.html#if-statements)
+- [Python reference: the if statement](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
+- [Python tutorial: syntax errors](https://docs.python.org/3/tutorial/errors.html#syntax-errors)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,438 @@
+---
+title: The while Loop
+description: Repeat a block of code with while, stop an endless loop with Ctrl+C, count with a counter variable, keep output on one line with the end parameter of print, and build a nested loop.
+---
+
+<Video id="j_JuhAWlEaI" title="The while Loop" start={12487} />
+
+---
+
+So far every line of a program has run once, or not at all. Many tasks need a line to run again and again. Go through every value of a list. Read a file one character at a time. Download something piece by piece. Or print the same text ten times.
+
+You could copy the line ten times. For a billion times that plan fails. The better plan is to write the line once and tell Python to repeat it. A statement that repeats a block of code is called a **loop**.
+
+Python has two loops, `while` and `for`. This lesson covers `while`. The next one is [The for Loop](/docs/python-one-shot/control-flow/for-loop).
+
+## Step 1: A loop that never stops
+
+Create a new file, `while_demo.py`. One `print` prints one line. To repeat it, the lesson puts it under `while True:`.
+
+{/* check: skip */}
+```python title="while_demo.py"
+while True:
+    print("Hello World")
+```
+
+`while` is a keyword. It is followed by a condition and a colon, and below it comes an indented block, the same shape as an `if`. The difference is what happens after the block:
+
+- An `if` checks its condition once and runs the block once.
+- A `while` checks its condition, runs the block, and then goes back and checks again. It repeats for as long as the condition is true.
+
+The block can hold many lines. Here it holds one.
+
+Run the file with `python while_demo.py`. The condition is `True`, which is always true, so the loop never ends. `Hello World` fills the terminal faster than you can read. A loop like this is called an **infinite loop**.
+
+<Callout type="warn" title="Stop a running program with Ctrl+C">
+Click into the terminal, hold the Ctrl key and press C. Python stops the program at once and shows what it was doing at that moment.
+</Callout>
+
+```text
+Hello World
+Hello World
+Traceback (most recent call last):
+  File "C:\...\FirstProject\while_demo.py", line 2, in <module>
+    print("Hello World")
+    ~~~~~^^^^^^^^^^^^^^^
+KeyboardInterrupt
+```
+
+This is not a bug in your code. `KeyboardInterrupt` is Python's way of saying "stopped from the keyboard". The path is cut short here with `...`. On your computer that line shows the full path of your own file, so it will look different. The line number can differ too. It is the line Python was working on at the moment you pressed the keys. The video shows line 3, because the file there begins with an empty line.
+
+While the loop runs, the instructor opens the Windows Task Manager. The processor is busy at around 30 percent, only to print the same two words. An application that gets stuck in such a loop by mistake keeps the processor busy in the same way, and that can slow down the whole computer.
+
+So `True` is not a useful condition here. The opposite is no better. With `while False:` the condition is false at the very first check, and the block never runs:
+
+```python title="while_demo.py"
+while False:
+    print("Hello World")
+```
+
+This program prints nothing. The lesson needs something in between: true for a while, then false.
+
+## Step 2: Count with a counter
+
+To print the line five times, the program has to count: one, two, three, four, five. Counting needs a variable, called a **counter**. Any name works. By tradition programmers use `i`, and then `j` and `k` when they need more.
+
+Start at 1 and repeat while the counter is at most 5:
+
+{/* check: skip */}
+```python title="while_demo.py"
+i = 1
+
+while i <= 5:
+    print("Hello World")
+```
+
+Run this and it is endless again. Stop it with Ctrl+C. The reason: `i` is 1, and nothing ever changes it. 1 is less than 5 every time the condition is checked.
+
+The loop has to change the counter itself, inside its block:
+
+```python title="while_demo.py"
+i = 1
+
+while i <= 5:
+    print("Hello World")
+    i += 1
+```
+
+```text
+Hello World
+Hello World
+Hello World
+Hello World
+Hello World
+```
+
+`i += 1` adds 1 to `i`. It is short for `i = i + 1`.
+
+A counting loop has three parts, and all three are needed:
+
+| Part | In the code | Job |
+| --- | --- | --- |
+| Start value | `i = 1` | Set once, before the loop |
+| Condition | `i <= 5` | Checked before every round |
+| Change | `i += 1` | Inside the block, so the condition becomes false at some point |
+
+## Step 3: What is i after the loop?
+
+Add one line after the loop, without indentation, so it is outside the block:
+
+```python title="while_demo.py"
+i = 1
+
+while i <= 5:
+    print("Hello World")
+    i += 1
+
+print(i)
+```
+
+Guess the number before you read on. Many people say 5, because the loop counts to 5.
+
+```text
+Hello World
+Hello World
+Hello World
+Hello World
+Hello World
+6
+```
+
+It is 6. The lesson shows why with the debugger from [else and Debugging](/docs/python-one-shot/control-flow/else-and-debugging): a breakpoint on the `while` line, then Step Over, with an eye on the value of `i`.
+
+| `i` when the condition is checked | `i <= 5` | What happens |
+| --- | --- | --- |
+| 1 | True | Prints `Hello World`, `i` becomes 2 |
+| 2 | True | Prints `Hello World`, `i` becomes 3 |
+| 3 | True | Prints `Hello World`, `i` becomes 4 |
+| 4 | True | Prints `Hello World`, `i` becomes 5 |
+| 5 | True | Prints `Hello World`, `i` becomes 6 |
+| 6 | False | The loop ends. `print(i)` prints `6` |
+
+The block runs five times. The condition is checked six times. The loop can only end when the condition is false, and `i <= 5` is false for the first time when `i` is 6.
+
+![While_Loop_Flow](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-while-loop.svg)
+
+## Step 4: Stay on the same line with end
+
+The next goal needs a new trick. The loop should print `Telusko` and then `Rocks!!` several times, all on one line. As a first version the text is typed out in full:
+
+```python title="while_demo.py"
+i = 1
+
+while i <= 5:
+    print("Telusko Rocks!! Rocks!!")
+    i += 1
+
+print(i)
+```
+
+```text
+Telusko Rocks!! Rocks!!
+Telusko Rocks!! Rocks!!
+Telusko Rocks!! Rocks!!
+Telusko Rocks!! Rocks!!
+Telusko Rocks!! Rocks!!
+6
+```
+
+Two times `Rocks!!` is fixed in the text. For four times or ten times you would have to retype it. So the lesson takes the text apart and gives each part its own `print`:
+
+```python title="while_demo.py"
+i = 1
+
+while i <= 5:
+    print("Telusko ")
+    print("Rocks!! Rocks!! ")
+    i += 1
+
+print(i)
+```
+
+```text
+Telusko
+Rocks!! Rocks!!
+Telusko
+Rocks!! Rocks!!
+Telusko
+Rocks!! Rocks!!
+Telusko
+Rocks!! Rocks!!
+Telusko
+Rocks!! Rocks!!
+6
+```
+
+Now the two parts land on separate lines. In the video the instructor types `clear` wrongly as `clar` before this run, and PowerShell answers with a red error. That one is about the terminal command and has nothing to do with Python.
+
+Why separate lines? The instructor opens the definition of `print` in VS Code. Among its parameters is this one:
+
+```text
+end: str | None = "\n"
+```
+
+`print` has a parameter named `end`. It is the text that `print` adds after your values. Its default value is `"\n"`, the newline character, which moves the output to the next line. You never typed it, and it has been there in every `print` so far.
+
+You can pass a different ending. An empty string means "add nothing", so the output stays on the same line:
+
+```python title="while_demo.py"
+i = 1
+
+while i <= 5:
+    print("Telusko ", end = "")
+    print("Rocks!! Rocks!! ")
+    i += 1
+
+print(i)
+```
+
+```text
+Telusko Rocks!! Rocks!!
+Telusko Rocks!! Rocks!!
+Telusko Rocks!! Rocks!!
+Telusko Rocks!! Rocks!!
+Telusko Rocks!! Rocks!!
+6
+```
+
+The space inside `"Telusko "` keeps the two words apart. With `end = ""` nothing else would separate them.
+
+## Step 5: A loop inside a loop
+
+Now the repeated word. The second `print` is cut down to one `"Rocks!! "`, and it should run four times. Repeating a statement is a job for a loop, so a second `while` goes inside the first one. The counter `i` is already in use. The new loop gets its own counter, `j`.
+
+- The **outer loop** runs with `i` and prints `Telusko`.
+- The **inner loop** runs with `j` and prints `Rocks!!`.
+
+The editor underlines `j` at first, because it is not defined. The instructor adds `j = 1` at the top and runs the file:
+
+{/* check: skip */}
+```python title="while_demo.py"
+i = 1
+j = 1
+
+while i <= 5:
+    print("Telusko ", end = "")
+
+    while j <= 4:
+        print("Rocks!! ")
+
+    i += 1
+
+print(i)
+```
+
+`Rocks!!` runs down the terminal without end. It is the mistake from Step 2 again. `i` is increased, and nothing increases `j`. Stop it with Ctrl+C, then add `j += 1` to the inner block:
+
+```python title="while_demo.py"
+i = 1
+j = 1
+
+while i <= 5:
+    print("Telusko ", end = "")
+
+    while j <= 4:
+        print("Rocks!! ")
+        j += 1
+
+    i += 1
+
+print(i)
+```
+
+```text
+Telusko Rocks!!
+Rocks!!
+Rocks!!
+Rocks!!
+Telusko Telusko Telusko Telusko 6
+```
+
+The program ends now, and the output is a mess. The lesson repairs it in three steps.
+
+### Repair 1: keep Rocks on the same line
+
+Each `Rocks!!` ends with a newline. Give the inner `print` an empty ending as well:
+
+```python
+        print("Rocks!! ", end = "")
+```
+
+```text
+Telusko Rocks!! Rocks!! Rocks!! Rocks!! Telusko Telusko Telusko Telusko 6
+```
+
+### Repair 2: start a new line after each round
+
+Now nothing ends a line any more, and everything sits in one row. After each round of the outer loop the output should move to the next line. A `print()` with nothing in the brackets prints only its ending, the newline:
+
+```python title="while_demo.py"
+i = 1
+j = 1
+
+while i <= 5:
+    print("Telusko ", end = "")
+
+    while j <= 4:
+        print("Rocks!! ", end = "")
+        j += 1
+
+    i += 1
+    print()
+
+print(i)
+```
+
+```text
+Telusko Rocks!! Rocks!! Rocks!! Rocks!!
+Telusko
+Telusko
+Telusko
+Telusko
+6
+```
+
+Five lines, as wanted. Only the first one rocks.
+
+### Repair 3: reset j for every round
+
+The instructor debugs again and watches `j`:
+
+| Round of the outer loop | `j` when the inner loop is reached | Inner loop |
+| --- | --- | --- |
+| `i` is 1 | 1 | Runs four times. `j` goes up to 5 |
+| `i` is 2 | 5 | `j <= 4` is false at once. Nothing is printed |
+| `i` is 3, 4, 5 | 5 | The same |
+
+`j = 1` stands above both loops, so it runs once. After the first round `j` is 5 and stays 5. The inner loop needs a fresh counter each time the outer loop starts a new round. The line `j = 1` belongs inside the outer loop, before the inner one:
+
+```python title="while_demo.py"
+i = 1
+
+
+while i <= 5:
+    print("Telusko ", end = "")
+    j = 1
+    while j <= 4:
+        print("Rocks!! ", end = "")
+        j += 1
+
+    i += 1
+    print()
+
+print(i)
+```
+
+```text
+Telusko Rocks!! Rocks!! Rocks!! Rocks!!
+Telusko Rocks!! Rocks!! Rocks!! Rocks!!
+Telusko Rocks!! Rocks!! Rocks!! Rocks!!
+Telusko Rocks!! Rocks!! Rocks!! Rocks!!
+Telusko Rocks!! Rocks!! Rocks!! Rocks!!
+6
+```
+
+Where a value is assigned and where it is increased decides how a loop behaves.
+
+### Days and hours
+
+The lesson closes with a picture for the reset. Think of days and hours. On the first of the month the hours count 0, 1, 2 and so on, and the day stays the same. After hour 23 the day moves on by one, and the hours start again at 0.
+
+The day is the outer loop. The hours are the inner loop. Every time the inner loop has finished its full cycle, the outer loop takes one step and the inner counter starts from the beginning.
+
+## Additions beyond the lesson
+
+**Python has no do-while loop.** The lesson lists `while`, `do-while` and `for` as the common loops of programming languages. Python has `while` and `for` only.
+
+**Many programmers count from 0.** Starting at 0 with the condition `i < 5` also gives five rounds:
+
+```python title="count_from_zero.py"
+i = 0
+
+while i < 5:
+    print(i)
+    i += 1
+```
+
+```text
+0
+1
+2
+3
+4
+```
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page that ends by itself was run with Python 3.13 and gave the output shown, including the one-line output of Repair 1. The values in the two tables were confirmed with a line trace and by running the files. The three endless programs are not run by the automatic check. Each of them was started by hand and interrupted after a fraction of a second, and the `KeyboardInterrupt` lines are what Python 3.13 printed for the file, with the path shortened. The PowerShell message for `clar` was reproduced in Windows PowerShell.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `Hello World` without end | The condition is `True`, or the counter never changes. Both happen in the lesson | Press Ctrl+C. Then add `i += 1` inside the block |
+| `Rocks!!` without end | The inner loop has no `j += 1`. This happens in the lesson | Press Ctrl+C. Then add `j += 1` inside the inner block |
+| A traceback that ends with `KeyboardInterrupt` | You stopped the program with Ctrl+C | Nothing to fix. This is the normal way to stop a running program |
+| The loop is endless although `i += 1` is in the file | `i += 1` is not indented, so it stands after the loop and is never reached | Indent it so that it is part of the block |
+| Nothing is printed | The condition is false at the first check, as with `while False:` | Check the start value and the condition |
+| `print(i)` shows 6 and not 5 | The loop ends when `i <= 5` is false, and that first happens at 6 | Nothing to fix. Expect the counter to be one step past the limit |
+| Each part appears on its own line | `print` ends with a newline by default. This happens in the lesson | Pass `end = ""` |
+| Everything appears on one line | Every `print` has `end = ""`. This happens in the lesson | Add an empty `print()` where a line should end |
+| Only the first line has `Rocks!!` | `j = 1` stands before the outer loop, so `j` is never reset. This happens in the lesson | Move `j = 1` inside the outer loop, before the inner `while` |
+| `NameError: name 'j' is not defined` | The counter is used before it has a value. In the lesson the editor warns about this before the file is run | Assign `j = 1` before the inner loop |
+| `SyntaxError: expected ':'` | The colon after the condition is missing | End the `while` line with `:` |
+| `IndentationError: expected an indented block after 'while' statement on line 3` | The block is not indented. The number is the line of your `while` | Indent the block with 4 spaces |
+| `SyntaxError: invalid syntax` at `i++` | Python has no `++` operator | Write `i += 1` |
+| `clar : The term 'clar' is not recognized as the name of a cmdlet, function, script file, or operable program.` | A typing slip for `clear` in PowerShell. This happens in the lesson | Type `clear` or `cls` |
+
+## Try It Yourself
+
+1. Print `Hello World` ten times with a `while` loop. Change only one number in the lesson's code.
+2. Print the numbers 1 to 10, one per line. Then print them on a single line with `end = " "`.
+3. Before you run it, predict what `print(i)` shows after a loop that starts with `i = 1` and has the condition `i <= 10`.
+4. Remove `i += 1` from your loop, run the file and stop it with Ctrl+C. Read the last line of the traceback.
+5. Print the numbers from 5 down to 1. You need a different start value, a different condition and `i -= 1`.
+6. Print the table of 7, from `7 x 1 = 7` to `7 x 10 = 70`, with one `print` inside a loop.
+7. Change the final program so that it prints three lines, each with `Telusko` followed by six times `Rocks!!`.
+8. Use a nested loop to print the hours 0 to 23 for day 1 and day 2, each day on its own line. This is the days and hours picture as code.
+
+## Official references
+
+- [Python tutorial: first steps towards programming](https://docs.python.org/3/tutorial/introduction.html#first-steps-towards-programming)
+- [Python reference: the while statement](https://docs.python.org/3/reference/compound_stmts.html#the-while-statement)
+- [Python library: the print function](https://docs.python.org/3/builtins/functions.html#print)
+- [Python library: KeyboardInterrupt](https://docs.python.org/3/builtins/exceptions.html#KeyboardInterrupt)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

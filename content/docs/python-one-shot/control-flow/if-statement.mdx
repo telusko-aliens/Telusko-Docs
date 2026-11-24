@@ -1,0 +1,299 @@
+---
+title: The if Statement
+description: Make a program decide with the if statement, learn why the indented block matters in Python, and check whether a number is even or odd with a real condition.
+---
+
+<Video id="j_JuhAWlEaI" title="The if Statement" start={10730} />
+
+---
+
+Until now every program in this course ran straight down the file. Line 1, line 2, line 3, each one executed, every time. That is enough for calculations and for storing and fetching data.
+
+Useful software does more. It decides. If the password is right, open the account. If the cart is empty, show a message. The program looks at a condition and then goes one way or the other.
+
+In Python this starts with one small word, `if`. This lesson covers `if` alone. The next lessons add `else` and `elif`.
+
+## Step 1: Create a file and see the problem
+
+The lesson creates a new file in the same project and names it `if_demo.py`.
+
+<Callout type="info" title="Suggested code that appears by itself">
+In the video, a block of suggested code appears in the empty file as soon as it is created. That is a suggestion from GitHub Copilot, an AI helper inside VS Code, which guessed from the file name. The instructor does not accept it and switches the suggestions off for a while. If you see such a suggestion, press Esc and type the code yourself. You learn more that way.
+</Callout>
+
+The classic first example for `if` is to check whether a number is even or odd. Take a number, and imagine that it comes from the user:
+
+```python title="if_demo.py"
+num = 6
+
+print("Even")
+
+print("Odd")
+```
+
+Run it with `python if_demo.py`:
+
+```text
+Even
+Odd
+```
+
+It prints both words. Python runs every line it finds, from top to bottom. Nothing in this file says when `Even` should be printed and when `Odd`.
+
+We want one of the two, and the choice must depend on the value of `num`.
+
+## Step 2: Write the first if
+
+An `if` statement needs something that is true or false. The simplest such thing is the value `True` itself, which you know from [Data Types](/docs/python-one-shot/data-structures-and-types/data-types):
+
+```python title="if_demo.py"
+num = 6
+
+if True:
+    print("Even")
+
+print("Odd")
+```
+
+| Part | Meaning |
+| --- | --- |
+| `if` | The keyword that starts the statement |
+| `True` | The condition. It must come out as true or false |
+| `:` | The colon ends the `if` line and announces a block |
+| the four spaces before `print("Even")` | They put this line inside the `if` |
+
+The lines that belong to the `if` are called a **block**. Python's own name for it is a **suite**. The video uses both words.
+
+The rule is short. When the condition is true, the block runs. When it is false, Python skips the block.
+
+## Indentation is the block
+
+Languages such as C, C++, Java and C# mark a block with curly brackets, an opening one at the start and a closing one at the end. Python has no brackets for this. The block is marked by the empty space at the start of the line. This space is called **indentation**.
+
+Python reads it like this:
+
+- After the line that ends with a colon, the next line must start further to the right.
+- Every following line with the same indentation belongs to the same block.
+- The first line that starts back at the left edge is outside the block. The block has ended.
+
+There is no closing mark. The shape of the code is the structure of the program. That keeps Python code clean, and it also means that a space at the start of a line is never decoration. Moving a line to the left or to the right can change what the program does.
+
+<Callout type="info" title="Tab or four spaces">
+The lesson uses four spaces for one level. In VS Code you get them by pressing the Tab key once. The status bar in the video shows `Spaces: 4`, which means the editor inserts four spaces for one press of Tab. You can also press the spacebar four times. Both give the same file.
+</Callout>
+
+## Step 3: Inside the block or outside it
+
+To see the difference, the lesson turns the `Odd` line into a comment for now and adds a third print:
+
+```python title="if_demo.py"
+num = 6
+
+if True:
+    print("Even")
+
+print("Bye")
+
+# print("Odd")
+```
+
+`print("Even")` is inside the block. `print("Bye")` starts at the left edge, so it is outside. How does Python know? Only from the spaces.
+
+The instructor then moves `print("Bye")` into the block, by giving it four spaces too:
+
+```python title="if_demo.py"
+num = 6
+
+if True:
+    print("Even")
+
+    print("Bye")
+
+# print("Odd")
+```
+
+```text
+Even
+Bye
+```
+
+The empty line between the two prints changes nothing. Empty lines do not end a block. Only the indentation counts.
+
+Both words are printed. With `Bye` back outside the block, the output would be the same, because the condition is `True`. So this run does not show the difference yet.
+
+### Make the condition False
+
+The instructor moves `print("Bye")` back to the left edge and changes `True` to `False`:
+
+```python title="if_demo.py"
+num = 6
+
+if False:
+    print("Even")
+
+print("Bye")
+
+# print("Odd")
+```
+
+```text
+Bye
+```
+
+Now the difference shows. Python reaches the `if`, finds `False`, skips the whole block and continues with the first line after it. `Bye` is outside the block, so it is printed whatever the condition is.
+
+| Condition | `print("Even")`, inside the block | `print("Bye")`, outside the block |
+| --- | --- | --- |
+| `True` | Runs | Runs |
+| `False` | Skipped | Runs |
+
+If `print("Bye")` were still inside the block, this run would print nothing at all.
+
+In the video the editor also shows `print("Even")` in a dull colour while the condition is `False`. VS Code has worked out that this line can never run. Change the condition back to `True` and the line gets its normal colour again.
+
+Before going on, the lesson sets the condition back to `True` and moves `print("Bye")` to the end of the file, because saying bye belongs at the end.
+
+## Step 4: Use a real condition
+
+A block under `if True:` always runs. Then the `if` is useless. The place of `True` should be taken by a question about the data, one that comes out as true for some numbers and false for others.
+
+When is a number even? When dividing it by 2 leaves no remainder. The remainder is what the `%` operator gives, as you saw in [Operators](/docs/python-one-shot/data-structures-and-types/operators). And `==` compares two values:
+
+```python
+>>> 6 % 2
+0
+>>> 6 % 2 == 0
+True
+>>> 5 % 2
+1
+>>> 5 % 2 == 0
+False
+```
+
+`num % 2 == 0` gives `True` for an even number and `False` for an odd one. That is exactly what `if` needs:
+
+```python title="if_demo.py"
+num = 6
+
+if num % 2 == 0:
+    print("Even")
+
+
+
+# print("Odd")
+
+print("Bye")
+```
+
+```text
+Even
+Bye
+```
+
+Python first works out `num % 2 == 0`. For 6 the result is `True`, so the block runs.
+
+![The_If_Statement](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-if-flow.svg)
+
+<Callout type="warn" title="Two equals signs">
+`=` stores a value in a variable. `==` asks whether two values are equal. A condition needs `==`. With a single `=` in this condition, Python stops with `SyntaxError: cannot assign to expression here. Maybe you meant '==' instead of '='?`
+</Callout>
+
+## Step 5: A second if for odd numbers
+
+Removing the `#` from the `Odd` line would print `Odd` for every number again. It needs its own condition. An odd number leaves the remainder 1:
+
+```python title="if_demo.py"
+num = 6
+
+if num % 2 == 0:
+    print("Even")
+
+
+if num % 2 == 1:
+    print("Odd")
+
+print("Bye")
+```
+
+```text
+Even
+Bye
+```
+
+For 6 the first condition is true and the second is false. Now change the number to 5, as the lesson does:
+
+```python title="if_demo.py"
+num = 5
+
+if num % 2 == 0:
+    print("Even")
+
+
+if num % 2 == 1:
+    print("Odd")
+
+print("Bye")
+```
+
+```text
+Odd
+Bye
+```
+
+The first block is skipped, the second one runs, and `Bye` is printed in both cases.
+
+### How many spaces?
+
+While typing the second `if`, the instructor first puts a single space before `print("Odd")`. That is valid Python. The language does not demand four spaces. It demands that the line is indented, and that all lines of one block are indented by the same amount.
+
+The lesson then changes it to four spaces, and gives the reason. Your code will be read by teammates, or by the whole world if the project is open source. Everyone is used to four spaces, and a block with one space is hard to see. So make it a habit: one Tab, or four spaces, for every level.
+
+## Not the best way yet
+
+The program works. At the end, the instructor says it is still not the best way to check even and odd.
+
+Look at what happens for 6. The first condition is true and `Even` is printed. Python then goes on and checks the second condition as well, although a number that is even can never be odd. The next lesson, [else and Debugging](/docs/python-one-shot/control-flow/else-and-debugging), removes that second check.
+
+## Additions beyond the lesson
+
+**Do not mix tabs and spaces.** VS Code inserts spaces when you press Tab, so in the video there is no difference between the two. In an editor that inserts a real tab character, a block with tabs on one line and spaces on the next can stop the program with `TabError: inconsistent use of tabs and spaces in indentation`. The official style guide of Python recommends four spaces.
+
+**A number from the user.** In the lesson `num` is fixed and you are asked to imagine that it comes from the user. With [User Input](/docs/python-one-shot/functions-modules-and-input/user-input) you can do it for real. Remember to convert the text: `num = int(input("Enter a number "))`. Without `int`, the line `if num % 2 == 0:` stops with a `TypeError`, because `num` is a string.
+
+<Callout type="info" title="Checked for these docs">
+Every program and prompt session on this page was run with Python 3.13 and gave the output shown. The video does not show a separate run for each state of the file. Where it does not, the output above comes from running the same code. The statements about one space of indentation, about `Bye` inside a `False` block, and every error message in the table below were tested in the same way. The listings leave out the empty first line that the file in the video has.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| Both `Even` and `Odd` are printed. This happens in the lesson | There is no condition, so every line runs | Put each print in the block of an `if` |
+| `IndentationError: expected an indented block after 'if' statement on line 7` | The line after the colon is not indented. The number at the end is the line of your `if`. In the lesson, VS Code underlines `print("Odd")` in red at this moment, before the file is run | Indent the line with four spaces |
+| `SyntaxError: expected ':'` | The colon at the end of the `if` line is missing | Add `:` after the condition |
+| `SyntaxError: cannot assign to expression here. Maybe you meant '==' instead of '='?` | A single `=` in the condition | Write `==` to compare |
+| `IndentationError: unexpected indent` | A line is indented although no block starts there, or it has more spaces than the line above it | Give all lines of a block the same indentation |
+| `IndentationError: unindent does not match any outer indentation level` | A line has fewer spaces than its block, and more than the `if` line | Line it up with the block or with the `if` |
+| A line runs although the condition is false | The line starts at the left edge, so it is outside the block | Indent it to move it into the block |
+| `NameError: name 'true' is not defined. Did you mean: 'True'?` | `true` written with a small letter | Write `True` and `False` with a capital letter |
+
+## Try It Yourself
+
+1. Write `if_demo.py` with `if True:` and one print inside the block. Run it, change `True` to `False`, and run it again.
+2. Add `print("Bye")` once inside the block and once outside. Run both versions with `False` and explain the difference.
+3. Set `num = 10` and print `Even` only when `num % 2 == 0`. Try 10, 11 and 0.
+4. Add a second `if` that prints `Odd`. Test it with 7.
+5. Write a program with `age = 20` that prints `Adult` when `age >= 18`. Then try `age = 15`.
+6. Set `num = -4` and print `Negative` when `num < 0`.
+7. Remove the indentation of the print under an `if` and run the file. Read the error message, then repair the file.
+8. Ask the user for a number with `int(input("Enter a number "))` and print whether it is even or odd.
+
+## Official references
+
+- [Python tutorial: if statements](https://docs.python.org/3/tutorial/controlflow.html#if-statements)
+- [Python reference: the if statement](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
+- [Python reference: indentation](https://docs.python.org/3/reference/lexical_analysis.html#indentation)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

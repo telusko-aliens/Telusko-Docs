@@ -1,0 +1,319 @@
+---
+title: The math Module
+description: Learn what a module is and the three ways to import one, using sqrt, ceil, floor and pow from the math module, and find the documentation of a module with help.
+---
+
+<Video id="j_JuhAWlEaI" title="The math Module" start={9376} />
+
+---
+
+In [Introduction to Functions](/docs/python-one-shot/functions-modules-and-input/introduction-to-functions) one task became one function. A real program has many tasks, so it has many functions. The next question is where to keep them all.
+
+The lesson answers with three examples. A calculator has addition, subtraction, division and multiplication. A login system has log in, log out, create a user and delete a user. A shopping site has add a product, delete a product and check out. Each of these is a group of functions that belong together.
+
+Such a group is called a **module**. Think of a module as a box that holds related functions. Python comes with many modules that are ready to use. This lesson uses one of them, `math`, to show how any module is used.
+
+## Step 1: A function that Python does not know yet
+
+Clear `Demo.py`. The task is to find the square root of 25. The square of a number is easy, `4 * 4`. The square root needs a real formula, so it is better to use a function that already exists. It is named `sqrt`:
+
+{/* check: error */}
+```python title="Demo.py"
+num = 25
+
+result = sqrt(num)
+
+print(result)
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\Users\navin\OneDrive\Documents\Python Course\FirstProject\Demo.py", line 3, in <module>
+    result = sqrt(num)
+             ^^^^
+NameError: name 'sqrt' is not defined
+```
+
+A `NameError` means that Python met a name it does not know. `print` and `int` are always available, because every program needs them. `sqrt` is needed only for mathematics, so it is kept in a module, and a module must be asked for first.
+
+<Callout type="info" title="Built-in or not">
+The instructor calls `sqrt` an inbuilt function that is "not openly available". The exact terms are these. **Built-in functions**, such as `print`, `int` and `len`, work without any import. `sqrt` is part of the **standard library**, the collection of modules that is installed together with Python. Nothing has to be downloaded for it, and it has to be imported before use.
+</Callout>
+
+## Step 2: Import the module
+
+The keyword `import` makes a module available in your file. After that, a function of the module is written as the module name, a dot, and the function name:
+
+```python title="Demo.py"
+import math
+
+num = 25
+
+result = math.sqrt(num)
+
+print(result)
+```
+
+```text
+5.0
+```
+
+The answer is `5.0` and not `5`, because `math.sqrt` always gives a float. If you need a whole number, pass the result to `int`, as in `int(math.sqrt(num))`.
+
+Import lines go at the top of the file. In VS Code, type `import ` and press Ctrl+Space to see a list of the modules you can import. The lesson scrolls past `base64`, `calendar`, `colorsys`, `concurrent`, `datetime` and many more. You can also write modules of your own, which comes later in [Modules and Packages](/docs/python-one-shot/functional-python/modules-and-packages).
+
+## Step 3: Import one function by name
+
+`import math` gives access to everything in the module, and every call needs the prefix `math.`. Can the prefix be dropped? Removing it alone does not work. With `import math` at the top and a plain `sqrt(num)` below, the program stops with the same `NameError: name 'sqrt' is not defined`.
+
+To use the short name, import the function itself:
+
+```python title="Demo.py"
+# import math
+
+from math import sqrt
+
+num = 25
+
+result = sqrt(num)
+
+print(result)
+```
+
+```text
+5.0
+```
+
+`from math import sqrt` takes one name out of the module and puts it into your file. Now `sqrt(num)` works without a prefix. The first line is a comment, so it does nothing here.
+
+![Three_Ways_To_Import_math](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-import-styles.svg)
+
+## Step 4: ceil and floor
+
+`math` holds many more functions. Type `math.` in VS Code and a list appears. The lesson picks two of them and explains them with a story.
+
+The instructor scored 59.4 percent in his 10th standard. Normal rounding makes that 59, because the part after the point is below 0.5. He always said 60, because he applied `ceil`.
+
+Think of a room. 59.4 is somewhere between the floor, 59, and the ceiling, 60. `ceil` always goes up to the ceiling. `floor` always goes down to the floor, however close the number is to the top.
+
+Both `import` lines are active in this version, so `sqrt` works by its short name and `ceil` through `math.`:
+
+```python title="Demo.py"
+import math
+
+from math import sqrt
+
+num = 25
+
+result = sqrt(num)
+result1 = math.ceil(59.4)
+
+print(result)
+print(result1)
+```
+
+```text
+5.0
+60
+```
+
+Change the line to `floor`, and even 59.9 goes down:
+
+```python title="Demo.py"
+import math
+
+from math import sqrt
+
+num = 25
+
+result = sqrt(num)
+result1 = math.floor(59.9)
+
+print(result)
+print(result1)
+```
+
+```text
+5.0
+59
+```
+
+| Function | What it gives | `59.4` | `59.9` |
+| --- | --- | --- | --- |
+| `math.floor(x)` | The nearest whole number below or equal to `x` | `59` | `59` |
+| `round(x)` | The nearest whole number | `59` | `60` |
+| `math.ceil(x)` | The nearest whole number above or equal to `x` | `60` | `60` |
+
+`round` is a built-in function and needs no import. The table can be checked in the prompt:
+
+```python
+>>> import math
+>>> math.floor(59.4), round(59.4), math.ceil(59.4)
+(59, 59, 60)
+>>> math.floor(59.9), round(59.9), math.ceil(59.9)
+(59, 60, 60)
+>>> math.ceil(59.0)
+59
+```
+
+The last line shows that a number that is already whole stays where it is.
+
+To use `ceil` without the prefix, import it by name too. Several names are separated by commas: `from math import sqrt, ceil`.
+
+## Step 5: Read the documentation with help
+
+How do you find out what a module offers? Open a terminal, start the Python prompt with `python`, and ask `help`. The name goes in quotes:
+
+{/* check: skip */}
+```python
+>>> help('math')
+Help on built-in module math:
+
+NAME
+    math
+
+DESCRIPTION
+    This module provides access to the mathematical functions
+    defined by the C standard.
+
+FUNCTIONS
+    acos(x, /)
+        Return the arc cosine (measured in radians) of x.
+
+        The result is between 0 and pi.
+```
+
+The text is long and is shown page by page. Only the first lines are printed here. Press Space or Enter to move on and `q` to return to the prompt. In the video the instructor leaves the pages with a key press that ends in a `KeyboardInterrupt` message. That is harmless, and `q` is the clean way out.
+
+You can also ask about one function:
+
+{/* check: skip */}
+```python
+>>> help('math.ceil')
+Help on built-in function ceil in math:
+
+math.ceil = ceil(x, /)
+    Return the ceiling of x as an Integral.
+
+    This is the smallest integer >= x.
+
+```
+
+The sign `>=` means "greater than or equal to". That matches the last line of the check in Step 4: `math.ceil(59.0)` is 59.
+
+## Step 6: pow, and names you do not use
+
+One more function from the module is `pow`, for powers. `pow(5,3)` is 5 raised to 3:
+
+```python title="Demo.py"
+import math
+
+from math import sqrt, ceil, pow
+
+num = 25
+
+result = sqrt(num)
+result1 = pow(5,3)
+
+print(result1)
+```
+
+```text
+125.0
+```
+
+The lesson prints only `result1` this time. The square root is still calculated and not shown.
+
+Look at the import lines in VS Code. `math` and `ceil` appear in a dimmer colour than `sqrt` and `pow`. The editor is telling you that these two are imported and never used. The program runs anyway. The dim colour is a hint that the import can be removed.
+
+## Step 7: A short name for a module
+
+`math` is a short word. Some module names are long, and typing them before every call gets tiring. With `as` you can give a module another name inside your file. This second name is called an **alias**:
+
+```python title="Demo.py"
+import math as m
+
+num = 25
+
+result = m.sqrt(num)
+result1 = m.pow(5,3)
+
+print(result1)
+```
+
+```text
+125.0
+```
+
+After `import math as m`, the module is known as `m` in this file, and the name `math` is not defined.
+
+## Three ways to import
+
+| Import line | How you call | Use it when |
+| --- | --- | --- |
+| `import math` | `math.sqrt(num)` | You use several functions and want to see where each comes from |
+| `from math import sqrt, ceil` | `sqrt(num)`, `ceil(59.4)` | You need a few functions and want short calls |
+| `import math as m` | `m.sqrt(num)` | The module name is long |
+
+## Additions beyond the lesson
+
+**Two kinds of pow.** Python also has a built-in `pow`, and the operator `**` from [IDLE and Number Operations](/docs/python-one-shot/python-basics/idle-and-number-operations). With positive whole numbers these two give a whole number. `math.pow` always gives a float:
+
+```python
+>>> import math
+>>> math.pow(5, 3)
+125.0
+>>> pow(5, 3)
+125
+>>> 5 ** 3
+125
+```
+
+After `from math import pow`, the name `pow` in your file means the one from `math`. That is why Step 6 prints `125.0`. Near the end of the video, the `from` line is deleted for a moment while `pow(5,3)` is still in the file. In that state the built-in `pow` would be called.
+
+**Values in a module.** A module can hold values as well as functions. `math.pi` is the number pi:
+
+```python
+>>> import math
+>>> math.pi
+3.141592653589793
+```
+
+<Callout type="info" title="Checked for these docs">
+Every program and prompt session on this page was run with Python 3.13 and gave the output shown. This includes the alias version at the end, and the version with `import math` and a plain `sqrt(num)`, whose error message is cut off in the video. `help('math')` and `help('math.ceil')` were run by hand. The text of `help` can differ slightly between Python versions. The line number in the traceback matches the code on this page. In the video it says line 6, because the file there starts with empty lines.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `NameError: name 'sqrt' is not defined` | `sqrt` is used without an import. This happens in the lesson | Add `import math` and call `math.sqrt(num)` |
+| The same `NameError` with `import math` at the top | The call is a plain `sqrt(num)`, and only the module name was imported. This happens in the lesson | Write `math.sqrt(num)`, or use `from math import sqrt` |
+| `NameError: name 'math' is not defined. Did you forget to import 'math'?` | `math.ceil(...)` is used, and the file has only `from math import sqrt`, or only `import math as m` | Add `import math`, or use the name you imported |
+| `ModuleNotFoundError: No module named 'maths'` | The module name is misspelled | The name is `math` |
+| The result is `5.0` and you wanted `5` | `math.sqrt` always gives a float | Use `int(math.sqrt(num))` |
+| `ValueError: math domain error` | `math.sqrt` was given a negative number | Pass zero or a positive number |
+| `KeyboardInterrupt` after `help('math')` | The help pages were interrupted with a key press. This happens in the lesson | Nothing is broken. Press `q` to leave the pages next time |
+
+## Try It Yourself
+
+1. Use `import math` to print the square root of `144`.
+2. Remove the import line and run the file. Read the error, then put the line back.
+3. Print the same square root with `from math import sqrt` and a call without the prefix.
+4. Print `math.ceil(7.1)`, `math.floor(7.9)` and `round(7.5)`. Guess each result first.
+5. In the Python prompt, run `help('math.floor')` and read the description.
+6. Import the module as `m` and print `m.pow(2, 10)`. Compare with `2 ** 10`.
+7. Write a function `hypotenuse(a, b)` that returns `math.sqrt(a * a + b * b)`. Print `hypotenuse(3, 4)`.
+8. Import `sqrt`, `ceil` and `floor` in one line and use only `sqrt`. Look at how your editor shows the unused names.
+
+## Official references
+
+- [Python library: math, mathematical functions](https://docs.python.org/3/library/math.html)
+- [Python tutorial: modules](https://docs.python.org/3/tutorial/modules.html)
+- [Python reference: the import statement](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
+- [Python library: the help function](https://docs.python.org/3/builtins/functions.html#help)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

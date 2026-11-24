@@ -1,0 +1,281 @@
+---
+title: map and reduce
+description: Change every value of a list with map, combine all values into one with reduce from the functools module, and write both with a named function and with a lambda.
+---
+
+<Video id="j_JuhAWlEaI" title="map and reduce" start={18821} />
+
+---
+
+In [The filter Function](/docs/python-one-shot/functional-python/filter-function) the program picked the even numbers out of a list. Picking values is one of three common jobs with data. This lesson covers the other two.
+
+The instructor admits that there is no real problem to solve yet, so the lesson creates one. First, take the even numbers and double each of them. Then add all the doubles to get one total.
+
+| Job | Tool | Values in | Values out |
+| --- | --- | --- | --- |
+| Keep some values | `filter` | 8 numbers | 4 even numbers |
+| Change every value | `map` | 4 even numbers | 4 doubles |
+| Combine all values | `reduce` | 4 doubles | 1 total |
+
+The work continues in the same file, `filter_map_reduce.py`, which ended the last lesson like this:
+
+```python title="filter_map_reduce.py"
+nums = [4,2,9,7,5,1,6,8]
+
+evens = list(filter(lambda n : n % 2 == 0, nums))
+
+print(evens)
+```
+
+```text
+[4, 2, 6, 8]
+```
+
+## Step 1: Double every value with map
+
+The goal is a new list named `doubles`. For 4 it should hold 8, for 2 it should hold 4, for 6 it should hold 12 and for 8 it should hold 16.
+
+The tool for this is the built-in `map`. It takes the same two things as `filter`:
+
+| Argument | What it is | In this lesson |
+| --- | --- | --- |
+| First | A function that says what to do with one value | `double_it` |
+| Second | An iterable, the values to work on | `evens` |
+
+The values are `evens` and not `nums`, because only the even numbers should be doubled.
+
+The function is called `double_it`. It takes one parameter, because `map` gives it one value at a time, and it returns that value times 2:
+
+```python title="filter_map_reduce.py"
+nums = [4,2,9,7,5,1,6,8]
+
+def double_it(n):
+    return n * 2
+
+
+evens = list(filter(lambda n : n % 2 == 0, nums))
+doubles = list(map( double_it, evens))
+
+print("Evens ",evens)
+print("Doubles ", doubles)
+```
+
+```text
+Evens  [4, 2, 6, 8]
+Doubles  [8, 4, 12, 16]
+```
+
+`map` takes the first value of `evens`, calls `double_it` with it, and keeps the result. Then it does the same with the next value, until the values are used up. Four values go in, so four values come out.
+
+Two small things about this program:
+
+- There are two spaces after `Evens` and `Doubles` in the output. One space is inside the string. The second is added by `print`, which puts a space between its arguments.
+- Like `filter`, `map` does not give a list by itself. It gives a **map object** that hands out the results one at a time. That is why the call is wrapped in `list(...)`. In the video the instructor says the line will return a list. It does, because of the `list(...)` around `map`.
+
+### How map differs from filter
+
+Both take a function and an iterable, and both call the function once for each value. The difference is what they do with the answer:
+
+| | `filter` | `map` |
+| --- | --- | --- |
+| The function returns | `True` or `False` | A new value |
+| The answer is used to | Decide whether the old value is kept | Replace the old value |
+| Number of results | The same or fewer | Always the same |
+| With `evens` | `n % 2 == 0` keeps or drops | `n * 2` turns 4 into 8 |
+
+## Step 2: map with a lambda
+
+`double_it` has one parameter and one expression. It can be written as a lambda inside the call, and the `def` lines can be removed:
+
+```python title="filter_map_reduce.py"
+nums = [4,2,9,7,5,1,6,8]
+
+
+evens = list(filter(lambda n : n % 2 == 0, nums))
+doubles = list(map(lambda n : n * 2, evens))
+
+print("Evens ",evens)
+print("Doubles ", doubles)
+```
+
+```text
+Evens  [4, 2, 6, 8]
+Doubles  [8, 4, 12, 16]
+```
+
+The output is the same.
+
+The instructor adds that the two lines could even be joined, by putting the whole `filter` call in the place of `evens`. That gives one long line. The lesson keeps the two lines, which are easier to read.
+
+## Step 3: Add everything with reduce
+
+Next, the lesson wants the sum of the doubles. 8 plus 4 plus 12 plus 16 is 40.
+
+This time the result is a single value, so there is no `list(...)`. The tool is `reduce`. It also takes a function and an iterable:
+
+```python
+sum = reduce( sum_it, doubles)
+```
+
+As soon as the instructor types `reduce`, the editor puts a yellow wavy line under it. `filter` and `map` did not get one. The editor is saying that the name `reduce` is not defined.
+
+### Why reduce needs an import
+
+`filter` and `map` are built in. `reduce` is not. It lives in a module named `functools`, which comes with Python. So it must be imported, in the first line of the file:
+
+```python
+from functools import reduce
+```
+
+This is the `from ... import ...` form you saw in [The math Module](/docs/python-one-shot/functions-modules-and-input/the-math-module). After it, the name `reduce` can be used directly.
+
+<Callout type="info" title="Why is reduce not built in?">
+In Python 2, `reduce` was a built-in function. Python 3 moved it to the `functools` module. The reason given in the Python documentation is that a plain `for` loop is easier to read in most cases, so `reduce` is needed less often than `filter` and `map`. It is still part of every Python installation. You only have to import it.
+</Callout>
+
+### The function for reduce takes two values
+
+What should `sum_it` look like? Think about how you add numbers. To add, you need two numbers. You cannot add one number. So the function for `reduce` takes **two** parameters and returns one value:
+
+```python title="filter_map_reduce.py"
+from functools import reduce
+
+nums = [4,2,9,7,5,1,6,8]
+
+def sum_it(a,b):
+    return a + b
+
+evens = list(filter(lambda n : n % 2 == 0, nums))
+doubles = list(map(lambda n : n * 2, evens))
+sum = reduce( sum_it, doubles)
+
+print("Evens ",evens)
+print("Doubles ", doubles)
+print("Total ", sum)
+```
+
+```text
+Evens  [4, 2, 6, 8]
+Doubles  [8, 4, 12, 16]
+Total  40
+```
+
+`reduce` works through the list from left to right and carries a running result along:
+
+| Call | `a` | `b` | Returns |
+| --- | --- | --- | --- |
+| First | 8 | 4 | 12 |
+| Second | 12 | 12 | 24 |
+| Third | 24 | 16 | 40 |
+
+The first call gets the first two values of the list. After that, `a` is always the result of the call before, and `b` is the next value of the list. When the list is used up, the last result is the answer. Four values needed three calls.
+
+![filter_map_and_reduce](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-map-reduce.svg)
+
+## Step 4: reduce with a lambda
+
+A lambda can take more than one parameter. So `sum_it` can become a lambda too, with `a,b` before the colon and `a + b` after it. The `def` lines are removed:
+
+```python title="filter_map_reduce.py"
+from functools import reduce
+
+nums = [4,2,9,7,5,1,6,8]
+
+
+evens = list(filter(lambda n : n % 2 == 0, nums))
+doubles = list(map(lambda n : n * 2, evens))
+sum = reduce( lambda a,b : a + b, doubles)
+
+print("Evens ",evens)
+print("Doubles ", doubles)
+print("Total ", sum)
+```
+
+```text
+Evens  [4, 2, 6, 8]
+Doubles  [8, 4, 12, 16]
+Total  40
+```
+
+The video ends with this version on screen. Three lines do the three jobs: keep the even numbers, double them, add them.
+
+<Callout type="warn" title="The variable name sum hides a built-in function">
+Python already has a built-in function named `sum`. The video uses `sum` as a variable name, and the program works. But from that line on, `sum` in this file means the number 40 and no longer the function. A later line such as `sum([1, 2, 3])` in the same file would stop with `TypeError: 'int' object is not callable`. This page keeps the code of the video. In your own programs, a name such as `total` is the safer choice.
+</Callout>
+
+## filter, map and reduce side by side
+
+| | `filter` | `map` | `reduce` |
+| --- | --- | --- | --- |
+| Job | Keep some values | Change every value | Combine all values |
+| The function takes | 1 value | 1 value | 2 values |
+| The function returns | `True` or `False` | The new value | The combined value |
+| Result | A filter object | A map object | A single value |
+| Needs `list(...)` | Yes, to see the values | Yes, to see the values | No |
+| Needs an import | No | No | `from functools import reduce` |
+
+## Additions beyond the lesson
+
+**The built-in sum does this particular job in one call.** Adding the numbers of a list is so common that Python has a function for it. `reduce` is the general tool, for any way of combining two values:
+
+```python
+>>> from functools import reduce
+>>> doubles = [8, 4, 12, 16]
+>>> sum(doubles)
+40
+>>> reduce(lambda a,b : a * b, doubles)
+6144
+```
+
+The second line multiplies all the values, which `sum` cannot do.
+
+**reduce needs at least one value.** With an empty list there is nothing to return, and `reduce` stops with an error. A third argument gives it a starting value, which is also the answer for an empty list:
+
+```python
+>>> from functools import reduce
+>>> reduce(lambda a,b : a + b, [], 0)
+0
+>>> reduce(lambda a,b : a + b, [8, 4, 12, 16], 100)
+140
+```
+
+Without the `0`, the first call ends with `TypeError: reduce() of empty iterable with no initial value`.
+
+<Callout type="info" title="Checked for these docs">
+Every program and prompt session on this page was run with Python 3.13 and gave the output shown. In the video, the last version, with the lambda inside `reduce`, is typed in the final seconds, and the terminal still shows the run before it. It was run for these docs and prints the same three lines. The error messages on this page were produced with Python 3.13. Old lines from earlier steps, which the video keeps as comments in its files, are left out of the listings.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| Yellow wavy line under `reduce` in the editor, and `NameError: name 'reduce' is not defined` when you run the file | `reduce` is not built in and was not imported. The editor warning appears in the lesson | Add `from functools import reduce` at the top of the file |
+| Yellow wavy line under `double_it` or `sum_it` | The call was typed before the function was written. This happens in the lesson, and the line goes away when the `def` is added | Define the function above the line that uses it |
+| `<map object at 0x...>` and no numbers | The result of `map` was printed without `list(...)`. The address differs on every run | Write `list(map(...))` |
+| `TypeError: <lambda>() missing 1 required positional argument: 'b'` | A two-parameter function was given to `map` with one list. `map` passes one value at a time | Use a one-parameter function for `map`. Two parameters belong to `reduce` |
+| `TypeError: <lambda>() takes 1 positional argument but 2 were given` | A one-parameter function was given to `reduce` | The function for `reduce` must take two parameters |
+| `TypeError: reduce() of empty iterable with no initial value` | The list given to `reduce` is empty | Pass a starting value as the third argument, for example `0` |
+| `TypeError: 'int' object is not callable` at a line with `sum(...)` | A variable named `sum` was created earlier in the file and hides the built-in function | Rename the variable, for example to `total` |
+| A label with a spelling slip, such as `Totla` | A typing mistake inside the quotes. Python prints a string exactly as it is written. The instructor types `"Totla"` for a moment and corrects it before running | Check the text inside the quotes |
+
+## Try It Yourself
+
+1. Use `map` and a named function to make a list with the square of each number in `[1, 2, 3, 4, 5]`.
+2. Rewrite exercise 1 with a lambda inside the `map` call.
+3. Print the result of `map(...)` without `list(...)`. What do you see, and why?
+4. From `nums = [4,2,9,7,5,1,6,8]`, keep the odd numbers with `filter`, then add 10 to each of them with `map`. Print both lists.
+5. Import `reduce` and use it to multiply all the numbers in `[1, 2, 3, 4, 5]`. You should get the factorial of 5, which you met in [Factorial](/docs/python-one-shot/arrays-and-recursion/factorial).
+6. Write a function `bigger(a, b)` that returns the larger of its two numbers, with `if` and `else`. Give it to `reduce` to find the largest number in `nums`.
+7. Remove the import line from your file and run it. Read the error, then put the line back.
+8. In the lesson's final program, rename the variable `sum` to `total`. Then add the line `print(sum(doubles))` at the end and check that it prints `40`.
+
+## Official references
+
+- [Python library: the map built-in](https://docs.python.org/3/builtins/functions.html#map)
+- [Python library: functools.reduce](https://docs.python.org/3/library/functools.html#functools.reduce)
+- [Python how-to: functional programming](https://docs.python.org/3/howto/functional.html)
+- [What's New in Python 3.0, where reduce moved to functools](https://docs.python.org/3/whatsnew/3.0.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

@@ -1,0 +1,12 @@
+{
+  "title": "Data Structures and Types",
+  "pages": [
+    "lists.mdx",
+    "tuples.mdx",
+    "sets.mdx",
+    "dictionaries.mdx",
+    "variable-storage.mdx",
+    "data-types.mdx",
+    "operators.mdx"
+  ]
+}

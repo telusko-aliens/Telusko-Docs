@@ -1,0 +1,291 @@
+---
+title: The filter Function
+description: Pick the values you want from a list with the built-in filter function, first with a named function and then with a lambda, and see why the result must be turned into a list.
+---
+
+<Video id="j_JuhAWlEaI" title="The filter Function" start={18326} />
+
+---
+
+Most programs work with data, and often with a lot of it. You rarely want all of it. You want the rows that match a condition, the way you filter a column in a spreadsheet.
+
+The lesson names three jobs that come up again and again with data:
+
+| Job | What it does | Example |
+| --- | --- | --- |
+| **Filter** | Keeps only the values that pass a condition | From a list of numbers, keep the even ones |
+| **Map** | Changes every value into another value | Find the square of each number |
+| **Reduce** | Combines many values into a single value | Add all the numbers |
+
+This page covers the first job. The other two follow in [map and reduce](/docs/python-one-shot/functional-python/map-and-reduce). All three use the two ideas from the previous lessons: passing a function to another function, from [Higher Order Functions](/docs/python-one-shot/functional-python/higher-order-functions), and the short one-line functions from [Lambda Functions](/docs/python-one-shot/functional-python/lambda-functions).
+
+## Step 1: Find the even numbers with a loop
+
+The lesson creates a new file, `filter_map_reduce.py`, with a list of numbers. The task is to collect the even numbers in a second list named `evens`.
+
+You already know one way to do it. Start with an empty list, walk through `nums` with a `for` loop, and append every number whose remainder after division by 2 is 0:
+
+```python title="filter_map_reduce.py"
+nums = [4,2,9,7,5,1,6,8]
+
+evens = []
+
+for i in nums:
+    if i % 2 == 0:
+        evens.append(i)
+
+
+print(evens)
+```
+
+```text
+[4, 2, 6, 8]
+```
+
+This works. The instructor calls it the **imperative** way: you write every step yourself. The other way is **declarative**: you call a function that does the steps for you, and you only say what you want.
+
+| Style | Meaning | Here |
+| --- | --- | --- |
+| Imperative | You write how to do it, step by step | Empty list, loop, `if`, `append` |
+| Declarative | You say what you want and a function does the work | `filter(...)` |
+
+## Step 2: Meet filter
+
+Python has a built-in tool for this job, named `filter`. Built-in means that you can use it without importing anything, like `print` and `len`.
+
+`filter` takes two things:
+
+| Argument | What it is | In this lesson |
+| --- | --- | --- |
+| First | A function that holds the condition | `is_even` |
+| Second | An **iterable**, the values to go through | `nums` |
+
+An iterable is anything you can walk through one value at a time. A list is an iterable, and so are a tuple, a set, a string and a `range`.
+
+The second argument is clear: it is `nums`. The first one needs a thought. Nobody can filter without knowing the condition. So `filter` asks you for the condition, and it wants it in the form of a function. The lesson calls that function `is_even` and writes the call first:
+
+```python
+evens = filter(is_even, nums)
+```
+
+Notice that `is_even` has no round brackets here. You are handing the function itself to `filter`, exactly as `square` was handed to `operate` in the higher order functions lesson. `filter` will do the calling.
+
+## Step 3: Write the condition function
+
+Looking at `filter(is_even, nums)`, you might think that `is_even` receives the whole list. It does not. `is_even` receives **one value**. `filter` takes the values from `nums` one by one, calls `is_even` with each of them, and looks at the answer:
+
+- If the function returns `True`, the value is kept.
+- If the function returns `False`, the value is dropped.
+
+The instructor compares it with choosing clothes for a party. You go through the wardrobe one piece at a time and say false, false, false, true. The piece that gets a true is the one you pick up.
+
+To see this at work, the lesson first writes a function that says `True` to everything:
+
+{/* check: noout */}
+```python title="filter_map_reduce.py"
+nums = [4,2,9,7,5,1,6,8]
+
+def is_even(n):
+    return True
+
+evens = filter(is_even, nums)
+
+print(evens)
+```
+
+{/* check: skip */}
+```text
+<filter object at 0x000001222D36B7F0>
+```
+
+That is not a list of numbers. `filter` gives back a **filter object**. Think of it as a machine that is ready to hand out the kept values, one at a time, when somebody asks for them. Printing the machine shows only its type and the place in memory where it lives.
+
+<Callout type="info" title="The address is different for you">
+The number after `at` is a memory address. It changes on every run and on every computer, so your output will show another value. The words `filter object` are the part to look at.
+</Callout>
+
+## Step 4: Turn the result into a list
+
+To get the values out, pass the filter object to `list(...)`. `list` asks for all the values and puts them in a list:
+
+```python title="filter_map_reduce.py"
+nums = [4,2,9,7,5,1,6,8]
+
+def is_even(n):
+    return True
+
+evens = list(filter(is_even, nums))
+
+print(evens)
+```
+
+```text
+[4, 2, 9, 7, 5, 1, 6, 8]
+```
+
+Now there is a list, and it holds every number. That is correct, because the function returns `True` for every value. In the wardrobe picture, you are wearing all the clothes at once.
+
+Change the function so that it always returns `False`:
+
+```python title="filter_map_reduce.py"
+nums = [4,2,9,7,5,1,6,8]
+
+def is_even(n):
+    return False
+
+evens = list(filter(is_even, nums))
+
+print(evens)
+```
+
+```text
+[]
+```
+
+Nothing passes, so the list is empty. These two runs prove the rule: the return value of your function decides what stays.
+
+## Step 5: Use the real condition
+
+Now replace the fixed answer with the real test. `n % 2 == 0` is a comparison, so it is `True` for an even number and `False` for an odd one. The function can return it directly:
+
+```python title="filter_map_reduce.py"
+nums = [4,2,9,7,5,1,6,8]
+
+def is_even(n):
+    return n % 2 == 0
+
+evens = list(filter(is_even, nums))
+
+print(evens)
+```
+
+```text
+[4, 2, 6, 8]
+```
+
+The same result as the loop in Step 1, with no empty list, no loop and no `append`.
+
+![How_filter_Picks_Values](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-filter.svg)
+
+The kept values stay in the order they had in `nums`. The list `nums` is not changed. `filter` only reads it.
+
+## Step 6: Replace the function with a lambda
+
+`is_even` takes one parameter and its body is a single expression. That is exactly the kind of function a lambda is made for. The lesson first stores the lambda under the same name:
+
+```python title="filter_map_reduce.py"
+nums = [4,2,9,7,5,1,6,8]
+
+is_even = lambda n : n % 2 == 0
+
+evens = list(filter(is_even, nums))
+
+print(evens)
+```
+
+```text
+[4, 2, 6, 8]
+```
+
+The name `is_even` is used in one place only. So the lambda can go straight into the call, and the extra line disappears:
+
+```python title="filter_map_reduce.py"
+nums = [4,2,9,7,5,1,6,8]
+
+evens = list(filter(lambda n : n % 2 == 0, nums))
+
+print(evens)
+```
+
+```text
+[4, 2, 6, 8]
+```
+
+This is the reason the course taught lambda before `filter`.
+
+The line can look heavy the first time, with `list`, `filter` and `lambda` together. As the instructor says, it is unfamiliar more than it is difficult. Read it in pieces:
+
+| Piece | Meaning |
+| --- | --- |
+| `list( ... )` | I want a list |
+| `filter( ... )` | made by filtering |
+| `lambda n : n % 2 == 0` | with this condition for each value `n` |
+| `nums` | from these values |
+
+## Three ways to write the same thing
+
+| Version | Code | Good when |
+| --- | --- | --- |
+| Loop | `for` with `if` and `append` | You want to see every step |
+| Named function | `list(filter(is_even, nums))` | The condition is long, or used in several places |
+| Lambda | `list(filter(lambda n : n % 2 == 0, nums))` | The condition is short and used once |
+
+## Additions beyond the lesson
+
+**A filter object gives its values only once.** After `list(...)` has taken the values out, the object is empty. A second `list(...)` on the same object gives an empty list:
+
+```python
+>>> nums = [4,2,9,7,5,1,6,8]
+>>> evens = filter(lambda n : n % 2 == 0, nums)
+>>> list(evens)
+[4, 2, 6, 8]
+>>> list(evens)
+[]
+```
+
+That is one more reason to write `list(filter(...))` and keep the list, as the lesson does.
+
+**You can loop over a filter object directly.** If you only want to go through the values, `list` is not needed:
+
+```python
+>>> nums = [4,2,9,7,5,1,6,8]
+>>> for n in filter(lambda n : n % 2 == 0, nums):
+...     print(n)
+...
+4
+2
+6
+8
+```
+
+<Callout type="info" title="A small note on the word function">
+The lesson calls `filter` an inbuilt function, and that is how everybody uses it. Strictly, `filter` is a built-in class in Python 3, which is why the editor's hover box in the video starts with `class filter`. Calling it creates the filter object you saw in Step 3. The Python documentation lists it on the Built-in Functions page.
+</Callout>
+
+<Callout type="info" title="Checked for these docs">
+Every program and prompt session on this page was run with Python 3.13 and gave the output shown. The program in Step 3 was run too. Its output is not compared automatically because the memory address differs on every run. The line shown there is the one from the video. The video does not clearly show a new run of the last version, with the lambda inside the call. It was run for these docs and prints `[4, 2, 6, 8]`. The error messages in the table below were produced with Python 3.13. Old lines from earlier steps, which the video keeps as comments in its files, are left out of the listings.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `<filter object at 0x...>` and no numbers | The result of `filter` was printed directly. This happens in the lesson | Wrap it: `list(filter(is_even, nums))` |
+| The whole list comes back, `[4, 2, 9, 7, 5, 1, 6, 8]` | The function returns `True` for every value. The lesson does this on purpose | Return the real condition, `n % 2 == 0` |
+| An empty list `[]` | The function returns `False` for every value, also shown in the lesson. A function with no `return` does the same, because it gives back `None` | Make sure the function returns the result of the condition |
+| Red underline in the editor and `Expected expression` | The first argument is missing, as in `filter(, nums)`. The lesson has this state for a moment while typing | Put the function first: `filter(is_even, nums)` |
+| `NameError: name 'is_even' is not defined` | The function is used before the `def` line has run, or its name is spelled differently | Define the function above the line that uses it |
+| `TypeError: is_even() missing 1 required positional argument: 'n'` | Written as `filter(is_even(), nums)`. The brackets call the function at once, with no value | Pass the name only, without brackets |
+| `TypeError: 'function' object is not iterable` | The arguments are in the wrong order, `filter(nums, is_even)` | Function first, values second |
+| The second `list(evens)` is empty | A filter object gives its values only once | Store the list: `evens = list(filter(...))` |
+
+## Try It Yourself
+
+1. Type the loop version from Step 1 and run it. Then change the condition so that it collects the odd numbers.
+2. Write a function `is_odd(n)` and use it with `filter` on `nums`. Print the result as a list.
+3. Print `filter(is_odd, nums)` without `list`. Run the file twice and compare the two memory addresses.
+4. Use `filter` with a lambda to keep only the numbers greater than 5 from `nums`.
+5. Make a list of names, for example `['navin', 'kiran', 'harsh', 'john']`. Use `filter` and a lambda to keep the names that have more than 4 letters. `len(name)` gives the number of letters.
+6. Write `is_even` so that it always returns `True`, then so that it always returns `False`. Predict both outputs before you run the file.
+7. Swap the two arguments of `filter` on purpose. Read the error message and explain it in your own words.
+8. Use `filter` on `range(1, 21)` to get all the numbers from 1 to 20 that can be divided by 3.
+
+## Official references
+
+- [Python library: the filter built-in](https://docs.python.org/3/builtins/functions.html#filter)
+- [Python tutorial: lambda expressions](https://docs.python.org/3/tutorial/controlflow.html#lambda-expressions)
+- [Python how-to: functional programming](https://docs.python.org/3/howto/functional.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

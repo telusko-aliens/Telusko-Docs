@@ -1,0 +1,415 @@
+---
+title: "__init__ and super() with Inheritance"
+description: Find out which initialiser runs when a child class object is created, why every class already has a parent named object, and how super() lets the child call the methods of its parent.
+---
+
+<Video id="j_JuhAWlEaI" title="__init__ and super() with Inheritance" start={24861} />
+
+---
+
+[Inheritance and MRO](/docs/python-one-shot/object-oriented-python/inheritance-and-mro) showed that a child class gets the methods of its parent. `__init__` is a method too. So what happens to it when classes inherit?
+
+The question matters in every real program. The parent's `__init__` usually sets up the data of the object. If the child writes an `__init__` of its own, does the parent's still run? The answer surprises most beginners, and the fix is a small built-in named `super()`.
+
+The lesson also clears up something from the last pages: the long list of names the editor suggests for every object, even for an object of an almost empty class.
+
+## Step 1: Start with one small class
+
+The file `inheritance.py` is cut down to a single class with one method.
+
+```python title="inheritance.py"
+class A:
+    def f1(self):
+        print("f1 works")
+
+
+obj1 = A()
+obj1.f1()
+```
+
+```text
+f1 works
+```
+
+Before the last two lines are added, the lesson runs the file with only the class in it. Nothing is printed. A class definition alone produces no output.
+
+## Every class has a parent: `object`
+
+Type `obj1.` in the editor. The class has one method, `f1`, and the list of suggestions is much longer. It contains names such as `__init__`, `__new__`, `__str__` and `__eq__`. Nobody wrote them in `A`.
+
+They come from a parent. Every class in Python inherits from a built-in class named `object`, also when you do not mention it. So every class you write is already a child class.
+
+You can write the parent out. These two headers mean the same thing:
+
+```python title="object.py"
+class A:
+    def f1(self):
+        print("f1 works")
+
+class B(object):
+    def f1(self):
+        print("f1 works")
+
+print(A.__bases__ == B.__bases__)
+```
+
+```text
+True
+```
+
+The lesson writes `class A(object):` for a moment, opens the file where the editor keeps the description of `object`, and then changes the header back to `class A:`. The `print` line was added for these docs. `__bases__` holds the parents of a class, and the output confirms that both classes have the same one.
+
+This is also the answer to a question from [Constructor with `__new__`](/docs/python-one-shot/object-oriented-python/constructor-with-new): a class without its own `__new__` and `__init__` uses the ones from `object`.
+
+## Step 2: Add `__init__` to the parent
+
+```python title="inheritance.py"
+class A:
+
+    def __init__(self):
+        print("in A init")
+
+    def f1(self):
+        print("f1 works")
+
+
+obj1 = A()
+obj1.f1()
+```
+
+```text
+in A init
+f1 works
+```
+
+As you know from [The `__init__` Method](/docs/python-one-shot/object-oriented-python/init-method), `__init__` runs when the object is created.
+
+## Step 3: A child class without `__init__`
+
+Now add a class `B` with a method `f2`. Its `__init__` is commented out for the moment. The video first runs this file with `obj1 = A()`, which prints `in A init` and `f1 works`, before switching to `B()`. In the lesson `B` first has no parent, and creating an object of `B` and calling `f1` fails:
+
+{/* check: error */}
+```python title="inheritance.py"
+
+class A:
+
+    def __init__(self):
+        print("in A init")
+
+    def f1(self):
+        print("f1 works")
+
+class B:
+    #   def __init__(self):
+    #     print("in A init")
+
+    def f2(self):
+        print("f2 works")
+
+
+obj1 = B()
+obj1.f1()
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\PythonCourse\FirstProject\oop\inheritance.py", line 19, in <module>
+    obj1.f1()
+    ^^^^^^^
+AttributeError: 'B' object has no attribute 'f1'. Did you mean: 'f2'?
+```
+
+The instructor forgot to make `B` a child of `A`. With `class B(A):` it works:
+
+```python title="inheritance.py"
+class A:
+
+    def __init__(self):
+        print("in A init")
+
+    def f1(self):
+        print("f1 works")
+
+class B(A):
+    #   def __init__(self):
+    #     print("in A init")
+
+    def f2(self):
+        print("f2 works")
+
+
+obj1 = B()
+obj1.f1()
+```
+
+```text
+in A init
+f1 works
+```
+
+Look at the first line of the output. The object was created from `B`, and `B` has no `__init__`. Python still printed `in A init`.
+
+`__init__` is found like any other method. Python looks in the class of the object first. `B` has none, so Python goes on to the parent and runs the `__init__` of `A`.
+
+## Step 4: The child gets its own `__init__`
+
+Remove the comment signs and let the `__init__` of `B` print its own text.
+
+```python title="inheritance.py"
+class A:
+
+    def __init__(self):
+        print("in A init")
+
+    def f1(self):
+        print("f1 works")
+
+class B(A):
+    def __init__(self):
+        print("in B init")
+
+    def f2(self):
+        print("f2 works")
+
+
+obj1 = B()
+obj1.f1()
+```
+
+```text
+in B init
+f1 works
+```
+
+`in A init` is gone. Python searched for `__init__`, found one in `B`, and stopped searching. The `__init__` of `A` did not run.
+
+So only one `__init__` is called, never both:
+
+- If the child class has an `__init__`, that one runs.
+- If it has none, the `__init__` of the parent runs.
+
+<Callout type="warn" title="Why this matters">
+In a real class, the parent's `__init__` creates the instance variables. If the child defines its own `__init__` and the parent's is skipped, those variables are never created, and the first line that uses them fails. The additions at the end of this page show this.
+</Callout>
+
+## Step 5: Call the parent with `super()`
+
+To run both, the child's `__init__` has to call the parent's. That is what `super()` is for.
+
+First, some words. The parent and the child have several names, and they all mean the same thing. The video shows most of them in a caption, and the instructor adds "derived class":
+
+| The class that gives | The class that receives |
+| --- | --- |
+| Parent class | Child class |
+| Super class | Sub class |
+| Base class | Derived class |
+
+`super()` gets its name from "super class". Inside a method, `super()` gives you access to the methods of the parent class.
+
+```python title="inheritance.py"
+class A:
+
+    def __init__(self):
+        print("in A init")
+
+    def f1(self):
+        print("f1 works")
+
+class B(A):
+    def __init__(self):
+        super().__init__()
+        print("in B init")
+
+    def f2(self):
+        print("f2 works")
+
+
+obj1 = B()
+obj1.f1()
+```
+
+```text
+in A init
+in B init
+f1 works
+```
+
+Follow the line `obj1 = B()`:
+
+1. Python finds `__init__` in `B` and starts it.
+2. Its first line, `super().__init__()`, calls the `__init__` of `A`. That prints `in A init`.
+3. Back in `B`, the next line prints `in B init`.
+
+The parent's line comes first because the call to `super().__init__()` is the first line of the child's `__init__`.
+
+![Which_Init_Runs](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-super-init.svg)
+
+<Callout type="info" title="What super() gives you">
+In the video the instructor says that `super()` creates the object of the super class. The exact picture is a little different. No second object is created. `super()` gives back a small helper object. For a method called through it, the search continues with the next class in the method resolution order, which here is the parent `A`, and the method runs on the same object, `self`. So `super().__init__()` runs the `__init__` of `A` on the object of `B` that is being set up.
+</Callout>
+
+## Step 6: Call other methods of the parent
+
+`super()` is not limited to `__init__`. Any method of the parent can be called from the child. The lesson calls `f1` from inside `f2`, first through `self`.
+
+```python title="inheritance.py"
+class A:
+
+    def __init__(self):
+        print("in A init")
+
+    def f1(self):
+        print("f1 works")
+
+class B(A):
+    def __init__(self):
+        super().__init__()
+        print("in B init")
+
+    def f2(self):
+        self.f1()
+        print("f2 works")
+
+
+obj1 = B()
+obj1.f2()
+```
+
+```text
+in A init
+in B init
+f1 works
+f2 works
+```
+
+The last line of the file now calls `f2`. `f2` calls `f1` first and then prints its own line. `self.f1()` works because the object inherits `f1` from `A`.
+
+The same call can be written with `super()`:
+
+```python title="inheritance.py"
+class A:
+
+    def __init__(self):
+        print("in A init")
+
+    def f1(self):
+        print("f1 works")
+
+class B(A):
+    def __init__(self):
+        super().__init__()
+        print("in B init")
+
+    def f2(self):
+        super().f1()
+        print("f2 works")
+
+
+obj1 = B()
+obj1.f2()
+```
+
+```text
+in A init
+in B init
+f1 works
+f2 works
+```
+
+The video shows this last version only for a moment, at the very end, and does not run it on screen. It was run for these docs, and the output is the one shown above. It is the same as with `self.f1()`.
+
+| Inside class `B` | Meaning |
+| --- | --- |
+| `super().__init__()` | Run the `__init__` of the parent |
+| `self.f1()` | Call `f1` on this object. Python searches `B` first, then `A` |
+| `super().f1()` | Call `f1` of the parent. The search continues with the next class in the method resolution order, which here is `A` |
+
+## Additions beyond the lesson
+
+These points are not in the video. They were run for these docs.
+
+**1. When `self.f1()` and `super().f1()` differ.** In the lesson both give the same result, because only `A` has an `f1`. If the child defines its own `f1`, `self.f1()` finds the child's version and `super().f1()` finds the parent's.
+
+```python title="differ.py"
+class A:
+    def f1(self):
+        print("f1 of A")
+
+class B(A):
+    def f1(self):
+        print("f1 of B")
+
+    def f2(self):
+        self.f1()
+        super().f1()
+
+
+obj1 = B()
+obj1.f2()
+```
+
+```text
+f1 of B
+f1 of A
+```
+
+**2. Passing values to the parent.** When the parent's `__init__` takes values, the child passes them on inside the brackets of `__init__`. Without that call, `self.name` would not exist.
+
+```python title="values.py"
+class Person:
+    def __init__(self, name):
+        self.name = name
+
+class Student(Person):
+    def __init__(self, name, course):
+        super().__init__(name)
+        self.course = course
+
+
+s1 = Student("navin", "Python")
+print(s1.name, s1.course)
+```
+
+```text
+navin Python
+```
+
+If you remove the line `super().__init__(name)`, the `print` line stops with `AttributeError: 'Student' object has no attribute 'name'`.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown. The traceback in Step 3 was produced by hand and matches the video. The file path in it is the one from the video. The file in the video starts with an empty line. The listings on this page leave it out, except the first listing of Step 3, where it keeps the line number of the traceback as in the video. The version with `super().f1()` is not run on screen in the video, so its output comes from the run for these docs.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `AttributeError: 'B' object has no attribute 'f1'. Did you mean: 'f2'?` | `B` was written without a parent. This happens in the lesson | Write `class B(A):` |
+| A red line in the editor after a pasted method, and `IndentationError: unindent does not match any outer indentation level` when run | The pasted lines are indented by a different number of spaces than the rest of the class. The lesson pastes `__init__` into `B` this way, comments it out and fixes the spaces later | Give every method in the class the same indentation, 4 spaces |
+| The child prints `in A init` from its own `__init__` | The method was copied from `A` and the text was not changed. This happens in the lesson | Change the text to `in B init` |
+| The parent's `__init__` does not run | The child has its own `__init__`, so Python stops there | Add `super().__init__()` as the first line of the child's `__init__` |
+| Nothing happens for the parent, and there is no error | `super().__init__` was written without the final brackets, so the method is named and not called | Write `super().__init__()` |
+| `TypeError: descriptor '__init__' of 'super' object needs an argument` | `super.__init__()` was written without brackets after `super` | Write `super().__init__()` |
+| `NameError: name 'f1' is not defined. Did you mean: 'self.f1'?` | A method of the parent was called as plain `f1()` inside the child | Write `self.f1()` or `super().f1()` |
+| `AttributeError: 'Student' object has no attribute 'name'` | The parent's `__init__` creates the variable, and the child's `__init__` did not call it | Call `super().__init__(...)` with the values the parent needs |
+
+## Try It Yourself
+
+1. Write class `A` with `f1` only, create an object, and look at the suggestions after `obj1.` in your editor. Find three names that you did not write.
+2. Add an `__init__` to `A` that prints a line. Create `class B(A):` with a method `f2` and no `__init__`. What does `obj1 = B()` print?
+3. Give `B` its own `__init__` with a different text. Predict the output before you run the file.
+4. Add `super().__init__()` as the first line of the `__init__` of `B`. Then move it below the `print` line and compare the two outputs.
+5. Call `f1` from inside `f2`, once with `self.f1()` and once with `super().f1()`.
+6. Add a class `C(B)` with an `__init__` that calls `super().__init__()` and prints `in C init`. Predict the three lines that `C()` prints.
+7. Remove `super().__init__()` from `B` only, keep it in `C`, and run the file again. Which line is missing now?
+
+## Official references
+
+- [Python library: `super`](https://docs.python.org/3/builtins/functions.html#super)
+- [Python library: `object`](https://docs.python.org/3/builtins/functions.html#object)
+- [Python tutorial: inheritance](https://docs.python.org/3/tutorial/classes.html#inheritance)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

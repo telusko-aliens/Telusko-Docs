@@ -1,0 +1,315 @@
+---
+title: Tuples
+description: Create tuples with round brackets, see why their values cannot be changed, unpack a tuple into variables, and test for a value with the in keyword.
+---
+
+<Video id="j_JuhAWlEaI" title="Tuples" start={4973} />
+
+---
+
+In [Lists](/docs/python-one-shot/data-structures-and-types/lists) you stored many values in one variable and then changed them freely. You appended, inserted, removed and sorted.
+
+Sometimes that freedom is not what you want. Some groups of values belong together and should stay exactly as they are once they are created. Python has a second type for storing several values, the **tuple**. A tuple looks and reads like a list, with one big difference: it cannot be changed.
+
+This lesson creates tuples, shows what they share with lists, and then tests how far "cannot be changed" really goes.
+
+## Step 1: Create a tuple
+
+Start with something familiar. The variable is named `tup`, and the values go in square brackets:
+
+```python
+>>> tup = [23,45,67,43]
+>>> type(tup)
+<class 'list'>
+```
+
+The built-in function `type` tells you what kind of value a variable holds. Here it answers `list`. The name `tup` changes nothing, because a name can be anything. The square brackets decide. The word `class` in the output is explained much later, in [Class and Object](/docs/python-one-shot/object-oriented-python/class-and-object). For now, read it as "of type".
+
+There are two ways to write a tuple. The first is to leave the brackets out:
+
+```python
+>>> tup = 23,45,67,43
+>>> type(tup)
+<class 'tuple'>
+```
+
+The second is to use **round brackets**:
+
+```python
+>>> tup = (23,45,67,43)
+>>> type(tup)
+<class 'tuple'>
+```
+
+Both create the same tuple. The round brackets are the usual way to write it, because they make it clear where the tuple starts and ends.
+
+| You write | You get |
+| --- | --- |
+| `[23,45,67,43]` | A list |
+| `23,45,67,43` | A tuple |
+| `(23,45,67,43)` | A tuple |
+
+<Callout type="info" title="The up arrow in IDLE">
+The lesson is still in IDLE. To repeat the assignment with different brackets, the instructor brings back the previous line with the up arrow key. A fresh IDLE does not do that. He shows where to change it: open the Options menu, choose Configure IDLE, go to the Keys tab, and set the keys for `history-previous` and `history-next`. Without that change, the keys are Alt+P and Alt+N.
+</Callout>
+
+## Step 2: What a tuple shares with a list
+
+Much of what you did with a list works the same way:
+
+```python
+>>> tup = (23,45,67,43)
+>>> min(tup)
+23
+>>> max(tup)
+67
+>>> tup[2]
+67
+```
+
+`min` and `max` find the smallest and the largest value. An index in square brackets fetches one value, and counting starts at 0 as always. Note the brackets: a tuple is created with round brackets, and an index is always asked for with square brackets.
+
+The difference shows when you type `tup.` in IDLE and wait for the popup. For a list the popup was long: `append`, `insert`, `remove`, `pop` and more. For a tuple it has two entries:
+
+| Method | What it does |
+| --- | --- |
+| `count` | How many times a value occurs |
+| `index` | The index of a value |
+
+Both only read the tuple. There is no method that adds or removes anything.
+
+## Step 3: A tuple cannot be changed
+
+Try to replace the 67 with 65:
+
+{/* check: skip */}
+```python
+>>> tup = (23,45,67,43)
+>>> tup[2] = 65
+Traceback (most recent call last):
+  File "<python-input-1>", line 1, in <module>
+    tup[2] = 65
+    ~~~^^^
+TypeError: 'tuple' object does not support item assignment
+```
+
+"Item assignment" means giving a new value to one position. A tuple does not support it. A tuple is **immutable**, which means it cannot be changed after it is created. A list is **mutable**, which means it can.
+
+| | List | Tuple |
+| --- | --- | --- |
+| Written with | `[ ]` | `( )` |
+| Read by index, `x[2]` | Yes | Yes |
+| `min`, `max`, `len` | Yes | Yes |
+| Change a value, `x[2] = 65` | Yes | No |
+| Add or remove values | Yes | No |
+| Methods | Many | `count` and `index` |
+
+Why does it matter which types are mutable? The instructor gives two reasons. Later topics will ask for one kind or the other: some features of Python accept only immutable data. And when a value in your project refuses to change, you should be able to say at once: this is a tuple, so it cannot.
+
+The length is read the same way as for a list:
+
+```python
+>>> tup = (23,45,67,43)
+>>> len(tup)
+4
+```
+
+## Step 4: Mixed values and unpacking
+
+Like a list, a tuple can hold values of different types:
+
+```python
+>>> tupA = (2,'navin', 7.9)
+>>> tupA
+(2, 'navin', 7.9)
+```
+
+Suppose you want each of these values in a variable of its own. One way is to fetch them one at a time, `num = tupA[0]` and so on. Python offers a shorter way. Write the variable names on the left, separated by commas:
+
+```python
+>>> tupA = (2,'navin', 7.9)
+>>> num, name, num1 = tupA
+>>> num
+2
+>>> name
+'navin'
+>>> num1
+7.9
+```
+
+The first value goes into the first name, the second into the second, the third into the third. This is called **unpacking**, because the values are taken out of the tuple and put into variables.
+
+There is one rule: the number of names must match the number of values. Ask for four values from a tuple of three and Python stops:
+
+{/* check: skip */}
+```python
+>>> tupA = (2,'navin', 7.9)
+>>> num, name, num1, num2 = tupA
+Traceback (most recent call last):
+  File "<python-input-1>", line 1, in <module>
+    num, name, num1, num2 = tupA
+    ^^^^^^^^^^^^^^^^^^^^^
+ValueError: not enough values to unpack (expected 4, got 3)
+```
+
+The message counts for you. Four names were expected to be filled, and the tuple had three values.
+
+## Step 5: A list inside a tuple
+
+A tuple can hold any value, and a list is a value. So a list can sit inside a tuple. The same is true the other way round: a tuple inside a list, a list inside a list, a tuple inside a tuple.
+
+```python
+>>> tupB = (34, 'navin', [3,4,5,6])
+>>> len(tupB)
+3
+```
+
+`tupB` has three elements: the number 34, the string `'navin'` and one list. The whole list counts as one element. The `len` line is an addition to the lesson to show that.
+
+Changing an element of the tuple fails, as expected. It fails even when the new value is the same 34 that is already there, and it fails for the list at index 2 as well:
+
+{/* check: skip */}
+```python
+>>> tupB = (34, 'navin', [3,4,5,6])
+>>> tupB[0] = 34
+Traceback (most recent call last):
+  File "<python-input-1>", line 1, in <module>
+    tupB[0] = 34
+    ~~~~^^^
+TypeError: 'tuple' object does not support item assignment
+>>> tupB[2] = [56,89,21]
+Traceback (most recent call last):
+  File "<python-input-2>", line 1, in <module>
+    tupB[2] = [56,89,21]
+    ~~~~^^^
+TypeError: 'tuple' object does not support item assignment
+```
+
+Now go one level deeper. `tupB[2]` is the list. `tupB[2][1]` is the value at index 1 of that list, the 4. Change that:
+
+```python
+>>> tupB = (34, 'navin', [3,4,5,6])
+>>> tupB[2][1] = 9
+>>> tupB
+(34, 'navin', [3, 9, 5, 6])
+```
+
+No error, and the 4 has become 9.
+
+This does not break the rule. The tuple still holds the same three elements: 34, `'navin'` and the same list. You did not give the tuple a new element. You changed a value inside the list, and a list is mutable.
+
+![Tuple_With_A_List_Inside](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-tuple-immutable.svg)
+
+The instructor admits this looks complex at first and advises you to try it yourself until it makes sense.
+
+## Step 6: Check for a value with in
+
+The lesson introduces a new keyword, `in`. It checks whether a value is part of a collection:
+
+```python
+>>> tupB = (34, 'navin', [3, 9, 5, 6])
+>>> 34 in tupB
+True
+>>> 'Navin' in tupB
+False
+```
+
+The answer is `True` or `False`. These two are called **Boolean** values.
+
+The second answer is `False` because of one letter. The tuple holds `'navin'` with a small `n`, and the test asks for `'Navin'` with a capital `N`. For Python these are two different strings.
+
+`in` works on lists and strings too. You will use it often.
+
+## Step 7: A tuple with one value
+
+The instructor comes back to tuples at the end of the next lesson, [Sets](/docs/python-one-shot/data-structures-and-types/sets), with a point he says he missed here. How do you write a tuple that holds one value only?
+
+```python
+>>> tup = (45)
+>>> type(tup)
+<class 'int'>
+```
+
+That is a plain whole number, an `int`. Round brackets around a single value are the ordinary brackets you know from arithmetic, as in `(9 + 2) * 3`, and Python ignores them here.
+
+The fix is a comma after the value:
+
+```python
+>>> tup = (45,)
+>>> type(tup)
+<class 'tuple'>
+```
+
+This fits what Step 1 showed. `23,45,67,43` was a tuple without any brackets. The commas make the tuple, and the round brackets are there for the reader.
+
+## What to remember
+
+The instructor closes with two points:
+
+1. A tuple is written with round brackets.
+2. A tuple is immutable.
+
+## Additions beyond the lesson
+
+The two tuple methods appear in the popup and are not run in the video. The instructor also mentions that `sum` works on a tuple. Here they are:
+
+```python
+>>> tup = (23,45,67,43)
+>>> tup.count(45)
+1
+>>> tup.index(67)
+2
+>>> sum(tup)
+178
+```
+
+Unpacking also fails when there are too few names. The message is then the opposite one:
+
+{/* check: skip */}
+```python
+>>> tupA = (2,'navin', 7.9)
+>>> num, name = tupA
+Traceback (most recent call last):
+  File "<python-input-1>", line 1, in <module>
+    num, name = tupA
+    ^^^^^^^^^
+ValueError: too many values to unpack (expected 2)
+```
+
+<Callout type="info" title="Checked for these docs">
+Every prompt session on this page was run again with Python 3.13, and each line gave the result shown. The sessions that end in an error were run by hand. The lesson runs them in IDLE. This page shows them as the plain Python 3.13 prompt prints them, so the middle lines can look a little different from the video. The last line, which names the error, is the same in both. The number in `<python-input-1>` counts the lines you have typed, so yours may differ.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `type(tup)` gives `<class 'list'>` | The values are in square brackets. The lesson shows this on purpose | Use round brackets for a tuple |
+| `TypeError: 'tuple' object does not support item assignment` | A line tries to change an element of a tuple, such as `tup[2] = 65`. This is shown in the lesson | Use a list if the values must change, or create a new tuple |
+| `ValueError: not enough values to unpack (expected 4, got 3)` | More names on the left than values in the tuple. This is shown in the lesson | Use as many names as there are values |
+| `ValueError: too many values to unpack (expected 2)` | Fewer names on the left than values in the tuple | Use as many names as there are values |
+| `AttributeError: 'tuple' object has no attribute 'append'` | A list method was called on a tuple | A tuple has `count` and `index` only. Use a list if you need to add values |
+| `'Navin' in tupB` gives `False` | Capital and small letters are different. The tuple holds `'navin'`. This is shown in the lesson | Write the string exactly as it is stored |
+| `type(tup)` gives `<class 'int'>` after `tup = (45)` | Brackets around one value do not make a tuple. This is shown in the lesson | Add a comma: `tup = (45,)` |
+| The up arrow does not bring back the last line in IDLE | IDLE uses other keys by default | Press Alt+P, or change the keys under Options, Configure IDLE, Keys |
+
+## Try It Yourself
+
+1. Create `days = ('mon','tue','wed','thu','fri')`. Print its type, its length, the first value and the last value with a negative index.
+2. Assign `a = [1,2,3]`, `b = 1,2,3` and `c = (1,2,3)`. Use `type` on each. Which two are the same type?
+3. Try `days[0] = 'sun'`. Read the error. Then create a list with the same values and do the same assignment there.
+4. Create `student = ('kiran', 21, 8.4)` and unpack it into `name`, `age` and `score` in one line. Print each variable.
+5. Unpack `student` into two names, and then into four names. Compare the two error messages.
+6. Create `data = (10, 'harsh', [1,2,3])`. Change the 2 inside the list to 20. Then try to replace the whole list with `[7,8,9]`. Explain why one works and the other does not.
+7. Check with `in` whether `'harsh'`, `'Harsh'` and `10` are in `data`. Guess each answer before you press Enter.
+8. Create a tuple that holds the single value `'navin'`, and prove with `type` that it is a tuple. Then leave out the comma and check the type again.
+
+## Official references
+
+- [Python tutorial: tuples and sequences](https://docs.python.org/3/tutorial/datastructures.html#tuples-and-sequences)
+- [Python library: tuples](https://docs.python.org/3/builtins/stdtypes.html#tuples)
+- [Python library: the type function](https://docs.python.org/3/builtins/functions.html#type)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

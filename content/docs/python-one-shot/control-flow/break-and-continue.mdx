@@ -1,0 +1,223 @@
+---
+title: break and continue
+description: Skip some rounds of a loop with continue, stop a loop early with break, and see in the debugger where each of them sends the program.
+---
+
+<Video id="j_JuhAWlEaI" title="break and continue" start={13806} />
+
+---
+
+A [for loop](/docs/python-one-shot/control-flow/for-loop) treats every value the same way. It takes the first value, runs the block, takes the next value, and goes on until nothing is left.
+
+Real tasks are less regular. Sometimes a few values should be left out. Sometimes the loop should stop as soon as something is found, even though more values are waiting.
+
+Python has one small statement for each case. **continue** skips the rest of the current round. **break** ends the whole loop. Both are single words, and both are usually placed inside an `if`.
+
+## Step 1: The starting point
+
+The lesson continues in `for_demo.py` with the loop from the previous lesson:
+
+```python title="for_demo.py"
+for value in range(10):
+    print(value)
+```
+
+```text
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+```
+
+One round of a loop, from the `for` line to the end of the block, is called an **iteration**. This loop has ten iterations.
+
+## Step 2: Skip values with an if
+
+The task: do not print the values that can be divided by 3. That means 0, 3, 6 and 9 should be left out.
+
+A number can be divided by 3 when the remainder of the division is 0. The remainder comes from the `%` operator, so the first idea is to print only when the remainder is not 0:
+
+```python title="for_demo.py"
+for value in range(10):
+    if value % 3 != 0:
+        print(value)
+```
+
+```text
+1
+2
+4
+5
+7
+8
+```
+
+0, 3, 6 and 9 are gone. This is a correct solution.
+
+It has one cost. The statement that does the real work, here `print(value)`, now sits inside the `if` block. In a real program that work can be many lines long, and all of them would have to be indented one level deeper.
+
+## Step 3: Skip values with continue
+
+The second way turns the condition around. It checks for the values that should be left out, and for those it says `continue`. The work stays at the level of the loop:
+
+```python title="for_demo.py"
+for value in range(10):
+    if value % 3 == 0:
+        continue
+
+    print(value)
+```
+
+```text
+1
+2
+4
+5
+7
+8
+```
+
+The output is the same as in Step 2.
+
+`continue` means: skip the remaining statements of this iteration and go on with the next value. When `value` is 0, the condition is true, `continue` runs, and `print(value)` is never reached in that round. The loop takes the next value, 1. For 1 the condition is false, so `continue` is not executed and the value is printed.
+
+<Callout type="info" title="The output in the video">
+In the video the full output of this version is not visible in one piece, because the instructor steps through it in the debugger. The output above comes from running the same code.
+</Callout>
+
+### Watch continue in the debugger
+
+Set a breakpoint on the `for` line, start **Python Debugger: Debug Python File** and press **Step Over** repeatedly, as in [else and Debugging](/docs/python-one-shot/control-flow/else-and-debugging). This is what the lesson sees:
+
+| `value` | `value % 3 == 0` | Where the program goes | Printed |
+| --- | --- | --- | --- |
+| 0 | True | To `continue`, then back to the `for` line | Nothing |
+| 1 | False | To `print(value)` | `1` |
+| 2 | False | To `print(value)` | `2` |
+| 3 | True | To `continue`, then back to the `for` line | Nothing |
+
+After a `continue` the highlighted line jumps straight back to the `for` line. The `print` line is skipped.
+
+## Step 4: Stop the loop with break
+
+For the next experiment the lesson deletes the `data` list, which is no longer needed, and comments out the two `continue` lines. The loop prints 0 to 9 again.
+
+The new task: print only the values before 5, which means 0 to 4, and then stop. Skipping is not enough here. The loop should end.
+
+```python title="for_demo.py"
+for value in range(10):
+
+    if value == 5:
+        break
+
+    print(value)
+
+
+print("Bye")
+```
+
+```text
+0
+1
+2
+3
+4
+Bye
+```
+
+`break` ends the loop at once. The values 6 to 9 are never taken from the range. The program continues with the first line after the loop, which prints `Bye`.
+
+`print("Bye")` is there to show exactly that. It starts at the left edge with no indentation, so it does not belong to the loop. It runs once, after the loop has ended.
+
+Notice the order inside the loop. The check comes before `print(value)`. When `value` is 5 the loop is left before anything is printed, so 5 does not appear in the output.
+
+### Watch break in the debugger
+
+The lesson debugs this version too:
+
+| `value` | `value == 5` | Where the program goes | Printed |
+| --- | --- | --- | --- |
+| 0 to 4 | False | To `print(value)`, then back to the `for` line | `0` to `4` |
+| 5 | True | To `break`, then directly to `print("Bye")` | `Bye` |
+
+## continue and break side by side
+
+The two words are easy to mix up. They do very different things:
+
+| | `continue` | `break` |
+| --- | --- | --- |
+| Ends | The current iteration only | The whole loop |
+| Next line that runs | The `for` line, with the next value | The first line after the loop |
+| Later values | Are still processed | Are never processed |
+| In the lesson | Leaves out 0, 3, 6 and 9 | Stops when the value is 5 |
+
+![Break_And_Continue](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-break-continue.svg)
+
+## Additions beyond the lesson
+
+**Both work in a while loop too.** The lesson shows them in a for loop. In a [while loop](/docs/python-one-shot/control-flow/while-loop) they behave the same way. Here `break` ends a loop whose condition is always true:
+
+```python title="while_break.py"
+i = 0
+
+while True:
+    if i == 3:
+        break
+
+    print(i)
+    i += 1
+
+print("Bye")
+```
+
+```text
+0
+1
+2
+Bye
+```
+
+Be careful with `continue` in a while loop. It jumps back to the condition. If the line that changes the counter comes after the `continue`, the counter is never changed again and the loop runs forever.
+
+**In nested loops, they act on the nearest loop.** A `break` in an inner loop ends the inner loop only. The outer loop goes on with its next round.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown. This includes the `continue` version, whose full output is not visible in the video. The error messages in the table below were produced by running the faulty code. The debugger tables are described from the video. The listings leave out the commented while loop from the previous lesson that is still in the instructor's file. The listings in Steps 1 to 3 also leave out the line `data = [2, 'Navin', 4.5, 8, 'Telusko', 'Python']`, which is still at the top of that file and is not used.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `SyntaxError: 'break' outside loop` | `break` is written outside a loop, often because its indentation is wrong | Put `break` inside the block of a `for` or `while` loop |
+| `SyntaxError: 'continue' not properly in loop` | `continue` is written outside a loop | Put `continue` inside the block of a loop |
+| `IndentationError: expected an indented block after 'if' statement on line 2` | The line under the `if` is not indented. The editor shows a red line for a moment in the lesson when `print(value)` is still unindented under a new `if` | Indent the line under the `if` |
+| Nothing is printed at all | `print(value)` is indented under the `if`, after `continue`. A line that follows `continue` in the same block can never run | Move `print(value)` back to the level of the loop |
+| 5 is printed as well, then the loop stops | `print(value)` comes before the check with `break` | Check first, print after |
+| `Bye` is printed in every round | `print("Bye")` is indented and belongs to the loop | Remove its indentation |
+
+## Try It Yourself
+
+1. Print the numbers from 0 to 19 and skip every number that can be divided by 4. Solve it once with `!=` and once with `continue`.
+2. Print the numbers from 1 to 20 and stop the loop when you reach the first number that can be divided by 7. Print `Done` after the loop.
+3. In the `break` example, move the `if` block below `print(value)`. Guess the output before you run it.
+4. Loop over `[3, 8, 12, 5, 20, 7]` and print only the even numbers. Use `continue`.
+5. Loop over `['Navin', 'Kiran', 'Harsh', 'Telusko', 'Python']` and stop when you find `'Telusko'`. Print `Found` when it happens.
+6. Use both statements in one loop over `range(20)`: skip the odd numbers and stop completely when the value is greater than 12.
+7. Debug your solution for exercise 6 with a breakpoint on the `for` line. Watch which line runs after `continue` and which line runs after `break`.
+
+## Official references
+
+- [Python tutorial: break and continue statements](https://docs.python.org/3/tutorial/controlflow.html#break-and-continue-statements)
+- [Python reference: the break statement](https://docs.python.org/3/reference/simple_stmts.html#the-break-statement)
+- [Python reference: the continue statement](https://docs.python.org/3/reference/simple_stmts.html#the-continue-statement)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

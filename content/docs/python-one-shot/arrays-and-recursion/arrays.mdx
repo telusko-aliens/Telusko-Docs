@@ -1,0 +1,330 @@
+---
+title: Arrays
+description: Import the array module, create an array with a type code, see why it accepts values of one type only, and print it as an array, as a list and value by value.
+---
+
+<Video id="j_JuhAWlEaI" title="Arrays" start={14074} />
+
+---
+
+To store four values you can create four variables, `a`, `b`, `c` and `d`. To store many values in one place you already know better tools: a [list](/docs/python-one-shot/data-structures-and-types/lists) or a [tuple](/docs/python-one-shot/data-structures-and-types/tuples).
+
+A list accepts anything. A number, a name and a decimal number can sit side by side, as in `[10, "telusko", 3.14]`. That freedom looks like a pure advantage. The lesson points at two problems that come with it.
+
+The first problem is about operations. With numbers you do arithmetic. With a string you fetch a character or take a slice. When everything is mixed in one list, there is no single operation that fits every value.
+
+The second problem is about memory. A list does not hold the values themselves. It holds references to them, and the values are separate objects that can lie anywhere in memory. For time-consuming work on a lot of data, much of the time goes into reaching the values.
+
+The answer to both problems is the **array**: a collection in which every value has the same type and the values are stored together, one after the other.
+
+## Arrays in Python
+
+Arrays are not a Python invention. Most programming languages have them. Python keeps them simple and puts them into a module named `array`, which is installed together with Python.
+
+For heavy work with arrays, such as two-dimensional arrays or complex calculations, Python programmers use a library named **NumPy**. That is why NumPy comes up whenever people talk about machine learning and AI. This lesson stays with the built-in `array` module.
+
+## Step 1: Import the array module
+
+Create a new file named `array_demo.py`. A list needs no preparation. An array does, because it lives in a module, and a module has to be imported first, as you saw in [The math Module](/docs/python-one-shot/functions-modules-and-input/the-math-module).
+
+```python title="array_demo.py"
+from array import *
+```
+
+The star means "everything". This line brings every name from the `array` module into the file, so they can be used directly. The name you need is `array`, which creates an array. It has the same name as the module.
+
+In VS Code, hold Ctrl and click the word `array` in this line. The editor opens a file that lists what the module offers. The lesson scrolls through it. There is a lot in it, and you do not need to understand it all. Two things are worth a look: the type codes and the list of operations.
+
+## The type codes
+
+One array holds one type of value, and you have to say which type when you create the array. You do that with a **type code**, a single letter in quotes.
+
+| Type code | Stands for | Python type | Minimum size in bytes |
+| --- | --- | --- | --- |
+| `'b'` | signed char, one byte | `int` | 1 |
+| `'h'` | signed short | `int` | 2 |
+| `'i'` | signed int | `int` | 2 |
+| `'I'` (capital i) | unsigned int | `int` | 2 |
+| `'l'` (small L) | signed long | `int` | 4 |
+| `'f'` | float | `float` | 4 |
+| `'d'` | double, a float with more precision | `float` | 8 |
+
+**Signed** means the number can carry a minus sign, so negative and positive values are both allowed. **Unsigned** means no sign, so only zero and positive values are allowed. The small letter is the signed version and the capital letter is the unsigned one: `'i'` and `'I'`, `'h'` and `'H'`, `'l'` and `'L'`.
+
+<Callout type="info" title="About this table">
+The table is taken from the official documentation of the `array` module and shows only the codes a beginner needs. The table on screen in the video is hard to read in one place: the capital `'I'` and the small `'l'` look the same in its font. The video table also lists `'u'` for characters. The documentation marks `'u'` as deprecated, which means it is on its way out. The full list in the documentation has more codes, for example `'q'` for very large integers.
+</Callout>
+
+## What an array can do
+
+The same file lists the operations of an array. The lesson reads out a few of them:
+
+| Operation | What it does |
+| --- | --- |
+| `append` | Adds a value at the end |
+| `insert` | Adds a value at a position |
+| `pop` | Removes a value and gives it back |
+| `remove` | Removes a value |
+| `count` | Counts how often a value occurs |
+| `tolist` | Gives the values as a list |
+| `buffer_info` | Gives the memory address and the number of values |
+
+This lesson uses the last two. The next lesson, [Array Functions](/docs/python-one-shot/arrays-and-recursion/array-functions), tries more of them.
+
+## Step 2: Start with a plain list
+
+The lesson first writes the values in square brackets and asks Python what that is:
+
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = [33,4,55,5,66]
+
+print(type(arr1))
+```
+
+```text
+<class 'list'>
+```
+
+Square brackets make a list, whatever the variable is called. Python has no special symbol for an array.
+
+## Step 3: Call array() and meet the first error
+
+An array is created by calling `array(...)`. The first attempt passes only the list:
+
+{/* check: error */}
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = array([33,4,55,5,66])
+
+print(type(arr1))
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\Users\navin\OneDrive\Documents\Python Course\FirstProject\array_demo.py", line 4, in <module>
+    arr1 = array([33,4,55,5,66])
+TypeError: array() argument 1 must be a unicode character, not list
+```
+
+This happens in the lesson. Read the last line: argument 1 must be a unicode character, not list.
+
+The first argument of `array()` is not the data. It is the type code. "Unicode character" here means a string with one character, such as `'i'`. Python found a list in that place and stopped.
+
+## Step 4: Add the type code, and try a float
+
+The type code goes first and the values second. To test the one-type rule, the lesson slips a `5.5` into the values:
+
+{/* check: error */}
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = array('i',[33,4,55,5.5,66])
+
+print(type(arr1))
+```
+
+{/* check: skip */}
+```text
+Traceback (most recent call last):
+  File "C:\Users\navin\OneDrive\Documents\Python Course\FirstProject\array_demo.py", line 4, in <module>
+    arr1 = array('i',[33,4,55,5.5,66])
+TypeError: 'float' object cannot be interpreted as an integer
+```
+
+The type code `'i'` promises integers. `5.5` is a float, and the array refuses it. A list would have accepted the value without a word. This is the first problem from the introduction, solved: an array of integers contains integers and nothing else.
+
+With `5` in place of `5.5` the array is created:
+
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = array('i',[33,4,55,5,66])
+
+print(type(arr1))
+```
+
+```text
+<class 'array.array'>
+```
+
+The type reads `array.array`: the type `array` from the module `array`.
+
+![Array_Vs_List](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-array-vs-list.svg)
+
+## Step 5: Print the array
+
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = array('i',[33,4,55,5,66])
+
+print(arr1)
+```
+
+```text
+array('i', [33, 4, 55, 5, 66])
+```
+
+The output has three parts: the word `array`, the type code `'i'` and the values.
+
+## Step 6: Print only the values with tolist()
+
+If you want the values without the word `array` and the type code, ask the array for a list:
+
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = array('i',[33,4,55,5,66])
+
+print(arr1.tolist())
+```
+
+```text
+[33, 4, 55, 5, 66]
+```
+
+`tolist()` gives back an ordinary list with the same values. The array itself is not changed.
+
+## Step 7: Print the values one by one
+
+An array is a collection, and the best tool to go through a collection is [the for loop](/docs/python-one-shot/control-flow/for-loop):
+
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = array('i',[33,4,55,5,66])
+
+for n in arr1:
+    print(n)
+```
+
+```text
+33
+4
+55
+5
+66
+```
+
+In each round `n` holds one value of the array, exactly as it did with a list.
+
+## Step 8: Look at buffer_info()
+
+The last experiment prints the buffer info of the array before the loop:
+
+{/* check: noout */}
+```python title="array_demo.py"
+from array import *
+
+
+arr1 = array('i',[33,4,55,5,66])
+
+print(arr1.buffer_info())
+
+for n in arr1:
+    print(n)
+```
+
+{/* check: skip */}
+```text
+(2293267669616, 5)
+33
+4
+55
+5
+66
+```
+
+`buffer_info()` gives two numbers in round brackets, a tuple.
+
+| Number | Meaning |
+| --- | --- |
+| `2293267669616` | The address in memory where the values of the array are stored |
+| `5` | The size of the array, counted in values. This array has five values |
+
+The address is the number from the video. It is different on every machine and in every run, so you will see another number. The `5` will be the same.
+
+## List and array side by side
+
+| | List | Array |
+| --- | --- | --- |
+| Created with | Square brackets | `array(type code, values)` |
+| Import needed | No | Yes, from the `array` module |
+| Types of values | Any mix | One type only, fixed by the type code |
+| A value of another type | Accepted | `TypeError` |
+| Works in a `for` loop | Yes | Yes |
+
+## Additions beyond the lesson
+
+**Lists are the everyday choice.** In everyday Python code, lists are used far more often than arrays from the `array` module. For numerical work, such as data analysis and machine learning, programmers normally use NumPy arrays, the library the instructor mentions. The `array` module is still a good place to learn the idea of one type per collection.
+
+**Index numbers and len() work as with lists.** `arr1[0]` gives the first value and `len(arr1)` gives the number of values:
+
+```python
+>>> from array import *
+>>> arr1 = array('i',[33,4,55,5,66])
+>>> arr1[0]
+33
+>>> len(arr1)
+5
+```
+
+**The real size of one value.** The sizes in the type code table are minimum sizes. `itemsize` tells you how many bytes one value takes on your machine. For `'i'` it is 4 on today's usual computers, and it may differ on yours:
+
+{/* check: skip */}
+```python
+>>> from array import *
+>>> arr1 = array('i',[33,4,55,5,66])
+>>> arr1.itemsize
+4
+```
+
+<Callout type="info" title="Checked for these docs">
+Every program and prompt session on this page was run with Python 3.13 and gave the output shown. Both `TypeError` messages were reproduced by running the code. The tracebacks are shown with the file path from the video and with the line number that matches the listings on this page. In the video the file starts with an empty line, so the errors are reported there for line 5. The `buffer_info()` output shows the address from the video, which cannot be repeated on another machine. The second number, 5, was confirmed. The other error messages in the table below were also produced by running the faulty code.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `<class 'list'>` when you expected an array | Square brackets alone create a list | Wrap the values: `array('i',[33,4,55,5,66])` |
+| `TypeError: array() argument 1 must be a unicode character, not list` | The type code is missing, so the list is in first place. This happens in the lesson | Put the type code first: `array('i',[...])` |
+| `TypeError: 'float' object cannot be interpreted as an integer` | A float such as `5.5` in an array with the type code `'i'`. This happens in the lesson | Use integers only, or choose the type code `'f'` or `'d'` |
+| `TypeError: 'str' object cannot be interpreted as an integer` | A string such as `'4'` among the values of an integer array | Remove the quotes |
+| `NameError: name 'array' is not defined. Did you forget to import 'array'?` | The import line is missing | Add `from array import *` at the top |
+| `TypeError: 'module' object is not callable. Did you mean: 'array.array(...)'?` | The file says `import array`, and then `array(...)` is the module, not the type | Use `from array import *`, or write `array.array('i',[...])` |
+| `NameError: name 'i' is not defined. Did you mean: 'id'?` | The type code is written without quotes | Write `'i'` |
+| `ValueError: bad typecode (must be b, B, u, w, h, H, i, I, l, L, q, Q, f or d)` | The letter is not a type code. The list of codes inside the message depends on the Python version | Pick a code from the table |
+| `OverflowError: can't convert negative value to unsigned int` | A negative number in an array with the unsigned code `'I'` | Use the signed code `'i'` |
+
+## Try It Yourself
+
+1. Create an array of five integers of your choice with the type code `'i'`. Print its type and then the array itself.
+2. Print the same array as a list, and then value by value with a for loop.
+3. Create an array of the prices `99.5`, `149.0` and `20.25` with the type code `'d'` and print it.
+4. Put `'hello'` into your integer array from exercise 1 and run the file. Read the error message, then remove the string.
+5. Create an array with the type code `'d'` and the values `1`, `2` and `3`. Print it and look closely at how the values are shown. Explain what happened.
+6. Add up all values of an integer array with a for loop and print the total.
+7. Print `buffer_info()` of one of your arrays. Run the file twice and compare the two numbers of each run.
+8. Create one array with the code `'i'` and one with `'I'`. Try to store `-5` in each. Which one accepts it, and why?
+
+## Official references
+
+- [Python library: array, efficient arrays of numeric values](https://docs.python.org/3/library/array.html)
+- [Python tutorial: more on lists](https://docs.python.org/3/tutorial/datastructures.html#more-on-lists)
+- [Python tutorial: modules](https://docs.python.org/3/tutorial/modules.html)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

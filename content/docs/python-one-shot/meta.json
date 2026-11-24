@@ -1,0 +1,15 @@
+{
+  "title": "Python One Shot",
+  "icon": "Rocket",
+  "pages": [
+    "getting-started.mdx",
+    "python-basics",
+    "data-structures-and-types",
+    "functions-modules-and-input",
+    "control-flow",
+    "arrays-and-recursion",
+    "functional-python",
+    "object-oriented-python",
+    "exceptions-and-multithreading"
+  ]
+}

@@ -1,0 +1,683 @@
+---
+title: Multithreading
+description: Run several functions at the same time with threads, wait for them with join, measure when threads save time, and see why CPU-heavy work needs multiprocessing.
+---
+
+<Video id="j_JuhAWlEaI" title="Multithreading" start={28973} />
+
+---
+
+Every program in this course has run one step at a time. A line finishes, then the next line starts. A function that is called runs to its end before the caller goes on.
+
+Real software does several things at once. You are on a phone call, you minimise it, and you read a chat or check the cricket score while the call goes on. In a game such as Mario, the player moves, the enemies move, the music plays and the score updates, all together. If each of these were a function that had to finish before the next one starts, the player would move, then stop, then the enemies would move, then stop, then a bit of music would play.
+
+The last lesson of the course shows how Python runs functions side by side with **threads**, where threads help, where they do not, and what **multiprocessing** does about that.
+
+## Step 1: Two classes, one after the other
+
+The instructor uses a small example, and says so himself: the output is not important, the way it is produced is. Create `threads_demo.py` in the `adv` folder:
+
+```python title="threads_demo.py"
+class Hello:
+    def do(self):
+        for i in range(5):
+            print("Hello ", i+1)
+
+class Hi:
+    def do(self):
+        for i in range(5):
+            print("Hi ", i+1)
+
+if __name__ == '__main__':
+
+    t1 = Hello()
+    t2 = Hi()
+
+    t1.do()
+    t2.do()
+```
+
+```text
+Hello  1
+Hello  2
+Hello  3
+Hello  4
+Hello  5
+Hi  1
+Hi  2
+Hi  3
+Hi  4
+Hi  5
+```
+
+`t1.do()` runs its whole loop. Only then does `t2.do()` start. The goal of the lesson is to make both run at the same time. The `if __name__ == '__main__':` line comes from [The Special Variable \_\_name\_\_](/docs/python-one-shot/functional-python/special-variable-name). It becomes important at the end of this page.
+
+<Callout type="info" title="Two spaces in the output">
+`"Hello "` ends with a space, and `print` puts one more space between its values. So the output has two spaces before the number.
+</Callout>
+
+## Processes and threads
+
+Every running program is a **process**. The lesson opens the Windows Task Manager to show them. On the Performance tab, the instructor's machine shows about 298 processes and more than 5,000 threads. When he starts one more application, both numbers go up.
+
+A process is heavy. It takes time to create and it has its own memory. A **thread** is a lighter unit of work inside a process. One process can have many threads, and they share the memory of that process.
+
+| | Process | Thread |
+| --- | --- | --- |
+| What it is | A running program | A line of execution inside a process |
+| Memory | Its own | Shared with the other threads of the process |
+| Cost to create | Higher | Lower |
+| Python module | `multiprocessing` | `threading` |
+
+## Step 2: Turn the classes into threads
+
+Python's `threading` module has a class named `Thread`. The lesson says there are two ways to use it: with classes, and with functions. It starts with classes. The instructor first types `Thread(target=Hello.do)`, removes it again, and uses inheritance: `Hello` and `Hi` inherit from `Thread`, and the method `do` is renamed to `run`.
+
+```python title="threads_demo.py"
+from threading import Thread
+
+class Hello(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hello ", i+1)
+
+class Hi(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hi ", i+1)
+
+if __name__ == '__main__':
+
+    t1 = Hello()
+    t2 = Hi()
+
+    t1.run()
+    t2.run()
+```
+
+```text
+Hello  1
+Hello  2
+Hello  3
+Hello  4
+Hello  5
+Hi  1
+Hi  2
+Hi  3
+Hi  4
+Hi  5
+```
+
+Still one after the other. `t1` and `t2` are thread objects now, but nobody has started them. Calling `run()` yourself is an ordinary method call.
+
+## Step 3: start, not run
+
+Change the last two lines to `start()`:
+
+{/* check: noout */}
+```python title="threads_demo.py"
+from threading import Thread
+
+class Hello(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hello ", i+1)
+
+class Hi(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hi ", i+1)
+
+if __name__ == '__main__':
+
+    t1 = Hello()
+    t2 = Hi()
+
+    t1.start()
+    t2.start()
+```
+
+The first run in the video prints:
+
+{/* check: skip */}
+```text
+Hello  1
+Hello  2
+Hello  3
+Hi  1
+Hello  4
+Hi  2
+Hello  5
+Hi  3
+Hi  4
+Hi  5
+```
+
+The two loops are mixed. `start()` asks the system for a new thread, and that new thread calls `run()`. The lesson opens `threading.py` and shows the description of `start`: "It arranges for the object's run() method to be invoked in a separate thread of control."
+
+The name `run` is fixed. To prove it, the instructor renames the method in `Hello` back to `do` and keeps `start()`:
+
+```python title="threads_demo.py"
+from threading import Thread
+
+class Hello(Thread):
+    def do(self):
+        for i in range(5):
+            print("Hello ", i+1)
+
+class Hi(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hi ", i+1)
+
+if __name__ == '__main__':
+
+    t1 = Hello()
+    t2 = Hi()
+
+    t1.start()
+    t2.start()
+```
+
+```text
+Hi  1
+Hi  2
+Hi  3
+Hi  4
+Hi  5
+```
+
+No error, and no "Hello". `Thread` has a `run` method of its own that does nothing here. `Hello` inherits it, `start()` calls it, and `do` is never called. Change `do` back to `run` before you go on.
+
+<Callout type="warn" title="Your order will differ">
+A second run in the video gives a different mix: two "Hello" lines, then "Hi  1". The operating system decides which thread runs at each moment. That part of the system is called the **scheduler**, and your program does not control it. On a fast machine you may even see all five "Hello" lines first, because the first thread finishes before the second one starts. That happened in the runs for these docs. Every output of two running threads on this page is one possible result.
+</Callout>
+
+## Step 4: Slow the threads down with sleep
+
+To see the two threads take turns, the lesson makes each loop pause. `sleep(0.3)` from the `time` module pauses the thread that calls it for 0.3 seconds, and the other thread can work in the meantime.
+
+{/* check: noout */}
+```python title="threads_demo.py"
+from threading import Thread
+from time import sleep
+
+
+class Hello(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hello ", i+1)
+            sleep(0.3)
+
+
+class Hi(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hi ", i+1)
+            sleep(0.3)
+
+if __name__ == '__main__':
+
+    t1 = Hello()
+    t2 = Hi()
+
+    t1.start()
+    t2.start()
+```
+
+{/* check: skip */}
+```text
+Hello  1
+Hi  1
+Hello  2
+Hi  2
+Hello  3
+Hi  3
+Hi  4
+Hello  4
+Hi  5
+Hello  5
+```
+
+Almost a clean pattern. Look at the seventh line: "Hi  4" comes before "Hello  4". Both threads wake up at nearly the same moment, and either one can print first.
+
+### Where the pause has to go
+
+The instructor then tries to let one thread start a little after the other. In the video the pause is written between the two lines that create the objects:
+
+```python
+    t1 = Hello()
+    sleep(0.2)
+    t2 = Hi()
+
+    t1.start()
+    t2.start()
+```
+
+The output in the video still swaps now and then, and the instructor concludes that the scheduler cannot be controlled. That conclusion is right. The pause, however, has no effect in this position. Creating a `Thread` object does not start anything. The program waits 0.2 seconds before any thread exists, and then both `start()` calls follow each other at once.
+
+To make the second thread begin later, the pause must sit between the two `start()` calls. This is an addition to the lesson:
+
+{/* check: noout */}
+```python title="threads_demo.py"
+from threading import Thread
+from time import sleep
+
+
+class Hello(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hello ", i+1)
+            sleep(0.3)
+
+
+class Hi(Thread):
+    def run(self):
+        for i in range(5):
+            print("Hi ", i+1)
+            sleep(0.3)
+
+if __name__ == '__main__':
+
+    t1 = Hello()
+    t2 = Hi()
+
+    t1.start()
+    sleep(0.2)
+    t2.start()
+```
+
+Measured for these docs, "Hi  1" appeared at the same moment as "Hello  1" with the pause in the video's position, and 0.2 seconds after it with the pause between the `start()` calls. Six runs in a row then gave a clean Hello, Hi, Hello, Hi pattern. It is still a delay and no guarantee. As the instructor says, slowing a program down on purpose is only good for a demonstration.
+
+## Step 5: Threads from functions
+
+The second way needs no classes, and the lesson calls it the more Pythonic one. Write plain functions and hand each one to a `Thread` as its `target`:
+
+{/* check: noout */}
+```python title="threads_demo.py"
+from threading import Thread
+from time import sleep
+
+def hello():
+    for i in range(5):
+        print("Hello ", i+1)
+        sleep(0.3)
+
+
+def hi():
+    for i in range(5):
+        print("Hi ", i+1)
+        sleep(0.3)
+
+if __name__ == '__main__':
+
+    t1 = Thread(target=hello)
+    t2 = Thread(target=hi)
+
+    t1.start()
+    t2.start()
+```
+
+`target=hello` has no brackets after `hello`. You pass the function itself, as in [Higher Order Functions](/docs/python-one-shot/functional-python/higher-order-functions), and the thread calls it later. The output is the same kind of mix as before. The file in the video still has the `sleep(0.2)` line between the two `Thread(...)` lines. It is left out here because it changes nothing.
+
+## Step 6: The main thread and join
+
+Add one line at the end of the file, after `t2.start()`:
+
+```python
+    print("Bye")
+```
+
+A greeting at the end of the program. This is what the video shows:
+
+{/* check: skip */}
+```text
+Hello  1
+Hi  1
+Bye
+Hello  2
+Hi  2
+Hi  3
+Hello  3
+Hi  4
+Hello  4
+Hello  5
+Hi  5
+```
+
+"Bye" is the third line. The reason is that the program had a thread from the beginning: the one that runs the file from top to bottom. It is called the **main thread**. It starts `t1`, starts `t2`, and then has nothing left to wait for, so it goes on to `print("Bye")` while the other two are in their first pause.
+
+To make the main thread wait, call `join()`:
+
+{/* check: noout */}
+```python title="threads_demo.py"
+from threading import Thread
+from time import sleep
+
+def hello():
+    for i in range(5):
+        print("Hello ", i+1)
+        sleep(0.3)
+
+
+def hi():
+    for i in range(5):
+        print("Hi ", i+1)
+        sleep(0.3)
+
+if __name__ == '__main__':
+
+    t1 = Thread(target=hello)
+    t2 = Thread(target=hi)
+
+    t1.start()
+    t2.start()
+
+    t1.join()
+    t2.join()
+
+    print("Bye")
+```
+
+{/* check: skip */}
+```text
+Hello  1
+Hi  1
+Hello  2
+Hi  2
+Hello  3
+Hi  3
+Hi  4
+Hello  4
+Hi  5
+Hello  5
+Bye
+```
+
+`t1.join()` means: wait here until `t1` has finished. After both joins, "Bye" is the last line in every run.
+
+![Threads_And_Join](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-threads-join.svg)
+
+## Step 7: Do threads save time?
+
+So far threads changed the order of the output. Now the lesson measures time. The function `download` pretends to download a file. The `sleep(0.5)` stands for the waiting.
+
+{/* check: noout */}
+```python title="threads_demo.py"
+from threading import Thread
+from time import sleep, time
+
+def download(file_name):
+    print("Downloading file... ",file_name)
+    sleep(0.5)
+    print("Download complete")
+
+if __name__ == '__main__':
+
+    files = ['video.mp4', 'image.png', 'data.csv']
+
+    start = time()
+    for f in files:
+        download(f)
+    end = time()
+    print(f"serial time {end - start:.2f} seconds")
+
+    threads = []
+
+    for f in files:
+        t = Thread(target=download, args=(f,))
+        threads.append(t)
+
+    start = time()
+
+    for t in threads:
+        t.start()
+
+    for t in threads:
+        t.join()
+
+    end = time()
+
+    print(f"parallel with threads time {end - start:.2f} seconds")
+
+    print("Bye")
+```
+
+{/* check: skip */}
+```text
+Downloading file...  video.mp4
+Download complete
+Downloading file...  image.png
+Download complete
+Downloading file...  data.csv
+Download complete
+serial time 1.50 seconds
+Downloading file...  video.mp4
+Downloading file...  image.png
+Downloading file...  data.csv
+Download complete
+Download complete
+Download complete
+parallel with threads time 0.50 seconds
+Bye
+```
+
+| Line | Meaning |
+| --- | --- |
+| `time()` | The current time as a number of seconds. `end - start` is the time that passed |
+| `:.2f` | Show the number with two decimals, inside an f-string |
+| `args=(f,)` | The arguments for the target function, as a tuple. The comma makes `(f,)` a tuple with one item, as in [Tuples](/docs/python-one-shot/data-structures-and-types/tuples) |
+| `threads.append(t)` | Keep every thread in a list, so that two loops can start them all and then join them all |
+
+One after the other, three downloads take three times 0.5 seconds. With three threads, all three wait at the same time, and the total is 0.5 seconds. The same numbers came out on the machine used for these docs. The order of the "Downloading" lines can differ.
+
+A program that mostly waits, for a network, a disk or a user, is called **I/O bound**. I/O stands for input and output. Threads are a good fit for it.
+
+## Step 8: Work for the CPU
+
+Now a task that does not wait. `calculate` adds up the squares of all numbers in a range, 50 million of them. The result is not used. Only the time matters. The plan: split the range in two halves, give each half to a thread, and finish in half the time.
+
+{/* check: noout */}
+```python title="threads_demo.py"
+from threading import Thread
+from time import sleep, time
+
+
+def calculate(n1, n2):
+    sum = 0
+    for n in range(n1, n2):
+        sum += n*n
+
+
+
+if __name__ == '__main__':
+
+    num = 50_000_000
+
+    start = time()
+    calculate(0, num)
+    end = time()
+
+    print(f"serial time {end - start:.2f} seconds")
+
+    mid = num // 2
+
+    t1 = Thread(target=calculate, args = (0, mid))
+    t2 = Thread(target=calculate, args = (mid, num))
+
+    start = time()
+
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    end = time()
+
+    print(f"parallel with threads time {end - start:.2f} seconds")
+
+    print("Bye")
+```
+
+{/* check: skip */}
+```text
+serial time 1.67 seconds
+parallel with threads time 1.57 seconds
+Bye
+```
+
+`50_000_000` is 50 million. Python lets you put underscores into a number to make it readable. `num // 2` gives a whole number, which `range` needs.
+
+Two threads, and almost no gain. The instructor runs it five times, and the thread version stays between 1.49 and 1.57 seconds against 1.57 to 1.67 for the serial one.
+
+## The GIL
+
+The reason has a name: the **GIL**, the global interpreter lock. In the standard build of CPython, the Python you download from python.org, only one thread executes Python bytecode at a time. Bytecode is the form your code is translated into before it runs. A thread must hold the lock to run it. The others wait for their turn.
+
+So `t1` and `t2` do not run on two CPU cores at the same time. They take turns on the lock, and the switching costs a little time as well.
+
+Why did the downloads get faster then? A thread that waits, in `sleep` or for a network or a file, gives the lock away while it waits. Three threads can wait at the same time. They cannot calculate at the same time. A task like `calculate`, which keeps the processor busy, is called **CPU bound**.
+
+## Step 9: multiprocessing
+
+The answer of the lesson is to use processes. Each process has its own memory, its own Python interpreter and so its own GIL. The class `Process` from the `multiprocessing` module is used in almost the same way as `Thread`. This is the final file of the video:
+
+{/* check: noout */}
+```python title="threads_demo.py"
+from threading import Thread
+from time import sleep, time
+from multiprocessing import Process
+
+
+def calculate(n1, n2):
+    sum = 0
+    for n in range(n1, n2):
+        sum += n*n
+
+
+
+if __name__ == '__main__':
+
+    num = 50_000_000
+
+    start = time()
+    calculate(0, num)
+    end = time()
+
+    print(f"serial time {end - start:.2f} seconds")
+
+    mid = num // 2
+
+    t1 = Thread(target=calculate, args = (0, mid))
+    t2 = Thread(target=calculate, args = (mid, num))
+
+    start = time()
+
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    end = time()
+
+    print(f"parallel with threads time {end - start:.2f} seconds")
+
+    t1 = Process(target=calculate, args = (0, mid))
+    t2 = Process(target=calculate, args = (mid, num))
+
+    start = time()
+
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    end = time()
+
+    print(f"parallel with process time {end - start:.2f} seconds")
+
+    print("Bye")
+```
+
+{/* check: skip */}
+```text
+serial time 1.52 seconds
+parallel with threads time 1.55 seconds
+parallel with process time 0.88 seconds
+Bye
+```
+
+| Run | Video's machine | Machine used for these docs |
+| --- | --- | --- |
+| Serial | 1.52 seconds | 3.52 seconds |
+| Two threads | 1.55 seconds | 3.58 seconds |
+| Two processes | 0.88 seconds | 1.98 seconds |
+
+The numbers depend on the computer, and yours will be different again. The pattern is the same on both machines. Two threads are no faster than the serial run, and in this run a little slower. Two processes need a bit more than half the time. It is not exactly half, because starting a process takes time too.
+
+<Callout type="warn" title="Keep the __main__ check when you use Process">
+On Windows, every new process starts a fresh Python that reads your file again. Lines at the top level of the file would run again in each new process, including the lines that create processes. The line `if __name__ == '__main__':` stops that, because the name is `__main__` only in the process you started yourself. The file in the video has this check from the first version, so it runs correctly. Tested for these docs on Windows: a file that creates and starts a `Process` without the check stops in the new process with `RuntimeError: An attempt has been made to start a new process before the current process has finished its bootstrapping phase.`
+</Callout>
+
+## Which one to use
+
+| Situation | Choice in the lesson |
+| --- | --- |
+| The work mostly waits: downloads, files, network (I/O bound) | Threads |
+| Several things must go on side by side and speed is not the point | Threads |
+| The work is calculation (CPU bound) | Stay serial, or use processes |
+
+Processes cost more memory and more time to create. The instructor's summary is that the right choice depends on the situation.
+
+## Additions beyond the lesson
+
+**A Python without the GIL.** Since Python 3.13 there is a second, optional build of CPython called the free-threaded build, in which the GIL is disabled and threads can run Python code on several cores at once. In Python 3.13 it is experimental. From Python 3.14 it is officially supported. In both cases it is optional, and it is not what a normal installation gives you. It is a separate program, usually named `python3.13t`. Everything on this page describes the standard build, and the timings in the video match it.
+
+**The name `sum`.** `sum` is also the name of a built-in Python function. Inside `calculate` the variable hides it. Nothing breaks here, and in your own code a name such as `total` avoids the clash.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 on Windows and finished without an error. The three programs without threads running side by side gave exactly the output shown. For the others, the output shown is the one from the video, because the order of lines and the times change from run to run. In the two outputs with "Bye", one line had scrolled out of view in the video ("Hi  5" at the bottom of the first, "Hello  1" at the top of the second). It is filled in here, since it is the one line that thread still had to print. The first four lines of the download output had scrolled away too and are taken from the earlier serial run in the video. The first "Bye" output and the download times of 1.50 and 0.50 seconds were reproduced exactly in runs for these docs. The GIL description was compared with the Python glossary and the free-threading guide linked below.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| "Hello" five times, then "Hi" five times, although the classes inherit from `Thread` | `run()` was called directly. This happens in the lesson | Call `start()` |
+| One thread prints nothing, and there is no error | The method is not named `run`, so the empty `run` of `Thread` is used. The lesson shows this with `do` | Name the method `run` |
+| `NameError: name 'Target' is not defined` | `Target()` was typed for `Thread(target=...)`. The instructor types it and corrects it before running | `t1 = Thread(target=hello)` |
+| "Bye" appears in the middle of the output | The main thread does not wait for the others. This happens in the lesson | Call `join()` on each thread before the last `print` |
+| The pause between creating `t1` and `t2` changes nothing | A thread begins at `start()`, not when the object is created. The video has the pause in this place | Put the pause between the two `start()` calls |
+| `TypeError: download() takes 1 positional argument but 9 were given` | `args=(f)` is a string, not a tuple, so each of the 9 letters of `'video.mp4'` becomes an argument. The instructor types `(f)` first and corrects it | `args=(f,)` with the comma |
+| `parallel with threads time 0.00 seconds` | Nothing stood between `start = time()` and `end = time()` yet. This happens in the lesson before the threads are written | Start and join the threads between the two lines |
+| `NameError: name 'Process' is not defined. Did you mean: 'process'?` | `process` was imported with a small p, and the code uses `Process`. The instructor types the import this way and corrects it before running | `from multiprocessing import Process` |
+| `RuntimeError: threads can only be started once` | `start()` was called twice on the same thread object | Create a new `Thread` object for each run |
+| Threads give no speed-up for a calculation | The GIL lets one thread at a time execute Python bytecode | Use `Process`, or keep the code serial |
+
+## Try It Yourself
+
+1. Write two functions, `tick` and `tock`, that each print their word five times. Call them one after the other and note the output.
+2. Run both as threads with `Thread(target=...)` and `start()`. Run the file several times. Is the order always the same?
+3. Add `sleep(0.2)` in both loops. Then print "Done" at the end of the file, first without `join()` and then with it.
+4. Rewrite `tick` as a class that inherits from `Thread`. Call `run()` once and `start()` once and explain the difference.
+5. Add a fourth file name to the `files` list of the download program. Guess the serial time and the thread time before you run it.
+6. This is the homework from the lesson. Give each file a size, and let `download` sleep for a time that depends on the size. Compare the serial time and the thread time.
+7. Run the final file three times and write down the three times of each run. Which of the three values changes most?
+8. Change `num` to `10_000_000`. Are two processes still faster than the serial run on your machine?
+
+## Official references
+
+- [Python library: threading](https://docs.python.org/3/library/threading.html)
+- [Python library: multiprocessing](https://docs.python.org/3/library/multiprocessing.html)
+- [Python glossary: global interpreter lock](https://docs.python.org/3/glossary.html#term-global-interpreter-lock)
+- [Python HOWTO: free-threaded Python](https://docs.python.org/3/howto/free-threading-python.html)
+
+## Where to go next
+
+This is the last lesson of the course. The video ends with the final run of `threads_demo.py` and a short thank you from the instructor. There is no closing slide and no list of next topics.
+
+The pages of this section are a good place to repeat things. The [Getting Started](/docs/python-one-shot/getting-started) page lists every lesson, and [Introduction to Python](/docs/python-one-shot/python-basics/introduction-to-python) is the first one. The Try It Yourself exercises on each page are the quickest way to find out what you still need to practise.
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

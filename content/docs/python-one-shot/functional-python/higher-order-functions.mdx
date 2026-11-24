@@ -1,0 +1,248 @@
+---
+title: Higher Order Functions
+description: Pass a function to another function as an argument, see why Python allows it, and write one function that can square or cube a whole list.
+---
+
+<Video id="j_JuhAWlEaI" title="Higher Order Functions" start={17461} />
+
+---
+
+"Higher order function" sounds like a hard topic. The instructor says it right away: the name is complex, the concept is not.
+
+So far you have passed values to functions: numbers, strings, lists. This lesson asks one question. Can you pass a function to a function?
+
+In Python you can. A function that takes another function as an argument, or returns a function, is called a **higher order function**. This lesson builds one that takes a function as an argument.
+
+## The idea in six lines
+
+The video shows the shape of the idea on a small card:
+
+```python
+def func1():
+     #logic
+
+def func2():
+     #logic
+func1(func2)
+```
+
+Look at the last line. `func1` is called, and the thing in the brackets is `func2`, another function. The card is a sketch and not a complete program, since a function body needs at least one real statement. The steps below turn it into code that runs.
+
+## Step 1: Two ordinary functions
+
+Create a file named `higher_order_func.py`. It starts with two small functions, one for the square of a number and one for the cube, and a call to the first one:
+
+```python title="higher_order_func.py"
+def square(num):
+    num * num
+
+def cube(num):
+    num * num * num
+
+
+value = 5
+result = square(value)
+print(result)
+```
+
+Run it with `python higher_order_func.py`. The expected answer is 25. The program prints:
+
+```text
+None
+```
+
+The instructor notices the slip at once. The functions calculate `num * num` and then throw the result away, because there is no `return`. A function without `return` gives back `None`, as you saw in [Introduction to Functions](/docs/python-one-shot/functions-modules-and-input/introduction-to-functions).
+
+There was one more slip before that. The very first run in the lesson fails before Python even reads the file:
+
+{/* check: skip */}
+```text
+PS C:\PythonCourse\FirstProject> python higher_order.func.py
+...python.exe: can't open file 'C:\\PythonCourse\\FirstProject\\higher_order.func.py': [Errno 2] No such file or directory
+```
+
+The file name was typed with a dot where the underscore belongs. The three dots at the start stand for the folder of the Python program, which is different on every machine.
+
+With `return` in both functions:
+
+```python title="higher_order_func.py"
+def square(num):
+    return num * num
+
+def cube(num):
+    return num * num * num
+
+
+value = 5
+result = square(value)
+print(result)
+```
+
+```text
+25
+```
+
+This is a perfectly good way to work. You know which function you want, you call it, you pass the value.
+
+## Step 2: Pass the function as an argument
+
+Now the lesson changes the plan. The call should not name `square` directly. It should go to a general function, `operate`, and tell it two things: the value, and which operation to perform on it.
+
+```python title="higher_order_func.py"
+def square(num):
+    return num * num
+
+def cube(num):
+    return num * num * num
+
+def operate(num, operation):
+    return operation(num)  # square(num)
+
+value = 5
+result = operate(value, square)
+print(result)
+```
+
+```text
+25
+```
+
+Read the call `operate(value, square)` slowly. `square` is written without brackets. Nothing is called at this point. The function itself is handed over, in the same way as the value 5.
+
+Inside `operate`, the two parameters receive the two arguments:
+
+| Parameter | Receives | So inside `operate` |
+| --- | --- | --- |
+| `num` | `value`, which is 5 | `num` is 5 |
+| `operation` | `square` | `operation` is another name for the function `square` |
+
+A beginner may look at `operation(num)` and say that `operation` is a variable, so how can it be called? It can, because what it holds is a function. Putting brackets after it calls that function. The comment in the code says it: for this call, `operation(num)` means `square(num)`.
+
+The name `operation` is the instructor's choice. Any parameter name works.
+
+`operate` is the higher order function here, because it accepts another function.
+
+Change one word in the call and the same `operate` gives a different result:
+
+```python
+result = operate(value, cube)
+```
+
+```text
+125
+```
+
+<Callout type="info" title="A name with brackets and a name without">
+`square` is the function. `square(5)` is a call, and its value is the result, 25. To pass a function, write the name alone. If you write `operate(value, square())`, Python tries to call `square` first, with no argument, and stops with an error.
+</Callout>
+
+## Why Python allows this
+
+If you come from C or Java, passing a function like this may look new. The instructor explains it with the term **first-class citizen**. In Python, functions are first-class. You can create a function, call it, and also pass it to another function as an argument.
+
+Behind the scenes every function in Python is an object, like a number or a list. A function name is a variable that refers to that object. That is why it can travel as an argument.
+
+<Callout type="info" title="Is Python a functional language?">
+The video calls Python "a functional programming" language. To be exact, Python supports several styles. You can write procedures, you can write classes and objects, and you can write in a functional style. The official Functional Programming HOWTO calls Python a multi-paradigm language. What matters for this lesson is true without any doubt: functions are objects, and they can be passed around.
+</Callout>
+
+## Step 3: Operate on a whole list
+
+The lesson makes the example a little bigger. There is no longer one value. There is a list, `nums`, and `operate` should apply the operation to every number in it and print each result. Nothing is returned this time, so the call is not stored in `result`.
+
+```python title="higher_order_func.py"
+def square(num):
+    return num * num
+
+def cube(num):
+    return num * num * num
+
+def operate(nums, operation):
+
+    for i in nums:
+        result = operation(i)
+        print(result)
+
+
+nums = [5,6,7]
+operate(nums, cube)
+```
+
+```text
+125
+216
+343
+```
+
+The loop takes one number at a time. `operation(i)` runs whatever function was passed in. Here that is `cube`, so the output is the cube of 5, 6 and 7.
+
+Pass `square` and the same loop does different work:
+
+```python
+operate(nums, square)
+```
+
+```text
+25
+36
+49
+```
+
+![Higher_Order_Function](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-higher-order-function.svg)
+
+There is one condition, and the instructor names it. `operate` calls `operation(i)` with one value. So any function you pass must accept one value. A function that needs two arguments, such as an `add(a, b)`, does not fit this `operate`.
+
+| | Ordinary function | Higher order function |
+| --- | --- | --- |
+| Example here | `square`, `cube` | `operate` |
+| Receives | Values, such as 5 | At least one function, here together with a value or a list |
+| What it does | A fixed piece of work | Work that depends on the function it was given |
+
+## Additions beyond the lesson
+
+- **Returning a function counts too.** The lesson shows a function that receives a function. A function that returns a function is also a higher order function. You will meet that kind in [Inner Functions](/docs/python-one-shot/functional-python/inner-functions) and [Decorators](/docs/python-one-shot/functional-python/decorators).
+- **Python has higher order functions built in.** `sorted` accepts a function through its `key` argument and uses it to compare the items. Here `len` is passed, without brackets, so the names are sorted by length:
+
+```python
+>>> sorted(['telusko', 'navin', 'python'], key=len)
+['navin', 'python', 'telusko']
+```
+
+The next lessons use two more, in [The filter Function](/docs/python-one-shot/functional-python/filter-function) and [map and reduce](/docs/python-one-shot/functional-python/map-and-reduce).
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown, including the two variants where only the last line changes. For `operate(value, square)` the video shows no separate terminal output that can be told apart from the earlier run. The instructor says "it works", and the run for these docs printed 25. The error messages in the table below were produced by running the faulty lines.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `can't open file ... [Errno 2] No such file or directory` | The file name in the command is wrong, `higher_order.func.py` with a dot. This happens in the lesson | Type the name as it is saved: `python higher_order_func.py` |
+| The program prints `None` | The function calculates a value and has no `return`. This happens in the lesson | Write `return num * num` |
+| `NameError: name 'operation' is not defined` | `operation` was written in the call. It is only a parameter name inside `operate`. The editor warns about this in the lesson | Pass a real function: `operate(value, square)` |
+| `TypeError: square() missing 1 required positional argument: 'num'` | The function was called while passing it: `operate(value, square())` | Pass the name without brackets |
+| `TypeError: 'int' object is not callable` | The second argument is a number and not a function, for example `operate(5, 6)` | Pass a function as the second argument |
+| `TypeError: add() missing 1 required positional argument: 'b'` | The function passed needs two values, and `operate` calls it with one | Pass a function that accepts one value |
+| `NameError: name 'operate' is not defined` | The call is written and the function `operate` does not exist yet, or the call comes before the `def` | Define `operate` above the line that calls it |
+
+## Try It Yourself
+
+1. Type `square`, `cube` and the first `operate` from this lesson and get 25 and 125 for the value 5.
+2. Add a function `double(num)` that returns `num * 2`. Pass it to `operate` without changing `operate`.
+3. Add `print(operation)` as the first line of `operate` and run the program with `square` and then with `cube`. What do you see? The address at the end differs on every machine.
+4. Change the list to `[1,2,3,4]` and print the cubes with the list version of `operate`.
+5. Change the list version so that `operate` collects the results in a new list with `append` and returns that list. Print the returned list.
+6. Call `operate(value, square())` on purpose. Read the error and explain it in one sentence.
+7. Write a function `apply_twice(num, operation)` that returns `operation(operation(num))`. What does `apply_twice(2, square)` give? What about `apply_twice(2, cube)`?
+8. Write `show(nums, check)` that prints only the numbers for which `check(number)` returns `True`. Test it with a function `is_even(num)`.
+
+## Official references
+
+- [Python tutorial: defining functions](https://docs.python.org/3/tutorial/controlflow.html#defining-functions)
+- [Python HOWTO: functional programming](https://docs.python.org/3/howto/functional.html)
+- [Python documentation: sorted](https://docs.python.org/3/builtins/functions.html#sorted)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

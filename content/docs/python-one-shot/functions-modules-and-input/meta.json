@@ -1,0 +1,9 @@
+{
+  "title": "Functions, Modules and Input",
+  "pages": [
+    "introduction-to-functions.mdx",
+    "the-math-module.mdx",
+    "swapping-variables.mdx",
+    "user-input.mdx"
+  ]
+}

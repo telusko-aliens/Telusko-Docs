@@ -1,0 +1,415 @@
+---
+title: Lists
+description: Store many values in one variable with a list, read them by index and slice, and change the list with append, insert, remove, pop, del, extend, reverse and sort.
+---
+
+<Video id="j_JuhAWlEaI" title="Lists" start={3952} />
+
+---
+
+Storing one value is easy. You pick a name and assign the value, as in `num1 = 65`. You have done that since [IDLE and Number Operations](/docs/python-one-shot/python-basics/idle-and-number-operations).
+
+Real programs rarely deal with one value. They deal with the marks of a whole class, the names of all users, the prices of every item in a cart. Creating a separate variable for each value does not work when there are hundreds of them.
+
+Python has a type for this job, the **list**. A list is a collection of values kept in one variable. This lesson creates lists, reads values out of them, and then changes them in every way a list allows.
+
+<Callout type="info" title="This lesson uses IDLE">
+Until now the lesson typed into the Python prompt inside the terminal. From here it uses **IDLE**, the small Python window you met earlier. The prompt is the same `>>>`, and every line on this page works in both places.
+
+IDLE adds one helpful feature for this topic. When you type a variable name and a dot, such as `nums.`, and wait about two seconds, a small list of everything you can do with that value pops up. If it does not appear, press Ctrl+Space.
+
+Two things are different from the terminal. In a fresh IDLE the up arrow key does not bring back the previous line. The keys for that are Alt+P for the previous line and Alt+N for the next one. And you cannot clear the IDLE window, so the lesson presses Enter a few times to get some space.
+</Callout>
+
+## Step 1: Create a list
+
+One number in one variable looks like this:
+
+```python
+>>> num1 = 65
+>>> num1
+65
+```
+
+For many numbers, write them between **square brackets**, separated by commas:
+
+```python
+>>> nums = [45,87,21,24,99]
+>>> nums
+[45, 87, 21, 24, 99]
+```
+
+`nums` is one variable that holds five values. The name does not matter. The square brackets make it a list.
+
+Python prints the list with a space after each comma. You can type it with or without those spaces. The result is the same list.
+
+<Callout type="info" title="What happens without the brackets">
+The instructor first types `nums = 45,87,21,24,99` and adds the brackets before pressing Enter. He mentions that the line also works without them, and that it then creates a different data type. That type is the tuple, the topic of the next lesson, [Tuples](/docs/python-one-shot/data-structures-and-types/tuples).
+</Callout>
+
+## Step 2: Fetch one value with its index
+
+Printing the whole list is easy. To get one value out of it, use its **index**, the position number of the value. You saw index numbers with strings in [More on Strings](/docs/python-one-shot/python-basics/more-on-strings). A string is a collection of characters, a list is a collection of values, and both number their positions the same way.
+
+Write the name of the list, then the index in square brackets:
+
+```python
+>>> nums = [45,87,21,24,99]
+>>> nums[0]
+45
+```
+
+Counting starts at 0, so `nums[0]` is the first value. To print the 99, the instructor tries index 5, because the list has five values:
+
+{/* check: skip */}
+```python
+>>> nums = [45,87,21,24,99]
+>>> nums[5]
+Traceback (most recent call last):
+  File "<python-input-1>", line 1, in <module>
+    nums[5]
+    ~~~~^^^
+IndexError: list index out of range
+```
+
+Five values have the indexes 0, 1, 2, 3 and 4. There is no index 5, and Python says so: `list index out of range`. The last index is always one less than the number of values.
+
+```python
+>>> nums = [45,87,21,24,99]
+>>> nums[4]
+99
+>>> nums[-1]
+99
+```
+
+Negative indexes count from the end. `-1` is the last value, `-2` the one before it, and so on. This is handy when you do not know how long the list is.
+
+![List_Index_Numbers](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-list-index.svg)
+
+<Callout type="info" title="Which bracket goes where">
+The instructor's advice here: programming is close to English, and a large part of the work is remembering which bracket to use where. For a list it is square brackets, both to create the list and to ask for an index.
+</Callout>
+
+## Step 3: Take a slice
+
+A **slice** is a part of a list. You write the index where the part starts, a colon, and the index where it stops. The stop index itself is not included.
+
+```python
+>>> nums = [45,87,21,24,99]
+>>> nums[2:4]
+[21, 24]
+>>> nums[2:]
+[21, 24, 99]
+```
+
+To get 21 and 24, which sit at index 2 and 3, the slice is `[2:4]`, because 4 is excluded. If you leave out the stop index, the slice runs to the end of the list.
+
+A single index gives you one value. A slice always gives you a list, even a short one.
+
+## Step 4: Strings and mixed values
+
+A list is not limited to numbers. Here is a list of strings:
+
+```python
+>>> names = ['navin','harsh','kiran']
+>>> names
+['navin', 'harsh', 'kiran']
+```
+
+Every string needs its own quotes.
+
+One list can also hold values of different types, here a string, a whole number and a float:
+
+```python
+>>> mix = ['navin',67,6.5]
+>>> mix
+['navin', 67, 6.5]
+```
+
+Some languages demand that all values in a collection have the same type. A Python list has no such rule.
+
+## Step 5: Combine two lists
+
+"Combine" can mean two different things, and the lesson shows both.
+
+### A list inside a list
+
+```python
+>>> nums = [45,87,21,24,99]
+>>> names = ['navin','harsh','kiran']
+>>> mix = [nums, names]
+>>> mix
+[[45, 87, 21, 24, 99], ['navin', 'harsh', 'kiran']]
+>>> mix[0]
+[45, 87, 21, 24, 99]
+>>> len(mix)
+2
+```
+
+Look at the brackets in the output. There is one outer list, and inside it there are two lists. So `mix` has two elements only, and `len(mix)` confirms it. That is why `mix[0]` is not 45. It is the whole first list.
+
+To reach a value inside an inner list, use two indexes. The first one picks the inner list, the second one picks the value in it:
+
+```python
+>>> nums = [45,87,21,24,99]
+>>> names = ['navin','harsh','kiran']
+>>> mix = [nums, names]
+>>> mix[0][0]
+45
+>>> mix[1][2]
+'kiran'
+```
+
+| Expression | Read it as | Result |
+| --- | --- | --- |
+| `mix[0]` | The first element of `mix` | `[45, 87, 21, 24, 99]` |
+| `mix[0][0]` | The first element of `mix`, then its first value | `45` |
+| `mix[1]` | The second element of `mix` | `['navin', 'harsh', 'kiran']` |
+| `mix[1][2]` | The second element of `mix`, then its value at index 2 | `'kiran'` |
+
+### One flat list with +
+
+If you want a single list with all the values, add the two lists:
+
+```python
+>>> nums = [45,87,21,24,99]
+>>> names = ['navin','harsh','kiran']
+>>> mix = nums + names
+>>> mix
+[45, 87, 21, 24, 99, 'navin', 'harsh', 'kiran']
+>>> len(mix)
+8
+```
+
+The last line is an addition to the lesson. It shows the difference from the list of lists: this `mix` has eight elements.
+
+## Step 6: Add values with append and insert
+
+The lesson restarts IDLE at this point and enters a new `nums` list. The values are different from the ones above.
+
+Type `nums.` in IDLE and the popup shows what a list can do: `append`, `clear`, `copy`, `count`, `extend`, `index`, `insert`, `pop`, `remove`, `reverse` and, at the end, `sort`. These are called **methods**. A method is a function that belongs to a value. You call it with a dot after the value.
+
+```python
+>>> nums = [23,56,14,36,45]
+>>> nums.append(33)
+>>> nums
+[23, 56, 14, 36, 45, 33]
+>>> nums.count(14)
+1
+>>> nums.count(15)
+0
+>>> nums.insert(1,55)
+>>> nums
+[23, 55, 56, 14, 36, 45, 33]
+```
+
+- `append(33)` adds 33 at the end of the list.
+- `count(14)` tells you how many times 14 occurs. There is one 14 and no 15.
+- `insert(1,55)` puts 55 at index 1. The first number is the index, the second is the value. The 56 that was at index 1, and everything after it, moves one place to the right.
+
+`append` and `insert` print nothing. They change the list and return nothing to show. Type `nums` to see the result.
+
+`count` needs to know what to count. In the lesson it is first called with empty brackets:
+
+{/* check: skip */}
+```python
+>>> nums = [23,56,14,36,45,33]
+>>> nums.count()
+Traceback (most recent call last):
+  File "<python-input-1>", line 1, in <module>
+    nums.count()
+    ~~~~~~~~~~^^
+TypeError: list.count() takes exactly one argument (0 given)
+```
+
+An **argument** is a value you pass to a function inside its brackets. The message says that `count` wants exactly one, and got none.
+
+### Lists are mutable
+
+In [More on Strings](/docs/python-one-shot/python-basics/more-on-strings) you tried to change a part of a string, and Python refused. A string is **immutable**, which means it cannot be changed after it is created.
+
+A list is **mutable**. Mutable means it can be changed. That is why `append` and `insert` work, and why everything in the next steps works too.
+
+## Step 7: Remove values with remove, pop and del
+
+After Step 6 the list is `[23, 55, 56, 14, 36, 45, 33]`.
+
+```python
+>>> nums = [23, 55, 56, 14, 36, 45, 33]
+>>> nums.remove(56)
+>>> nums
+[23, 55, 14, 36, 45, 33]
+>>> nums.pop(4)
+45
+>>> nums
+[23, 55, 14, 36, 33]
+>>> nums.pop()
+33
+>>> del nums[2:4]
+>>> nums
+[23, 55]
+```
+
+There are three ways to remove, and they differ in what you tell Python:
+
+| Code | You give | What it does |
+| --- | --- | --- |
+| `nums.remove(56)` | A value | Removes the value 56. Prints nothing |
+| `nums.pop(4)` | An index | Removes the value at index 4 and gives it back, here 45 |
+| `nums.pop()` | Nothing | Removes the last value and gives it back, here 33 |
+| `del nums[2:4]` | A slice | Deletes the values at index 2 and 3. Prints nothing |
+
+`del` is a Python keyword, not a method, so it is written before the list and without a dot.
+
+After `nums.pop()` the list is `[23, 55, 14, 36]`. Index 2 holds 14 and index 3 holds 36, and the stop index 4 is excluded as in every slice. So `del nums[2:4]` removes 14 and 36, and only `[23, 55]` is left. The instructor hesitates for a moment at this output in the video and then confirms the same result.
+
+<Callout type="info" title="Why the method is called pop">
+A **stack** is a way of organising data in which the value that was added last is taken out first. This rule is called last in, first out. Think of a stack of books: the last book you put on top is the first one you take off. Taking a value off a stack is called popping, and `pop()` without an index does exactly that with the last value of a list.
+</Callout>
+
+## Step 8: Add or replace several values
+
+`append` and `insert` add one value. To add several at once, pass a list to `extend`:
+
+```python
+>>> nums = [23, 55]
+>>> nums.extend([44,56,11,99])
+>>> nums
+[23, 55, 44, 56, 11, 99]
+>>> nums[2:4] = [54,76]
+>>> nums
+[23, 55, 54, 76, 11, 99]
+```
+
+The fourth line assigns to a slice. `nums[2:4]` stands for the values at index 2 and 3, which are 44 and 56, and the assignment replaces them with 54 and 76.
+
+This is the exact operation that failed for a string in the earlier lesson. It works here because a list is mutable.
+
+## Step 9: Reverse, sort, min, max and sum
+
+```python
+>>> nums = [23, 55, 54, 76, 11, 99]
+>>> nums.reverse()
+>>> nums
+[99, 11, 76, 54, 55, 23]
+>>> nums.sort()
+>>> nums
+[11, 23, 54, 55, 76, 99]
+>>> min(nums)
+11
+>>> max(nums)
+99
+>>> sum(nums)
+318
+```
+
+`reverse()` turns the order around. `sort()` puts the values in order, smallest first. Both change the list itself and print nothing.
+
+`min`, `max` and `sum` are different. They are built-in functions of Python, not methods of the list. You pass the list to them in round brackets, and they return the smallest value, the largest value and the total.
+
+`min` also works on a list of strings:
+
+```python
+>>> names = ['navin','harsh','kiran']
+>>> min(names)
+'harsh'
+```
+
+Strings are compared in alphabetical order. `h` comes before `k` and `n`, so `'harsh'` is the minimum. By the same rule `max(names)` gives `'navin'`, as the instructor says without running it.
+
+A total of names makes no sense, and Python agrees:
+
+{/* check: skip */}
+```python
+>>> names = ['navin','harsh','kiran']
+>>> sum(names)
+Traceback (most recent call last):
+  File "<python-input-1>", line 1, in <module>
+    sum(names)
+    ~~~^^^^^^^
+TypeError: unsupported operand type(s) for +: 'int' and 'str'
+```
+
+`sum` starts at the number 0 and adds each value to it. Adding the string `'navin'` to the number 0 is not possible. `int` is Python's name for a whole number and `str` its name for a string.
+
+## List operations in this lesson
+
+| Code | What it does | Changes the list |
+| --- | --- | --- |
+| `nums[0]`, `nums[-1]` | Reads one value by index | No |
+| `nums[2:4]` | Reads a slice | No |
+| `len(nums)` | Number of elements | No |
+| `nums + names` | A new list with the values of both | No |
+| `nums.append(33)` | Adds a value at the end | Yes |
+| `nums.insert(1,55)` | Adds a value at an index | Yes |
+| `nums.extend([44,56])` | Adds several values at the end | Yes |
+| `nums.count(14)` | How many times a value occurs | No |
+| `nums.remove(56)` | Removes a value | Yes |
+| `nums.pop(4)`, `nums.pop()` | Removes by index, or the last value, and returns it | Yes |
+| `del nums[2:4]` | Deletes a slice | Yes |
+| `nums[2:4] = [54,76]` | Replaces a slice | Yes |
+| `nums.reverse()`, `nums.sort()` | Reverses or sorts | Yes |
+| `min(nums)`, `max(nums)`, `sum(nums)` | Smallest, largest, total | No |
+
+## Additions beyond the lesson
+
+The instructor mentions that a list can also find the index of a value, and does not run it. The method is `index`:
+
+```python
+>>> nums = [23,56,14,36,45]
+>>> nums.index(14)
+2
+```
+
+`remove` needs a value that is in the list. For a value that is not there, it stops with an error:
+
+{/* check: skip */}
+```python
+>>> nums = [23,56,14,36,45]
+>>> nums.remove(100)
+Traceback (most recent call last):
+  File "<python-input-1>", line 1, in <module>
+    nums.remove(100)
+    ~~~~~~~~~~~^^^^^
+ValueError: list.remove(x): x not in list
+```
+
+<Callout type="info" title="Checked for these docs">
+Every prompt session on this page was run again with Python 3.13, and each line gave the result shown. The four sessions that end in an error were run by hand. The lesson runs them in IDLE. This page shows them as the plain Python 3.13 prompt prints them, so the middle lines can look a little different from the video. The last line, which names the error, is the same in both. The number in `<python-input-1>` counts the lines you have typed, so yours may differ.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `IndexError: list index out of range` | The index does not exist, such as `nums[5]` in a list of five values. This happens in the lesson | Use an index from 0 to the length minus 1, or `-1` for the last value |
+| `TypeError: list.count() takes exactly one argument (0 given)` | `count()` was called with empty brackets. This happens in the lesson | Pass the value to count, as in `nums.count(14)` |
+| `TypeError: unsupported operand type(s) for +: 'int' and 'str'` | `sum` was used on a list of strings. This is shown in the lesson | Use `sum` on lists of numbers only |
+| `TypeError: insert expected 2 arguments, got 1` | `insert` was given the value only, as in `nums.insert(55)`. The instructor types this and corrects it before pressing Enter | Give the index first, then the value: `nums.insert(1,55)` |
+| `ValueError: list.remove(x): x not in list` | The value passed to `remove` is not in the list | Check with `nums.count(value)` first, or remove a value that exists |
+| `mix[0]` gives a whole list and not 45 | `mix` is a list of lists, so its first element is a list | Use two indexes, `mix[0][0]` |
+| `nums` is not a list after `nums = 45,87,21` | Without square brackets Python creates a tuple. The instructor starts to type this in the lesson | Put the values in `[ ]` |
+| Nothing is printed after `nums.append(33)` or `nums.sort()` | These methods change the list and return nothing to show | Type `nums` to see the list |
+| The up arrow does not bring back the last line in IDLE | IDLE uses other keys by default. This happens in the lesson | Press Alt+P for the previous line and Alt+N for the next |
+
+## Try It Yourself
+
+1. Create a list `marks` with the values 72, 85, 64, 91 and 58. Print the first value, the last value with a negative index, and the number of values with `len`.
+2. From `marks`, print a slice with the second and third value. Then print everything from index 2 to the end.
+3. Create `cities` with three city names. Build `both = [marks, cities]` and fetch the second city with two indexes. What does `len(both)` give, and why?
+4. Build `flat = marks + cities` and compare `len(flat)` with `len(both)`.
+5. Add 77 to the end of `marks` with `append`, then put 100 at index 0 with `insert`. Print the list after each line.
+6. Remove 64 with `remove`, the value at index 1 with `pop`, and the last value with `pop()`. Before each line, write down what you expect the list to be.
+7. Start with `nums = [5, 3, 9]`. Add 8, 1 and 7 in one line with `extend`, replace the first two values with a slice assignment, then sort the list and print `min`, `max` and `sum`.
+8. Type `marks[10]` and `sum(cities)`. Read both error messages and say in your own words what each one means.
+
+## Official references
+
+- [Python tutorial: lists](https://docs.python.org/3/tutorial/introduction.html#lists)
+- [Python tutorial: more on lists](https://docs.python.org/3/tutorial/datastructures.html#more-on-lists)
+- [Python tutorial: the del statement](https://docs.python.org/3/tutorial/datastructures.html#the-del-statement)
+- [Python library: lists](https://docs.python.org/3/builtins/stdtypes.html#lists)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>

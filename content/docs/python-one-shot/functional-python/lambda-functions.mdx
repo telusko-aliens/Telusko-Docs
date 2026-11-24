@@ -1,0 +1,255 @@
+---
+title: Lambda Functions
+description: Write small functions without a name using the lambda keyword, see how a lambda compares with def, and learn the one rule that limits it to a single expression.
+---
+
+<Video id="j_JuhAWlEaI" title="Lambda Functions" start={17934} />
+
+---
+
+You can create a function, call it, pass values to it, and since [Higher Order Functions](/docs/python-one-shot/functional-python/higher-order-functions) you can even pass a function to a function. It may feel like enough about functions.
+
+There is one more idea: the **anonymous function**. Anonymous means without a name. Python creates such a function with the keyword `lambda`.
+
+Why would anyone want a function without a name? The lesson gives two reasons. Sometimes a function is needed only once, in one place, and a name for it adds nothing. And when the whole body is one expression, two lines of `def` and `return` are more ceremony than the work deserves.
+
+## Step 1: Start with a normal function
+
+Create a file named `lambda_demo.py`. The lesson writes the call first: a function that receives 5 and should give back its square.
+
+At that moment the program cannot work, because the function does not exist yet. The instructor first calls it `func`, finds that awkward to say, and settles on `fun`:
+
+```python title="lambda_demo.py"
+def fun(num):
+    return num * num
+
+result = fun(5)
+print(result)
+```
+
+```text
+25
+```
+
+This is a normal function. It has a name, one parameter and a body of one line.
+
+### One line with def
+
+Python lets you put a body of one simple statement on the same line as the `def`:
+
+```python title="lambda_demo.py"
+def fun(num): return num * num
+
+result = fun(5)
+print(result)
+```
+
+```text
+25
+```
+
+The instructor is not sure that this even runs, then says that it works and that it does not look good. Both points are right. It runs, and Python programmers rarely write it this way. There is a better tool for one-line functions.
+
+## Step 2: A function can be assigned to a variable
+
+Before the new syntax, the lesson fills a gap. In the previous lesson, `square` was passed to `operate`. If a function can be passed, it can also be assigned:
+
+```python title="lambda_demo.py"
+def fun(num):
+    return num * num
+
+square = fun
+
+result = square(5)
+print(result)
+```
+
+```text
+25
+```
+
+`square = fun` has no brackets, so nothing is called. The line gives the same function a second name. After it, `square(5)` and `fun(5)` do the same work.
+
+Keep this in mind for the next step: a function is a value, and a variable can hold it.
+
+## Step 3: The same function as a lambda
+
+What matters in a function? The instructor's answer: the name can be anything. The important parts are the parameter and the expression, which is the calculation done with the parameter.
+
+So the lesson comments out the `def` and tries to write only those two parts, with a colon between them:
+
+```python
+fun = num : num * num
+```
+
+The editor marks the line with errors, and Python would refuse it with `SyntaxError: invalid syntax`. One word is missing. The keyword `lambda` tells Python that a function starts here:
+
+```python title="lambda_demo.py"
+# def fun(num):
+#     return num * num
+
+fun = lambda num : num * num
+
+result = fun(5)
+print(result)
+```
+
+```text
+25
+```
+
+Compare the two forms piece by piece:
+
+| Piece | With `def` | With `lambda` |
+| --- | --- | --- |
+| Keyword | `def` | `lambda` |
+| Name | `fun`, required | None |
+| Parameters | In brackets: `(num)` | No brackets: `num` |
+| Body | One or more statements | Exactly one expression |
+| Giving back the result | `return num * num` | The value of the expression is returned. There is no `return` keyword |
+
+![Lambda_Function_Parts](https://dyz1pdcuffwr5.cloudfront.net/PythonOneShot/py1s-lambda.svg)
+
+### Why it is called anonymous
+
+Look only at the right side of the `=`: `lambda num : num * num`. That part is the function, and it has no name.
+
+In this lesson it is assigned to the variable `fun`, so there is a name to call it by. That is done here to make the lambda easy to test. In the coming lessons the lambda is not assigned at all. It is written directly in the place where a function is needed, for example as an argument in [The filter Function](/docs/python-one-shot/functional-python/filter-function) and [map and reduce](/docs/python-one-shot/functional-python/map-and-reduce).
+
+## Step 4: A lambda with two parameters
+
+To show what kind of expression fits, the lesson adds a second example. First as a normal function:
+
+```python title="lambda_demo.py"
+# def fun(num):
+#     return num * num
+
+def add(a,b):
+    return a+b
+
+fun = lambda num : num * num
+
+result = fun(5)
+print(result)
+
+result2 = add(4,5)
+print(result2)
+```
+
+```text
+25
+9
+```
+
+Two lines again for one expression. Now the same `add` as a lambda:
+
+```python title="lambda_demo.py"
+# def fun(num):
+#     return num * num
+
+# def add(a,b):
+#     return a+b
+
+fun = lambda num : num * num
+
+result = fun(5)
+print(result)
+
+add = lambda a,b : a + b
+
+result2 = add(4,5)
+print(result2)
+```
+
+```text
+25
+9
+```
+
+A lambda is not limited to one parameter. Write as many as you need, separated by commas, then the colon, then the expression.
+
+## The one rule: a single expression
+
+The instructor sums it up as "no return keyword, nothing, just the expression". That is the rule that defines a lambda. Its body is a single expression, and the value of that expression is what the lambda returns.
+
+An expression is a piece of code that produces a value, such as `num * num` or `a + b`. Statements are not allowed in a lambda. You cannot write an assignment, a `for` loop, a `return` or a second line. If a function needs any of those, write it with `def`.
+
+| Use `lambda` when | Use `def` when |
+| --- | --- |
+| The body is one expression | The body needs several lines or statements |
+| The function is used once, in one place | The function is called from several places |
+| A name would add nothing | A good name makes the code easier to read |
+
+## Additions beyond the lesson
+
+- **A lambda passed directly.** This is what the coming lessons do. Here is `operate` from the previous lesson, called with a lambda in the place of `square`. The function is created in the call itself and never gets a name:
+
+```python title="lambda_direct.py"
+def operate(nums, operation):
+
+    for i in nums:
+        result = operation(i)
+        print(result)
+
+
+nums = [5,6,7]
+operate(nums, lambda num : num * num)
+```
+
+```text
+25
+36
+49
+```
+
+- **Python sees no name either.** Print a function made with `def` and one made with `lambda`. The first shows its name. The second shows only the word lambda in angle brackets. The addresses at the end differ on every machine and every run:
+
+{/* check: skip */}
+```python
+>>> def fun(num):
+...     return num * num
+...
+>>> fun
+<function fun at 0x00000146FE737920>
+>>> lambda num : num * num
+<function <lambda> at 0x00000146FE7379C0>
+```
+
+- **Spacing and style.** The video writes a space before the colon: `lambda num : num * num`. Python accepts that. Most Python code is written without that space: `lambda num: num * num`. Python's style guide also suggests `def` whenever a function gets a name, as in `fun = lambda ...`. Assigning a lambda to a name is fine for learning how it works, which is what this lesson does.
+
+<Callout type="info" title="Checked for these docs">
+Every program on this page was run with Python 3.13 and gave the output shown. That includes the one-line `def`, for which the video shows no separate run. The `SyntaxError` for the line without the keyword `lambda` and the other messages in the table below were produced by running the faulty lines. The session that prints the two functions was run separately at a prompt, because its addresses change with every run.
+</Callout>
+
+## Mistakes and fixes
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| `NameError: name 'func' is not defined` | The function is called before it exists, or under another name. The lesson first writes `func(5)` and later names the function `fun` | Define the function above the call and use the same name in both places |
+| `NameError: name 'fun' is not defined` | The `def` was commented out and nothing replaced it. The editor underlines `fun` in the lesson | Remove the `#` signs or write the lambda |
+| `SyntaxError: invalid syntax` at the colon | `fun = num : num * num`, the keyword is missing. This happens in the lesson | Write `fun = lambda num : num * num` |
+| `IndentationError: expected an indented block after function definition on line 1` | `return` on its own line without indentation. It shows for a moment in the lesson's editor while two lines are joined. The line number in the message depends on your file | Indent the body, or put it on the `def` line |
+| `SyntaxError: invalid syntax` at `return` | `lambda num : return num * num` | Leave out `return`. A lambda returns the value of its expression |
+| `TypeError: <lambda>() missing 1 required positional argument: 'b'` | A lambda with two parameters was called with one value, such as `add(4)` | Pass a value for every parameter |
+| The program prints something like `<function <lambda> at 0x...>` | The lambda was printed without being called | Call it with brackets and arguments: `print(fun(5))` |
+
+## Try It Yourself
+
+1. Write `fun` as a normal function, then as a one-line `def`, then as a lambda. Check that each version prints 25 for 5.
+2. Write a lambda `cube` that returns the cube of a number and print `cube(3)`.
+3. Write a lambda `add3` with three parameters that returns their sum. Test it with 1, 2 and 3.
+4. Write a lambda `is_even` that returns `True` for an even number and `False` for an odd one. Use the `%` operator.
+5. Remove the word `lambda` from one of your lines and run the file. Read the error message, then repair the line.
+6. Take the list version of `operate` from the previous lesson and call it with a lambda that doubles each number.
+7. Assign your lambda `cube` to a second variable named `power3`, as the lesson does with `square = fun`, and call it through the new name.
+8. Try to write a lambda that contains `return`. Read the error and say in one sentence why Python refuses it.
+
+## Official references
+
+- [Python tutorial: lambda expressions](https://docs.python.org/3/tutorial/controlflow.html#lambda-expressions)
+- [Python reference: lambdas](https://docs.python.org/3/reference/expressions.html#lambda)
+- [Python HOWTO: small functions and the lambda expression](https://docs.python.org/3/howto/functional.html#small-functions-and-the-lambda-expression)
+
+---
+
+Written By: <a href="https://www.linkedin.com/in/shramik-masti-5bb3a1212/" className="text-blue-600 dark:text-blue-400 hover:opacity-80 no-underline inline-flex items-center gap-1" target="_blank" rel="noopener noreferrer"> Shramik Masti <ExternalLink className="w-4 h-4" /></a>
